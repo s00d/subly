@@ -88,7 +88,7 @@ export default {
   payment_history: "Ödeme Geçmişi", record_payment: "Ödeme Kaydet",
   payment_recorded: "Ödeme kaydedildi, sonraki tarih güncellendi", add_payment: "Ödeme Kaydı Ekle",
   no_payment_records: "Ödeme kaydı yok", note_optional: "Not (isteğe bağlı)",
-  recurring_notifications: "Tekrarlayan Hatırlatmalar", recurring_notifications_info: "Ödemeye kadar günlük hatırlatma gönder.",
+  recurring_notifications: "Tekrarlayan Hatırlatmalar", recurring_notifications_info: "Ödemeye kadar günlük hatırlatma gönder.", notification_sound: "Bildirim sesi", notification_sound_info: "Ödeme hatırlatmasında ses çal.", test_sound: "Sesi test et",
   notification_schedule: "Bildirim Zamanı", notification_schedule_info: "Bildirimlerin ne zaman gönderileceğini seçin.",
   schedule_any: "Her Zaman", schedule_morning: "Sabah (7–12)", schedule_evening: "Akşam (17–22)",
   schedule_custom: "Özel Saat", hour: "Saat",

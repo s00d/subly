@@ -88,7 +88,7 @@ export default {
   payment_history: "결제 내역", record_payment: "결제 기록",
   payment_recorded: "결제가 기록되었습니다. 다음 날짜가 업데이트되었습니다", add_payment: "결제 기록 추가",
   no_payment_records: "결제 기록이 없습니다", note_optional: "메모 (선택사항)",
-  recurring_notifications: "반복 알림", recurring_notifications_info: "결제까지 매일 알림을 보냅니다.",
+  recurring_notifications: "반복 알림", recurring_notifications_info: "결제까지 매일 알림을 보냅니다.", notification_sound: "알림 소리", notification_sound_info: "결제 알림 시 소리를 재생합니다.", test_sound: "소리 테스트",
   notification_schedule: "알림 시간", notification_schedule_info: "알림을 보낼 시간을 선택하세요.",
   schedule_any: "아무 때나", schedule_morning: "오전 (7–12)", schedule_evening: "저녁 (17–22)",
   schedule_custom: "사용자 정의 시간", hour: "시",

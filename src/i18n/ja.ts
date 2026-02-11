@@ -88,7 +88,7 @@ export default {
   payment_history: "支払い履歴", record_payment: "支払いを記録",
   payment_recorded: "支払いを記録し、次回日付を更新しました", add_payment: "支払い記録を追加",
   no_payment_records: "支払い記録はありません", note_optional: "メモ（任意）",
-  recurring_notifications: "繰り返しリマインダー", recurring_notifications_info: "支払いまで毎日リマインダーを送信します。",
+  recurring_notifications: "繰り返しリマインダー", recurring_notifications_info: "支払いまで毎日リマインダーを送信します。", notification_sound: "通知音", notification_sound_info: "支払いリマインダー時に音を鳴らします。", test_sound: "音をテスト",
   notification_schedule: "通知時間", notification_schedule_info: "通知を送信する時間を選択してください。",
   schedule_any: "いつでも", schedule_morning: "朝 (7–12)", schedule_evening: "夜 (17–22)",
   schedule_custom: "カスタム時間", hour: "時",

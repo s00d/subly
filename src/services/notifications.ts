@@ -6,6 +6,7 @@ import {
 import type { Subscription, Settings } from "@/schemas/appData";
 import { sendTelegramPaymentReminder, type TelegramConfig } from "@/services/telegram";
 import { formatCurrency } from "@/services/calculations";
+import { playNotificationSound } from "@/services/sound";
 
 // =============================================
 // Types
@@ -265,6 +266,11 @@ export async function checkAndNotify(
         if (onNotified) onNotified(sub.id, todayStr);
       }
     }
+  }
+
+  // Play sound once if any notifications were sent and sound is enabled
+  if (sentCount > 0 && settings.notificationSound !== false) {
+    playNotificationSound();
   }
 
   return { sentCount, alerts };

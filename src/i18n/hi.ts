@@ -88,7 +88,7 @@ export default {
   payment_history: "भुगतान इतिहास", record_payment: "भुगतान दर्ज करें",
   payment_recorded: "भुगतान दर्ज किया गया और अगली तिथि अपडेट की गई", add_payment: "भुगतान रिकॉर्ड जोड़ें",
   no_payment_records: "कोई भुगतान रिकॉर्ड नहीं", note_optional: "नोट (वैकल्पिक)",
-  recurring_notifications: "दोहराए जाने वाले अनुस्मारक", recurring_notifications_info: "भुगतान तक दैनिक अनुस्मारक भेजें।",
+  recurring_notifications: "दोहराए जाने वाले अनुस्मारक", recurring_notifications_info: "भुगतान तक दैनिक अनुस्मारक भेजें।", notification_sound: "सूचना ध्वनि", notification_sound_info: "भुगतान अनुस्मारक पर ध्वनि चलाएँ।", test_sound: "ध्वनि परीक्षण",
   notification_schedule: "सूचना समय", notification_schedule_info: "चुनें कि सूचनाएँ कब भेजी जाएँ।",
   schedule_any: "कभी भी", schedule_morning: "सुबह (7–12)", schedule_evening: "शाम (17–22)",
   schedule_custom: "कस्टम समय", hour: "घंटा",

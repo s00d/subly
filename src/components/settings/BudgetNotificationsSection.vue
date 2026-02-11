@@ -9,7 +9,8 @@ import AppSelect from "@/components/ui/AppSelect.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import { enable as enableAutostart, disable as disableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { sendTestNotification } from "@/services/notifications";
-import { Bell } from "lucide-vue-next";
+import { playNotificationSound } from "@/services/sound";
+import { Bell, Volume2 } from "lucide-vue-next";
 
 const store = useAppStore();
 const { t } = useI18n();
@@ -34,6 +35,16 @@ const recurringNotifications = ref(store.state.settings.recurringNotifications !
 function toggleRecurring() {
   recurringNotifications.value = !recurringNotifications.value;
   store.updateSettings({ recurringNotifications: recurringNotifications.value });
+}
+
+// --- Notification sound ---
+const notificationSound = ref(store.state.settings.notificationSound !== false);
+function toggleNotificationSound() {
+  notificationSound.value = !notificationSound.value;
+  store.updateSettings({ notificationSound: notificationSound.value });
+}
+function handleTestSound() {
+  playNotificationSound();
 }
 
 // --- Notification schedule ---
@@ -79,10 +90,13 @@ async function handleTestNotification() {
   testingSending.value = true;
   try {
     const result = await sendTestNotification();
+    // Play sound if enabled
+    if (store.state.settings.notificationSound !== false) {
+      playNotificationSound();
+    }
     if (result.system) {
       toast(t("test_notification_sent"));
     } else {
-      // System notification unavailable — show in-app only
       toast(t("test_notification_sent_inapp"));
     }
   } catch {
@@ -140,6 +154,25 @@ loadAutostartStatus();
         :label="t('recurring_notifications')"
         :description="t('recurring_notifications_info')"
       />
+    </div>
+
+    <!-- Notification sound -->
+    <div class="mb-4 flex items-center gap-3">
+      <div class="flex-1">
+        <AppToggle
+          :modelValue="notificationSound"
+          @update:modelValue="toggleNotificationSound"
+          :label="t('notification_sound')"
+          :description="t('notification_sound_info')"
+        />
+      </div>
+      <button
+        @click="handleTestSound"
+        class="p-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
+        :title="t('test_sound')"
+      >
+        <Volume2 :size="16" />
+      </button>
     </div>
 
     <!-- Notification schedule -->

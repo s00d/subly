@@ -299,6 +299,9 @@ export default {
   // Notification schedule
   recurring_notifications: "Повторяющиеся напоминания",
   recurring_notifications_info: "Отправлять напоминания каждый день до оплаты, а не только один раз.",
+  notification_sound: "Звук уведомлений",
+  notification_sound_info: "Воспроизводить звук при напоминании о платеже.",
+  test_sound: "Тест звука",
   notification_schedule: "Время уведомлений",
   notification_schedule_info: "Выберите, когда отправлять уведомления. «Любое» — при каждой проверке.",
   schedule_any: "Любое время",

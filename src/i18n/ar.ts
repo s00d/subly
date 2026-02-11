@@ -88,7 +88,7 @@ export default {
   payment_history: "سجل المدفوعات", record_payment: "تسجيل دفعة",
   payment_recorded: "تم تسجيل الدفعة وتحديث التاريخ التالي", add_payment: "إضافة سجل دفع",
   no_payment_records: "لا توجد سجلات دفع", note_optional: "ملاحظة (اختياري)",
-  recurring_notifications: "تذكيرات متكررة", recurring_notifications_info: "إرسال تذكيرات يومية حتى الدفع.",
+  recurring_notifications: "تذكيرات متكررة", recurring_notifications_info: "إرسال تذكيرات يومية حتى الدفع.", notification_sound: "صوت الإشعار", notification_sound_info: "تشغيل صوت عند تذكير الدفع.", test_sound: "اختبار الصوت",
   notification_schedule: "جدول الإشعارات", notification_schedule_info: "اختر وقت إرسال الإشعارات.",
   schedule_any: "أي وقت", schedule_morning: "صباحًا (7–12)", schedule_evening: "مساءً (17–22)",
   schedule_custom: "وقت مخصص", hour: "ساعة",

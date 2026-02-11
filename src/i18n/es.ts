@@ -89,7 +89,7 @@ export default {
   payment_recorded: "Pago registrado, próxima fecha actualizada", add_payment: "Agregar registro de pago",
   no_payment_records: "Sin registros de pago", note_optional: "Nota (opcional)",
   recurring_notifications: "Recordatorios recurrentes",
-  recurring_notifications_info: "Enviar recordatorios diarios hasta el pago.",
+  recurring_notifications_info: "Enviar recordatorios diarios hasta el pago.", notification_sound: "Sonido de notificación", notification_sound_info: "Reproducir un sonido al recibir un recordatorio de pago.", test_sound: "Probar sonido",
   notification_schedule: "Horario de notificaciones",
   notification_schedule_info: "Elige cuándo se envían las notificaciones.",
   schedule_any: "Cualquier hora", schedule_morning: "Mañana (7–12)", schedule_evening: "Noche (17–22)",

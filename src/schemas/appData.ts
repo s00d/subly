@@ -143,6 +143,7 @@ export const SettingsSchema = z.object({
   notificationSchedule: z.enum(["any", "morning", "evening", "custom"]).default("any"),
   notificationCustomHour: z.number().int().min(0).max(23).default(9),
   recurringNotifications: z.boolean().default(true),
+  notificationSound: z.boolean().default(true),
   currencyAutoUpdate: z.boolean().default(false),
   currencyUpdateTargets: z.array(z.string()).default([]),       // currency IDs to auto-update
   lastCurrencyUpdate: z.string().default(""),                   // ISO date of last rate fetch
@@ -236,6 +237,7 @@ export const AppDataSchema = z.object({
     notificationSchedule: "any",
     notificationCustomHour: 9,
     recurringNotifications: true,
+    notificationSound: true,
     currencyAutoUpdate: false,
     currencyUpdateTargets: [],
     lastCurrencyUpdate: "",

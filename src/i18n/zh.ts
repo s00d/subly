@@ -299,6 +299,9 @@ export default {
   // Notification schedule
   recurring_notifications: "重复提醒",
   recurring_notifications_info: "每天发送提醒直到付款，而非仅一次。",
+  notification_sound: "通知声音",
+  notification_sound_info: "收到付款提醒时播放声音。",
+  test_sound: "测试声音",
   notification_schedule: "通知时间",
   notification_schedule_info: "选择通知发送时间。'任何时间'在每次检查时发送。",
   schedule_any: "任何时间",

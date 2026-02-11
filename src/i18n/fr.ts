@@ -88,7 +88,7 @@ export default {
   payment_history: "Historique des paiements", record_payment: "Enregistrer un paiement",
   payment_recorded: "Paiement enregistré, prochaine date mise à jour", add_payment: "Ajouter un paiement",
   no_payment_records: "Aucun paiement enregistré", note_optional: "Note (facultatif)",
-  recurring_notifications: "Rappels récurrents", recurring_notifications_info: "Envoyer des rappels quotidiens jusqu'au paiement.",
+  recurring_notifications: "Rappels récurrents", recurring_notifications_info: "Envoyer des rappels quotidiens jusqu'au paiement.", notification_sound: "Son de notification", notification_sound_info: "Jouer un son lors d'un rappel de paiement.", test_sound: "Tester le son",
   notification_schedule: "Horaire des notifications", notification_schedule_info: "Choisissez quand les notifications sont envoyées.",
   schedule_any: "N'importe quand", schedule_morning: "Matin (7–12)", schedule_evening: "Soir (17–22)",
   schedule_custom: "Heure personnalisée", hour: "Heure",

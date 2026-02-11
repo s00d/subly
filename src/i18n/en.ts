@@ -299,6 +299,9 @@ export default {
   // Notification schedule
   recurring_notifications: "Recurring reminders",
   recurring_notifications_info: "Send reminders every day until payment, not just once.",
+  notification_sound: "Notification sound",
+  notification_sound_info: "Play a sound when a payment reminder is triggered.",
+  test_sound: "Test sound",
   notification_schedule: "Notification time",
   notification_schedule_info: "Choose when notifications are sent. 'Any' sends at each check interval.",
   schedule_any: "Any time",
