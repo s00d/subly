@@ -1,0 +1,258 @@
+@import "tailwindcss";
+
+@theme {
+  /* Color scheme - Blue (default) */
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-light: #dbeafe;
+  --color-accent: #3b82f6;
+
+  /* Surfaces */
+  --color-surface: #ffffff;
+  --color-surface-secondary: #f8fafc;
+  --color-surface-hover: #f1f5f9;
+  --color-border: #e2e8f0;
+
+  /* Text */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94a3b8;
+
+  /* Status */
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-danger: #ef4444;
+  --color-info: #06b6d4;
+}
+
+/* Dark theme overrides */
+.dark {
+  --color-surface: #1e293b;
+  --color-surface-secondary: #0f172a;
+  --color-surface-hover: #334155;
+  --color-border: #334155;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  --color-primary-light: #1e3a5f;
+}
+
+/* Color themes */
+.theme-green {
+  --color-primary: #16a34a;
+  --color-primary-hover: #15803d;
+  --color-primary-light: #dcfce7;
+  --color-accent: #22c55e;
+}
+.dark .theme-green {
+  --color-primary-light: #14532d;
+}
+
+.theme-red {
+  --color-primary: #dc2626;
+  --color-primary-hover: #b91c1c;
+  --color-primary-light: #fee2e2;
+  --color-accent: #ef4444;
+}
+.dark .theme-red {
+  --color-primary-light: #450a0a;
+}
+
+.theme-yellow {
+  --color-primary: #d97706;
+  --color-primary-hover: #b45309;
+  --color-primary-light: #fef3c7;
+  --color-accent: #f59e0b;
+}
+.dark .theme-yellow {
+  --color-primary-light: #451a03;
+}
+
+.theme-purple {
+  --color-primary: #7c3aed;
+  --color-primary-hover: #6d28d9;
+  --color-primary-light: #ede9fe;
+  --color-accent: #8b5cf6;
+}
+.dark .theme-purple {
+  --color-primary-light: #2e1065;
+}
+
+.theme-indigo {
+  --color-primary: #4f46e5;
+  --color-primary-hover: #4338ca;
+  --color-primary-light: #e0e7ff;
+  --color-accent: #6366f1;
+}
+.dark .theme-indigo {
+  --color-primary-light: #1e1b4b;
+}
+
+.theme-pink {
+  --color-primary: #db2777;
+  --color-primary-hover: #be185d;
+  --color-primary-light: #fce7f3;
+  --color-accent: #ec4899;
+}
+.dark .theme-pink {
+  --color-primary-light: #500724;
+}
+
+.theme-rose {
+  --color-primary: #e11d48;
+  --color-primary-hover: #be123c;
+  --color-primary-light: #ffe4e6;
+  --color-accent: #f43f5e;
+}
+.dark .theme-rose {
+  --color-primary-light: #4c0519;
+}
+
+.theme-orange {
+  --color-primary: #ea580c;
+  --color-primary-hover: #c2410c;
+  --color-primary-light: #fff7ed;
+  --color-accent: #f97316;
+}
+.dark .theme-orange {
+  --color-primary-light: #431407;
+}
+
+.theme-teal {
+  --color-primary: #0d9488;
+  --color-primary-hover: #0f766e;
+  --color-primary-light: #ccfbf1;
+  --color-accent: #14b8a6;
+}
+.dark .theme-teal {
+  --color-primary-light: #042f2e;
+}
+
+.theme-cyan {
+  --color-primary: #0891b2;
+  --color-primary-hover: #0e7490;
+  --color-primary-light: #cffafe;
+  --color-accent: #06b6d4;
+}
+.dark .theme-cyan {
+  --color-primary-light: #083344;
+}
+
+.theme-emerald {
+  --color-primary: #059669;
+  --color-primary-hover: #047857;
+  --color-primary-light: #d1fae5;
+  --color-accent: #10b981;
+}
+.dark .theme-emerald {
+  --color-primary-light: #022c22;
+}
+
+.theme-lime {
+  --color-primary: #65a30d;
+  --color-primary-hover: #4d7c0f;
+  --color-primary-light: #ecfccb;
+  --color-accent: #84cc16;
+}
+.dark .theme-lime {
+  --color-primary-light: #1a2e05;
+}
+
+.theme-sky {
+  --color-primary: #0284c7;
+  --color-primary-hover: #0369a1;
+  --color-primary-light: #e0f2fe;
+  --color-accent: #0ea5e9;
+}
+.dark .theme-sky {
+  --color-primary-light: #082f49;
+}
+
+.theme-slate {
+  --color-primary: #475569;
+  --color-primary-hover: #334155;
+  --color-primary-light: #f1f5f9;
+  --color-accent: #64748b;
+}
+.dark .theme-slate {
+  --color-primary-light: #1e293b;
+}
+
+/* Base styles */
+html, body, #app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', system-ui, sans-serif;
+  background-color: var(--color-surface-secondary);
+  color: var(--color-text-primary);
+  transition: background-color 0.2s, color 0.2s;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prevent text selection on UI elements */
+button, nav, aside {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-text-muted);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-secondary);
+}
+
+/* Form elements in dark mode */
+.dark select,
+.dark input,
+.dark textarea {
+  color-scheme: dark;
+}
+
+/* Smooth transitions */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* Focus visible ring */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Checkbox/radio styling */
+input[type="checkbox"] {
+  accent-color: var(--color-primary);
+}
+
+/* Hide scrollbar utility */
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Touch-friendly tap targets on mobile */
+@media (max-width: 640px) {
+  button, a, [role="button"] {
+    min-height: 36px;
+  }
+}
