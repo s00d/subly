@@ -1,3 +1,11 @@
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Windows%20%7C%20Linux-blue?style=for-the-badge)](https://github.com/s00d/subly)
+[![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](https://github.com/s00d/subly/blob/main/LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/s00d/subly?style=for-the-badge)](https://github.com/s00d/subly/releases)
+[![GitHub downloads](https://img.shields.io/github/downloads/s00d/subly/total?style=for-the-badge)](https://github.com/s00d/subly/releases)
+[![GitHub issues](https://img.shields.io/badge/github-issues-orange?style=for-the-badge)](https://github.com/s00d/subly/issues)
+[![GitHub stars](https://img.shields.io/badge/github-stars-yellow?style=for-the-badge)](https://github.com/s00d/subly/stargazers)
+[![Donate](https://img.shields.io/badge/Donate-Donationalerts-ff4081?style=for-the-badge)](https://www.donationalerts.com/r/s00d88)
+
 # Subly — Subscription & Expense Tracker
 
 <p align="center">
@@ -144,22 +152,20 @@ app/subly/
 - [Rust](https://www.rust-lang.org/tools/install) (stable)
 - Tauri system dependencies — see [docs](https://v2.tauri.app/start/prerequisites/)
 
-### Install
+### Build Steps
 
 ```bash
-cd app/subly
+# Clone the repository
+git clone https://github.com/s00d/subly.git
+cd subly/app/subly
+
+# Install dependencies
 pnpm install
-```
 
-### Development
-
-```bash
+# Development mode
 pnpm tauri dev
-```
 
-### Build
-
-```bash
+# Build for production
 pnpm tauri build
 ```
 
@@ -169,6 +175,36 @@ Built binaries will be in `src-tauri/target/release/bundle/`.
 
 ```bash
 pnpm tauri icon app-icon.svg
+```
+
+### Platform-Specific Notes
+
+#### macOS
+
+```bash
+# If you encounter signing issues after installing
+chmod +x /Applications/Subly.app
+xattr -cr /Applications/Subly.app
+codesign --force --deep --sign - /Applications/Subly.app
+```
+
+> **Note:** macOS builds are unsigned. On first launch you may need to right-click the app → Open, or run the commands above.
+
+#### Windows
+
+```bash
+# Install Rust (https://rustup.rs) and Node.js (https://nodejs.org)
+# Then follow the build steps above
+```
+
+#### Linux
+
+```bash
+# Install system dependencies
+sudo apt-get update
+sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
+
+# Then follow the build steps above
 ```
 
 ---
