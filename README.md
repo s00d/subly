@@ -5,129 +5,129 @@
 </p>
 
 <p align="center">
-  <strong>Desktop-приложение для учёта подписок и расходов</strong><br>
+  <strong>Desktop app for tracking subscriptions and expenses</strong><br>
   Tauri v2 · Vue 3 · TypeScript · Tailwind CSS v4
 </p>
 
 ---
 
-## Возможности
+## Features
 
-### Подписки
-- Добавление, редактирование и удаление подписок (ежедневные, еженедельные, ежемесячные, ежегодные циклы)
-- Избранное — приоритетное отображение важных подписок
-- Теги и категории с пользовательскими иконками
-- Группировка по категориям или способу оплаты
-- Компактный и расширенный вид списка
-- Пакетные действия (удаление, смена категории, добавление тегов)
-- Подробная карточка подписки с историей платежей
-- Автоматическое продление и отслеживание просроченных платежей
+### Subscriptions
+- Add, edit, and delete subscriptions (daily, weekly, monthly, yearly cycles)
+- Favorites — pin important subscriptions to the top
+- Tags and categories with custom icons
+- Group by category or payment method
+- Compact and expanded list views
+- Batch actions (delete, change category, add tags)
+- Detailed subscription card with payment history
+- Auto-renewal and overdue payment tracking
 
-### Расходы
-- Учёт разовых расходов с категориями, тегами и заметками
-- Фильтрация по периоду, категории и тегам
-- Экспорт расходов в CSV
+### Expenses
+- Track one-time expenses with categories, tags, and notes
+- Filter by period, category, and tags
+- Export expenses to CSV
 
-### Дашборд
-- Сводная статистика: ежемесячные/ежегодные траты, количество активных подписок
-- Диаграммы: разбивка по категориям (Doughnut), тренд расходов (Bar)
-- Прогноз расходов на следующий месяц/квартал
-- Lifetime-стоимость подписок
-- Средняя стоимость по категориям
-- Виджеты с настраиваемым порядком и видимостью
-- Оповещения о просроченных платежах
+### Dashboard
+- Summary stats: monthly/yearly spending, active subscription count
+- Charts: category breakdown (Doughnut), spending trend (Bar)
+- Spending forecast for the next month/quarter
+- Lifetime cost of subscriptions
+- Average cost per category
+- Customizable widget order and visibility
+- Overdue payment alerts
 
-### Календарь
-- Визуализация предстоящих платежей на календарной сетке
-- Статистика месяца: количество платежей и общая сумма
-- Переход к деталям подписки по клику
+### Calendar
+- Visualize upcoming payments on a calendar grid
+- Monthly stats: payment count and total amount
+- Click to navigate to subscription details
 
-### Уведомления
-- Системные уведомления о предстоящих и просроченных платежах
-- Повторяющиеся напоминания каждый платёжный цикл
-- Расписание отправки: утро, вечер или пользовательское время
-- Настраиваемые заголовки и тексты уведомлений
-- Telegram-бот для отправки уведомлений
-- In-app оповещения с копированием и закрытием
+### Notifications
+- System notifications for upcoming and overdue payments
+- Recurring reminders every payment cycle
+- Notification schedule: morning, evening, or custom time
+- Customizable notification titles and messages
+- Telegram bot integration for sending alerts
+- In-app alerts with copy and dismiss actions
 
-### Валюты
-- 34 валюты из коробки с возможностью добавления своих
-- Автоматическое обновление курсов через Fixer.io (по расписанию)
-- Конвертация в выбранные целевые валюты
+### Currencies
+- 34 currencies out of the box with the ability to add custom ones
+- Automatic rate updates via Fixer.io (on a schedule)
+- Conversion to selected target currencies
 
-### Настройки
-- **Внешний вид**: 15+ цветовых тем, адаптивный интерфейс
-- **Категории**: пользовательские иконки, порядок, основная категория
-- **Способы оплаты**: иконки, редактирование, основной способ
-- **Теги**: избранные теги, редактирование, сортировка
-- **Валюты**: основная валюта, ручное/автоматическое обновление курсов
-- **Участники**: учёт расходов по членам семьи
-- **Бюджет**: месячный бюджет и прогресс-бар
-- **Данные**: экспорт/импорт `.subly`, JSON, CSV; импорт из CSV
+### Settings
+- **Appearance**: 15+ color themes, responsive interface
+- **Categories**: custom icons, ordering, default category
+- **Payment methods**: icons, editing, default method
+- **Tags**: favorites, editing, sorting
+- **Currencies**: main currency, manual/automatic rate updates
+- **Household members**: track expenses per family member
+- **Budget**: monthly budget with progress bar
+- **Data**: export/import `.subly`, JSON, CSV; import from CSV
 
-### Системный трей
-- Иконка в трее с отображением ближайших платежей
-- Клик по платежу открывает приложение и показывает детали
-- Сворачивание в трей при закрытии окна
-- Автозапуск при включении компьютера
+### System Tray
+- Tray icon showing upcoming payments
+- Click on a payment to open the app and show details
+- Minimize to tray on window close
+- Auto-start on system boot
 
-### Локализация
-12 языков: English, Русский, 中文, Español, Français, Deutsch, Português, 日本語, 한국어, العربية, हिन्दी, Türkçe
+### Localization
+12 languages: English, Русский, 中文, Español, Français, Deutsch, Português, 日本語, 한국어, العربية, हिन्दी, Türkçe
 
 ---
 
-## Технологии
+## Tech Stack
 
-| Слой | Стек |
-|------|------|
+| Layer | Stack |
+|-------|-------|
 | **Framework** | [Tauri v2](https://v2.tauri.app/) |
 | **Frontend** | [Vue 3](https://vuejs.org/) (Composition API, `<script setup>`) |
-| **Стили** | [Tailwind CSS v4](https://tailwindcss.com/) |
-| **Типизация** | TypeScript + [Zod v4](https://zod.dev/) |
-| **Графики** | [Chart.js](https://www.chartjs.org/) + [vue-chartjs](https://vue-chartjs.org/) |
-| **Иконки** | [Lucide](https://lucide.dev/) |
-| **Роутинг** | [Vue Router](https://router.vuejs.org/) |
-| **Сборка** | [Vite](https://vitejs.dev/) |
-| **Пакетный менеджер** | [pnpm](https://pnpm.io/) |
+| **Styling** | [Tailwind CSS v4](https://tailwindcss.com/) |
+| **Type Safety** | TypeScript + [Zod v4](https://zod.dev/) |
+| **Charts** | [Chart.js](https://www.chartjs.org/) + [vue-chartjs](https://vue-chartjs.org/) |
+| **Icons** | [Lucide](https://lucide.dev/) |
+| **Routing** | [Vue Router](https://router.vuejs.org/) |
+| **Bundler** | [Vite](https://vitejs.dev/) |
+| **Package Manager** | [pnpm](https://pnpm.io/) |
 
-### Tauri-плагины
-- `@tauri-apps/plugin-store` — локальное хранилище данных
-- `@tauri-apps/plugin-notification` — системные уведомления
-- `@tauri-apps/plugin-dialog` — диалоги выбора файлов
-- `@tauri-apps/plugin-fs` — работа с файловой системой
-- `@tauri-apps/plugin-clipboard-manager` — буфер обмена
-- `@tauri-apps/plugin-autostart` — автозапуск
-- `@tauri-apps/plugin-opener` — открытие ссылок
+### Tauri Plugins
+- `@tauri-apps/plugin-store` — local data storage
+- `@tauri-apps/plugin-notification` — system notifications
+- `@tauri-apps/plugin-dialog` — file picker dialogs
+- `@tauri-apps/plugin-fs` — file system access
+- `@tauri-apps/plugin-clipboard-manager` — clipboard
+- `@tauri-apps/plugin-autostart` — launch on boot
+- `@tauri-apps/plugin-opener` — open URLs
 
 ---
 
-## Структура проекта
+## Project Structure
 
 ```
 app/subly/
 ├── src/
 │   ├── components/
-│   │   ├── calendar/        # Компоненты календаря
-│   │   ├── dashboard/       # Виджеты дашборда
-│   │   ├── expenses/        # Форма расходов
+│   │   ├── calendar/        # Calendar components
+│   │   ├── dashboard/       # Dashboard widgets
+│   │   ├── expenses/        # Expense form
 │   │   ├── layout/          # AppLayout, Header, Sidebar, MobileTabBar
-│   │   ├── settings/        # Секции настроек
-│   │   ├── subscriptions/   # Форма, детали, история платежей
-│   │   └── ui/              # Переиспользуемые UI-компоненты
-│   ├── composables/         # useAlerts, useToast, useCurrencyFormat и др.
-│   ├── i18n/                # 12 файлов локализации
+│   │   ├── settings/        # Settings sections
+│   │   ├── subscriptions/   # Form, detail, payment history
+│   │   └── ui/              # Reusable UI components
+│   ├── composables/         # useAlerts, useToast, useCurrencyFormat, etc.
+│   ├── i18n/                # 12 language files
 │   ├── pages/               # Dashboard, Subscriptions, Expenses, Calendar, Settings
 │   ├── router/              # Vue Router
-│   ├── schemas/             # Zod-схемы данных
-│   ├── services/            # Бизнес-логика, уведомления, экспорт, трей
-│   └── stores/              # Глобальный стор (appStore)
+│   ├── schemas/             # Zod data schemas
+│   ├── services/            # Business logic, notifications, export, tray
+│   └── stores/              # Global store (appStore)
 ├── src-tauri/
-│   ├── src/                 # Rust: main.rs, lib.rs (трей, меню, окна)
+│   ├── src/                 # Rust: main.rs, lib.rs (tray, menu, windows)
 │   ├── capabilities/        # Tauri permissions
-│   ├── icons/               # Иконки приложения
-│   └── tauri.conf.json      # Конфигурация Tauri
-├── public/assets/           # SVG-логотипы сервисов
-├── .github/workflows/       # GitHub Actions для автосборки
+│   ├── icons/               # App icons
+│   └── tauri.conf.json      # Tauri configuration
+├── public/assets/           # SVG service logos
+├── .github/workflows/       # GitHub Actions for automated builds
 ├── index.html
 ├── package.json
 ├── vite.config.ts
@@ -136,36 +136,36 @@ app/subly/
 
 ---
 
-## Быстрый старт
+## Getting Started
 
-### Требования
+### Prerequisites
 - [Node.js](https://nodejs.org/) >= 20
 - [pnpm](https://pnpm.io/) >= 9
 - [Rust](https://www.rust-lang.org/tools/install) (stable)
-- Системные зависимости Tauri — см. [документацию](https://v2.tauri.app/start/prerequisites/)
+- Tauri system dependencies — see [docs](https://v2.tauri.app/start/prerequisites/)
 
-### Установка
+### Install
 
 ```bash
 cd app/subly
 pnpm install
 ```
 
-### Разработка
+### Development
 
 ```bash
 pnpm tauri dev
 ```
 
-### Сборка
+### Build
 
 ```bash
 pnpm tauri build
 ```
 
-Собранные бинарники появятся в `src-tauri/target/release/bundle/`.
+Built binaries will be in `src-tauri/target/release/bundle/`.
 
-### Генерация иконок
+### Generate Icons
 
 ```bash
 pnpm tauri icon app-icon.svg
@@ -173,20 +173,20 @@ pnpm tauri icon app-icon.svg
 
 ---
 
-## Скриншоты
+## Screenshots
 
-> _TODO: добавить скриншоты интерфейса_
+> _TODO: add screenshots_
 
 ---
 
 ## CI/CD
 
-В `.github/workflows/build.yml` настроен GitHub Actions workflow для автоматической сборки под macOS (Universal), Linux и Windows. Подпись кода отключена.
+A GitHub Actions workflow is configured in `.github/workflows/build.yml` for automated builds on macOS (Universal), Linux, and Windows. Code signing is disabled.
 
-Релизы создаются автоматически при пуше тега `v*`.
+Releases are created automatically when a `v*` tag is pushed.
 
 ---
 
-## Лицензия
+## License
 
 MIT
