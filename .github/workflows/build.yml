@@ -26,10 +26,6 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
 
-    defaults:
-      run:
-        working-directory: app/subly
-
     steps:
       - uses: actions/checkout@v4
 
@@ -43,7 +39,6 @@ jobs:
         with:
           node-version: 20
           cache: 'pnpm'
-          cache-dependency-path: app/subly/pnpm-lock.yaml
 
       - uses: actions/cache@v4
         with:
@@ -52,11 +47,11 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            app/subly/src-tauri/target/
+            src-tauri/target/
             C:\Users\runneradmin\.cargo\registry\index\
             C:\Users\runneradmin\.cargo\registry\cache\
             C:\Users\runneradmin\.cargo\git\db\
-          key: ${{ runner.os }}-cargo-${{ matrix.args }}-${{ hashFiles('app/subly/src-tauri/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ matrix.args }}-${{ hashFiles('src-tauri/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-${{ matrix.args }}-
             ${{ runner.os }}-cargo-
@@ -80,7 +75,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          projectPath: app/subly
           tagName: v__VERSION__
           appName: 'subly_${{ matrix.os }}'
           releaseName: 'Subly v__VERSION__'
