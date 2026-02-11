@@ -96,22 +96,24 @@ function alreadyNotifiedToday(lastNotifiedDate: string): boolean {
 // =============================================
 
 export async function sendTestNotification(): Promise<{ system: boolean }> {
-  const hasPermission = await checkNotificationPermission();
-  let system = false;
-
-  if (hasPermission) {
-    try {
-      sendNotification({
-        title: "Subly — Test Notification",
-        body: "Notifications are working correctly!",
-      });
-      system = true;
-    } catch (e) {
-      console.warn("Test notification failed:", e);
+  try {
+    // Always try to request permission first
+    let granted = await isPermissionGranted();
+    if (!granted) {
+      const permission = await requestPermission();
+      granted = permission === "granted";
     }
-  }
 
-  return { system };
+    // Send regardless — wrapped in try/catch
+    sendNotification({
+      title: "Subly — Test Notification",
+      body: "Notifications are working correctly!",
+    });
+    return { system: true };
+  } catch (e) {
+    console.warn("Test notification failed:", e);
+    return { system: false };
+  }
 }
 
 // =============================================
@@ -133,7 +135,6 @@ export async function checkAndNotify(
 
   // Check schedule — if not in the right time window, only generate alerts (no push/telegram)
   const withinSchedule = isWithinSchedule(settings);
-  const hasPermission = await checkNotificationPermission();
   const recurring = settings.recurringNotifications !== false;
 
   const today = new Date();
@@ -193,20 +194,18 @@ export async function checkAndNotify(
         : (shouldSendPush && diffDays === daysBefore); // non-recurring: only on exact day
 
       if (shouldSendForThisSub) {
-        // System notification
-        if (hasPermission) {
-          const vars = { name: sub.name, days: diffDays, price: sub.price };
-          const title = settings.notificationTitle || "Subly — Payment Reminder";
-          const body = diffDays === 0
-            ? applyTemplate(settings.notificationBodyDueToday || 'Payment for "{name}" is due today!', vars)
-            : applyTemplate(settings.notificationBodyDueSoon || 'Payment for "{name}" is due in {days} day(s).', vars);
+        // System notification — always try, ignore errors
+        const vars = { name: sub.name, days: diffDays, price: sub.price };
+        const title = settings.notificationTitle || "Subly — Payment Reminder";
+        const body = diffDays === 0
+          ? applyTemplate(settings.notificationBodyDueToday || 'Payment for "{name}" is due today!', vars)
+          : applyTemplate(settings.notificationBodyDueSoon || 'Payment for "{name}" is due in {days} day(s).', vars);
 
-          try {
-            sendNotification({ title, body });
-            sentCount++;
-          } catch (e) {
-            console.warn("Failed to send notification for:", sub.name, e);
-          }
+        try {
+          sendNotification({ title, body });
+          sentCount++;
+        } catch (e) {
+          console.warn("Failed to send notification for:", sub.name, e);
         }
 
         // Telegram
@@ -241,19 +240,17 @@ export async function checkAndNotify(
         : (shouldSendPush && !alreadyNotifiedToday(sub.lastNotifiedDate || ""));
 
       if (shouldSendOverdue) {
-        if (hasPermission) {
-          const vars = { name: sub.name, days: Math.abs(diffDays), price: sub.price };
-          const title = settings.notificationOverdueTitle || "Subly — Overdue Payment";
-          const body = applyTemplate(
-            settings.notificationOverdueBody || '"{name}" is overdue by {days} day(s).',
-            vars,
-          );
-          try {
-            sendNotification({ title, body });
-            sentCount++;
-          } catch (e) {
-            console.warn("Failed to send overdue notification for:", sub.name, e);
-          }
+        const vars = { name: sub.name, days: Math.abs(diffDays), price: sub.price };
+        const title = settings.notificationOverdueTitle || "Subly — Overdue Payment";
+        const body = applyTemplate(
+          settings.notificationOverdueBody || '"{name}" is overdue by {days} day(s).',
+          vars,
+        );
+        try {
+          sendNotification({ title, body });
+          sentCount++;
+        } catch (e) {
+          console.warn("Failed to send overdue notification for:", sub.name, e);
         }
 
         if (telegramEnabled) {
