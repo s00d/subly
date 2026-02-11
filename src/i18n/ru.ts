@@ -170,6 +170,8 @@ export default {
   // Common
   success: "Успешно",
   error: "Ошибка",
+  fill_required_fields: "Пожалуйста, заполните все обязательные поля.",
+  save_error: "Не удалось сохранить. Проверьте данные и попробуйте ещё раз.",
   confirm: "Подтвердить",
   copied_to_clipboard: "Скопировано в буфер обмена",
   upload_logo: "Загрузить логотип",

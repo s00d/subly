@@ -47,7 +47,7 @@ export default {
   reset_success: "データをデフォルトにリセットしました", notification_settings: "通知設定",
   notify_days_before: "デフォルトの事前通知日数", autostart: "自動起動",
   autostart_info: "コンピュータ起動時にSublyを自動的に起動します。",
-  success: "成功", error: "エラー", confirm: "確認", copied_to_clipboard: "クリップボードにコピーしました",
+  success: "成功", error: "エラー", fill_required_fields: "すべての必須フィールドを入力してください。", save_error: "保存に失敗しました。データを確認してもう一度お試しください。", confirm: "確認", copied_to_clipboard: "クリップボードにコピーしました",
   upload_logo: "ロゴをアップロード", logo_preview: "プレビュー", calculate_next_payment_date: "次回支払日を計算",
   copy: "コピー", view_all: "すべて表示", no_data_yet: "データはまだありません",
   add_subscriptions_to_see_stats: "統計を表示するにはサブスクリプションを追加してください",

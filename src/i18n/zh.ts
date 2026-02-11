@@ -170,6 +170,8 @@ export default {
   // Common
   success: "成功",
   error: "错误",
+  fill_required_fields: "请填写所有必填字段。",
+  save_error: "保存失败，请检查数据后重试。",
   confirm: "确认",
   copied_to_clipboard: "已复制到剪贴板",
   upload_logo: "上传图标",

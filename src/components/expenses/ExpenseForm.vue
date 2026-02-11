@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, reactive } from "vue";
 import { useAppStore } from "@/stores/appStore";
 import { useI18n } from "@/i18n";
+import { useToast } from "@/composables/useToast";
 import type { Expense } from "@/schemas/appData";
+import { ExpenseSchema } from "@/schemas/appData";
 import Modal from "@/components/ui/Modal.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
@@ -22,8 +24,10 @@ const emit = defineEmits<{
 
 const store = useAppStore();
 const { t } = useI18n();
+const { toast } = useToast();
 
 const form = ref<Partial<Expense>>({});
+const errors = reactive<Record<string, string>>({});
 
 function resetForm() {
   form.value = {
@@ -71,22 +75,43 @@ const payerOptions = computed<SelectOption[]>(() =>
   store.state.household.map((h) => ({ label: h.name, value: h.id }))
 );
 
+function clearErrors() {
+  Object.keys(errors).forEach((k) => delete errors[k]);
+}
+
 function handleSave() {
-  if (!form.value.name?.trim() || !form.value.amount) return;
-  if (isEditing.value && props.editExpense) {
-    store.updateExpense({ ...form.value, id: props.editExpense.id } as Partial<Expense> & { id: string });
-  } else {
-    store.addExpense({
-      ...form.value,
-      id: crypto.randomUUID(),
-      name: form.value.name!,
-      currencyId: form.value.currencyId!,
-      date: form.value.date!,
-      createdAt: new Date().toISOString(),
-    });
+  clearErrors();
+
+  const raw = isEditing.value && props.editExpense
+    ? { ...props.editExpense, ...form.value }
+    : { ...form.value, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+
+  const result = ExpenseSchema.safeParse(raw);
+
+  if (!result.success) {
+    for (const issue of result.error.issues) {
+      const field = issue.path[0] as string;
+      if (field && !errors[field]) {
+        errors[field] = issue.message;
+      }
+    }
+    toast(t("fill_required_fields"), "error");
+    return;
   }
-  emit("saved");
-  emit("close");
+
+  try {
+    if (isEditing.value && props.editExpense) {
+      store.updateExpense(result.data);
+    } else {
+      store.addExpense(result.data);
+    }
+    toast(t("success"));
+    emit("saved");
+    emit("close");
+  } catch (e) {
+    console.error("Expense save failed:", e);
+    toast(t("save_error"), "error");
+  }
 }
 </script>
 
@@ -99,6 +124,7 @@ function handleSave() {
         :modelValue="form.name || ''"
         @update:modelValue="(v) => form.name = String(v)"
         :placeholder="t('expense_name')"
+        :error="errors.name"
         required
       />
 
@@ -112,6 +138,7 @@ function handleSave() {
             type="number"
             step="0.01"
             min="0"
+            :error="errors.amount"
             required
           />
         </div>
@@ -121,6 +148,7 @@ function handleSave() {
             :options="currencyOptions"
             :modelValue="form.currencyId || ''"
             @update:modelValue="(v) => (form.currencyId = String(v))"
+            :error="errors.currencyId"
           />
         </div>
       </div>
@@ -131,6 +159,7 @@ function handleSave() {
         :modelValue="form.date || ''"
         @update:modelValue="(v) => form.date = String(v)"
         type="date"
+        :error="errors.date"
         required
       />
 

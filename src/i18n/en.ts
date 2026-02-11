@@ -170,6 +170,8 @@ export default {
   // Common
   success: "Success",
   error: "Error",
+  fill_required_fields: "Please fill in all required fields.",
+  save_error: "Failed to save. Please check the data and try again.",
   confirm: "Confirm",
   copied_to_clipboard: "Copied to clipboard",
   upload_logo: "Upload Logo",

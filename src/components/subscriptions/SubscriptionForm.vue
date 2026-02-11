@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, reactive } from "vue";
 import { useAppStore } from "@/stores/appStore";
 import { useI18n } from "@/i18n";
+import { useToast } from "@/composables/useToast";
 import type { Subscription, CycleType } from "@/schemas/appData";
-import { parseSubscription } from "@/schemas/appData";
+import { parseSubscription, SubscriptionSchema } from "@/schemas/appData";
 import Modal from "@/components/ui/Modal.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
@@ -26,8 +27,10 @@ const emit = defineEmits<{
 
 const store = useAppStore();
 const { t } = useI18n();
+const { toast } = useToast();
 
 const form = ref<Partial<Subscription>>({});
+const errors = reactive<Record<string, string>>({});
 
 function resetForm() {
   form.value = {
@@ -110,28 +113,42 @@ function calculateNextPayment() {
   form.value.nextPayment = next.toISOString().split("T")[0];
 }
 
+function clearErrors() {
+  Object.keys(errors).forEach((k) => delete errors[k]);
+}
+
 function handleSubmit() {
-  if (!form.value.name || !form.value.price || !form.value.nextPayment) return;
+  clearErrors();
+
+  const raw = isEdit.value && props.editSubscription
+    ? { ...props.editSubscription, ...form.value }
+    : { ...form.value, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+
+  const result = SubscriptionSchema.safeParse(raw);
+
+  if (!result.success) {
+    for (const issue of result.error.issues) {
+      const field = issue.path[0] as string;
+      if (field && !errors[field]) {
+        errors[field] = issue.message;
+      }
+    }
+    toast(t("fill_required_fields"), "error");
+    return;
+  }
 
   try {
     if (isEdit.value && props.editSubscription) {
-      const updated = parseSubscription({
-        ...props.editSubscription,
-        ...form.value,
-      });
-      store.updateSubscription(updated);
+      store.updateSubscription(result.data);
     } else {
-      const newSub = parseSubscription({
-        ...form.value,
-        id: crypto.randomUUID(),
-        createdAt: new Date().toISOString(),
-      });
-      store.addSubscription(newSub);
+      store.addSubscription(result.data);
     }
+    toast(t("success"));
     emit("saved");
     emit("close");
   } catch (e) {
-    console.error("Subscription validation failed:", e);
+    console.error("Subscription save failed:", e);
+    toast(t("save_error"), "error");
   }
 }
 </script>
@@ -146,6 +163,7 @@ function handleSubmit() {
             v-model="form.name!"
             :label="t('subscription_name') + ' *'"
             :placeholder="t('subscription_name')"
+            :error="errors.name"
             required
           />
         </div>
@@ -161,6 +179,7 @@ function handleSubmit() {
             v-model="form.price!"
             type="number"
             :label="t('price') + ' *'"
+            :error="errors.price"
             step="0.01"
             min="0"
             required
@@ -171,6 +190,7 @@ function handleSubmit() {
             v-model="form.currencyId!"
             :options="currencyOptions"
             :label="t('currencies')"
+            :error="errors.currencyId"
             searchable
           />
         </div>
@@ -183,6 +203,7 @@ function handleSubmit() {
             v-model="form.frequency!"
             type="number"
             :label="t('frequency')"
+            :error="errors.frequency"
             min="1"
             max="366"
           />
@@ -206,6 +227,7 @@ function handleSubmit() {
             v-model="form.startDate!"
             type="date"
             :label="t('start_date')"
+            :error="errors.startDate"
           />
         </div>
         <button
@@ -221,6 +243,7 @@ function handleSubmit() {
             v-model="form.nextPayment!"
             type="date"
             :label="t('next_payment') + ' *'"
+            :error="errors.nextPayment"
             required
           />
         </div>

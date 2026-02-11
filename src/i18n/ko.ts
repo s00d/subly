@@ -47,7 +47,7 @@ export default {
   reset_success: "데이터가 기본값으로 재설정되었습니다", notification_settings: "알림 설정",
   notify_days_before: "기본 사전 알림 일수", autostart: "자동 시작",
   autostart_info: "컴퓨터 시작 시 Subly를 자동으로 실행합니다.",
-  success: "성공", error: "오류", confirm: "확인", copied_to_clipboard: "클립보드에 복사되었습니다",
+  success: "성공", error: "오류", fill_required_fields: "모든 필수 항목을 입력해 주세요.", save_error: "저장에 실패했습니다. 데이터를 확인하고 다시 시도해 주세요.", confirm: "확인", copied_to_clipboard: "클립보드에 복사되었습니다",
   upload_logo: "로고 업로드", logo_preview: "미리보기", calculate_next_payment_date: "다음 결제일 계산",
   copy: "복사", view_all: "모두 보기", no_data_yet: "아직 데이터가 없습니다",
   add_subscriptions_to_see_stats: "통계를 보려면 구독을 추가하세요",
