@@ -1,5 +1,6 @@
 import {
   isPermissionGranted,
+  requestPermission,
   sendNotification,
 } from "@tauri-apps/plugin-notification";
 import type { Subscription, Settings } from "@/schemas/appData";
@@ -35,7 +36,12 @@ export interface NotifyContext {
 
 export async function checkNotificationPermission(): Promise<boolean> {
   try {
-    return await isPermissionGranted();
+    let granted = await isPermissionGranted();
+    if (!granted) {
+      const result = await requestPermission();
+      granted = result === "granted";
+    }
+    return granted;
   } catch {
     return false;
   }
