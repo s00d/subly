@@ -19,7 +19,14 @@ const { t } = useI18n();
 const inputValue = ref("");
 const showSuggestions = ref(false);
 
-/** All tag names not yet selected */
+/** Favorite tags not yet selected — shown as quick-pick chips */
+const quickTags = computed(() =>
+  store.favoriteTags.value
+    .filter((tag) => !props.modelValue.includes(tag.name))
+    .map((tag) => tag.name),
+);
+
+/** All tag names not yet selected (for dropdown search) */
 const suggestions = computed(() => {
   const allTags = store.state.tags;
   if (!inputValue.value.trim()) {
@@ -100,7 +107,7 @@ function onBlur() {
         </button>
       </div>
 
-      <!-- Suggestions -->
+      <!-- Suggestions dropdown (on focus + typing) -->
       <div
         v-if="showSuggestions && suggestions.length > 0"
         class="absolute left-0 right-0 top-full mt-1 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg shadow-lg z-10 max-h-28 overflow-auto"
@@ -115,6 +122,20 @@ function onBlur() {
           {{ tagName }}
         </button>
       </div>
+    </div>
+
+    <!-- Quick-pick favorite tags -->
+    <div v-if="quickTags.length > 0" class="flex flex-wrap gap-1.5 mt-2">
+      <button
+        v-for="tagName in quickTags"
+        :key="tagName"
+        type="button"
+        @click="addTag(tagName)"
+        class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border border-dashed border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] transition-colors"
+      >
+        <Plus :size="10" />
+        {{ tagName }}
+      </button>
     </div>
   </div>
 </template>

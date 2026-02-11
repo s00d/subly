@@ -5,6 +5,7 @@ import { useI18n } from "@/i18n";
 import { useToast } from "@/composables/useToast";
 import type { Subscription, CycleType } from "@/schemas/appData";
 import { parseSubscription, SubscriptionSchema } from "@/schemas/appData";
+import { mapZodErrors, type ZodFieldMeta } from "@/composables/useZodErrors";
 import Modal from "@/components/ui/Modal.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
@@ -31,6 +32,17 @@ const { toast } = useToast();
 
 const form = ref<Partial<Subscription>>({});
 const errors = reactive<Record<string, string>>({});
+
+const fieldMeta: ZodFieldMeta = {
+  name: "string",
+  price: "number",
+  currencyId: "string",
+  nextPayment: "date",
+  startDate: "date",
+  frequency: "number",
+  notifyDaysBefore: "number",
+  cycle: "number",
+};
 
 function resetForm() {
   form.value = {
@@ -120,19 +132,23 @@ function clearErrors() {
 function handleSubmit() {
   clearErrors();
 
-  const raw = isEdit.value && props.editSubscription
+  const base = isEdit.value && props.editSubscription
     ? { ...props.editSubscription, ...form.value }
     : { ...form.value, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+
+  // Coerce numeric fields — HTML inputs always return strings
+  const raw = {
+    ...base,
+    price: Number(base.price) || 0,
+    frequency: Number(base.frequency) || 1,
+    notifyDaysBefore: Number(base.notifyDaysBefore ?? 1),
+    cycle: Number(base.cycle) || 3,
+  };
 
   const result = SubscriptionSchema.safeParse(raw);
 
   if (!result.success) {
-    for (const issue of result.error.issues) {
-      const field = issue.path[0] as string;
-      if (field && !errors[field]) {
-        errors[field] = issue.message;
-      }
-    }
+    mapZodErrors(result.error.issues, errors, fieldMeta, t);
     toast(t("fill_required_fields"), "error");
     return;
   }

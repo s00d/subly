@@ -47,7 +47,7 @@ export default {
   reset_success: "Daten auf Standard zurückgesetzt", notification_settings: "Benachrichtigungseinstellungen",
   notify_days_before: "Standard-Vorlaufzeit in Tagen", autostart: "Autostart",
   autostart_info: "Subly automatisch beim Computerstart starten.",
-  success: "Erfolg", error: "Fehler", fill_required_fields: "Bitte füllen Sie alle Pflichtfelder aus.", save_error: "Speichern fehlgeschlagen. Bitte überprüfen Sie die Daten und versuchen Sie es erneut.", confirm: "Bestätigen", copied_to_clipboard: "In die Zwischenablage kopiert",
+  success: "Erfolg", error: "Fehler", fill_required_fields: "Bitte füllen Sie alle Pflichtfelder aus.", save_error: "Speichern fehlgeschlagen. Bitte überprüfen Sie die Daten und versuchen Sie es erneut.", field_required: "Dieses Feld ist erforderlich.", field_invalid_number: "Bitte geben Sie eine gültige Zahl ein.", field_invalid_date: "Bitte geben Sie ein gültiges Datum ein.", field_min_value: "Der Wert muss mindestens {min} betragen.", confirm: "Bestätigen", copied_to_clipboard: "In die Zwischenablage kopiert",
   upload_logo: "Logo hochladen", logo_preview: "Vorschau", calculate_next_payment_date: "Nächstes Zahlungsdatum berechnen",
   copy: "Kopieren", view_all: "Alle anzeigen", no_data_yet: "Noch keine Daten",
   add_subscriptions_to_see_stats: "Fügen Sie Abonnements hinzu, um Statistiken zu sehen",

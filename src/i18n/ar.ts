@@ -47,7 +47,7 @@ export default {
   reset_success: "تم إعادة تعيين البيانات للافتراضي", notification_settings: "إعدادات الإشعارات",
   notify_days_before: "أيام الإشعار الافتراضية", autostart: "بدء تلقائي",
   autostart_info: "تشغيل Subly تلقائيًا عند بدء تشغيل الكمبيوتر.",
-  success: "نجاح", error: "خطأ", fill_required_fields: "يرجى ملء جميع الحقول المطلوبة.", save_error: "فشل الحفظ. يرجى التحقق من البيانات والمحاولة مرة أخرى.", confirm: "تأكيد", copied_to_clipboard: "تم النسخ إلى الحافظة",
+  success: "نجاح", error: "خطأ", fill_required_fields: "يرجى ملء جميع الحقول المطلوبة.", save_error: "فشل الحفظ. يرجى التحقق من البيانات والمحاولة مرة أخرى.", field_required: "هذا الحقل مطلوب.", field_invalid_number: "يرجى إدخال رقم صالح.", field_invalid_date: "يرجى إدخال تاريخ صالح.", field_min_value: "يجب أن تكون القيمة {min} على الأقل.", confirm: "تأكيد", copied_to_clipboard: "تم النسخ إلى الحافظة",
   upload_logo: "رفع الشعار", logo_preview: "معاينة", calculate_next_payment_date: "حساب تاريخ الدفع التالي",
   copy: "نسخ", view_all: "عرض الكل", no_data_yet: "لا توجد بيانات بعد",
   add_subscriptions_to_see_stats: "أضف اشتراكات لعرض الإحصائيات",

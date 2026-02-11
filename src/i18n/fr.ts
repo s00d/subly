@@ -47,7 +47,7 @@ export default {
   reset_success: "Données réinitialisées", notification_settings: "Paramètres de notifications",
   notify_days_before: "Jours d'avance par défaut", autostart: "Démarrage automatique",
   autostart_info: "Lancer Subly automatiquement au démarrage de l'ordinateur.",
-  success: "Succès", error: "Erreur", fill_required_fields: "Veuillez remplir tous les champs obligatoires.", save_error: "Échec de l'enregistrement. Vérifiez les données et réessayez.", confirm: "Confirmer", copied_to_clipboard: "Copié dans le presse-papiers",
+  success: "Succès", error: "Erreur", fill_required_fields: "Veuillez remplir tous les champs obligatoires.", save_error: "Échec de l'enregistrement. Vérifiez les données et réessayez.", field_required: "Ce champ est obligatoire.", field_invalid_number: "Veuillez entrer un nombre valide.", field_invalid_date: "Veuillez entrer une date valide.", field_min_value: "La valeur doit être au moins {min}.", confirm: "Confirmer", copied_to_clipboard: "Copié dans le presse-papiers",
   upload_logo: "Télécharger le logo", logo_preview: "Aperçu", calculate_next_payment_date: "Calculer la prochaine date",
   copy: "Copier", view_all: "Voir tout", no_data_yet: "Aucune donnée",
   add_subscriptions_to_see_stats: "Ajoutez des abonnements pour voir les statistiques",

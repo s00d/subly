@@ -47,7 +47,7 @@ export default {
   reset_success: "Veriler varsayılana sıfırlandı", notification_settings: "Bildirim Ayarları",
   notify_days_before: "Varsayılan önceden bildirim günü", autostart: "Otomatik Başlatma",
   autostart_info: "Bilgisayar başlatıldığında Subly'yi otomatik olarak başlat.",
-  success: "Başarılı", error: "Hata", fill_required_fields: "Lütfen tüm zorunlu alanları doldurun.", save_error: "Kaydetme başarısız. Lütfen verileri kontrol edip tekrar deneyin.", confirm: "Onayla", copied_to_clipboard: "Panoya kopyalandı",
+  success: "Başarılı", error: "Hata", fill_required_fields: "Lütfen tüm zorunlu alanları doldurun.", save_error: "Kaydetme başarısız. Lütfen verileri kontrol edip tekrar deneyin.", field_required: "Bu alan zorunludur.", field_invalid_number: "Lütfen geçerli bir sayı girin.", field_invalid_date: "Lütfen geçerli bir tarih girin.", field_min_value: "Değer en az {min} olmalıdır.", confirm: "Onayla", copied_to_clipboard: "Panoya kopyalandı",
   upload_logo: "Logo Yükle", logo_preview: "Önizleme", calculate_next_payment_date: "Sonraki ödeme tarihini hesapla",
   copy: "Kopyala", view_all: "Tümünü Gör", no_data_yet: "Henüz veri yok",
   add_subscriptions_to_see_stats: "İstatistikleri görmek için abonelik ekleyin",

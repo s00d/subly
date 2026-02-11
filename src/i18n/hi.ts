@@ -47,7 +47,7 @@ export default {
   reset_success: "डेटा डिफ़ॉल्ट पर रीसेट किया गया", notification_settings: "सूचना सेटिंग्स",
   notify_days_before: "डिफ़ॉल्ट अग्रिम सूचना दिन", autostart: "ऑटो-स्टार्ट",
   autostart_info: "कंप्यूटर शुरू होने पर Subly स्वचालित रूप से लॉन्च करें।",
-  success: "सफलता", error: "त्रुटि", fill_required_fields: "कृपया सभी आवश्यक फ़ील्ड भरें।", save_error: "सहेजने में विफल। कृपया डेटा जाँचें और पुनः प्रयास करें।", confirm: "पुष्टि करें", copied_to_clipboard: "क्लिपबोर्ड पर कॉपी किया गया",
+  success: "सफलता", error: "त्रुटि", fill_required_fields: "कृपया सभी आवश्यक फ़ील्ड भरें।", save_error: "सहेजने में विफल। कृपया डेटा जाँचें और पुनः प्रयास करें।", field_required: "यह फ़ील्ड आवश्यक है।", field_invalid_number: "कृपया एक मान्य संख्या दर्ज करें।", field_invalid_date: "कृपया एक मान्य तिथि दर्ज करें।", field_min_value: "मान कम से कम {min} होना चाहिए।", confirm: "पुष्टि करें", copied_to_clipboard: "क्लिपबोर्ड पर कॉपी किया गया",
   upload_logo: "लोगो अपलोड करें", logo_preview: "पूर्वावलोकन", calculate_next_payment_date: "अगली भुगतान तिथि गणना करें",
   copy: "कॉपी", view_all: "सभी देखें", no_data_yet: "अभी कोई डेटा नहीं",
   add_subscriptions_to_see_stats: "सांख्यिकी देखने के लिए सदस्यताएँ जोड़ें",

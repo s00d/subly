@@ -5,6 +5,7 @@ import { useI18n } from "@/i18n";
 import { useToast } from "@/composables/useToast";
 import type { Expense } from "@/schemas/appData";
 import { ExpenseSchema } from "@/schemas/appData";
+import { mapZodErrors, type ZodFieldMeta } from "@/composables/useZodErrors";
 import Modal from "@/components/ui/Modal.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
@@ -28,6 +29,13 @@ const { toast } = useToast();
 
 const form = ref<Partial<Expense>>({});
 const errors = reactive<Record<string, string>>({});
+
+const fieldMeta: ZodFieldMeta = {
+  name: "string",
+  amount: "number",
+  currencyId: "string",
+  date: "date",
+};
 
 function resetForm() {
   form.value = {
@@ -82,19 +90,20 @@ function clearErrors() {
 function handleSave() {
   clearErrors();
 
-  const raw = isEditing.value && props.editExpense
+  const base = isEditing.value && props.editExpense
     ? { ...props.editExpense, ...form.value }
     : { ...form.value, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+
+  // Coerce numeric fields — HTML inputs always return strings
+  const raw = {
+    ...base,
+    amount: Number(base.amount) || 0,
+  };
 
   const result = ExpenseSchema.safeParse(raw);
 
   if (!result.success) {
-    for (const issue of result.error.issues) {
-      const field = issue.path[0] as string;
-      if (field && !errors[field]) {
-        errors[field] = issue.message;
-      }
-    }
+    mapZodErrors(result.error.issues, errors, fieldMeta, t);
     toast(t("fill_required_fields"), "error");
     return;
   }
