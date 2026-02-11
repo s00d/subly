@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/appStore";
 import { useI18n } from "@/i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
+import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { getPricePerMonth, isOverdue, isUpcoming } from "@/services/calculations";
 import { getMonthlySpendingHistory, getForecast, getMonthComparison, getLifetimeCosts, getCategoryAverages } from "@/services/analytics";
 import { Doughnut } from "vue-chartjs";
@@ -25,6 +26,7 @@ const router = useRouter();
 const store = useAppStore();
 const { t } = useI18n();
 const { fmt, toMainCurrency } = useCurrencyFormat();
+const { fmtPercent } = useLocaleFormat();
 
 function goToSubscriptions() { router.push("/subscriptions"); }
 
@@ -303,7 +305,7 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
             </div>
             <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 text-sm">
               <div><p class="text-[var(--color-text-muted)]">{{ t('budget') }}</p><p class="font-semibold text-[var(--color-text-primary)]">{{ fmt(budget) }}</p></div>
-              <div><p class="text-[var(--color-text-muted)]">{{ t('budget_used') }}</p><p class="font-semibold text-[var(--color-text-primary)]">{{ (budgetUsed || 0).toFixed(1) }}%</p></div>
+              <div><p class="text-[var(--color-text-muted)]">{{ t('budget_used') }}</p><p class="font-semibold text-[var(--color-text-primary)]">{{ fmtPercent(budgetUsed || 0) }}</p></div>
               <div><p class="text-[var(--color-text-muted)]">{{ t('budget_remaining') }}</p><p class="font-semibold text-[var(--color-text-primary)]">{{ fmt(budgetLeft || 0) }}</p></div>
               <div v-if="overBudget"><p class="text-red-500">{{ t('over_budget') }}</p><p class="font-semibold text-red-500">{{ fmt(overBudget) }}</p></div>
             </div>

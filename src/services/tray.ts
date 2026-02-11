@@ -3,6 +3,7 @@ import { Menu, MenuItem, PredefinedMenuItem } from "@tauri-apps/api/menu";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Subscription, Settings, Currency } from "@/schemas/appData";
 import { isUpcoming, isOverdue, formatCurrency, getPricePerMonth } from "@/services/calculations";
+import { formatDateShortNonReactive } from "@/composables/useLocaleFormat";
 
 const TRAY_ID = "main-tray";
 
@@ -113,8 +114,7 @@ export async function setupTray(
       for (const sub of upcoming) {
         const cur = currencies.find((c) => c.id === sub.currencyId);
         const price = formatCurrency(sub.price, cur?.code || "USD", cur?.symbol);
-        const date = new Date(sub.nextPayment);
-        const dateStr = date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        const dateStr = formatDateShortNonReactive(sub.nextPayment);
         const subId = sub.id;
         menuItems.push(
           await MenuItem.new({

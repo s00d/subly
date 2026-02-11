@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n";
 import { useHeaderActions } from "@/composables/useHeaderActions";
 import { getPricePerMonth, getDaysUntilPayment, getBillingCycleText, isOverdue } from "@/services/calculations";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
+import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useToast } from "@/composables/useToast";
 import type { Subscription } from "@/schemas/appData";
 import SubscriptionForm from "@/components/subscriptions/SubscriptionForm.vue";
@@ -27,6 +28,7 @@ const vueRouter = useRouter();
 const { t } = useI18n();
 const { setActions, clearActions } = useHeaderActions();
 const { fmt } = useCurrencyFormat();
+const { fmtDateMedium } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 
 // Register header action
@@ -290,9 +292,7 @@ function getPaymentMethod(id: string) {
   return store.state.paymentMethods.find((p) => p.id === id);
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
+const formatDate = fmtDateMedium;
 
 // Actions
 function openAdd() {

@@ -71,22 +71,9 @@ export function getBillingCycleText(cycle: CycleType, frequency: number, t: (key
 }
 
 /**
- * Format currency
+ * Format currency (locale-aware)
  */
-export function formatCurrency(amount: number, currencyCode: string, symbol?: string): string {
-  try {
-    const formatted = new Intl.NumberFormat(undefined, {
-      style: "currency",
-      currency: currencyCode,
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-    return formatted;
-  } catch {
-    const s = symbol || currencyCode;
-    return `${s}${amount.toFixed(2)}`;
-  }
-}
+export { formatCurrencyLocale as formatCurrency } from "@/composables/useLocaleFormat";
 
 /**
  * Calculate next payment dates for a subscription within a month

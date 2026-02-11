@@ -58,7 +58,7 @@ function isActive(name: string): boolean {
 
     <!-- Footer -->
     <div class="p-4 border-t border-[var(--color-border)]">
-      <p class="text-xs text-[var(--color-text-muted)]">Subly v0.1.0</p>
+      <p class="text-xs text-[var(--color-text-muted)]">Subly v0.1.1</p>
     </div>
   </aside>
 </template>

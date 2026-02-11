@@ -3,6 +3,7 @@ import { ref, computed } from "vue";
 import { useAppStore } from "@/stores/appStore";
 import { useI18n } from "@/i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
+import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useToast } from "@/composables/useToast";
 import { getPaymentDatesInMonth, convertPrice } from "@/services/calculations";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -20,6 +21,7 @@ import { AlertTriangle } from "lucide-vue-next";
 const store = useAppStore();
 const { t } = useI18n();
 const { fmt: fmtMain, getCurrencyRate } = useCurrencyFormat();
+const { fmtMonthYear, fmtDateMedium } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 
 // --- Navigation ---
@@ -27,11 +29,9 @@ const now = new Date();
 const currentMonth = ref(now.getMonth());
 const currentYear = ref(now.getFullYear());
 
-const monthNames = computed(() => [
-  t("month_january"), t("month_february"), t("month_march"), t("month_april"),
-  t("month_may"), t("month_june"), t("month_july"), t("month_august"),
-  t("month_september"), t("month_october"), t("month_november"), t("month_december"),
-]);
+const currentMonthLabel = computed(() =>
+  fmtMonthYear(new Date(currentYear.value, currentMonth.value, 1)),
+);
 
 const isCurrentMonth = computed(() =>
   currentMonth.value === now.getMonth() && currentYear.value === now.getFullYear()
@@ -157,7 +157,7 @@ function openDayDetail(cell: CalendarCell) {
 
 const dayModalTitle = computed(() => {
   if (!selectedDay.value) return "";
-  return `${monthNames.value[currentMonth.value]} ${selectedDay.value.day}, ${currentYear.value}`;
+  return fmtDateMedium(new Date(currentYear.value, currentMonth.value, selectedDay.value.day).toISOString());
 });
 
 // --- Subscription detail ---
@@ -233,7 +233,7 @@ function onSaved() {
 <template>
   <div class="max-w-5xl">
     <CalendarHeader
-      :monthName="monthNames[currentMonth]"
+      :monthName="currentMonthLabel"
       :year="currentYear"
       :isCurrentMonth="isCurrentMonth"
       @prevMonth="prevMonth"

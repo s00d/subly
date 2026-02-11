@@ -36,7 +36,7 @@ const { t } = useI18n();
         <ChevronLeft :size="16" class="text-[var(--color-text-secondary)]" />
       </button>
       <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">
-        {{ monthName }} {{ year }}
+        {{ monthName }}
       </h2>
       <button
         @click="emit('nextMonth')"

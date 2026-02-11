@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from "@/i18n";
+import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { CreditCard, TrendingUp, TrendingDown, Wallet, BarChart3, Star } from "lucide-vue-next";
 
 defineProps<{
@@ -15,6 +16,7 @@ defineProps<{
 }>();
 
 const { t } = useI18n();
+const { fmtPercent } = useLocaleFormat();
 </script>
 
 <template>
@@ -67,7 +69,7 @@ const { t } = useI18n();
         <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center shrink-0"><Wallet :size="16" class="text-rose-600 dark:text-rose-400" /></div>
         <span class="text-[10px] sm:text-xs text-[var(--color-text-muted)] leading-tight">{{ t('percentage_budget_used') }}</span>
       </div>
-      <p class="text-xl sm:text-2xl font-bold text-[var(--color-text-primary)]">{{ (budgetUsed || 0).toFixed(1) }}%</p>
+      <p class="text-xl sm:text-2xl font-bold text-[var(--color-text-primary)]">{{ fmtPercent(budgetUsed || 0) }}</p>
     </div>
     <div v-if="totalSavings > 0" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-4">
       <div class="flex items-center gap-2 sm:gap-3 mb-2">

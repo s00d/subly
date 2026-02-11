@@ -2,11 +2,13 @@
 import { computed } from "vue";
 import { useAppStore } from "@/stores/appStore";
 import { useI18n } from "@/i18n";
+import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { Wallet, TrendingUp, ArrowRight } from "lucide-vue-next";
 import { useRouter } from "vue-router";
 
 const store = useAppStore();
 const { t } = useI18n();
+const { fmtCurrency, fmtDateShort } = useLocaleFormat();
 const router = useRouter();
 
 const now = new Date();
@@ -39,7 +41,7 @@ const recentExpenses = computed(() =>
     .slice(0, 5)
 );
 
-const symbol = computed(() => store.mainCurrency.value?.symbol || "$");
+const mainCode = computed(() => store.mainCurrency.value?.code || "USD");
 
 function getCategoryName(id: string) {
   return store.state.categories.find((c) => c.id === id)?.name || "";
@@ -63,11 +65,11 @@ function getCategoryName(id: string) {
     <div class="grid grid-cols-2 gap-3 mb-4">
       <div class="p-3 rounded-lg bg-[var(--color-surface-hover)]">
         <p class="text-xs text-[var(--color-text-muted)]">{{ t('this_month') }}</p>
-        <p class="text-lg font-bold text-[var(--color-text-primary)]">{{ symbol }}{{ monthExpenses.toFixed(2) }}</p>
+        <p class="text-lg font-bold text-[var(--color-text-primary)]">{{ fmtCurrency(monthExpenses, mainCode) }}</p>
       </div>
       <div class="p-3 rounded-lg bg-[var(--color-surface-hover)]">
         <p class="text-xs text-[var(--color-text-muted)]">{{ t('this_year') }}</p>
-        <p class="text-lg font-bold text-[var(--color-text-primary)]">{{ symbol }}{{ yearExpenses.toFixed(2) }}</p>
+        <p class="text-lg font-bold text-[var(--color-text-primary)]">{{ fmtCurrency(yearExpenses, mainCode) }}</p>
       </div>
     </div>
 
@@ -78,10 +80,10 @@ function getCategoryName(id: string) {
         class="flex items-center justify-between py-1.5 text-sm">
         <div class="min-w-0">
           <span class="text-[var(--color-text-primary)] truncate block">{{ exp.name }}</span>
-          <span class="text-xs text-[var(--color-text-muted)]">{{ exp.date }} · {{ getCategoryName(exp.categoryId) }}</span>
+          <span class="text-xs text-[var(--color-text-muted)]">{{ fmtDateShort(exp.date) }} · {{ getCategoryName(exp.categoryId) }}</span>
         </div>
         <span class="shrink-0 font-medium text-[var(--color-text-primary)] ml-3">
-          {{ store.state.currencies.find(c => c.id === exp.currencyId)?.symbol }}{{ exp.amount.toFixed(2) }}
+          {{ fmtCurrency(exp.amount, store.state.currencies.find(c => c.id === exp.currencyId)?.code || 'USD') }}
         </span>
       </div>
     </div>

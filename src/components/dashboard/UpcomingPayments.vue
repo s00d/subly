@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Subscription } from "@/schemas/appData";
 import { useI18n } from "@/i18n";
+import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { ArrowRight } from "lucide-vue-next";
 
 defineProps<{
@@ -10,10 +11,7 @@ defineProps<{
 
 const emit = defineEmits<{ navigate: [] }>();
 const { t } = useI18n();
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
+const { fmtDateShort: formatDate } = useLocaleFormat();
 </script>
 
 <template>

@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useAppStore } from "@/stores/appStore";
 import { useI18n } from "@/i18n";
+import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useHeaderActions } from "@/composables/useHeaderActions";
 import type { Expense } from "@/schemas/appData";
 import ExpenseForm from "@/components/expenses/ExpenseForm.vue";
@@ -18,6 +19,7 @@ import {
 const store = useAppStore();
 const { t } = useI18n();
 const { setActions } = useHeaderActions();
+const { fmtDateMedium, fmtNumber, fmtCurrency } = useLocaleFormat();
 
 // ---- Form state ----
 const showForm = ref(false);
@@ -126,10 +128,10 @@ const totalFiltered = computed(() =>
 function getCurrency(id: string) { return store.state.currencies.find((c) => c.id === id); }
 function getCategory(id: string) { return store.state.categories.find((c) => c.id === id); }
 function getPaymentMethod(id: string) { return store.state.paymentMethods.find((p) => p.id === id); }
-function formatDate(d: string) { return d; }
+function formatDate(d: string) { return fmtDateMedium(d); }
 function formatAmount(amount: number, currencyId: string) {
   const cur = getCurrency(currencyId);
-  return `${cur?.symbol || ""}${amount.toFixed(2)}`;
+  return fmtCurrency(amount, cur?.code || "USD");
 }
 
 function handleDelete(id: string) {
@@ -196,7 +198,7 @@ onMounted(() => {
         <span>{{ filteredExpenses.length }} {{ t('expenses').toLowerCase() }}</span>
       </div>
       <div class="text-sm font-semibold text-[var(--color-text-primary)]">
-        {{ store.mainCurrency.value?.symbol }}{{ totalFiltered.toFixed(2) }}
+        {{ fmtCurrency(totalFiltered, store.mainCurrency.value?.code || 'USD') }}
       </div>
     </div>
 

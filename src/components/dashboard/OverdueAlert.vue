@@ -2,6 +2,7 @@
 import type { Subscription } from "@/schemas/appData";
 import { AlertTriangle } from "lucide-vue-next";
 import { useI18n } from "@/i18n";
+import { useLocaleFormat } from "@/composables/useLocaleFormat";
 
 defineProps<{
   subscriptions: Subscription[];
@@ -9,10 +10,7 @@ defineProps<{
 }>();
 
 const { t } = useI18n();
-
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
+const { fmtDateShort: formatDate } = useLocaleFormat();
 </script>
 
 <template>

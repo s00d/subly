@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useAppStore } from "@/stores/appStore";
 import { useI18n } from "@/i18n";
+import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { getPricePerMonth, getDaysUntilPayment, getBillingCycleText, formatCurrency, isOverdue } from "@/services/calculations";
 import type { Subscription } from "@/schemas/appData";
 import Modal from "@/components/ui/Modal.vue";
@@ -27,6 +28,7 @@ const emit = defineEmits<{
 
 const store = useAppStore();
 const { t } = useI18n();
+const { fmtDateFull, fmtDateMedium } = useLocaleFormat();
 
 const sub = computed(() => props.subscription);
 
@@ -63,13 +65,8 @@ const overdue = computed(() =>
   sub.value ? isOverdue(sub.value) : false
 );
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, { weekday: "short", month: "long", day: "numeric", year: "numeric" });
-}
-
-function formatDateShort(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-}
+const formatDate = fmtDateFull;
+const formatDateShort = fmtDateMedium;
 </script>
 
 <template>

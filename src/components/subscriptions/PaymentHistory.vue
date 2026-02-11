@@ -2,6 +2,7 @@
 import { ref, computed } from "vue";
 import { useAppStore } from "@/stores/appStore";
 import { useI18n } from "@/i18n";
+import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { formatCurrency } from "@/services/calculations";
 import type { PaymentRecord } from "@/schemas/appData";
 import { History, Plus, Trash2, ChevronDown, ChevronUp, Receipt } from "lucide-vue-next";
@@ -15,6 +16,7 @@ const props = defineProps<{
 
 const store = useAppStore();
 const { t } = useI18n();
+const { fmtDateMedium } = useLocaleFormat();
 
 const expanded = ref(false);
 const showAddForm = ref(false);
@@ -59,13 +61,7 @@ function deleteRecord(recordId: string) {
   store.deletePaymentRecord(props.subscriptionId, recordId);
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+const formatDate = fmtDateMedium;
 </script>
 
 <template>
