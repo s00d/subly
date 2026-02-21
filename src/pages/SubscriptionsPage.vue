@@ -31,13 +31,20 @@ const { fmt } = useCurrencyFormat();
 const { fmtDateMedium } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 
+const now = ref(Date.now());
+let nowInterval: ReturnType<typeof setInterval> | null = null;
+
 // Register header action
 onMounted(() => {
   setActions([{ id: "add-sub", icon: Plus, title: t("new_subscription"), onClick: openAdd }]);
   // Open subscription detail from tray click (query param ?sub=id)
   handleSubQueryParam();
+  nowInterval = setInterval(() => { now.value = Date.now(); }, 60_000);
 });
-onUnmounted(() => { clearActions(); });
+onUnmounted(() => {
+  clearActions();
+  if (nowInterval) clearInterval(nowInterval);
+});
 
 // Watch for route query changes (e.g. from tray navigation)
 watch(() => route.query.sub, () => handleSubQueryParam());
@@ -242,6 +249,7 @@ async function onMenuSelect(id: string, sub: Subscription) {
 
 // Computed subscriptions list
 const filteredSubscriptions = computed(() => {
+  void now.value;
   let subs = [...store.state.subscriptions];
   if (store.state.settings.hideDisabled) subs = subs.filter((s) => !s.inactive);
   if (filterState.value === "active") subs = subs.filter((s) => !s.inactive);

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/appStore";
 import { useI18n } from "@/i18n";
@@ -29,6 +29,16 @@ const { fmt, toMainCurrency } = useCurrencyFormat();
 const { fmtPercent } = useLocaleFormat();
 
 function goToSubscriptions() { router.push("/subscriptions"); }
+
+const now = ref(Date.now());
+let nowInterval: ReturnType<typeof setInterval> | null = null;
+
+onMounted(() => {
+  nowInterval = setInterval(() => { now.value = Date.now(); }, 60_000);
+});
+onUnmounted(() => {
+  if (nowInterval) clearInterval(nowInterval);
+});
 
 const hasSubscriptions = computed(() => store.state.subscriptions.length > 0);
 
@@ -97,16 +107,18 @@ function moveWidget(id: string, direction: -1 | 1) {
 }
 
 // ---- Data computations ----
-const overdueSubscriptions = computed(() =>
-  store.state.subscriptions.filter((s) => isOverdue(s))
-    .sort((a, b) => new Date(a.nextPayment).getTime() - new Date(b.nextPayment).getTime())
-);
+const overdueSubscriptions = computed(() => {
+  void now.value;
+  return store.state.subscriptions.filter((s) => isOverdue(s))
+    .sort((a, b) => new Date(a.nextPayment).getTime() - new Date(b.nextPayment).getTime());
+});
 
-const upcomingSubscriptions = computed(() =>
-  store.state.subscriptions.filter((s) => isUpcoming(s, 30))
+const upcomingSubscriptions = computed(() => {
+  void now.value;
+  return store.state.subscriptions.filter((s) => isUpcoming(s, 30))
     .sort((a, b) => new Date(a.nextPayment).getTime() - new Date(b.nextPayment).getTime())
-    .slice(0, 5)
-);
+    .slice(0, 5);
+});
 
 const activeSubs = computed(() => store.activeSubscriptions.value);
 const inactiveSubs = computed(() => store.inactiveSubscriptions.value);
@@ -128,22 +140,25 @@ const mostExpensive = computed(() => {
 });
 
 const amountDueThisMonth = computed(() => {
-  const now = new Date();
-  const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  void now.value;
+  const today = new Date();
+  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
   return activeSubs.value.reduce((sum, s) => {
     const next = new Date(s.nextPayment);
-    return (next >= now && next <= endOfMonth) ? sum + toMainCurrency(s.price, s.currencyId) : sum;
+    return (next >= today && next <= endOfMonth) ? sum + toMainCurrency(s.price, s.currencyId) : sum;
   }, 0);
 });
 
 const budget = computed(() => store.state.settings.budget);
 
-// Monthly expenses (one-time)
-const now2 = new Date();
-const currentMonthStr = `${now2.getFullYear()}-${String(now2.getMonth() + 1).padStart(2, "0")}`;
+const currentMonthStr = computed(() => {
+  void now.value;
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+});
 const monthlyExpensesTotal = computed(() =>
   store.state.expenses
-    .filter((e) => e.date.startsWith(currentMonthStr))
+    .filter((e) => e.date.startsWith(currentMonthStr.value))
     .reduce((s, e) => s + toMainCurrency(e.amount, e.currencyId), 0)
 );
 

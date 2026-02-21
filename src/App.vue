@@ -4,6 +4,7 @@ import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/appStore";
 import { checkAndNotify } from "@/services/notifications";
 import { shouldUpdateRates, updateCurrencyRates } from "@/services/currencyUpdater";
+import { setupPushNotifications, startPushNotificationListener } from "@/services/pushNotifications";
 import { useAlerts } from "@/composables/useAlerts";
 import { setupTray, setTraySubscriptionClickHandler } from "@/services/tray";
 import AppLayout from "@/components/layout/AppLayout.vue";
@@ -100,6 +101,22 @@ onMounted(async () => {
 
   // Setup system tray
   await initTray();
+
+  // Setup push notifications (iOS — safe no-op on desktop)
+  try {
+    const pushResult = await setupPushNotifications();
+    if (pushResult.registered && pushResult.token) {
+      console.log("Push notifications registered, token:", pushResult.token);
+    }
+    await startPushNotificationListener((event) => {
+      console.log("Push notification event:", event.type, event.payload);
+      if (event.type === "FOREGROUND_DELIVERY" || event.type === "BACKGROUND_TAP") {
+        runNotificationCheck();
+      }
+    });
+  } catch (e) {
+    console.warn("Push notification init skipped:", e);
+  }
 
   // Global keyboard shortcuts
   document.addEventListener("keydown", handleKeyDown);

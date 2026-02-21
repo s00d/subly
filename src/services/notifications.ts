@@ -147,6 +147,9 @@ export async function checkAndNotify(
 
   const telegramEnabled = telegram?.enabled && telegram.botToken && telegram.chatId;
 
+  // Check system notification permission once upfront
+  const hasPermission = withinSchedule ? await checkNotificationPermission() : false;
+
   for (const sub of subscriptions) {
     if (sub.inactive) continue;
     if (!sub.notify) continue;
@@ -195,21 +198,22 @@ export async function checkAndNotify(
         : (shouldSendPush && diffDays === daysBefore); // non-recurring: only on exact day
 
       if (shouldSendForThisSub) {
-        // System notification — always try, ignore errors
         const vars = { name: sub.name, days: diffDays, price: sub.price };
         const title = settings.notificationTitle || "Subly — Payment Reminder";
         const body = diffDays === 0
           ? applyTemplate(settings.notificationBodyDueToday || 'Payment for "{name}" is due today!', vars)
           : applyTemplate(settings.notificationBodyDueSoon || 'Payment for "{name}" is due in {days} day(s).', vars);
 
-        try {
-          sendNotification({ title, body });
-          sentCount++;
-        } catch (e) {
-          console.warn("Failed to send notification for:", sub.name, e);
+        if (hasPermission) {
+          try {
+            sendNotification({ title, body });
+            sentCount++;
+          } catch (e) {
+            console.warn("Failed to send notification for:", sub.name, e);
+          }
         }
 
-        // Telegram
+        // Telegram (independent of system permission)
         if (telegramEnabled) {
           sendTelegramPaymentReminder(
             { botToken: telegram!.botToken, chatId: telegram!.chatId },
@@ -247,11 +251,14 @@ export async function checkAndNotify(
           settings.notificationOverdueBody || '"{name}" is overdue by {days} day(s).',
           vars,
         );
-        try {
-          sendNotification({ title, body });
-          sentCount++;
-        } catch (e) {
-          console.warn("Failed to send overdue notification for:", sub.name, e);
+
+        if (hasPermission) {
+          try {
+            sendNotification({ title, body });
+            sentCount++;
+          } catch (e) {
+            console.warn("Failed to send overdue notification for:", sub.name, e);
+          }
         }
 
         if (telegramEnabled) {

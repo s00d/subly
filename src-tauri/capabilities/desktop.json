@@ -18,6 +18,8 @@
     "notification:allow-notify",
     "notification:allow-request-permission",
     "notification:allow-is-permission-granted",
+    "notifications:default",
+    "os:default",
     "store:default",
     "fs:default",
     "core:default",
