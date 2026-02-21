@@ -5,13 +5,18 @@ import { useI18n } from "@/i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { formatCurrency } from "@/services/calculations";
 import type { PaymentRecord } from "@/schemas/appData";
-import { History, Plus, Trash2, ChevronDown, ChevronUp, Receipt } from "lucide-vue-next";
+import { History, Plus, Trash2, ChevronDown, ChevronUp, Receipt, RefreshCw } from "lucide-vue-next";
+import Tooltip from "@/components/ui/Tooltip.vue";
 
 const props = defineProps<{
   subscriptionId: string;
   currencyId: string;
   price: number;
   history: PaymentRecord[];
+}>();
+
+const emit = defineEmits<{
+  recordPayment: [id: string];
 }>();
 
 const store = useAppStore();
@@ -77,13 +82,22 @@ const formatDate = fmtDateMedium;
         <span v-if="history.length > 0" class="text-[10px] font-medium text-[var(--color-primary)]">
           {{ t('total') }}: {{ fmt(totalPaid, currencyId) }}
         </span>
-        <button
-          @click="showAddForm = !showAddForm"
-          class="p-1 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-primary)] transition-colors"
-          :title="t('add_payment')"
-        >
-          <Plus :size="13" />
-        </button>
+        <Tooltip :text="t('record_payment')" position="bottom">
+          <button
+            @click="emit('recordPayment', subscriptionId)"
+            class="p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-[var(--color-text-muted)] hover:text-green-600 transition-colors"
+          >
+            <RefreshCw :size="13" />
+          </button>
+        </Tooltip>
+        <Tooltip :text="t('add_payment')" position="bottom">
+          <button
+            @click="showAddForm = !showAddForm"
+            class="p-1 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-primary)] transition-colors"
+          >
+            <Plus :size="13" />
+          </button>
+        </Tooltip>
       </div>
     </div>
 

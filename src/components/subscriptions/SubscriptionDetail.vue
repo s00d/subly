@@ -7,6 +7,7 @@ import { getPricePerMonth, getDaysUntilPayment, getBillingCycleText, formatCurre
 import type { Subscription } from "@/schemas/appData";
 import Modal from "@/components/ui/Modal.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
+import Tooltip from "@/components/ui/Tooltip.vue";
 import PaymentHistory from "@/components/subscriptions/PaymentHistory.vue";
 import { Pencil, Copy, RefreshCw, ExternalLink, Trash2, Calendar, CreditCard, Tag, User, Bell, BellOff, Link, FileText, Clock, AlertTriangle, Power, Star, Hash, CircleDollarSign } from "lucide-vue-next";
 
@@ -216,6 +217,7 @@ const formatDateShort = fmtDateMedium;
         :currencyId="sub.currencyId"
         :price="sub.price"
         :history="sub.paymentHistory || []"
+        @recordPayment="(id: string) => emit('recordPayment', id)"
       />
 
       <!-- Cancellation -->
@@ -227,56 +229,54 @@ const formatDateShort = fmtDateMedium;
     </div>
 
     <template #footer>
-      <div class="flex items-center gap-2 w-full">
-        <!-- Left actions -->
-        <button
-          v-if="sub && !sub.inactive"
-          @click="emit('recordPayment', sub!.id)"
-          class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
-          :title="t('record_payment')"
-        >
-          <CircleDollarSign :size="16" />
-        </button>
-        <button
-          v-if="sub && !sub.autoRenew"
-          @click="emit('renew', sub!.id)"
-          class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
-          :title="t('renew')"
-        >
-          <RefreshCw :size="16" />
-        </button>
-        <button
-          v-if="sub"
-          @click="emit('clone', sub!.id)"
-          class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] transition-colors"
-          :title="t('clone')"
-        >
-          <Copy :size="16" />
-        </button>
-        <button
-          v-if="sub"
-          @click="emit('delete', sub!.id)"
-          class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          :title="t('delete')"
-        >
-          <Trash2 :size="16" />
-        </button>
+      <div class="flex items-center gap-1 w-full">
+        <Tooltip v-if="sub && !sub.inactive" :text="t('record_payment')">
+          <button
+            @click="emit('recordPayment', sub!.id)"
+            class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+          >
+            <CircleDollarSign :size="16" />
+          </button>
+        </Tooltip>
+        <Tooltip v-if="sub" :text="t('renew')">
+          <button
+            @click="emit('renew', sub!.id)"
+            class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+          >
+            <RefreshCw :size="16" />
+          </button>
+        </Tooltip>
+        <Tooltip v-if="sub" :text="t('clone')">
+          <button
+            @click="emit('clone', sub!.id)"
+            class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] transition-colors"
+          >
+            <Copy :size="16" />
+          </button>
+        </Tooltip>
+        <Tooltip v-if="sub" :text="t('edit_subscription')">
+          <button
+            @click="emit('edit', sub!)"
+            class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] transition-colors"
+          >
+            <Pencil :size="16" />
+          </button>
+        </Tooltip>
+        <Tooltip v-if="sub" :text="t('delete')">
+          <button
+            @click="emit('delete', sub!.id)"
+            class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          >
+            <Trash2 :size="16" />
+          </button>
+        </Tooltip>
 
         <div class="flex-1" />
 
-        <!-- Right actions -->
         <button
           @click="emit('close')"
           class="px-4 py-2 rounded-lg border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
         >{{ t('cancel') }}</button>
-        <button
-          v-if="sub"
-          @click="emit('edit', sub!)"
-          class="px-5 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors flex items-center gap-1.5"
-        >
-          <Pencil :size="14" />
-          {{ t('edit_subscription') }}
-        </button>
       </div>
     </template>
   </Modal>

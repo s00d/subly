@@ -15,11 +15,9 @@ import Toast from "@/components/ui/Toast.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
-import AppDropdown from "@/components/ui/AppDropdown.vue";
-import type { DropdownItem } from "@/components/ui/AppDropdown.vue";
-import { Plus, Search, MoreVertical, Pencil, Trash2, Copy, RefreshCw, ExternalLink, CreditCard, AlertTriangle, Star, CheckSquare, Hash, CircleDollarSign, LayoutList, LayoutGrid, Rows3, FolderOpen } from "lucide-vue-next";
-import { markRaw } from "vue";
+import { Plus, Search, Pencil, Trash2, Copy, RefreshCw, ExternalLink, CreditCard, AlertTriangle, Star, CheckSquare, Hash, CircleDollarSign, LayoutList, LayoutGrid, Rows3, FolderOpen } from "lucide-vue-next";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { Menu } from "@tauri-apps/api/menu";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 
 const store = useAppStore();
@@ -199,51 +197,35 @@ function confirmBatchCategory() {
 
 const batchDeleteConfirmIds = ref<string[]>([]);
 
-// Active menu
-const activeMenuId = ref<string | null>(null);
-const menuAnchorEl = ref<HTMLElement | null>(null);
-const menuBtnRefs = ref<Record<string, HTMLElement>>({});
+// Native context menu
+async function showContextMenu(sub: Subscription, event: MouseEvent) {
+  if (selectionMode.value) return;
 
-function setMenuBtnRef(id: string, el: any) {
-  if (el) menuBtnRefs.value[id] = el as HTMLElement;
-}
-
-function toggleMenu(id: string) {
-  if (activeMenuId.value === id) {
-    activeMenuId.value = null;
-    menuAnchorEl.value = null;
-  } else {
-    activeMenuId.value = id;
-    menuAnchorEl.value = menuBtnRefs.value[id] || null;
-  }
-}
-
-function getMenuItems(sub: Subscription): DropdownItem[] {
-  return [
-    { id: "favorite", label: sub.favorite ? t("remove_from_favorites") : t("add_to_favorites"), icon: markRaw(Star) },
-    { id: "record_payment", label: t("record_payment"), icon: markRaw(CircleDollarSign), hidden: sub.inactive },
-    { id: "edit", label: t("edit_subscription"), icon: markRaw(Pencil) },
-    { id: "clone", label: t("clone"), icon: markRaw(Copy) },
-    { id: "renew", label: t("renew"), icon: markRaw(RefreshCw), hidden: sub.autoRenew },
-    { id: "url", label: t("url"), icon: markRaw(ExternalLink), hidden: !sub.url },
-    { id: "copy", label: t("copy"), icon: markRaw(Copy) },
-    { id: "sep", label: "", separator: true },
-    { id: "delete", label: t("delete"), icon: markRaw(Trash2), danger: true },
+  const items: any[] = [
+    { id: "favorite", text: sub.favorite ? t("remove_from_favorites") : t("add_to_favorites"), action: () => store.toggleFavorite(sub.id) },
   ];
-}
+  if (!sub.inactive) {
+    items.push({ id: "record_payment", text: t("record_payment"), action: () => handleRecordPayment(sub.id) });
+  }
+  items.push(
+    { id: "edit", text: t("edit_subscription"), action: () => openEdit(sub) },
+    { id: "clone", text: t("clone"), action: () => handleClone(sub.id) },
+    { id: "renew", text: t("renew"), action: () => handleRenew(sub.id) },
+  );
+  if (sub.url) {
+    items.push({ id: "url", text: t("url"), action: () => handleOpenUrl(sub.url) });
+  }
+  items.push(
+    { id: "copy", text: t("copy"), action: () => handleCopyName(sub) },
+    { item: "Separator" },
+    { id: "delete", text: t("delete"), action: () => requestDelete(sub.id) },
+  );
 
-async function onMenuSelect(id: string, sub: Subscription) {
-  activeMenuId.value = null;
-  menuAnchorEl.value = null;
-  switch (id) {
-    case "favorite": store.toggleFavorite(sub.id); break;
-    case "record_payment": handleRecordPayment(sub.id); break;
-    case "edit": openEdit(sub); break;
-    case "clone": handleClone(sub.id); break;
-    case "renew": handleRenew(sub.id); break;
-    case "url": if (sub.url) handleOpenUrl(sub.url); break;
-    case "copy": handleCopyName(sub); break;
-    case "delete": requestDelete(sub.id); break;
+  try {
+    const menu = await Menu.new({ items });
+    await menu.popup();
+  } catch (e) {
+    console.warn("Context menu failed:", e);
   }
 }
 
@@ -318,7 +300,6 @@ function openEdit(sub: Subscription) {
   detailSub.value = null;
   editingSub.value = sub;
   showForm.value = true;
-  activeMenuId.value = null;
 }
 
 // Delete confirmation
@@ -328,7 +309,6 @@ function requestDelete(id: string) {
   showDetail.value = false;
   detailSub.value = null;
   deleteConfirmId.value = id;
-  activeMenuId.value = null;
 }
 
 function confirmDelete() {
@@ -344,20 +324,17 @@ function cancelDelete() { deleteConfirmId.value = null; }
 function handleClone(id: string) {
   showDetail.value = false;
   store.cloneSubscription(id);
-  activeMenuId.value = null;
   toast(t("subscription_added"));
 }
 
 function handleRenew(id: string) {
   showDetail.value = false;
   store.renewSubscription(id);
-  activeMenuId.value = null;
   toast(t("success"));
 }
 
 function handleRecordPayment(id: string) {
   store.recordPayment(id);
-  activeMenuId.value = null;
   toast(t("payment_recorded"));
   // Refresh detail if open
   if (detailSub.value && detailSub.value.id === id) {
@@ -366,13 +343,11 @@ function handleRecordPayment(id: string) {
 }
 
 async function handleOpenUrl(url: string) {
-  activeMenuId.value = null;
   const fullUrl = url.startsWith("http") ? url : `https://${url}`;
   try { await openUrl(fullUrl); } catch (e) { console.error("Failed to open URL:", e); }
 }
 
 async function handleCopyName(sub: Subscription) {
-  activeMenuId.value = null;
   try { await writeText(sub.name); toast(t("copied_to_clipboard")); }
   catch (e) { console.error("Failed to copy:", e); }
 }
@@ -403,11 +378,6 @@ const stateFilterOptions = computed<SelectOption[]>(() => [
   { value: "active", label: t("active_subscriptions") },
   { value: "inactive", label: t("inactive_subscriptions") },
 ]);
-
-function closeMenu() {
-  activeMenuId.value = null;
-  menuAnchorEl.value = null;
-}
 
 // Detail panel event handlers
 function onDetailEdit(sub: Subscription) { openEdit(sub); }
@@ -552,7 +522,7 @@ function onDetailToggleFavorite(id: string) {
             ]"
           >
             <!-- COMPACT VIEW -->
-            <div v-if="viewMode === 'compact'" class="flex items-center gap-2 px-3 py-2 cursor-pointer" @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)">
+            <div v-if="viewMode === 'compact'" class="flex items-center gap-2 px-3 py-2 cursor-pointer" @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)" @contextmenu.prevent="showContextMenu(sub, $event)">
               <div v-if="selectionMode" class="shrink-0" @click.stop="toggleSelected(sub.id)">
                 <div class="w-4 h-4 rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
                   :class="selectedIds.has(sub.id) ? 'bg-[var(--color-primary)] border-[var(--color-primary)] text-white' : 'border-[var(--color-border)] hover:border-[var(--color-primary)]'"
@@ -570,17 +540,11 @@ function onDetailToggleFavorite(id: string) {
                 :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'text-red-500' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'text-orange-500' : 'text-[var(--color-text-muted)]'"
               >{{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}</span>
               <p class="text-xs font-semibold text-[var(--color-text-primary)] shrink-0">{{ fmt(sub.price, sub.currencyId) }}</p>
-              <div v-if="!selectionMode" class="shrink-0" @click.stop>
-                <button :ref="(el: any) => setMenuBtnRef(sub.id, el)" @click="toggleMenu(sub.id)" class="p-1 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)]">
-                  <MoreVertical :size="14" />
-                </button>
-                <AppDropdown :items="getMenuItems(sub)" :open="activeMenuId === sub.id" :anchorEl="menuAnchorEl" @select="(id: string) => onMenuSelect(id, sub)" @close="closeMenu" />
-              </div>
             </div>
 
             <!-- EXPANDED VIEW (card) -->
             <template v-else-if="viewMode === 'expanded'">
-              <div class="p-4 cursor-pointer" @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)">
+              <div class="p-4 cursor-pointer" @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)" @contextmenu.prevent="showContextMenu(sub, $event)">
                 <div class="flex items-start gap-3 mb-3">
                   <div v-if="selectionMode" class="shrink-0 mt-1" @click.stop="toggleSelected(sub.id)">
                     <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
@@ -602,10 +566,6 @@ function onDetailToggleFavorite(id: string) {
                       <IconDisplay v-if="getCategoryIcon(sub.categoryId)" :icon="getCategoryIcon(sub.categoryId)" :size="12" />
                       {{ getCategoryName(sub.categoryId) }}
                     </p>
-                  </div>
-                  <div v-if="!selectionMode" class="shrink-0" @click.stop>
-                    <button :ref="(el: any) => setMenuBtnRef(sub.id, el)" @click="toggleMenu(sub.id)" class="p-1.5 rounded-lg hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)]"><MoreVertical :size="18" /></button>
-                    <AppDropdown :items="getMenuItems(sub)" :open="activeMenuId === sub.id" :anchorEl="menuAnchorEl" @select="(id: string) => onMenuSelect(id, sub)" @close="closeMenu" />
                   </div>
                 </div>
 
@@ -643,7 +603,7 @@ function onDetailToggleFavorite(id: string) {
 
             <!-- DEFAULT VIEW -->
             <template v-else>
-              <div class="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 cursor-pointer" @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)">
+              <div class="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 cursor-pointer" @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)" @contextmenu.prevent="showContextMenu(sub, $event)">
                 <div v-if="selectionMode" class="shrink-0" @click.stop="toggleSelected(sub.id)">
                   <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
                     :class="selectedIds.has(sub.id) ? 'bg-[var(--color-primary)] border-[var(--color-primary)] text-white' : 'border-[var(--color-border)] hover:border-[var(--color-primary)]'"
@@ -682,10 +642,6 @@ function onDetailToggleFavorite(id: string) {
                 </div>
                 <div class="shrink-0 hidden sm:block" :title="getPaymentMethod(sub.paymentMethodId)?.name">
                   <IconDisplay :icon="getPaymentMethod(sub.paymentMethodId)?.icon || '💳'" :size="22" />
-                </div>
-                <div v-if="!selectionMode" class="shrink-0" @click.stop>
-                  <button :ref="(el: any) => setMenuBtnRef(sub.id, el)" @click="toggleMenu(sub.id)" class="p-1 sm:p-1.5 rounded-lg hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)]"><MoreVertical :size="16" /></button>
-                  <AppDropdown :items="getMenuItems(sub)" :open="activeMenuId === sub.id" :anchorEl="menuAnchorEl" @select="(id: string) => onMenuSelect(id, sub)" @close="closeMenu" />
                 </div>
               </div>
               <div v-if="store.state.settings.showSubscriptionProgress && !sub.inactive" class="h-1 bg-[var(--color-surface-hover)]">

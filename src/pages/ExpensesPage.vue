@@ -12,9 +12,10 @@ import AppSelect from "@/components/ui/AppSelect.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import {
-  Plus, Search, Trash2, Edit3, CheckSquare, Square, X, Hash,
+  Plus, Search, Trash2, CheckSquare, Square, X, Hash,
   ArrowUpDown, Calendar as CalendarIcon, Wallet,
 } from "lucide-vue-next";
+import { Menu } from "@tauri-apps/api/menu";
 
 const store = useAppStore();
 const { t } = useI18n();
@@ -138,6 +139,23 @@ function handleDelete(id: string) {
   store.deleteExpense(id);
 }
 
+async function showContextMenu(exp: Expense, event: MouseEvent) {
+  if (selectionMode.value) return;
+
+  try {
+    const menu = await Menu.new({
+      items: [
+        { id: "edit", text: t("edit"), action: () => openEdit(exp) },
+        { item: "Separator" },
+        { id: "delete", text: t("delete"), action: () => handleDelete(exp.id) },
+      ],
+    });
+    await menu.popup();
+  } catch (e) {
+    console.warn("Context menu failed:", e);
+  }
+}
+
 // ---- Header action ----
 onMounted(() => {
   setActions([{ id: "add-expense", icon: Plus, title: t("add_expense"), onClick: openAdd }]);
@@ -218,8 +236,9 @@ onMounted(() => {
       <div
         v-for="exp in filteredExpenses"
         :key="exp.id"
-        class="flex items-center gap-3 p-3 sm:p-4 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-primary)]/40 transition-all cursor-pointer group"
+        class="flex items-center gap-3 p-3 sm:p-4 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] hover:border-[var(--color-primary)]/40 transition-all cursor-pointer"
         @click="selectionMode ? toggleSelect(exp.id) : openEdit(exp)"
+        @contextmenu.prevent="showContextMenu(exp, $event)"
       >
         <!-- Checkbox (selection mode) -->
         <button v-if="selectionMode" @click.stop="toggleSelect(exp.id)" class="shrink-0">
@@ -256,15 +275,6 @@ onMounted(() => {
           </span>
         </div>
 
-        <!-- Actions -->
-        <div v-if="!selectionMode" class="shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button @click.stop="openEdit(exp)" class="p-1.5 rounded hover:bg-[var(--color-surface-hover)]">
-            <Edit3 :size="14" class="text-[var(--color-text-muted)]" />
-          </button>
-          <button @click.stop="handleDelete(exp.id)" class="p-1.5 rounded hover:bg-red-500/10">
-            <Trash2 :size="14" class="text-red-400" />
-          </button>
-        </div>
       </div>
     </div>
 
