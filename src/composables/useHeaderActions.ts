@@ -13,7 +13,7 @@ export function useHeaderActions() {
   function setActions(newActions: HeaderAction[]) {
     actions.value = newActions.map((a) => ({
       ...a,
-      icon: markRaw(a.icon as any),
+      icon: markRaw(a.icon as object) as Component,
     }));
   }
 

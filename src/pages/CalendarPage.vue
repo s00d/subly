@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useAppStore } from "@/stores/appStore";
-import { useI18n } from "@/i18n";
+import { ref, computed, onMounted, watch } from "vue";
+import { useSubscriptionsStore } from "@/stores/subscriptions";
+import { useExpensesStore } from "@/stores/expenses";
+import { useI18n } from "vue-i18n";
+import { useHeaderActions } from "@/composables/useHeaderActions";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useToast } from "@/composables/useToast";
@@ -14,15 +16,22 @@ import CalendarMonthStats from "@/components/calendar/CalendarMonthStats.vue";
 import CalendarDayModal from "@/components/calendar/CalendarDayModal.vue";
 import SubscriptionDetail from "@/components/subscriptions/SubscriptionDetail.vue";
 import SubscriptionForm from "@/components/subscriptions/SubscriptionForm.vue";
+import ExpenseDetail from "@/components/expenses/ExpenseDetail.vue";
+import ExpenseForm from "@/components/expenses/ExpenseForm.vue";
 import Toast from "@/components/ui/Toast.vue";
-import type { Subscription } from "@/schemas/appData";
+import type { Subscription, Expense } from "@/schemas/appData";
+import { dbGetExpensesForMonth } from "@/services/database";
 import { AlertTriangle } from "lucide-vue-next";
 
-const store = useAppStore();
+const subsStore = useSubscriptionsStore();
+const expsStore = useExpensesStore();
 const { t } = useI18n();
+const { clearActions } = useHeaderActions();
 const { fmt: fmtMain, getCurrencyRate } = useCurrencyFormat();
 const { fmtMonthYear, fmtDateMedium } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
+
+onMounted(() => clearActions());
 
 // --- Navigation ---
 const now = new Date();
@@ -68,6 +77,16 @@ function resetMonth() {
 }
 
 // --- Grid ---
+const monthExpenses = ref<Expense[]>([]);
+
+async function loadMonthExpenses() {
+  const monthStr = `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, "0")}`;
+  monthExpenses.value = await dbGetExpensesForMonth(monthStr);
+}
+
+watch([currentYear, currentMonth], loadMonthExpenses);
+onMounted(() => loadMonthExpenses());
+
 const calendarGrid = computed<CalendarCell[]>(() => {
   const year = currentYear.value;
   const month = currentMonth.value;
@@ -79,7 +98,7 @@ const calendarGrid = computed<CalendarCell[]>(() => {
   const todayMonth = today.getMonth();
   const todayYear = today.getFullYear();
 
-  const activeSubs = store.state.subscriptions.filter((s) => !s.inactive);
+  const activeSubs = subsStore.subscriptions.filter((s) => !s.inactive);
   const subsByDay: Record<number, CalendarCell["subs"]> = {};
 
   for (const sub of activeSubs) {
@@ -90,15 +109,11 @@ const calendarGrid = computed<CalendarCell[]>(() => {
     }
   }
 
-  // Expenses for this month
   const expByDay: Record<number, { id: string; name: string; amount: number; currencyId: string }[]> = {};
-  const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
-  for (const exp of store.state.expenses) {
-    if (exp.date.startsWith(monthStr)) {
-      const d = parseInt(exp.date.split("-")[2], 10);
-      if (!expByDay[d]) expByDay[d] = [];
-      expByDay[d].push({ id: exp.id, name: exp.name, amount: exp.amount, currencyId: exp.currencyId });
-    }
+  for (const exp of monthExpenses.value) {
+    const d = parseInt(exp.date.split("-")[2], 10);
+    if (!expByDay[d]) expByDay[d] = [];
+    expByDay[d].push({ id: exp.id, name: exp.name, amount: exp.amount, currencyId: exp.currencyId });
   }
 
   const cells: CalendarCell[] = [];
@@ -165,7 +180,7 @@ const detailSub = ref<Subscription | null>(null);
 const showDetail = ref(false);
 
 function openSubDetail(subId: string) {
-  const sub = store.state.subscriptions.find((s) => s.id === subId);
+  const sub = subsStore.subscriptions.find((s) => s.id === subId);
   if (sub) {
     selectedDay.value = null;
     detailSub.value = sub;
@@ -190,14 +205,14 @@ function handleEdit(sub: Subscription) {
 
 function handleClone(id: string) {
   closeDetail();
-  store.cloneSubscription(id);
+  subsStore.cloneSubscription(id);
   toast(t("subscription_added"));
 }
 
 function handleRenew(id: string) {
   closeDetail();
-  store.renewSubscription(id);
-  toast(t("success"));
+  subsStore.renewSubscription(id);
+  toast(t("payment_recorded"));
 }
 
 // --- Delete ---
@@ -210,7 +225,7 @@ function handleDelete(id: string) {
 
 function confirmDelete() {
   if (deleteConfirmId.value) {
-    store.deleteSubscription(deleteConfirmId.value);
+    subsStore.deleteSubscription(deleteConfirmId.value);
     toast(t("subscription_deleted"));
   }
   deleteConfirmId.value = null;
@@ -227,6 +242,65 @@ function handleOpenUrl(url: string) {
 
 function onSaved() {
   toast(editingSub.value ? t("subscription_updated") : t("subscription_added"));
+}
+
+// --- Expense detail ---
+const detailExp = ref<Expense | null>(null);
+const showExpDetail = ref(false);
+
+function openExpDetail(expId: string) {
+  const exp = monthExpenses.value.find((e) => e.id === expId);
+  if (exp) {
+    selectedDay.value = null;
+    detailExp.value = exp;
+    showExpDetail.value = true;
+  }
+}
+
+function closeExpDetail() {
+  showExpDetail.value = false;
+  detailExp.value = null;
+}
+
+// --- Expense edit form ---
+const showExpForm = ref(false);
+const editingExp = ref<Expense | null>(null);
+
+function handleExpEdit(exp: Expense) {
+  closeExpDetail();
+  editingExp.value = exp;
+  showExpForm.value = true;
+}
+
+async function onExpSaved() {
+  toast(editingExp.value ? t("expense_updated") : t("expense_added"));
+  await loadMonthExpenses();
+}
+
+// --- Expense delete ---
+const deleteExpConfirmId = ref<string | null>(null);
+
+function handleExpDelete(id: string) {
+  closeExpDetail();
+  deleteExpConfirmId.value = id;
+}
+
+async function confirmExpDelete() {
+  if (deleteExpConfirmId.value) {
+    await expsStore.deleteExpense(deleteExpConfirmId.value);
+    toast(t("expense_deleted"));
+    await loadMonthExpenses();
+  }
+  deleteExpConfirmId.value = null;
+}
+
+function cancelExpDelete() {
+  deleteExpConfirmId.value = null;
+}
+
+async function handleExpOpenUrl(url: string) {
+  const fullUrl = url.startsWith("http") ? url : `https://${url}`;
+  openUrl(fullUrl).catch(console.warn);
 }
 </script>
 
@@ -260,6 +334,7 @@ function onSaved() {
       :expenses="selectedDay?.expenses || []"
       @close="selectedDay = null"
       @selectSub="openSubDetail"
+      @selectExp="openExpDetail"
     />
 
     <!-- Subscription detail -->
@@ -272,8 +347,8 @@ function onSaved() {
       @renew="handleRenew"
       @delete="handleDelete"
       @openUrl="handleOpenUrl"
-      @toggleFavorite="(id: string) => { store.toggleFavorite(id); if (detailSub && detailSub.id === id) detailSub = { ...store.state.subscriptions.find((s) => s.id === id)! }; }"
-      @recordPayment="(id: string) => { store.recordPayment(id); if (detailSub && detailSub.id === id) detailSub = { ...store.state.subscriptions.find((s) => s.id === id)! }; }"
+      @toggleFavorite="(id: string) => { subsStore.toggleFavorite(id); if (detailSub && detailSub.id === id) detailSub = { ...subsStore.subscriptions.find((s) => s.id === id)! }; }"
+      @recordPayment="(id: string) => { subsStore.recordPayment(id); if (detailSub && detailSub.id === id) detailSub = { ...subsStore.subscriptions.find((s) => s.id === id)! }; }"
     />
 
     <!-- Edit / Add form -->
@@ -294,19 +369,66 @@ function onSaved() {
         leave-from-class="opacity-100"
         leave-to-class="opacity-0"
       >
-        <div v-if="deleteConfirmId" class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div v-if="deleteConfirmId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div class="absolute inset-0 bg-black/50" @click="cancelDelete" />
-          <div class="relative bg-[var(--color-surface)] rounded-xl shadow-2xl w-full max-w-sm p-6">
-            <div class="flex items-center gap-3 mb-4">
-              <div class="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                <AlertTriangle :size="20" class="text-red-500" />
+          <div class="relative bg-[var(--color-surface)] w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
+            <div class="flex items-center gap-3 mb-3 sm:mb-4">
+              <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+                <AlertTriangle :size="18" class="text-red-500" />
               </div>
-              <h3 class="text-lg font-semibold text-[var(--color-text-primary)]">{{ t('delete') }}</h3>
+              <h3 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('delete') }}</h3>
             </div>
-            <p class="text-sm text-[var(--color-text-secondary)] mb-6">{{ t('confirm_delete_subscription') }}</p>
-            <div class="flex justify-end gap-3">
-              <button @click="cancelDelete" class="px-4 py-2 rounded-lg border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">{{ t('cancel') }}</button>
-              <button @click="confirmDelete" class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">{{ t('delete') }}</button>
+            <p class="text-xs sm:text-sm text-[var(--color-text-secondary)] mb-4 sm:mb-6">{{ t('confirm_delete_subscription') }}</p>
+            <div class="flex justify-end gap-2 sm:gap-3">
+              <button @click="cancelDelete" class="px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-xs sm:text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">{{ t('cancel') }}</button>
+              <button @click="confirmDelete" class="px-3 sm:px-4 py-2 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-medium hover:bg-red-700">{{ t('delete') }}</button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
+    <!-- Expense detail -->
+    <ExpenseDetail
+      :show="showExpDetail"
+      :expense="detailExp"
+      @close="closeExpDetail"
+      @edit="handleExpEdit"
+      @delete="handleExpDelete"
+      @openUrl="handleExpOpenUrl"
+    />
+
+    <!-- Expense edit form -->
+    <ExpenseForm
+      :show="showExpForm"
+      :editExpense="editingExp"
+      @close="showExpForm = false"
+      @saved="onExpSaved"
+    />
+
+    <!-- Expense delete confirmation -->
+    <Teleport to="body">
+      <Transition
+        enter-active-class="transition ease-out duration-200"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition ease-in duration-150"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div v-if="deleteExpConfirmId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
+          <div class="absolute inset-0 bg-black/50" @click="cancelExpDelete" />
+          <div class="relative bg-[var(--color-surface)] w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
+            <div class="flex items-center gap-3 mb-3 sm:mb-4">
+              <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+                <AlertTriangle :size="18" class="text-red-500" />
+              </div>
+              <h3 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('delete') }}</h3>
+            </div>
+            <p class="text-xs sm:text-sm text-[var(--color-text-secondary)] mb-4 sm:mb-6">{{ t('confirm_delete_expense') }}</p>
+            <div class="flex justify-end gap-2 sm:gap-3">
+              <button @click="cancelExpDelete" class="px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-xs sm:text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">{{ t('cancel') }}</button>
+              <button @click="confirmExpDelete" class="px-3 sm:px-4 py-2 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-medium hover:bg-red-700">{{ t('delete') }}</button>
             </div>
           </div>
         </div>

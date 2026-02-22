@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useAppStore } from "@/stores/appStore";
-import { useI18n } from "@/i18n";
+import { useSettingsStore } from "@/stores/settings";
+import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppToggle from "@/components/ui/AppToggle.vue";
@@ -11,45 +11,46 @@ import { enable as enableAutostart, disable as disableAutostart, isEnabled as is
 import { sendTestNotification } from "@/services/notifications";
 import { playNotificationSound } from "@/services/sound";
 import { Bell, Volume2 } from "lucide-vue-next";
+import Tooltip from "@/components/ui/Tooltip.vue";
 
-const store = useAppStore();
+const settingsStore = useSettingsStore();
 const { t } = useI18n();
 const { toast } = useToast();
 
 // --- Budget ---
-const budgetInput = ref(store.state.settings.budget);
+const budgetInput = ref(settingsStore.settings.budget);
 function saveBudget() {
-  store.updateSettings({ budget: budgetInput.value });
+  settingsStore.updateSettings({ budget: budgetInput.value });
   toast(t("success"));
 }
 
 // --- Notify days ---
-const notifyDaysBefore = ref(store.state.settings.notifyDaysBefore);
+const notifyDaysBefore = ref(settingsStore.settings.notifyDaysBefore);
 function saveNotifyDays() {
-  store.updateSettings({ notifyDaysBefore: notifyDaysBefore.value });
+  settingsStore.updateSettings({ notifyDaysBefore: notifyDaysBefore.value });
   toast(t("success"));
 }
 
 // --- Recurring notifications ---
-const recurringNotifications = ref(store.state.settings.recurringNotifications !== false);
+const recurringNotifications = ref(settingsStore.settings.recurringNotifications !== false);
 function toggleRecurring() {
   recurringNotifications.value = !recurringNotifications.value;
-  store.updateSettings({ recurringNotifications: recurringNotifications.value });
+  settingsStore.updateSettings({ recurringNotifications: recurringNotifications.value });
 }
 
 // --- Notification sound ---
-const notificationSound = ref(store.state.settings.notificationSound !== false);
+const notificationSound = ref(settingsStore.settings.notificationSound !== false);
 function toggleNotificationSound() {
   notificationSound.value = !notificationSound.value;
-  store.updateSettings({ notificationSound: notificationSound.value });
+  settingsStore.updateSettings({ notificationSound: notificationSound.value });
 }
 function handleTestSound() {
   playNotificationSound();
 }
 
 // --- Notification schedule ---
-const notifSchedule = ref(store.state.settings.notificationSchedule || "any");
-const notifCustomHour = ref(store.state.settings.notificationCustomHour ?? 9);
+const notifSchedule = ref(settingsStore.settings.notificationSchedule || "any");
+const notifCustomHour = ref(settingsStore.settings.notificationCustomHour ?? 9);
 
 const scheduleOptions = computed<SelectOption[]>(() => [
   { value: "any", label: t("schedule_any") },
@@ -59,7 +60,7 @@ const scheduleOptions = computed<SelectOption[]>(() => [
 ]);
 
 function saveSchedule() {
-  store.updateSettings({
+  settingsStore.updateSettings({
     notificationSchedule: notifSchedule.value as "any" | "morning" | "evening" | "custom",
     notificationCustomHour: notifCustomHour.value,
   });
@@ -67,14 +68,14 @@ function saveSchedule() {
 }
 
 // --- Notification templates ---
-const notifTitle = ref(store.state.settings.notificationTitle);
-const notifBodyToday = ref(store.state.settings.notificationBodyDueToday);
-const notifBodySoon = ref(store.state.settings.notificationBodyDueSoon);
-const notifOverdueTitle = ref(store.state.settings.notificationOverdueTitle);
-const notifOverdueBody = ref(store.state.settings.notificationOverdueBody);
+const notifTitle = ref(settingsStore.settings.notificationTitle);
+const notifBodyToday = ref(settingsStore.settings.notificationBodyDueToday);
+const notifBodySoon = ref(settingsStore.settings.notificationBodyDueSoon);
+const notifOverdueTitle = ref(settingsStore.settings.notificationOverdueTitle);
+const notifOverdueBody = ref(settingsStore.settings.notificationOverdueBody);
 
 function saveNotifTemplates() {
-  store.updateSettings({
+  settingsStore.updateSettings({
     notificationTitle: notifTitle.value,
     notificationBodyDueToday: notifBodyToday.value,
     notificationBodyDueSoon: notifBodySoon.value,
@@ -91,7 +92,7 @@ async function handleTestNotification() {
   try {
     const result = await sendTestNotification();
     // Play sound if enabled
-    if (store.state.settings.notificationSound !== false) {
+    if (settingsStore.settings.notificationSound !== false) {
       playNotificationSound();
     }
     if (result.system) {
@@ -126,24 +127,24 @@ loadAutostartStatus();
 </script>
 
 <template>
-  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-5">
-    <h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-4">{{ t('budget_and_notifications') }}</h2>
+  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+    <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('budget_and_notifications') }}</h2>
 
     <!-- Monthly budget -->
-    <div class="flex gap-3 items-end mb-2">
+    <div class="flex gap-2 sm:gap-3 items-end mb-2">
       <div class="flex-1">
         <AppInput v-model="budgetInput" type="number" min="0" step="0.01" :label="t('monthly_budget')" />
       </div>
-      <button @click="saveBudget" class="px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors">{{ t('save') }}</button>
+      <button @click="saveBudget" class="px-3 sm:px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-xs sm:text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors shrink-0">{{ t('save') }}</button>
     </div>
     <p class="text-xs text-[var(--color-text-muted)] mb-5">{{ t('budget_info') }}</p>
 
     <!-- Notify days -->
-    <div class="flex gap-3 items-end mb-4">
+    <div class="flex gap-2 sm:gap-3 items-end mb-4">
       <div class="flex-1">
         <AppInput v-model="notifyDaysBefore" type="number" :label="t('notify_days_before')" min="0" max="30" />
       </div>
-      <button @click="saveNotifyDays" class="px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors">{{ t('save') }}</button>
+      <button @click="saveNotifyDays" class="px-3 sm:px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-xs sm:text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors shrink-0">{{ t('save') }}</button>
     </div>
 
     <!-- Recurring notifications -->
@@ -166,24 +167,25 @@ loadAutostartStatus();
           :description="t('notification_sound_info')"
         />
       </div>
-      <button
-        @click="handleTestSound"
-        class="p-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
-        :title="t('test_sound')"
-      >
-        <Volume2 :size="16" />
-      </button>
+      <Tooltip :text="t('test_sound')">
+        <button
+          @click="handleTestSound"
+          class="p-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
+        >
+          <Volume2 :size="16" />
+        </button>
+      </Tooltip>
     </div>
 
     <!-- Notification schedule -->
-    <div class="flex gap-3 items-end mb-4">
-      <div class="flex-1">
+    <div class="flex flex-wrap gap-2 sm:gap-3 items-end mb-4">
+      <div class="flex-1 min-w-[140px]">
         <AppSelect v-model="notifSchedule" :options="scheduleOptions" :label="t('notification_schedule')" />
       </div>
-      <div v-if="notifSchedule === 'custom'" class="w-24">
+      <div v-if="notifSchedule === 'custom'" class="w-20 sm:w-24">
         <AppInput v-model="notifCustomHour" type="number" :label="t('hour')" min="0" max="23" />
       </div>
-      <button @click="saveSchedule" class="px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors">{{ t('save') }}</button>
+      <button @click="saveSchedule" class="px-3 sm:px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-xs sm:text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors shrink-0">{{ t('save') }}</button>
     </div>
     <p class="text-xs text-[var(--color-text-muted)] mb-5">{{ t('notification_schedule_info') }}</p>
 

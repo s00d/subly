@@ -1,22 +1,22 @@
 import { computed } from "vue";
-import { useAppStore } from "@/stores/appStore";
+import { useCatalogStore } from "@/stores/catalog";
 import { formatCurrency, convertPrice } from "@/services/calculations";
 
 export function useCurrencyFormat() {
-  const store = useAppStore();
+  const catalogStore = useCatalogStore();
 
-  const mainCurrency = computed(() => store.mainCurrency.value);
+  const mainCurrency = computed(() => catalogStore.mainCurrency);
 
   function fmt(amount: number, currencyId?: string): string {
     if (currencyId) {
-      const c = store.state.currencies.find((cur) => cur.id === currencyId);
+      const c = catalogStore.currencies.find((cur) => cur.id === currencyId);
       return formatCurrency(amount, c?.code || "USD", c?.symbol);
     }
     return formatCurrency(amount, mainCurrency.value?.code || "USD", mainCurrency.value?.symbol);
   }
 
   function getCurrencyRate(currencyId: string): number {
-    return store.state.currencies.find((c) => c.id === currencyId)?.rate || 1;
+    return catalogStore.currencies.find((c) => c.id === currencyId)?.rate || 1;
   }
 
   function toMainCurrency(price: number, currencyId: string): number {

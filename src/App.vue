@@ -2,45 +2,69 @@
 import { onMounted, onUnmounted, watch, computed } from "vue";
 import { useRouter } from "vue-router";
 import { useAppStore } from "@/stores/appStore";
+import { useSubscriptionsStore } from "@/stores/subscriptions";
+import { useSettingsStore } from "@/stores/settings";
+import { useCatalogStore } from "@/stores/catalog";
 import { checkAndNotify } from "@/services/notifications";
-import { shouldUpdateRates, updateCurrencyRates } from "@/services/currencyUpdater";
+import { shouldUpdateRates, updateCurrencyRates } from "@/services/rates";
+import type { RatesProviderType } from "@/services/rates";
 import { setupPushNotifications, startPushNotificationListener } from "@/services/pushNotifications";
+import { initSync, setSyncCallbacks, syncStatus, pullRemote, dismissPendingUpdate } from "@/services/sync";
+import { useI18n } from "vue-i18n";
+import { useToast } from "@/composables/useToast";
 import { useAlerts } from "@/composables/useAlerts";
 import { setupTray, setTraySubscriptionClickHandler } from "@/services/tray";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import InAppAlerts from "@/components/ui/InAppAlerts.vue";
 
 const router = useRouter();
-const store = useAppStore();
+const appStore = useAppStore();
+const subsStore = useSubscriptionsStore();
+const settingsStore = useSettingsStore();
+const catalogStore = useCatalogStore();
 const { alerts, setAlerts, dismiss, dismissAll } = useAlerts();
+const { t } = useI18n();
+const { toast } = useToast();
+
+async function handlePullRemote() {
+  const ok = await pullRemote();
+  if (ok) {
+    toast(t("sync_pull_success"));
+  } else if (syncStatus.error) {
+    toast(syncStatus.error, "error");
+  }
+}
+
+function handleDismissSync() {
+  dismissPendingUpdate();
+}
 
 async function initTray() {
   try {
     await setupTray(
-      store.state.subscriptions,
-      store.state.settings,
-      store.state.currencies,
+      subsStore.subscriptions,
+      settingsStore.settings,
+      catalogStore.currencies,
     );
   } catch (e) {
     console.warn("Tray setup failed:", e);
   }
 }
 
-// Periodic notification check interval
 let notificationInterval: ReturnType<typeof setInterval> | null = null;
 
 async function runNotificationCheck() {
   try {
     const result = await checkAndNotify({
-      subscriptions: store.state.subscriptions,
-      settings: store.state.settings,
+      subscriptions: subsStore.subscriptions,
+      settings: settingsStore.settings,
       telegram: {
-        botToken: store.state.telegramBotToken,
-        chatId: store.state.telegramChatId,
-        enabled: store.state.telegramEnabled,
+        botToken: settingsStore.telegramBotToken,
+        chatId: settingsStore.telegramChatId,
+        enabled: settingsStore.telegramEnabled,
       },
-      currencies: store.state.currencies,
-      onNotified: (subId, date) => store.markNotified(subId, date),
+      currencies: catalogStore.currencies,
+      onNotified: (subId, date) => subsStore.markNotified(subId, date),
     });
     if (result.alerts.length > 0) {
       setAlerts(result.alerts);
@@ -52,21 +76,27 @@ async function runNotificationCheck() {
 
 async function runCurrencyUpdate() {
   try {
-    const s = store.state.settings;
+    const s = settingsStore.settings;
     if (!s.currencyAutoUpdate) return;
-    if (!store.state.fixerApiKey) return;
+    const providerType = settingsStore.ratesProvider as RatesProviderType;
+    const apiKey = settingsStore.ratesApiKey;
+    if (!apiKey && providerType !== "frankfurter") return;
     if (!shouldUpdateRates(s.lastCurrencyUpdate)) return;
 
     const result = await updateCurrencyRates(
-      store.state.fixerApiKey,
-      store.state.fixerProvider,
-      store.state.currencies,
+      providerType,
+      apiKey,
+      catalogStore.currencies,
       s.mainCurrencyId,
       s.currencyUpdateTargets,
+      {
+        historyEnabled: s.rateHistoryEnabled,
+        historyDays: s.rateHistoryDays,
+      },
     );
 
     if (result.updated > 0) {
-      store.updateSettings({ lastCurrencyUpdate: new Date().toISOString().split("T")[0] });
+      settingsStore.updateSettings({ lastCurrencyUpdate: new Date().toISOString().split("T")[0] });
       console.log(`Currency rates updated: ${result.updated} currencies`);
     }
     if (result.error) {
@@ -78,31 +108,24 @@ async function runCurrencyUpdate() {
 }
 
 onMounted(async () => {
-  await store.init();
+  await appStore.init();
   applyTheme();
   applyColorTheme();
 
-  // Initial notification check
   await runNotificationCheck();
-
-  // Auto-update currency rates
   await runCurrencyUpdate();
 
-  // Check every 30 minutes
   notificationInterval = setInterval(() => {
     runNotificationCheck();
     runCurrencyUpdate();
   }, 30 * 60 * 1000);
 
-  // Setup tray subscription click handler — navigate to subscription detail
   setTraySubscriptionClickHandler((subId: string) => {
     router.push({ path: "/subscriptions", query: { sub: subId } });
   });
 
-  // Setup system tray
   await initTray();
 
-  // Setup push notifications (iOS — safe no-op on desktop)
   try {
     const pushResult = await setupPushNotifications();
     if (pushResult.registered && pushResult.token) {
@@ -118,7 +141,16 @@ onMounted(async () => {
     console.warn("Push notification init skipped:", e);
   }
 
-  // Global keyboard shortcuts
+  try {
+    setSyncCallbacks(
+      (data) => appStore.importData(data),
+      () => appStore.getExportData(),
+    );
+    await initSync();
+  } catch (e) {
+    console.warn("Sync init skipped:", e);
+  }
+
   document.addEventListener("keydown", handleKeyDown);
 });
 
@@ -127,17 +159,14 @@ onUnmounted(() => {
   if (notificationInterval) clearInterval(notificationInterval);
 });
 
-// Update tray when subscriptions change
 watch(
-  () => store.state.subscriptions,
+  () => subsStore.subscriptions,
   () => initTray(),
   { deep: true },
 );
 
 function handleKeyDown(e: KeyboardEvent) {
   const isMod = e.metaKey || e.ctrlKey;
-
-  // Ctrl/Cmd+1..4 for navigation
   if (isMod && !e.shiftKey) {
     switch (e.key) {
       case "1": e.preventDefault(); router.push("/"); break;
@@ -149,7 +178,7 @@ function handleKeyDown(e: KeyboardEvent) {
 }
 
 function applyTheme() {
-  const dt = store.state.settings.darkTheme;
+  const dt = settingsStore.settings.darkTheme;
   if (dt === 1) {
     document.documentElement.classList.add("dark");
   } else if (dt === 0) {
@@ -161,27 +190,25 @@ function applyTheme() {
 }
 
 function applyColorTheme() {
-  const theme = store.state.settings.colorTheme;
+  const theme = settingsStore.settings.colorTheme;
   document.body.className = document.body.className.replace(/theme-\w+/g, "").trim();
   if (theme !== "blue") {
     document.body.classList.add(`theme-${theme}`);
   }
 }
 
-// Watch for theme changes
-watch(() => store.state.settings.darkTheme, applyTheme);
-watch(() => store.state.settings.colorTheme, applyColorTheme);
+watch(() => settingsStore.settings.darkTheme, applyTheme);
+watch(() => settingsStore.settings.colorTheme, applyColorTheme);
 
-// Listen for system theme changes
 if (typeof window !== "undefined") {
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-    if (store.state.settings.darkTheme === 2) applyTheme();
+    if (settingsStore.settings.darkTheme === 2) applyTheme();
   });
 }
 </script>
 
 <template>
-  <div v-if="store.isLoading.value" class="h-screen flex items-center justify-center bg-[var(--color-surface-secondary)]">
+  <div v-if="appStore.isLoading" class="h-screen flex items-center justify-center bg-[var(--color-surface-secondary)]">
     <div class="text-center">
       <div class="w-12 h-12 rounded-xl bg-[var(--color-primary)] flex items-center justify-center mx-auto mb-3">
         <span class="text-white font-bold text-xl">W</span>
@@ -190,6 +217,32 @@ if (typeof window !== "undefined") {
     </div>
   </div>
   <AppLayout v-else>
+    <!-- Cloud sync update banner -->
+    <div
+      v-if="syncStatus.pendingUpdate"
+      class="mx-3 mt-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 flex items-start sm:items-center gap-3 flex-col sm:flex-row"
+    >
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-blue-800 dark:text-blue-200">{{ t('sync_remote_newer') }}</p>
+        <p class="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{{ t('sync_remote_newer_desc') }}</p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button
+          @click="handlePullRemote"
+          :disabled="syncStatus.syncing"
+          class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {{ syncStatus.syncing ? t('sync_syncing') : t('sync_pull') }}
+        </button>
+        <button
+          @click="handleDismissSync"
+          class="px-3 py-1.5 rounded-lg text-blue-600 dark:text-blue-400 text-xs font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+        >
+          {{ t('sync_dismiss') }}
+        </button>
+      </div>
+    </div>
+
     <!-- In-app alerts banner (shown on every page) -->
     <InAppAlerts
       :alerts="alerts"

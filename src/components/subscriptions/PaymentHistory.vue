@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useAppStore } from "@/stores/appStore";
-import { useI18n } from "@/i18n";
+import { useSubscriptionsStore } from "@/stores/subscriptions";
+import { useSettingsStore } from "@/stores/settings";
+import { useCatalogStore } from "@/stores/catalog";
+import { useI18n } from "vue-i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { formatCurrency } from "@/services/calculations";
-import type { PaymentRecord } from "@/schemas/appData";
+import type { PaymentRecord, Currency } from "@/schemas/appData";
 import { History, Plus, Trash2, ChevronDown, ChevronUp, Receipt, RefreshCw } from "lucide-vue-next";
 import Tooltip from "@/components/ui/Tooltip.vue";
 
@@ -19,7 +21,9 @@ const emit = defineEmits<{
   recordPayment: [id: string];
 }>();
 
-const store = useAppStore();
+const subsStore = useSubscriptionsStore();
+const settingsStore = useSettingsStore();
+const catalogStore = useCatalogStore();
 const { t } = useI18n();
 const { fmtDateMedium } = useLocaleFormat();
 
@@ -32,8 +36,33 @@ const addAmount = ref(props.price);
 const addNote = ref("");
 
 function fmt(amount: number, curId: string): string {
-  const c = store.state.currencies.find((cur) => cur.id === curId);
+  const c = catalogStore.currencies.find((cur) => cur.id === curId);
   return formatCurrency(amount, c?.code || "USD", c?.symbol);
+}
+
+function fmtCur(amount: number, currency: Currency): string {
+  return formatCurrency(amount, currency.code, currency.symbol);
+}
+
+const targetCurrencies = computed(() => {
+  const mainId = settingsStore.settings.mainCurrencyId;
+  const targets = settingsStore.settings.currencyUpdateTargets ?? [];
+  const ids = new Set(targets);
+  if (mainId) ids.add(mainId);
+  return [...ids]
+    .map((id) => catalogStore.currencies.find((c) => c.id === id))
+    .filter((c): c is Currency => !!c && c.rate > 0);
+});
+
+function getConvertTargets(curId: string) {
+  return targetCurrencies.value.filter((tc) => tc.id !== curId);
+}
+
+function convertAmount(amount: number, fromCurId: string, toCurrency: Currency): number {
+  const fromCur = catalogStore.currencies.find((c) => c.id === fromCurId);
+  if (!fromCur || fromCur.rate <= 0) return 0;
+  const inBase = amount / fromCur.rate;
+  return inBase * toCurrency.rate;
 }
 
 const visibleRecords = computed(() =>
@@ -41,15 +70,12 @@ const visibleRecords = computed(() =>
 );
 
 const totalPaid = computed(() =>
-  props.history.reduce((sum, r) => {
-    // Convert all to the subscription's currency for simplicity
-    return sum + r.amount;
-  }, 0),
+  props.history.reduce((sum, r) => sum + r.amount, 0),
 );
 
 function addRecord() {
   if (!addDate.value) return;
-  store.addPaymentRecord(props.subscriptionId, {
+  subsStore.addPaymentRecord(props.subscriptionId, {
     id: crypto.randomUUID(),
     date: addDate.value,
     amount: addAmount.value || props.price,
@@ -63,7 +89,7 @@ function addRecord() {
 }
 
 function deleteRecord(recordId: string) {
-  store.deletePaymentRecord(props.subscriptionId, recordId);
+  subsStore.deletePaymentRecord(props.subscriptionId, recordId);
 }
 
 const formatDate = fmtDateMedium;
@@ -79,9 +105,18 @@ const formatDate = fmtDateMedium;
         <span v-if="history.length > 0" class="text-[10px] text-[var(--color-text-muted)] ml-1">({{ history.length }})</span>
       </div>
       <div class="flex items-center gap-1">
-        <span v-if="history.length > 0" class="text-[10px] font-medium text-[var(--color-primary)]">
-          {{ t('total') }}: {{ fmt(totalPaid, currencyId) }}
-        </span>
+        <div v-if="history.length > 0" class="text-right mr-1">
+          <span class="text-[10px] font-medium text-[var(--color-primary)]">
+            {{ t('total') }}: {{ fmt(totalPaid, currencyId) }}
+          </span>
+          <div v-if="getConvertTargets(currencyId).length > 0" class="flex flex-wrap justify-end gap-x-1.5">
+            <span
+              v-for="tc in getConvertTargets(currencyId)"
+              :key="tc.id"
+              class="text-[9px] text-[var(--color-text-muted)]"
+            >≈ {{ fmtCur(convertAmount(totalPaid, currencyId, tc), tc) }}</span>
+          </div>
+        </div>
         <Tooltip :text="t('record_payment')" position="bottom">
           <button
             @click="emit('recordPayment', subscriptionId)"
@@ -150,16 +185,26 @@ const formatDate = fmtDateMedium;
       >
         <Receipt :size="12" class="text-[var(--color-text-muted)] shrink-0" />
         <span class="text-xs text-[var(--color-text-muted)] whitespace-nowrap">{{ formatDate(record.date) }}</span>
-        <span class="text-xs font-semibold text-[var(--color-text-primary)]">{{ fmt(record.amount, record.currencyId) }}</span>
+        <div class="min-w-0">
+          <span class="text-xs font-semibold text-[var(--color-text-primary)]">{{ fmt(record.amount, record.currencyId) }}</span>
+          <div v-if="getConvertTargets(record.currencyId).length > 0" class="flex flex-wrap gap-x-1.5">
+            <span
+              v-for="tc in getConvertTargets(record.currencyId)"
+              :key="tc.id"
+              class="text-[9px] text-[var(--color-text-muted)]"
+            >≈ {{ fmtCur(convertAmount(record.amount, record.currencyId, tc), tc) }}</span>
+          </div>
+        </div>
         <span v-if="record.note" class="text-[10px] text-[var(--color-text-muted)] truncate flex-1 min-w-0">{{ record.note }}</span>
         <div v-else class="flex-1" />
-        <button
-          @click="deleteRecord(record.id)"
-          class="p-0.5 rounded opacity-0 group-hover:opacity-100 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 hover:text-red-600 transition-all shrink-0"
-          :title="t('delete')"
-        >
-          <Trash2 :size="11" />
-        </button>
+        <Tooltip :text="t('delete')" position="left">
+          <button
+            @click="deleteRecord(record.id)"
+            class="p-0.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 hover:text-red-600 transition-all shrink-0"
+          >
+            <Trash2 :size="11" />
+          </button>
+        </Tooltip>
       </div>
     </div>
 

@@ -24,7 +24,8 @@
     "notification:allow-is-permission-granted",
     "notifications:default",
     "os:default",
-    "store:default",
+    "sql:default",
+    "sql:allow-execute",
     "fs:default",
     {
       "identifier": "fs:allow-write-text-file",

@@ -1,5 +1,5 @@
 import { computed } from "vue";
-import { useI18n } from "@/i18n";
+import { useI18n } from "vue-i18n";
 
 /**
  * Map app language codes to BCP-47 locale tags for Intl APIs.
@@ -142,7 +142,7 @@ export function useLocaleFormat() {
 
 // ─── Non-reactive helpers (for services/store) ─────────────────
 
-import { getLanguage } from "@/i18n";
+import { getLanguage } from "../i18n";
 
 export function getLocaleTagNonReactive(): string {
   return getLocaleTag(getLanguage());

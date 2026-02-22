@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { useI18n } from "@/i18n";
+import { useI18n } from "vue-i18n";
+import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 
 export interface CalendarCell {
   day: number;
@@ -18,6 +19,7 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
+const { fmt } = useCurrencyFormat();
 
 const weekDays = () => [t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat"), t("sun")];
 </script>
@@ -57,15 +59,17 @@ const weekDays = () => [t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat
             <div v-for="exp in (cell.expenses || []).slice(0, 3)" :key="exp.id" class="w-1.5 h-1.5 rounded-full bg-orange-400" />
             <div v-if="cell.subs.length + (cell.expenses?.length || 0) > 6" class="text-[8px] text-[var(--color-text-muted)] leading-none">+{{ cell.subs.length + (cell.expenses?.length || 0) - 6 }}</div>
           </div>
-          <!-- Desktop: show names -->
+          <!-- Desktop: show names + amounts -->
           <div class="hidden sm:block">
             <div v-for="sub in cell.subs.slice(0, 2)" :key="sub.id"
-              class="text-[10px] leading-tight truncate px-1 py-0.5 rounded bg-[var(--color-primary-light)] text-[var(--color-primary)] font-medium mb-0.5">
-              {{ sub.name }}
+              class="flex items-center gap-0.5 text-[10px] leading-tight px-1 py-0.5 rounded bg-blue-600 text-white dark:bg-blue-500 font-medium mb-0.5">
+              <span class="truncate">{{ sub.name }}</span>
+              <span class="ml-auto shrink-0 opacity-80">{{ fmt(sub.price, sub.currencyId) }}</span>
             </div>
             <div v-for="exp in (cell.expenses || []).slice(0, 2)" :key="exp.id"
-              class="text-[10px] leading-tight truncate px-1 py-0.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 font-medium mb-0.5">
-              {{ exp.name }}
+              class="flex items-center gap-0.5 text-[10px] leading-tight px-1 py-0.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 font-medium mb-0.5">
+              <span class="truncate">{{ exp.name }}</span>
+              <span class="ml-auto shrink-0 opacity-80">{{ fmt(exp.amount, exp.currencyId) }}</span>
             </div>
             <div v-if="cell.subs.length + (cell.expenses?.length || 0) > 4" class="text-[10px] text-[var(--color-text-muted)]">
               +{{ cell.subs.length + (cell.expenses?.length || 0) - 4 }}

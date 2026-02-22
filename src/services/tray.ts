@@ -61,7 +61,7 @@ export async function setupTray(
       formatCurrency(amount, mainCurrency?.code || "USD", mainCurrency?.symbol);
 
     // Build menu items
-    const menuItems: any[] = [];
+    const menuItems: (MenuItem | PredefinedMenuItem)[] = [];
 
     // Header: Monthly cost
     menuItems.push(

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, computed, reactive } from "vue";
-import { useAppStore } from "@/stores/appStore";
-import { useI18n } from "@/i18n";
+import { useExpensesStore } from "@/stores/expenses";
+import { useSettingsStore } from "@/stores/settings";
+import { useCatalogStore } from "@/stores/catalog";
+import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import type { Expense } from "@/schemas/appData";
 import { ExpenseSchema } from "@/schemas/appData";
@@ -16,6 +18,7 @@ import type { SelectOption } from "@/components/ui/AppSelect.vue";
 const props = defineProps<{
   show: boolean;
   editExpense?: Expense | null;
+  prefill?: { amount?: number; currencyId?: string; name?: string } | null;
 }>();
 
 const emit = defineEmits<{
@@ -23,7 +26,9 @@ const emit = defineEmits<{
   saved: [];
 }>();
 
-const store = useAppStore();
+const expsStore = useExpensesStore();
+const settingsStore = useSettingsStore();
+const catalogStore = useCatalogStore();
 const { t } = useI18n();
 const { toast } = useToast();
 
@@ -37,17 +42,22 @@ const fieldMeta: ZodFieldMeta = {
   date: "date",
 };
 
+function nextExpenseNumber(): number {
+  return expsStore.totalCount + 1;
+}
+
 function resetForm() {
   form.value = {
-    name: "",
+    name: `${t("expenses")} #${nextExpenseNumber()}`,
     amount: 0,
-    currencyId: store.state.settings.mainCurrencyId,
+    currencyId: settingsStore.settings.mainCurrencyId,
     date: new Date().toISOString().split("T")[0],
-    categoryId: store.state.settings.defaultCategoryId || "cat-1",
-    paymentMethodId: store.state.settings.defaultPaymentMethodId || store.enabledPaymentMethods.value[0]?.id || "",
-    payerUserId: store.state.household[0]?.id || "",
+    categoryId: settingsStore.settings.defaultCategoryId || "cat-1",
+    paymentMethodId: settingsStore.settings.defaultPaymentMethodId || catalogStore.enabledPaymentMethods[0]?.id || "",
+    payerUserId: catalogStore.household[0]?.id || "",
     tags: [],
     notes: "",
+    url: "",
   };
 }
 
@@ -57,6 +67,11 @@ watch(() => props.show, (val) => {
       form.value = { ...props.editExpense };
     } else {
       resetForm();
+      if (props.prefill) {
+        if (props.prefill.amount != null) form.value.amount = props.prefill.amount;
+        if (props.prefill.currencyId) form.value.currencyId = props.prefill.currencyId;
+        if (props.prefill.name) form.value.name = props.prefill.name;
+      }
     }
   }
 });
@@ -64,23 +79,23 @@ watch(() => props.show, (val) => {
 const isEditing = computed(() => !!props.editExpense);
 
 const currencyOptions = computed<SelectOption[]>(() =>
-  store.state.currencies.map((c) => ({ label: `${c.symbol} ${c.name} (${c.code})`, value: c.id }))
+  catalogStore.currencies.map((c) => ({ label: `${c.symbol} ${c.name} (${c.code})`, value: c.id }))
 );
 
 const categoryOptions = computed<SelectOption[]>(() =>
-  store.sortedCategories.value.map((c) => ({ label: c.name, value: c.id, icon: c.icon || undefined }))
+  catalogStore.sortedCategories.map((c) => ({ label: c.name, value: c.id, icon: c.icon || undefined }))
 );
 
 const paymentOptions = computed<SelectOption[]>(() => {
   const opts: SelectOption[] = [{ label: t("none"), value: "" }];
-  store.enabledPaymentMethods.value.forEach((p) =>
+  catalogStore.enabledPaymentMethods.forEach((p) =>
     opts.push({ label: p.name, value: p.id, icon: p.icon })
   );
   return opts;
 });
 
 const payerOptions = computed<SelectOption[]>(() =>
-  store.state.household.map((h) => ({ label: h.name, value: h.id }))
+  catalogStore.household.map((h) => ({ label: h.name, value: h.id }))
 );
 
 function clearErrors() {
@@ -110,9 +125,9 @@ function handleSave() {
 
   try {
     if (isEditing.value && props.editExpense) {
-      store.updateExpense(result.data);
+      expsStore.updateExpense(result.data);
     } else {
-      store.addExpense(result.data);
+      expsStore.addExpense(result.data);
     }
     toast(t("success"));
     emit("saved");
@@ -194,11 +209,20 @@ function handleSave() {
 
       <!-- Payer (if more than 1 household member) -->
       <AppSelect
-        v-if="store.state.household.length > 1"
+        v-if="catalogStore.household.length > 1"
         :label="t('paid_by')"
         :options="payerOptions"
         :modelValue="form.payerUserId || ''"
         @update:modelValue="(v) => (form.payerUserId = String(v))"
+      />
+
+      <!-- URL -->
+      <AppInput
+        :label="t('url')"
+        :modelValue="form.url || ''"
+        @update:modelValue="(v) => form.url = String(v)"
+        :placeholder="'https://...'"
+        type="url"
       />
 
       <!-- Tags -->

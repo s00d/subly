@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "@/i18n";
+import { useI18n } from "vue-i18n";
 import { Bar } from "vue-chartjs";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, PointElement, LineElement, Tooltip, Legend, Filler } from "chart.js";
 import type { MonthlySpending } from "@/services/analytics";
@@ -37,7 +37,7 @@ const chartOptions = computed(() => ({
     legend: { display: false },
     tooltip: {
       callbacks: {
-        label: (ctx: any) => props.fmt(ctx.raw),
+        label: (ctx: { raw: unknown }) => props.fmt(ctx.raw as number),
       },
     },
   },
@@ -45,7 +45,7 @@ const chartOptions = computed(() => ({
     y: {
       beginAtZero: true,
       ticks: {
-        callback: (val: any) => props.fmt(val),
+        callback: (val: string | number) => props.fmt(Number(val)),
         maxTicksLimit: 5,
       },
       grid: { color: "rgba(128,128,128,0.1)" },
@@ -63,12 +63,12 @@ const avg = computed(() => {
 </script>
 
 <template>
-  <div class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-5">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="text-sm font-semibold text-[var(--color-text-primary)]">{{ t('spending_trend') }}</h3>
-      <span class="text-xs text-[var(--color-text-muted)]">{{ t('avg') }}: {{ fmt(avg) }}</span>
+  <div class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+    <div class="flex items-center justify-between mb-3 sm:mb-4">
+      <h3 class="text-xs sm:text-sm font-semibold text-[var(--color-text-primary)]">{{ t('spending_trend') }}</h3>
+      <span class="text-[10px] sm:text-xs text-[var(--color-text-muted)]">{{ t('avg') }}: {{ fmt(avg) }}</span>
     </div>
-    <div class="h-56">
+    <div class="h-40 sm:h-56">
       <Bar :data="chartData" :options="chartOptions" />
     </div>
   </div>

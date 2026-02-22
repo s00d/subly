@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useAppStore } from "@/stores/appStore";
-import { useI18n } from "@/i18n";
+import { useCatalogStore } from "@/stores/catalog";
+import { useSettingsStore } from "@/stores/settings";
+import { useSubscriptionsStore } from "@/stores/subscriptions";
+import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import AppInput from "@/components/ui/AppInput.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import IconPickerModal from "@/components/ui/IconPickerModal.vue";
 import { Trash2, Plus, ChevronUp, ChevronDown, Star, Search, ImageIcon } from "lucide-vue-next";
+import Tooltip from "@/components/ui/Tooltip.vue";
 
-const store = useAppStore();
+const catalogStore = useCatalogStore();
+const settingsStore = useSettingsStore();
+const subsStore = useSubscriptionsStore();
 const { t } = useI18n();
 const { toast } = useToast();
 
@@ -17,15 +22,15 @@ const isCatSearching = computed(() => catSearch.value.length > 0);
 
 /** Sorted: default category first, then by order */
 const sortedCategories = computed(() => {
-  const defId = store.state.settings.defaultCategoryId;
-  return [...store.state.categories].sort((a, b) => {
+  const defId = settingsStore.settings.defaultCategoryId;
+  return [...catalogStore.categories].sort((a, b) => {
     // "No category" always first
     if (a.id === "cat-1" && b.id !== "cat-1") return -1;
     if (b.id === "cat-1" && a.id !== "cat-1") return 1;
     // Default/primary second
     if (a.id === defId && b.id !== defId) return -1;
     if (b.id === defId && a.id !== defId) return 1;
-    return a.order - b.order;
+    return a.sortOrder - b.sortOrder;
   });
 });
 
@@ -35,7 +40,7 @@ const filteredCategories = computed(() => {
   return sortedCategories.value.filter((c) => c.name.toLowerCase().includes(q));
 });
 
-const isUsedCategory = (id: string) => store.state.subscriptions.some((s) => s.categoryId === id);
+const isUsedCategory = (id: string) => subsStore.subscriptions.some((s) => s.categoryId === id);
 const isDefaultItem = (c: { i18nKey?: string }) => !!c.i18nKey;
 
 // Icon picker
@@ -44,7 +49,7 @@ const iconPickerCatId = ref<string | null>(null);
 const iconPickerValue = ref("");
 
 function openIconPicker(catId: string) {
-  const cat = store.state.categories.find((c) => c.id === catId);
+  const cat = catalogStore.categories.find((c) => c.id === catId);
   iconPickerCatId.value = catId;
   iconPickerValue.value = cat?.icon || "";
   showIconPicker.value = true;
@@ -52,9 +57,9 @@ function openIconPicker(catId: string) {
 
 function onIconSelected(icon: string) {
   if (iconPickerCatId.value) {
-    const cat = store.state.categories.find((c) => c.id === iconPickerCatId.value);
+    const cat = catalogStore.categories.find((c) => c.id === iconPickerCatId.value);
     if (cat) {
-      store.updateCategory(cat.id, cat.name, icon);
+      catalogStore.updateCategory(cat.id, cat.name, icon);
       toast(t("success"));
     }
   }
@@ -62,10 +67,10 @@ function onIconSelected(icon: string) {
   iconPickerCatId.value = null;
 }
 
-function addCat() { store.addCategory("Category"); }
-function saveCat(id: string, name: string) { store.updateCategory(id, name); toast(t("success")); }
+function addCat() { catalogStore.addCategory("Category"); }
+function saveCat(id: string, name: string) { catalogStore.updateCategory(id, name); toast(t("success")); }
 function removeCat(id: string) {
-  if (!store.deleteCategory(id)) toast(t("error"), "error");
+  if (!catalogStore.deleteCategory(id)) toast(t("error"), "error");
   else toast(t("success"));
 }
 
@@ -74,7 +79,7 @@ function moveCatUp(id: string) {
   const idx = ids.indexOf(id);
   if (idx <= 0) return;
   [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
-  store.reorderCategories(ids);
+  catalogStore.reorderCategories(ids);
 }
 
 function moveCatDown(id: string) {
@@ -82,19 +87,19 @@ function moveCatDown(id: string) {
   const idx = ids.indexOf(id);
   if (idx < 0 || idx >= ids.length - 1) return;
   [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
-  store.reorderCategories(ids);
+  catalogStore.reorderCategories(ids);
 }
 
 function getCatIcon(id: string): string {
-  return store.state.categories.find((c) => c.id === id)?.icon || "";
+  return catalogStore.categories.find((c) => c.id === id)?.icon || "";
 }
 </script>
 
 <template>
-  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-5">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-lg font-semibold text-[var(--color-text-primary)]">{{ t('categories') }}</h2>
-      <div class="relative w-44">
+  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+    <div class="flex items-center justify-between gap-2 mb-3">
+      <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)] shrink-0">{{ t('categories') }}</h2>
+      <div class="relative w-32 sm:w-44">
         <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
         <input v-model="catSearch" type="text" :placeholder="t('search')" class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-shadow" />
       </div>
@@ -104,39 +109,44 @@ function getCatIcon(id: string): string {
         v-for="(c, idx) in filteredCategories"
         :key="c.id"
         class="flex gap-2 items-center rounded-lg px-2 py-1"
-        :class="c.id === store.state.settings.defaultCategoryId ? 'bg-[var(--color-primary-light)]/50' : ''"
+        :class="c.id === settingsStore.settings.defaultCategoryId ? 'bg-[var(--color-primary-light)]/50' : ''"
       >
         <!-- Move buttons (not for cat-1 "No category") -->
-        <div v-if="!isCatSearching && c.id !== 'cat-1'" class="flex flex-col shrink-0">
-          <button @click="moveCatUp(c.id)" :disabled="idx === 0" class="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronUp :size="14" /></button>
-          <button @click="moveCatDown(c.id)" :disabled="idx === sortedCategories.length - 1" class="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronDown :size="14" /></button>
+        <div v-if="!isCatSearching && c.id !== 'cat-1'" class="flex flex-row sm:flex-col shrink-0">
+          <Tooltip :text="t('move_up')"><button @click="moveCatUp(c.id)" :disabled="idx === 0" class="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronUp :size="14" /></button></Tooltip>
+          <Tooltip :text="t('move_down')"><button @click="moveCatDown(c.id)" :disabled="idx === sortedCategories.length - 1" class="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronDown :size="14" /></button></Tooltip>
         </div>
         <div v-else-if="c.id === 'cat-1'" class="w-[22px] shrink-0" />
 
         <!-- Primary star -->
-        <button @click="store.updateSettings({ defaultCategoryId: c.id })" class="p-1 rounded-lg transition-colors shrink-0" :class="c.id === store.state.settings.defaultCategoryId ? 'text-yellow-500' : 'text-[var(--color-text-muted)] hover:text-yellow-500'" :title="t('set_as_primary')">
-          <Star :size="14" :fill="c.id === store.state.settings.defaultCategoryId ? 'currentColor' : 'none'" />
-        </button>
+        <Tooltip :text="t('set_as_primary')">
+          <button @click="settingsStore.updateSettings({ defaultCategoryId: c.id })" class="p-1 rounded-lg transition-colors shrink-0" :class="c.id === settingsStore.settings.defaultCategoryId ? 'text-yellow-500' : 'text-[var(--color-text-muted)] hover:text-yellow-500'">
+            <Star :size="14" :fill="c.id === settingsStore.settings.defaultCategoryId ? 'currentColor' : 'none'" />
+          </button>
+        </Tooltip>
 
         <!-- Icon button -->
-        <button
-          @click="openIconPicker(c.id)"
-          class="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 transition-colors hover:border-[var(--color-primary)]"
-          :class="getCatIcon(c.id) ? 'border-[var(--color-primary)]/30 bg-[var(--color-primary-light)]' : 'border-[var(--color-border)]'"
-          :title="t('choose_icon')"
-        >
+        <Tooltip :text="t('choose_icon')">
+          <button
+            @click="openIconPicker(c.id)"
+            class="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 transition-colors hover:border-[var(--color-primary)]"
+            :class="getCatIcon(c.id) ? 'border-[var(--color-primary)]/30 bg-[var(--color-primary-light)]' : 'border-[var(--color-border)]'"
+          >
           <IconDisplay v-if="getCatIcon(c.id)" :icon="getCatIcon(c.id)" :size="18" />
           <ImageIcon v-else :size="14" class="text-[var(--color-text-muted)]" />
         </button>
+        </Tooltip>
 
         <!-- Name: read-only for default, editable for user-added -->
         <div class="flex-1 min-w-0">
           <span v-if="isDefaultItem(c)" class="text-sm text-[var(--color-text-primary)] truncate block px-2 py-1">{{ c.name }}</span>
-          <AppInput v-else :modelValue="c.name" @update:modelValue="(v: any) => saveCat(c.id, String(v))" size="sm" />
+          <AppInput v-else :modelValue="c.name" @update:modelValue="(v: string | number) => saveCat(c.id, String(v))" size="sm" />
         </div>
 
         <!-- Delete (not for cat-1) -->
-        <button v-if="c.id !== 'cat-1'" @click="removeCat(c.id)" :disabled="isUsedCategory(c.id)" class="p-1.5 rounded-lg transition-colors shrink-0" :class="isUsedCategory(c.id) ? 'text-[var(--color-text-muted)] cursor-not-allowed' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'"><Trash2 :size="14" /></button>
+        <Tooltip v-if="c.id !== 'cat-1'" :text="t('delete')">
+          <button @click="removeCat(c.id)" :disabled="isUsedCategory(c.id)" class="p-1.5 rounded-lg transition-colors shrink-0" :class="isUsedCategory(c.id) ? 'text-[var(--color-text-muted)] cursor-not-allowed' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'"><Trash2 :size="14" /></button>
+        </Tooltip>
         <div v-else class="w-[34px] shrink-0" />
       </div>
     </div>

@@ -2,6 +2,7 @@
 import { watch } from "vue";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { CheckCircle, XCircle, Info, AlertTriangle, X, Copy } from "lucide-vue-next";
+import { tv } from "@/lib/tv";
 
 const props = defineProps<{
   message: string;
@@ -17,13 +18,6 @@ const icons = {
   error: XCircle,
   info: Info,
   warning: AlertTriangle,
-};
-
-const colors = {
-  success: "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300",
-  error: "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300",
-  info: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300",
-  warning: "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-800 dark:text-yellow-300",
 };
 
 let timer: ReturnType<typeof setTimeout> | null = null;
@@ -42,6 +36,24 @@ async function copyMessage() {
     try { await navigator.clipboard.writeText(props.message); } catch { /* ignore */ }
   }
 }
+
+const toastTv = tv({
+  base: [
+    "fixed z-[100] flex items-center gap-2.5 px-4 py-3 rounded-lg border shadow-lg",
+    "bottom-20 left-3 right-3 sm:bottom-6 sm:left-auto sm:right-6 sm:max-w-md",
+  ],
+  variants: {
+    type: {
+      success: "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300",
+      error: "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300",
+      info: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300",
+      warning: "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-800 dark:text-yellow-300",
+    },
+  },
+  defaultVariants: { type: "info" },
+});
+
+const actionBtnClass = "p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 opacity-60 hover:opacity-100";
 </script>
 
 <template>
@@ -56,23 +68,14 @@ async function copyMessage() {
     >
       <div
         v-if="show"
-        class="fixed bottom-6 right-6 z-[100] flex items-center gap-2.5 px-4 py-3 rounded-lg border shadow-lg max-w-md"
-        :class="colors[type || 'info']"
+        :class="toastTv({ type: type || 'info' })"
       >
         <component :is="icons[type || 'info']" :size="18" class="shrink-0" />
         <span class="text-sm font-medium flex-1 min-w-0">{{ message }}</span>
-        <button
-          @click="copyMessage"
-          class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 opacity-60 hover:opacity-100"
-          title="Copy"
-        >
+        <button @click="copyMessage" :class="actionBtnClass" title="Copy">
           <Copy :size="13" />
         </button>
-        <button
-          @click="emit('close')"
-          class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 opacity-60 hover:opacity-100"
-          title="Close"
-        >
+        <button @click="emit('close')" :class="actionBtnClass" title="Close">
           <X :size="14" />
         </button>
       </div>

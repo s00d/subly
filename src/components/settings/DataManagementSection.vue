@@ -1,13 +1,25 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useAppStore } from "@/stores/appStore";
-import { useI18n } from "@/i18n";
+import { useSubscriptionsStore } from "@/stores/subscriptions";
+import { useExpensesStore } from "@/stores/expenses";
+import { useCatalogStore } from "@/stores/catalog";
+import { useSettingsStore } from "@/stores/settings";
+import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { exportAsSubly, exportAsJson, exportAsCsv, exportExpensesCsv, importFromSubly, importFromJson, importFromCsv } from "@/services/export";
-import { resetAppData } from "@/services/storage";
-import { Download, Upload, RotateCcw, Archive, FileSpreadsheet } from "lucide-vue-next";
+import { resetAppData, executeSqlFile, loadAllData, dbLoadExpenses } from "@/services/database";
+import { open } from "@tauri-apps/plugin-dialog";
+import { readTextFile } from "@tauri-apps/plugin-fs";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { appDataDir, join } from "@tauri-apps/api/path";
+import { Download, Upload, RotateCcw, Archive, FileSpreadsheet, Database, FolderOpen } from "lucide-vue-next";
 
-const store = useAppStore();
+const appStore = useAppStore();
+const subsStore = useSubscriptionsStore();
+const expsStore = useExpensesStore();
+const catalogStore = useCatalogStore();
+const settingsStore = useSettingsStore();
 const { t } = useI18n();
 const { toast } = useToast();
 
@@ -18,7 +30,7 @@ const showResetConfirm = ref(false);
 async function handleExportSubly() {
   isExporting.value = true;
   try {
-    const ok = await exportAsSubly(store.getExportData());
+    const ok = await exportAsSubly(appStore.getExportData());
     if (ok) toast(t("export_success"));
   } catch (e) {
     console.error(e);
@@ -29,7 +41,7 @@ async function handleExportSubly() {
 async function handleImportSubly() {
   try {
     const data = await importFromSubly();
-    if (data) { store.importData(data); toast(t("import_success")); }
+    if (data) { appStore.importData(data); toast(t("import_success")); }
     else { toast(t("import_error"), "error"); }
   } catch (e) {
     console.error(e);
@@ -41,7 +53,7 @@ async function handleImportSubly() {
 async function handleExportJson() {
   isExporting.value = true;
   try {
-    const ok = await exportAsJson(store.getExportData());
+    const ok = await exportAsJson(appStore.getExportData());
     if (ok) toast(t("export_success"));
   } catch (e) {
     console.error(e);
@@ -52,7 +64,7 @@ async function handleExportJson() {
 async function handleExportCsv() {
   isExporting.value = true;
   try {
-    const ok = await exportAsCsv(store.state.subscriptions, store.state.categories, store.state.currencies, store.state.paymentMethods, store.state.household);
+    const ok = await exportAsCsv(subsStore.subscriptions, catalogStore.categories, catalogStore.currencies, catalogStore.paymentMethods, catalogStore.household);
     if (ok) toast(t("export_success"));
   } catch (e) {
     console.error(e);
@@ -63,7 +75,8 @@ async function handleExportCsv() {
 async function handleExportExpensesCsv() {
   isExporting.value = true;
   try {
-    const ok = await exportExpensesCsv(store.state.expenses, store.state.categories, store.state.currencies, store.state.paymentMethods, store.state.household);
+    const allExps = await dbLoadExpenses({}, 999999, 0);
+    const ok = await exportExpensesCsv(allExps.items, catalogStore.categories, catalogStore.currencies, catalogStore.paymentMethods, catalogStore.household);
     if (ok) toast(t("export_success"));
   } catch (e) {
     console.error(e);
@@ -74,7 +87,7 @@ async function handleExportExpensesCsv() {
 async function handleImportJson() {
   try {
     const data = await importFromJson();
-    if (data) { store.importData(data); toast(t("import_success")); }
+    if (data) { appStore.importData(data); toast(t("import_success")); }
     else { toast(t("import_error"), "error"); }
   } catch (e) {
     console.error(e);
@@ -85,18 +98,18 @@ async function handleImportJson() {
 async function handleImportCsv() {
   try {
     const subs = await importFromCsv({
-      categories: store.state.categories,
-      currencies: store.state.currencies,
-      paymentMethods: store.state.paymentMethods,
-      household: store.state.household,
-      defaultCategoryId: store.state.settings.defaultCategoryId || "cat-1",
-      defaultCurrencyId: store.state.settings.mainCurrencyId,
-      defaultPaymentMethodId: store.state.settings.defaultPaymentMethodId || store.state.paymentMethods[0]?.id || "",
-      defaultPayerUserId: store.state.household[0]?.id || "",
+      categories: catalogStore.categories,
+      currencies: catalogStore.currencies,
+      paymentMethods: catalogStore.paymentMethods,
+      household: catalogStore.household,
+      defaultCategoryId: settingsStore.settings.defaultCategoryId || "cat-1",
+      defaultCurrencyId: settingsStore.settings.mainCurrencyId,
+      defaultPaymentMethodId: settingsStore.settings.defaultPaymentMethodId || catalogStore.paymentMethods[0]?.id || "",
+      defaultPayerUserId: catalogStore.household[0]?.id || "",
     });
     if (subs && subs.length > 0) {
       for (const sub of subs) {
-        store.addSubscription(sub);
+        subsStore.addSubscription(sub);
       }
       toast(t("csv_import_success").replace("{count}", String(subs.length)));
     } else {
@@ -108,11 +121,52 @@ async function handleImportCsv() {
   }
 }
 
+// --- SQL import ---
+const isImportingSql = ref(false);
+
+async function handleImportSql() {
+  try {
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: "SQL", extensions: ["sql"] }],
+    });
+    if (!selected) return;
+
+    isImportingSql.value = true;
+    const sql = await readTextFile(selected as string);
+    const { statementsRun } = await executeSqlFile(sql);
+
+    const freshData = await loadAllData();
+    if (freshData) {
+      appStore.importData(freshData);
+    }
+
+    toast(t("sql_import_success").replace("{count}", String(statementsRun)));
+  } catch (e) {
+    console.error(e);
+    toast(t("sql_import_error"), "error");
+  } finally {
+    isImportingSql.value = false;
+  }
+}
+
+// --- Open DB folder ---
+async function handleOpenDbFolder() {
+  try {
+    const dataDir = await appDataDir();
+    const dbPath = await join(dataDir, "subly.db");
+    await revealItemInDir(dbPath);
+  } catch (e) {
+    console.error(e);
+    toast(t("error"), "error");
+  }
+}
+
 // --- Reset ---
 async function handleResetData() {
   try {
     const defaultData = await resetAppData();
-    store.importData(defaultData);
+    appStore.importData(defaultData);
     showResetConfirm.value = false;
     toast(t("reset_success"));
   } catch (e) {
@@ -153,6 +207,12 @@ async function handleResetData() {
       </button>
       <button @click="handleImportCsv" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs sm:text-sm font-medium hover:bg-[var(--color-surface-hover)]">
         <FileSpreadsheet :size="14" /> {{ t('import_from_csv') }}
+      </button>
+      <button @click="handleImportSql" :disabled="isImportingSql" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs sm:text-sm font-medium hover:bg-[var(--color-surface-hover)] disabled:opacity-50">
+        <Database :size="14" /> {{ t('import_from_sql') }}
+      </button>
+      <button @click="handleOpenDbFolder" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs sm:text-sm font-medium hover:bg-[var(--color-surface-hover)]">
+        <FolderOpen :size="14" /> {{ t('open_db_folder') }}
       </button>
     </div>
 

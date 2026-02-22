@@ -250,9 +250,11 @@ input[type="checkbox"] {
   display: none;
 }
 
-/* Touch-friendly tap targets on mobile */
+/* Touch-friendly tap targets on mobile — only for primary action buttons/links */
 @media (max-width: 640px) {
-  button, a, [role="button"] {
+  button:not([role="checkbox"]):not([role="switch"]):not([data-compact]),
+  a:not([data-compact]),
+  [role="button"]:not([data-compact]) {
     min-height: 36px;
   }
 }

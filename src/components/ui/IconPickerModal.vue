@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
-import { useI18n } from "@/i18n";
+import { useI18n } from "vue-i18n";
 import { logoAssets, type LogoAsset } from "@/services/logoAssets";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import { X, Search, Upload } from "lucide-vue-next";
+import { tv } from "@/lib/tv";
 
 const props = defineProps<{
   show: boolean;
@@ -179,6 +180,47 @@ function handleUpload(e: Event) {
 function onBackdropClick() {
   emit("close");
 }
+
+const pickerTv = tv({
+  slots: {
+    overlay: "fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4",
+    backdrop: "absolute inset-0 bg-black/50",
+    panel: [
+      "relative bg-[var(--color-surface)] w-full max-w-md overflow-hidden",
+      "rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[85vh] sm:max-h-none",
+    ],
+    header: "flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-[var(--color-border)]",
+    headerTitle: "text-sm sm:text-base font-semibold text-[var(--color-text-primary)]",
+    closeBtn: "p-1 rounded-lg hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)]",
+    searchRow: "px-4 sm:px-5 pt-3 sm:pt-4 pb-2 flex gap-2",
+    searchInput: [
+      "w-full pl-8 pr-3 py-2 rounded-lg border border-[var(--color-border)]",
+      "bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)]",
+      "placeholder-[var(--color-text-muted)]",
+      "focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-shadow",
+    ],
+    uploadBtn: [
+      "flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-border)]",
+      "text-xs sm:text-sm text-[var(--color-text-secondary)]",
+      "hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors shrink-0",
+    ],
+    currentWrap: "px-5 pb-2",
+    currentInner: "flex items-center gap-2 p-2 rounded-lg bg-[var(--color-primary-light)] border border-[var(--color-primary)]/20",
+    gridWrap: "px-4 sm:px-5 pb-4 max-h-[50vh] overflow-y-auto",
+    sectionLabel: "text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-medium mb-2",
+    grid: "grid grid-cols-8 gap-1.5",
+    iconBtn: "w-10 h-10 rounded-lg border flex items-center justify-center text-lg hover:bg-[var(--color-surface-hover)] transition-colors",
+    emptyText: "text-center py-8 text-sm text-[var(--color-text-muted)]",
+  },
+  variants: {
+    selected: {
+      true: { iconBtn: "border-[var(--color-primary)] bg-[var(--color-primary-light)]" },
+      false: { iconBtn: "border-[var(--color-border)]" },
+    },
+  },
+});
+
+const slots = pickerTv();
 </script>
 
 <template>
@@ -191,32 +233,27 @@ function onBackdropClick() {
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="show" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-        <div class="absolute inset-0 bg-black/50" @click="onBackdropClick" />
-        <div class="relative bg-[var(--color-surface)] w-full max-w-md overflow-hidden rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[85vh] sm:max-h-none">
-          <!-- Header -->
-          <div class="flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-[var(--color-border)]">
-            <h3 class="text-sm sm:text-base font-semibold text-[var(--color-text-primary)]">{{ t('choose_icon') }}</h3>
-            <button @click="emit('close')" class="p-1 rounded-lg hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)]">
+      <div v-if="show" :class="slots.overlay()">
+        <div :class="slots.backdrop()" @click="onBackdropClick" />
+        <div :class="slots.panel()">
+          <div :class="slots.header()">
+            <h3 :class="slots.headerTitle()">{{ t('choose_icon') }}</h3>
+            <button @click="emit('close')" :class="slots.closeBtn()">
               <X :size="20" />
             </button>
           </div>
 
-          <!-- Search + Upload -->
-          <div class="px-4 sm:px-5 pt-3 sm:pt-4 pb-2 flex gap-2">
+          <div :class="slots.searchRow()">
             <div class="relative flex-1">
               <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
               <input
                 v-model="search"
                 type="text"
                 :placeholder="t('search')"
-                class="w-full pl-8 pr-3 py-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-shadow"
+                :class="slots.searchInput()"
               />
             </div>
-            <button
-              @click="fileInput?.click()"
-              class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-border)] text-xs sm:text-sm text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors shrink-0"
-            >
+            <button @click="fileInput?.click()" :class="slots.uploadBtn()">
               <Upload :size="14" />
               <span class="hidden sm:inline">{{ t('upload') }}</span>
               <span class="sm:hidden">+</span>
@@ -224,26 +261,22 @@ function onBackdropClick() {
             <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="handleUpload" />
           </div>
 
-          <!-- Current selection -->
-          <div v-if="modelValue" class="px-5 pb-2">
-            <div class="flex items-center gap-2 p-2 rounded-lg bg-[var(--color-primary-light)] border border-[var(--color-primary)]/20">
+          <div v-if="modelValue" :class="slots.currentWrap()">
+            <div :class="slots.currentInner()">
               <IconDisplay :icon="modelValue" :size="24" />
               <span class="text-xs text-[var(--color-primary)] font-medium">{{ t('current') }}</span>
             </div>
           </div>
 
-          <!-- Icons grid -->
-          <div class="px-4 sm:px-5 pb-4 max-h-[50vh] overflow-y-auto">
-            <!-- Emoji groups -->
+          <div :class="slots.gridWrap()">
             <div v-for="group in filteredEmojiGroups" :key="group.label" class="mb-3">
-              <p class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-medium mb-2">{{ group.label }}</p>
-              <div class="grid grid-cols-8 gap-1.5">
+              <p :class="slots.sectionLabel()">{{ group.label }}</p>
+              <div :class="slots.grid()">
                 <button
                   v-for="item in group.items"
                   :key="item.emoji"
                   @click="select(item.emoji)"
-                  class="w-10 h-10 rounded-lg border flex items-center justify-center text-lg hover:bg-[var(--color-surface-hover)] transition-colors"
-                  :class="modelValue === item.emoji ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]' : 'border-[var(--color-border)]'"
+                  :class="pickerTv({ selected: modelValue === item.emoji }).iconBtn()"
                   :title="item.keywords"
                 >
                   {{ item.emoji }}
@@ -251,16 +284,14 @@ function onBackdropClick() {
               </div>
             </div>
 
-            <!-- SVG Assets -->
             <div v-if="filteredAssets.length > 0">
-              <p class="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-medium mb-2">{{ t('icons') }}</p>
-              <div class="grid grid-cols-8 gap-1.5">
+              <p :class="slots.sectionLabel()">{{ t('icons') }}</p>
+              <div :class="slots.grid()">
                 <button
                   v-for="asset in filteredAssets"
                   :key="asset.path"
                   @click="select(asset.path)"
-                  class="w-10 h-10 rounded-lg border flex items-center justify-center hover:bg-[var(--color-surface-hover)] transition-colors"
-                  :class="modelValue === asset.path ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]' : 'border-[var(--color-border)]'"
+                  :class="pickerTv({ selected: modelValue === asset.path }).iconBtn()"
                   :title="asset.name"
                 >
                   <img :src="asset.path" class="w-6 h-6 object-contain" />
@@ -268,7 +299,7 @@ function onBackdropClick() {
               </div>
             </div>
 
-            <div v-if="filteredAssets.length === 0 && filteredEmojiGroups.length === 0" class="text-center py-8 text-sm text-[var(--color-text-muted)]">
+            <div v-if="filteredAssets.length === 0 && filteredEmojiGroups.length === 0" :class="slots.emptyText()">
               {{ t('no_results') }}
             </div>
           </div>

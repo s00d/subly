@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick, watch } from "vue";
+import { ref, onMounted, onUnmounted, nextTick, watch, type Component } from "vue";
+import { tv } from "@/lib/tv";
 
 export interface DropdownItem {
   id: string;
   label: string;
-  icon?: any;       // Lucide component
+  icon?: Component;
   danger?: boolean;
   separator?: boolean;
   hidden?: boolean;
@@ -13,7 +14,6 @@ export interface DropdownItem {
 const props = defineProps<{
   items: DropdownItem[];
   open: boolean;
-  /** Element ref to anchor dropdown to */
   anchorEl?: HTMLElement | null;
 }>();
 
@@ -34,7 +34,6 @@ function updatePosition() {
   let top = rect.bottom + 4;
   let left = rect.right - menuWidth;
 
-  // Clamp to viewport
   if (left < 8) left = 8;
   if (top + menuHeight > window.innerHeight) {
     top = rect.top - menuHeight - 4;
@@ -77,6 +76,26 @@ onUnmounted(() => {
   document.removeEventListener("mousedown", onClickOutside);
   window.removeEventListener("scroll", updatePosition, true);
 });
+
+const dropdownTv = tv({
+  slots: {
+    menu: [
+      "fixed z-[200] bg-[var(--color-surface)] border border-[var(--color-border)]",
+      "rounded-xl shadow-xl py-1 min-w-[170px] origin-top-right",
+    ],
+    itemBtn: "w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors",
+    separator: "my-1 border-[var(--color-border)]",
+  },
+  variants: {
+    danger: {
+      true: { itemBtn: "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" },
+      false: { itemBtn: "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]" },
+    },
+  },
+  defaultVariants: { danger: false },
+});
+
+const slots = dropdownTv();
 </script>
 
 <template>
@@ -92,18 +111,15 @@ onUnmounted(() => {
       <div
         v-if="open"
         ref="menuRef"
-        class="fixed z-[200] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-xl py-1 min-w-[170px] origin-top-right"
+        :class="slots.menu()"
         :style="{ top: pos.top + 'px', left: pos.left + 'px' }"
       >
         <template v-for="item in items" :key="item.id">
-          <hr v-if="item.separator" class="my-1 border-[var(--color-border)]" />
+          <hr v-if="item.separator" :class="slots.separator()" />
           <button
             v-else-if="!item.hidden"
             @click="onSelect(item)"
-            class="w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors"
-            :class="item.danger
-              ? 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'
-              : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]'"
+            :class="dropdownTv({ danger: item.danger || undefined }).itemBtn()"
           >
             <component v-if="item.icon" :is="item.icon" :size="14" class="shrink-0" />
             <span>{{ item.label }}</span>

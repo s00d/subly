@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { useAppStore } from "@/stores/appStore";
-import { useI18n } from "@/i18n";
+import { useCatalogStore } from "@/stores/catalog";
+import { useSettingsStore } from "@/stores/settings";
+import { useI18n } from "vue-i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { getPricePerMonth, getDaysUntilPayment, getBillingCycleText, formatCurrency, isOverdue } from "@/services/calculations";
-import type { Subscription } from "@/schemas/appData";
+import type { Subscription, Currency } from "@/schemas/appData";
 import Modal from "@/components/ui/Modal.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
@@ -27,31 +28,72 @@ const emit = defineEmits<{
   recordPayment: [id: string];
 }>();
 
-const store = useAppStore();
+const catalogStore = useCatalogStore();
+const settingsStore = useSettingsStore();
 const { t } = useI18n();
 const { fmtDateFull, fmtDateMedium } = useLocaleFormat();
 
 const sub = computed(() => props.subscription);
 
 function fmt(price: number, currencyId: string): string {
-  const c = store.state.currencies.find((cur) => cur.id === currencyId);
+  const c = catalogStore.currencies.find((cur) => cur.id === currencyId);
   return formatCurrency(price, c?.code || "USD", c?.symbol);
 }
 
+function fmtCur(amount: number, currency: Currency): string {
+  return formatCurrency(amount, currency.code, currency.symbol);
+}
+
+const targetCurrencies = computed(() => {
+  const mainId = settingsStore.settings.mainCurrencyId;
+  const targets = settingsStore.settings.currencyUpdateTargets ?? [];
+  const ids = new Set(targets);
+  if (mainId) ids.add(mainId);
+  return [...ids]
+    .map((id) => catalogStore.currencies.find((c) => c.id === id))
+    .filter((c): c is Currency => !!c && c.rate > 0);
+});
+
+function convertAmount(amount: number, fromCurId: string, toCurrency: Currency): number {
+  const fromCur = catalogStore.currencies.find((c) => c.id === fromCurId);
+  if (!fromCur || fromCur.rate <= 0) return 0;
+  return (amount / fromCur.rate) * toCurrency.rate;
+}
+
+const convertedPrices = computed(() => {
+  if (!sub.value || targetCurrencies.value.length === 0) return [];
+  return targetCurrencies.value
+    .filter((tc) => tc.id !== sub.value!.currencyId)
+    .map((tc) => ({
+      currency: tc,
+      amount: convertAmount(sub.value!.price, sub.value!.currencyId, tc),
+    }));
+});
+
+const convertedMonthly = computed(() => {
+  if (!sub.value || targetCurrencies.value.length === 0) return [];
+  return targetCurrencies.value
+    .filter((tc) => tc.id !== sub.value!.currencyId)
+    .map((tc) => ({
+      currency: tc,
+      amount: convertAmount(monthlyPrice.value, sub.value!.currencyId, tc),
+    }));
+});
+
 const categoryName = computed(() =>
-  sub.value ? (store.state.categories.find((c) => c.id === sub.value!.categoryId)?.name || "") : ""
+  sub.value ? (catalogStore.categories.find((c) => c.id === sub.value!.categoryId)?.name || "") : ""
 );
 
 const categoryIcon = computed(() =>
-  sub.value ? (store.state.categories.find((c) => c.id === sub.value!.categoryId)?.icon || "") : ""
+  sub.value ? (catalogStore.categories.find((c) => c.id === sub.value!.categoryId)?.icon || "") : ""
 );
 
 const paymentMethod = computed(() =>
-  sub.value ? store.state.paymentMethods.find((p) => p.id === sub.value!.paymentMethodId) : null
+  sub.value ? catalogStore.paymentMethods.find((p) => p.id === sub.value!.paymentMethodId) : null
 );
 
 const payerName = computed(() =>
-  sub.value ? (store.state.household.find((h) => h.id === sub.value!.payerUserId)?.name || "") : ""
+  sub.value ? (catalogStore.household.find((h) => h.id === sub.value!.payerUserId)?.name || "") : ""
 );
 
 const monthlyPrice = computed(() =>
@@ -74,23 +116,31 @@ const formatDateShort = fmtDateMedium;
   <Modal :show="show && !!sub" :title="t('subscription_details')" @close="emit('close')" maxWidth="32rem">
     <div v-if="sub" class="space-y-4 sm:space-y-5">
       <!-- Header: Logo + Name + Price -->
-      <div class="flex items-center gap-3 sm:gap-4">
-        <div class="w-14 h-14 rounded-xl bg-[var(--color-primary-light)] flex items-center justify-center text-lg font-bold text-[var(--color-primary)] shrink-0 overflow-hidden">
+      <div class="flex items-center gap-2.5 sm:gap-4">
+        <div class="w-11 h-11 sm:w-14 sm:h-14 rounded-xl bg-[var(--color-primary-light)] flex items-center justify-center text-base sm:text-lg font-bold text-[var(--color-primary)] shrink-0 overflow-hidden">
           <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
           <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
         </div>
         <div class="flex-1 min-w-0">
-          <h3 class="text-lg font-semibold text-[var(--color-text-primary)] truncate">{{ sub.name }}</h3>
-          <p class="text-xs text-[var(--color-text-muted)]">
+          <h3 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)] truncate">{{ sub.name }}</h3>
+          <p class="text-[10px] sm:text-xs text-[var(--color-text-muted)]">
             {{ getBillingCycleText(sub.cycle, sub.frequency, t) }}
             <span v-if="!sub.autoRenew" class="ml-1 text-orange-500">({{ t('manual_renewal') }})</span>
           </p>
         </div>
         <div class="text-right shrink-0">
-          <p class="text-xl font-bold text-[var(--color-text-primary)]">{{ fmt(sub.price, sub.currencyId) }}</p>
-          <p v-if="sub.cycle !== 3 || sub.frequency !== 1" class="text-xs text-[var(--color-text-muted)]">
+          <p class="text-lg sm:text-xl font-bold text-[var(--color-text-primary)]">{{ fmt(sub.price, sub.currencyId) }}</p>
+          <p v-if="sub.cycle !== 3 || sub.frequency !== 1" class="text-[10px] sm:text-xs text-[var(--color-text-muted)]">
             ≈ {{ fmt(monthlyPrice, sub.currencyId) }}/{{ t('monthly').toLowerCase() }}
           </p>
+          <div v-if="convertedPrices.length > 0" class="mt-1 space-y-0.5">
+            <p v-for="cp in convertedPrices" :key="cp.currency.id" class="text-[10px] sm:text-xs text-[var(--color-text-muted)]">
+              ≈ {{ fmtCur(cp.amount, cp.currency) }}
+              <span v-if="sub.cycle !== 3 || sub.frequency !== 1">
+                ({{ fmtCur(convertedMonthly.find(cm => cm.currency.id === cp.currency.id)?.amount || 0, cp.currency) }}/{{ t('monthly').toLowerCase().charAt(0) }})
+              </span>
+            </p>
+          </div>
         </div>
       </div>
 
@@ -229,11 +279,11 @@ const formatDateShort = fmtDateMedium;
     </div>
 
     <template #footer>
-      <div class="flex items-center gap-1 w-full">
+      <div class="flex items-center gap-0.5 sm:gap-1 w-full overflow-x-auto scrollbar-none">
         <Tooltip v-if="sub && !sub.inactive" :text="t('record_payment')">
           <button
             @click="emit('recordPayment', sub!.id)"
-            class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+            class="p-1.5 sm:p-2 rounded-lg text-[var(--color-text-muted)] hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors shrink-0"
           >
             <CircleDollarSign :size="16" />
           </button>
@@ -241,7 +291,7 @@ const formatDateShort = fmtDateMedium;
         <Tooltip v-if="sub" :text="t('renew')">
           <button
             @click="emit('renew', sub!.id)"
-            class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+            class="p-1.5 sm:p-2 rounded-lg text-[var(--color-text-muted)] hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors shrink-0"
           >
             <RefreshCw :size="16" />
           </button>
@@ -249,7 +299,7 @@ const formatDateShort = fmtDateMedium;
         <Tooltip v-if="sub" :text="t('clone')">
           <button
             @click="emit('clone', sub!.id)"
-            class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] transition-colors"
+            class="p-1.5 sm:p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] transition-colors shrink-0"
           >
             <Copy :size="16" />
           </button>
@@ -257,7 +307,7 @@ const formatDateShort = fmtDateMedium;
         <Tooltip v-if="sub" :text="t('edit_subscription')">
           <button
             @click="emit('edit', sub!)"
-            class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] transition-colors"
+            class="p-1.5 sm:p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] transition-colors shrink-0"
           >
             <Pencil :size="16" />
           </button>
@@ -265,7 +315,7 @@ const formatDateShort = fmtDateMedium;
         <Tooltip v-if="sub" :text="t('delete')">
           <button
             @click="emit('delete', sub!.id)"
-            class="p-2 rounded-lg text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            class="p-1.5 sm:p-2 rounded-lg text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
           >
             <Trash2 :size="16" />
           </button>
@@ -275,7 +325,7 @@ const formatDateShort = fmtDateMedium;
 
         <button
           @click="emit('close')"
-          class="px-4 py-2 rounded-lg border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+          class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-[var(--color-border)] text-xs sm:text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors shrink-0"
         >{{ t('cancel') }}</button>
       </div>
     </template>

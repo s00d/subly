@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { X } from "lucide-vue-next";
+import { tv } from "@/lib/tv";
 
 defineProps<{
   title: string;
@@ -10,6 +11,24 @@ defineProps<{
 const emit = defineEmits<{
   close: [];
 }>();
+
+const modalTv = tv({
+  slots: {
+    overlay: "fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4",
+    backdrop: "absolute inset-0 bg-black/50",
+    panel: [
+      "relative bg-[var(--color-surface)] w-full overflow-hidden",
+      "rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[90vh] sm:max-h-none",
+    ],
+    header: "flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--color-border)]",
+    titleEl: "text-base sm:text-lg font-semibold text-[var(--color-text-primary)]",
+    closeBtn: "p-1 rounded-lg hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)]",
+    body: "px-4 sm:px-6 py-3 sm:py-4 max-h-[70vh] overflow-y-auto",
+    footer: "px-4 sm:px-6 py-3 sm:py-4 border-t border-[var(--color-border)] flex justify-end gap-3",
+  },
+});
+
+const slots = modalTv();
 </script>
 
 <template>
@@ -22,33 +41,22 @@ const emit = defineEmits<{
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="show" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-        <!-- Backdrop -->
-        <div class="absolute inset-0 bg-black/50" @click="emit('close')" />
-
-        <!-- Panel -->
+      <div v-if="show" :class="slots.overlay()">
+        <div :class="slots.backdrop()" @click="emit('close')" />
         <div
-          class="relative bg-[var(--color-surface)] w-full overflow-hidden rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[90vh] sm:max-h-none"
+          :class="slots.panel()"
           :style="{ maxWidth: maxWidth || '32rem' }"
         >
-          <!-- Header -->
-          <div class="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--color-border)]">
-            <h3 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ title }}</h3>
-            <button
-              @click="emit('close')"
-              class="p-1 rounded-lg hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)]"
-            >
+          <div :class="slots.header()">
+            <h3 :class="slots.titleEl()">{{ title }}</h3>
+            <button @click="emit('close')" :class="slots.closeBtn()">
               <X :size="20" />
             </button>
           </div>
-
-          <!-- Body -->
-          <div class="px-4 sm:px-6 py-3 sm:py-4 max-h-[70vh] overflow-y-auto">
+          <div :class="slots.body()">
             <slot />
           </div>
-
-          <!-- Footer -->
-          <div v-if="$slots.footer" class="px-4 sm:px-6 py-3 sm:py-4 border-t border-[var(--color-border)] flex justify-end gap-3">
+          <div v-if="$slots.footer" :class="slots.footer()">
             <slot name="footer" />
           </div>
         </div>

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, watch, computed, reactive } from "vue";
-import { useAppStore } from "@/stores/appStore";
-import { useI18n } from "@/i18n";
+import { useSubscriptionsStore } from "@/stores/subscriptions";
+import { useSettingsStore } from "@/stores/settings";
+import { useCatalogStore } from "@/stores/catalog";
+import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import type { Subscription, CycleType } from "@/schemas/appData";
 import { parseSubscription, SubscriptionSchema } from "@/schemas/appData";
@@ -26,7 +28,9 @@ const emit = defineEmits<{
   saved: [];
 }>();
 
-const store = useAppStore();
+const subsStore = useSubscriptionsStore();
+const settingsStore = useSettingsStore();
+const catalogStore = useCatalogStore();
 const { t } = useI18n();
 const { toast } = useToast();
 
@@ -49,15 +53,15 @@ function resetForm() {
     name: "",
     logo: "",
     price: 0,
-    currencyId: store.state.settings.mainCurrencyId,
+    currencyId: settingsStore.settings.mainCurrencyId,
     nextPayment: new Date().toISOString().split("T")[0],
     startDate: new Date().toISOString().split("T")[0],
     cycle: 3,
     frequency: 1,
     notes: "",
-    paymentMethodId: store.state.settings.defaultPaymentMethodId || store.enabledPaymentMethods.value[0]?.id || "",
-    payerUserId: store.state.household[0]?.id || "",
-    categoryId: store.state.settings.defaultCategoryId || "cat-1",
+    paymentMethodId: settingsStore.settings.defaultPaymentMethodId || catalogStore.enabledPaymentMethods[0]?.id || "",
+    payerUserId: catalogStore.household[0]?.id || "",
+    categoryId: settingsStore.settings.defaultCategoryId || "cat-1",
     notify: true,
     notifyDaysBefore: -1,
     inactive: false,
@@ -85,7 +89,7 @@ const title = computed(() => isEdit.value ? t("edit_subscription") : t("add_subs
 
 // Select options
 const currencyOptions = computed<SelectOption[]>(() =>
-  store.state.currencies.map((c) => ({ value: c.id, label: `${c.name} (${c.code})` }))
+  catalogStore.currencies.map((c) => ({ value: c.id, label: `${c.name} (${c.code})` }))
 );
 
 const cycleOptions = computed<SelectOption[]>(() => [
@@ -96,15 +100,15 @@ const cycleOptions = computed<SelectOption[]>(() => [
 ]);
 
 const paymentMethodOptions = computed<SelectOption[]>(() =>
-  store.enabledPaymentMethods.value.map((pm) => ({ value: pm.id, label: pm.name, icon: pm.icon }))
+  catalogStore.enabledPaymentMethods.map((pm) => ({ value: pm.id, label: pm.name, icon: pm.icon }))
 );
 
 const payerOptions = computed<SelectOption[]>(() =>
-  store.state.household.map((m) => ({ value: m.id, label: m.name }))
+  catalogStore.household.map((m) => ({ value: m.id, label: m.name }))
 );
 
 const categoryOptions = computed<SelectOption[]>(() =>
-  store.sortedCategories.value.map((c) => ({ value: c.id, label: c.name, icon: c.icon || undefined }))
+  catalogStore.sortedCategories.map((c) => ({ value: c.id, label: c.name, icon: c.icon || undefined }))
 );
 
 function calculateNextPayment() {
@@ -155,9 +159,9 @@ function handleSubmit() {
 
   try {
     if (isEdit.value && props.editSubscription) {
-      store.updateSubscription(result.data);
+      subsStore.updateSubscription(result.data);
     } else {
-      store.addSubscription(result.data);
+      subsStore.addSubscription(result.data);
     }
     toast(t("success"));
     emit("saved");

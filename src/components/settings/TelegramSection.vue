@@ -1,24 +1,24 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { useAppStore } from "@/stores/appStore";
-import { useI18n } from "@/i18n";
+import { useSettingsStore } from "@/stores/settings";
+import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppToggle from "@/components/ui/AppToggle.vue";
 import { sendTelegramTestMessage } from "@/services/telegram";
 import { Send } from "lucide-vue-next";
 
-const store = useAppStore();
+const settingsStore = useSettingsStore();
 const { t } = useI18n();
 const { toast } = useToast();
 
-const botToken = ref(store.state.telegramBotToken);
-const chatId = ref(store.state.telegramChatId);
-const enabled = ref(store.state.telegramEnabled);
+const botToken = ref(settingsStore.telegramBotToken);
+const chatId = ref(settingsStore.telegramChatId);
+const enabled = ref(settingsStore.telegramEnabled);
 const isTesting = ref(false);
 
 function saveTelegram() {
-  store.setTelegramConfig(botToken.value, chatId.value, enabled.value);
+  settingsStore.setTelegramConfig(botToken.value, chatId.value, enabled.value);
   toast(t("success"));
 }
 
@@ -41,8 +41,8 @@ async function testTelegram() {
 </script>
 
 <template>
-  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-5">
-    <h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-4">{{ t('telegram_notifications') }}</h2>
+  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+    <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('telegram_notifications') }}</h2>
     <div class="space-y-3">
       <AppToggle v-model="enabled" :label="t('telegram_enabled')" :description="t('telegram_enabled_info')" />
       <AppInput v-model="botToken" :label="t('telegram_bot_token')" :placeholder="t('telegram_bot_token_placeholder')" />

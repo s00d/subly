@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { ChevronDown, Check, Search } from "lucide-vue-next";
+import { tv } from "@/lib/tv";
 
 export interface SelectOption {
   value: string | number;
@@ -88,70 +89,117 @@ onUnmounted(() => {
   document.removeEventListener("mousedown", onClickOutside);
   window.removeEventListener("scroll", onScroll, true);
 });
+
+const selectTv = tv({
+  slots: {
+    root: "relative w-full",
+    labelEl: "block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5",
+    trigger: [
+      "w-full flex items-center gap-2 rounded-lg border",
+      "bg-[var(--color-surface)] text-left transition-shadow",
+      "disabled:opacity-50 disabled:cursor-not-allowed",
+    ],
+    triggerText: "flex-1 truncate",
+    chevron: "shrink-0 text-[var(--color-text-muted)] transition-transform",
+    panel: [
+      "fixed z-[200] bg-[var(--color-surface)] border border-[var(--color-border)]",
+      "rounded-xl shadow-xl overflow-hidden",
+    ],
+    searchWrap: "p-2 border-b border-[var(--color-border)]",
+    searchInput: [
+      "w-full pl-8 pr-3 py-1.5 rounded-md border border-[var(--color-border)]",
+      "bg-[var(--color-surface-secondary)] text-xs text-[var(--color-text-primary)]",
+      "placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]",
+    ],
+    list: "max-h-56 overflow-y-auto py-1",
+    emptyEl: "px-3 py-2 text-xs text-[var(--color-text-muted)] text-center",
+    optionEl: "w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors disabled:opacity-40",
+    errorEl: "mt-1 text-xs text-red-500",
+  },
+  variants: {
+    size: {
+      sm: { trigger: "px-2.5 py-1.5 text-xs" },
+      md: { trigger: "px-3 py-2 text-sm" },
+    },
+    status: {
+      error: { trigger: "border-red-500 ring-2 ring-red-500" },
+      open: { trigger: "border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]" },
+      normal: { trigger: "border-[var(--color-border)] hover:border-[var(--color-text-muted)]" },
+    },
+    chevronOpen: {
+      true: { chevron: "rotate-180" },
+    },
+    selected: {
+      true: { triggerText: "text-[var(--color-text-primary)]" },
+      false: { triggerText: "text-[var(--color-text-muted)]" },
+    },
+    optionActive: {
+      true: { optionEl: "bg-[var(--color-primary-light)] text-[var(--color-primary)] font-medium" },
+      false: { optionEl: "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]" },
+    },
+  },
+  defaultVariants: { size: "md", status: "normal" },
+});
+
+const slots = computed(() =>
+  selectTv({
+    size: props.size ?? "md",
+    status: props.error ? "error" : isOpen.value ? "open" : "normal",
+    chevronOpen: isOpen.value || undefined,
+    selected: !!selected.value || undefined,
+  }),
+);
 </script>
 
 <template>
-  <div class="relative w-full">
-    <label v-if="label" class="block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5">{{ label }}</label>
+  <div :class="slots.root()">
+    <label v-if="label" :class="slots.labelEl()">{{ label }}</label>
 
     <button
       ref="triggerRef"
       type="button"
       @click="toggle"
       :disabled="disabled"
-      class="w-full flex items-center gap-2 rounded-lg border bg-[var(--color-surface)] text-left transition-shadow disabled:opacity-50 disabled:cursor-not-allowed"
-      :class="[
-        error ? 'border-red-500 ring-2 ring-red-500' : isOpen ? 'border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]' : 'border-[var(--color-border)] hover:border-[var(--color-text-muted)]',
-        size === 'sm' ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm',
-      ]"
+      :class="slots.trigger()"
     >
       <span v-if="selected?.icon" class="shrink-0 text-base">
         <img v-if="selected.icon.startsWith('/') || selected.icon.startsWith('http') || selected.icon.startsWith('data:')" :src="selected.icon" class="w-5 h-5 object-contain inline-block" />
         <span v-else>{{ selected.icon }}</span>
       </span>
-      <span class="flex-1 truncate" :class="selected ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-muted)]'">
+      <span :class="slots.triggerText()">
         {{ selected?.label || placeholder || '—' }}
       </span>
-      <ChevronDown
-        :size="14"
-        class="shrink-0 text-[var(--color-text-muted)] transition-transform"
-        :class="{ 'rotate-180': isOpen }"
-      />
+      <ChevronDown :size="14" :class="slots.chevron()" />
     </button>
 
     <Teleport to="body">
       <div
         v-if="isOpen"
         ref="dropdownRef"
-        class="fixed z-[200] bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl shadow-xl overflow-hidden"
+        :class="slots.panel()"
         :style="{ top: pos.top + 'px', left: pos.left + 'px', width: pos.width + 'px' }"
       >
-        <div v-if="searchable" class="p-2 border-b border-[var(--color-border)]">
+        <div v-if="searchable" :class="slots.searchWrap()">
           <div class="relative">
             <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
             <input
               v-model="search"
               type="text"
-              class="w-full pl-8 pr-3 py-1.5 rounded-md border border-[var(--color-border)] bg-[var(--color-surface-secondary)] text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+              :class="slots.searchInput()"
               placeholder="Search..."
               @click.stop
             />
           </div>
         </div>
-        <div class="max-h-56 overflow-y-auto py-1">
-          <div v-if="filtered.length === 0" class="px-3 py-2 text-xs text-[var(--color-text-muted)] text-center">No results</div>
+        <div :class="slots.list()">
+          <div v-if="filtered.length === 0" :class="slots.emptyEl()">No results</div>
           <button
             v-for="opt in filtered"
             :key="String(opt.value)"
             type="button"
             @click="select(opt)"
             :disabled="opt.disabled"
-            class="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors disabled:opacity-40"
-            :class="[
-              String(opt.value) === String(modelValue)
-                ? 'bg-[var(--color-primary-light)] text-[var(--color-primary)] font-medium'
-                : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]',
-            ]"
+            :class="selectTv({ optionActive: String(opt.value) === String(modelValue) || undefined }).optionEl()"
           >
             <span v-if="opt.icon" class="shrink-0 text-base">
               <img v-if="opt.icon.startsWith('/') || opt.icon.startsWith('http') || opt.icon.startsWith('data:')" :src="opt.icon" class="w-5 h-5 object-contain inline-block" />
@@ -163,6 +211,6 @@ onUnmounted(() => {
         </div>
       </div>
     </Teleport>
-    <p v-if="error" class="mt-1 text-xs text-red-500">{{ error }}</p>
+    <p v-if="error" :class="slots.errorEl()">{{ error }}</p>
   </div>
 </template>

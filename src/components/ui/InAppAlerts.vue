@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { useI18n } from "@/i18n";
+import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import type { InAppAlert } from "@/services/notifications";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Bell, AlertTriangle, Clock, X, Copy } from "lucide-vue-next";
+import { tv } from "@/lib/tv";
 
 defineProps<{
   alerts: InAppAlert[];
@@ -27,14 +28,6 @@ function alertIcon(type: InAppAlert["type"]) {
   }
 }
 
-function alertColor(type: InAppAlert["type"]) {
-  switch (type) {
-    case "due_today": return "text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800";
-    case "upcoming": return "text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800";
-    case "overdue": return "text-red-600 bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800";
-  }
-}
-
 function alertLabel(alert: InAppAlert): string {
   if (alert.type === "due_today") return t("due_today_alert");
   if (alert.type === "upcoming") return t("in_days_alert").replace("{days}", String(alert.daysUntil));
@@ -50,7 +43,6 @@ async function copyAlert(alert: InAppAlert) {
     await writeText(alertText(alert));
     toast(t("copied_to_clipboard"));
   } catch {
-    // fallback
     try {
       await navigator.clipboard.writeText(alertText(alert));
       toast(t("copied_to_clipboard"));
@@ -59,18 +51,38 @@ async function copyAlert(alert: InAppAlert) {
     }
   }
 }
+
+const alertsTv = tv({
+  slots: {
+    root: "space-y-2 mb-4",
+    headerRow: "flex items-center justify-between mb-1",
+    headerLabel: "text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider",
+    dismissAllBtn: "text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors",
+    alertRow: "flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-2 rounded-lg border text-xs sm:text-sm",
+    actionBtn: "p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0",
+  },
+  variants: {
+    alertType: {
+      due_today: { alertRow: "text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800" },
+      upcoming: { alertRow: "text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800" },
+      overdue: { alertRow: "text-red-600 bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800" },
+    },
+  },
+});
+
+const slots = alertsTv();
 </script>
 
 <template>
-  <div v-if="alerts.length > 0" class="space-y-2 mb-4">
-    <div class="flex items-center justify-between mb-1">
-      <span class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider">
+  <div v-if="alerts.length > 0" :class="slots.root()">
+    <div :class="slots.headerRow()">
+      <span :class="slots.headerLabel()">
         {{ t("notifications") }} ({{ alerts.length }})
       </span>
       <button
         v-if="alerts.length > 1"
         @click="emit('dismissAll')"
-        class="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+        :class="slots.dismissAllBtn()"
       >
         {{ t("dismiss_all") }}
       </button>
@@ -89,29 +101,21 @@ async function copyAlert(alert: InAppAlert) {
       <div
         v-for="alert in alerts"
         :key="alert.id"
-        class="flex items-center gap-3 px-3 py-2 rounded-lg border text-sm"
-        :class="alertColor(alert.type)"
+        :class="alertsTv({ alertType: alert.type }).alertRow()"
       >
-        <component :is="alertIcon(alert.type)" :size="16" class="shrink-0" />
+        <component :is="alertIcon(alert.type)" :size="14" class="shrink-0 sm:[&]:w-4 sm:[&]:h-4" />
         <div class="flex-1 min-w-0">
-          <span class="font-medium truncate">{{ alert.subscriptionName }}</span>
-          <span class="mx-1.5 opacity-50">·</span>
-          <span class="opacity-80">{{ alertLabel(alert) }}</span>
-          <span class="mx-1.5 opacity-50">·</span>
-          <span class="font-semibold">{{ fmt(alert.price, alert.currencyId) }}</span>
+          <span class="font-medium truncate block sm:inline">{{ alert.subscriptionName }}</span>
+          <span class="hidden sm:inline mx-1.5 opacity-50">·</span>
+          <span class="opacity-80 block sm:inline text-[10px] sm:text-sm">{{ alertLabel(alert) }}</span>
+          <span class="mx-1 sm:mx-1.5 opacity-50 hidden sm:inline">·</span>
+          <span class="font-semibold sm:inline hidden">{{ fmt(alert.price, alert.currencyId) }}</span>
         </div>
-        <button
-          @click="copyAlert(alert)"
-          class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0"
-          :title="t('copy')"
-        >
+        <span class="font-semibold sm:hidden text-[11px] shrink-0">{{ fmt(alert.price, alert.currencyId) }}</span>
+        <button @click="copyAlert(alert)" :class="slots.actionBtn()" :title="t('copy')">
           <Copy :size="13" />
         </button>
-        <button
-          @click="emit('dismiss', alert.id)"
-          class="p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0"
-          :title="t('dismiss')"
-        >
+        <button @click="emit('dismiss', alert.id)" :class="slots.actionBtn()" :title="t('dismiss')">
           <X :size="14" />
         </button>
       </div>

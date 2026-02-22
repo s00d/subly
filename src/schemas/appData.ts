@@ -62,7 +62,10 @@ export const ExpenseSchema = z.object({
   payerUserId: z.string().default(""),
   tags: z.array(z.string()).default([]),
   notes: z.string().default(""),
+  url: z.string().default(""),
   createdAt: z.string().default(""),
+  subscriptionId: z.string().default(""),
+  paymentRecordId: z.string().default(""),
 });
 
 // ---- Category ----
@@ -70,8 +73,8 @@ export const CategorySchema = z.object({
   id: z.string(),
   name: z.string(),
   icon: z.string().default(""),
-  order: z.number().int().default(0),
-  i18nKey: z.string().default(""),  // if set, name is auto-translated on lang switch
+  sortOrder: z.number().int().default(0),
+  i18nKey: z.string().default(""),
 });
 
 // ---- Currency ----
@@ -81,7 +84,7 @@ export const CurrencySchema = z.object({
   symbol: z.string(),
   code: z.string(),
   rate: z.number().default(1),
-  order: z.number().int().default(0),
+  sortOrder: z.number().int().default(0),
   i18nKey: z.string().default(""),
 });
 
@@ -90,7 +93,7 @@ export const HouseholdMemberSchema = z.object({
   id: z.string(),
   name: z.string(),
   email: z.string().default(""),
-  order: z.number().int().default(0),
+  sortOrder: z.number().int().default(0),
 });
 
 // ---- Payment method ----
@@ -99,7 +102,7 @@ export const PaymentMethodSchema = z.object({
   name: z.string(),
   icon: z.string().default("💳"),
   enabled: z.boolean().default(true),
-  order: z.number().int().default(0),
+  sortOrder: z.number().int().default(0),
   i18nKey: z.string().default(""),
 });
 
@@ -108,7 +111,7 @@ export const TagSchema = z.object({
   id: z.string(),
   name: z.string(),
   favorite: z.boolean().default(true),
-  order: z.number().int().default(0),
+  sortOrder: z.number().int().default(0),
   i18nKey: z.string().default(""),
 });
 
@@ -155,6 +158,13 @@ export const SettingsSchema = z.object({
   // Subscription list view
   subscriptionViewMode: z.enum(["default", "compact", "expanded"]).default("default"),
   subscriptionGroupBy: z.enum(["none", "category", "payment_method"]).default("none"),
+  // Expense list view
+  expenseViewMode: z.enum(["default", "compact", "expanded"]).default("default"),
+  // Converter presets
+  converterPresets: z.array(z.number()).default([100, 500, 1000, 5000]),
+  // Rate history
+  rateHistoryEnabled: z.boolean().default(true),
+  rateHistoryDays: z.number().min(7).max(365).default(90),
   customColors: CustomColorsSchema.default({ main: "", accent: "", hover: "" }),
 });
 
@@ -244,8 +254,14 @@ export const AppDataSchema = z.object({
     dashboardWidgets: [],
     subscriptionViewMode: "default",
     subscriptionGroupBy: "none",
+    expenseViewMode: "default",
+    converterPresets: [100, 500, 1000, 5000],
+    rateHistoryEnabled: true,
+    rateHistoryDays: 90,
     customColors: { main: "", accent: "", hover: "" },
   }),
+  ratesApiKey: z.string().default(""),
+  ratesProvider: z.string().default("frankfurter"),
   fixerApiKey: z.string().default(""),
   fixerProvider: z.number().default(0),
   telegramBotToken: z.string().default(""),
@@ -358,6 +374,8 @@ export function validateAppData(raw: unknown): AppData | null {
         paymentMethods: safeParseArray(obj.paymentMethods, PaymentMethodSchema, []),
         tags: migrateTags(obj.tags),
         settings: safeParseObj(obj.settings, SettingsSchema),
+        ratesApiKey: typeof obj.ratesApiKey === "string" ? obj.ratesApiKey : (typeof obj.fixerApiKey === "string" ? obj.fixerApiKey : ""),
+        ratesProvider: typeof obj.ratesProvider === "string" ? obj.ratesProvider : migrateFixerProvider(obj.fixerProvider),
         fixerApiKey: typeof obj.fixerApiKey === "string" ? obj.fixerApiKey : "",
         fixerProvider: typeof obj.fixerProvider === "number" ? obj.fixerProvider : 0,
         telegramBotToken: typeof obj.telegramBotToken === "string" ? obj.telegramBotToken : "",
@@ -411,6 +429,13 @@ function safeParseObj<T>(
   if (result.success) return result.data;
   // Return default by parsing empty object
   return schema.parse({});
+}
+
+/** Migrate old numeric fixerProvider to string RatesProviderType */
+function migrateFixerProvider(raw: unknown): string {
+  if (raw === 1) return "apilayer";
+  if (raw === 0) return "fixer";
+  return "frankfurter";
 }
 
 /** Migrate tags from old string[] format to new Tag[] format */

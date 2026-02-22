@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
-import { useAppStore } from "@/stores/appStore";
-import { useI18n } from "@/i18n";
+import { useSubscriptionsStore } from "@/stores/subscriptions";
+import { useSettingsStore } from "@/stores/settings";
+import { useCatalogStore } from "@/stores/catalog";
+import { useI18n } from "vue-i18n";
+import { useHeaderActions } from "@/composables/useHeaderActions";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
-import { getPricePerMonth, isOverdue, isUpcoming } from "@/services/calculations";
+import { getPricePerMonth } from "@/services/calculations";
 import { getMonthlySpendingHistory, getForecast, getMonthComparison, getLifetimeCosts, getCategoryAverages } from "@/services/analytics";
+import { dbGetExpensesSince, dbGetExpenseAggregations, dbLoadOverdueSubscriptions, dbLoadUpcomingSubscriptions } from "@/services/database";
+import type { Expense } from "@/schemas/appData";
 import { Doughnut } from "vue-chartjs";
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend } from "chart.js";
 import { Wallet, ArrowRight, Settings2, Eye, EyeOff, ChevronUp, ChevronDown } from "lucide-vue-next";
+import Tooltip from "@/components/ui/Tooltip.vue";
 
 import OverdueAlert from "@/components/dashboard/OverdueAlert.vue";
 import UpcomingPayments from "@/components/dashboard/UpcomingPayments.vue";
@@ -19,11 +25,19 @@ import ForecastCard from "@/components/dashboard/ForecastCard.vue";
 import LifetimeCosts from "@/components/dashboard/LifetimeCosts.vue";
 import CategoryAverages from "@/components/dashboard/CategoryAverages.vue";
 import ExpenseSummary from "@/components/dashboard/ExpenseSummary.vue";
+import RateHistoryWidget from "@/components/dashboard/RateHistoryWidget.vue";
+import TopExpensesWidget from "@/components/dashboard/TopExpensesWidget.vue";
+import AvgCheckWidget from "@/components/dashboard/AvgCheckWidget.vue";
+import DayOfWeekWidget from "@/components/dashboard/DayOfWeekWidget.vue";
+import MonthCompareWidget from "@/components/dashboard/MonthCompareWidget.vue";
+import TagExpensesWidget from "@/components/dashboard/TagExpensesWidget.vue";
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(ArcElement, ChartTooltip, Legend);
 
 const router = useRouter();
-const store = useAppStore();
+const subsStore = useSubscriptionsStore();
+const settingsStore = useSettingsStore();
+const catalogStore = useCatalogStore();
 const { t } = useI18n();
 const { fmt, toMainCurrency } = useCurrencyFormat();
 const { fmtPercent } = useLocaleFormat();
@@ -33,14 +47,17 @@ function goToSubscriptions() { router.push("/subscriptions"); }
 const now = ref(Date.now());
 let nowInterval: ReturnType<typeof setInterval> | null = null;
 
+const { clearActions } = useHeaderActions();
 onMounted(() => {
+  clearActions();
+  loadDashboardSubscriptions();
   nowInterval = setInterval(() => { now.value = Date.now(); }, 60_000);
 });
 onUnmounted(() => {
   if (nowInterval) clearInterval(nowInterval);
 });
 
-const hasSubscriptions = computed(() => store.state.subscriptions.length > 0);
+const hasSubscriptions = computed(() => subsStore.subscriptions.length > 0);
 
 // ---- Widget configuration ----
 interface WidgetDef { id: string; labelKey: string }
@@ -57,13 +74,19 @@ const ALL_WIDGETS: WidgetDef[] = [
   { id: "category_avg", labelKey: "widget_category_avg" },
   { id: "charts", labelKey: "widget_charts" },
   { id: "expenses", labelKey: "widget_expenses" },
+  { id: "top_expenses", labelKey: "widget_top_expenses" },
+  { id: "avg_check", labelKey: "widget_avg_check" },
+  { id: "day_of_week", labelKey: "widget_day_of_week" },
+  { id: "month_compare", labelKey: "widget_month_compare" },
+  { id: "tag_expenses", labelKey: "widget_tag_expenses" },
+  { id: "rate_history", labelKey: "widget_rate_history" },
 ];
 
 const showWidgetConfig = ref(false);
 
 // Widget order + visibility from settings, with fallback to all visible
 const widgetConfig = computed(() => {
-  const saved = store.state.settings.dashboardWidgets;
+  const saved = settingsStore.settings.dashboardWidgets;
   if (!saved || saved.length === 0) {
     return ALL_WIDGETS.map((w) => ({ id: w.id, visible: true }));
   }
@@ -93,7 +116,7 @@ function toggleWidgetVisibility(id: string) {
   const updated = widgetConfig.value.map((w) =>
     w.id === id ? { ...w, visible: !w.visible } : w,
   );
-  store.updateSettings({ dashboardWidgets: updated });
+  settingsStore.updateSettings({ dashboardWidgets: updated });
 }
 
 function moveWidget(id: string, direction: -1 | 1) {
@@ -103,25 +126,24 @@ function moveWidget(id: string, direction: -1 | 1) {
   const newIdx = idx + direction;
   if (newIdx < 0 || newIdx >= arr.length) return;
   [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
-  store.updateSettings({ dashboardWidgets: arr });
+  settingsStore.updateSettings({ dashboardWidgets: arr });
 }
 
-// ---- Data computations ----
-const overdueSubscriptions = computed(() => {
-  void now.value;
-  return store.state.subscriptions.filter((s) => isOverdue(s))
-    .sort((a, b) => new Date(a.nextPayment).getTime() - new Date(b.nextPayment).getTime());
-});
+// ---- Data computations (loaded from SQL) ----
+const overdueSubscriptions = ref<import("@/schemas/appData").Subscription[]>([]);
+const upcomingSubscriptions = ref<import("@/schemas/appData").Subscription[]>([]);
 
-const upcomingSubscriptions = computed(() => {
-  void now.value;
-  return store.state.subscriptions.filter((s) => isUpcoming(s, 30))
-    .sort((a, b) => new Date(a.nextPayment).getTime() - new Date(b.nextPayment).getTime())
-    .slice(0, 5);
-});
+async function loadDashboardSubscriptions() {
+  const [overdue, upcoming] = await Promise.all([
+    dbLoadOverdueSubscriptions(),
+    dbLoadUpcomingSubscriptions(30, 5),
+  ]);
+  overdueSubscriptions.value = overdue;
+  upcomingSubscriptions.value = upcoming;
+}
 
-const activeSubs = computed(() => store.activeSubscriptions.value);
-const inactiveSubs = computed(() => store.inactiveSubscriptions.value);
+const activeSubs = computed(() => subsStore.activeSubscriptions);
+const inactiveSubs = computed(() => subsStore.inactiveSubscriptions);
 
 const totalMonthly = computed(() =>
   activeSubs.value.reduce((sum, s) => sum + getPricePerMonth(s.cycle, s.frequency, toMainCurrency(s.price, s.currencyId)), 0)
@@ -149,18 +171,21 @@ const amountDueThisMonth = computed(() => {
   }, 0);
 });
 
-const budget = computed(() => store.state.settings.budget);
+const budget = computed(() => settingsStore.settings.budget);
 
-const currentMonthStr = computed(() => {
-  void now.value;
+const monthlyExpensesTotal = ref(0);
+const analyticsExpenses = ref<Expense[]>([]);
+
+onMounted(async () => {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const monthPrefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const yearPrefix = String(d.getFullYear());
+  const agg = await dbGetExpenseAggregations(monthPrefix, yearPrefix);
+  monthlyExpensesTotal.value = agg.monthTotal;
+
+  const sinceDate = new Date(d.getFullYear(), d.getMonth() - 12, 1).toISOString().split("T")[0];
+  analyticsExpenses.value = await dbGetExpensesSince(sinceDate);
 });
-const monthlyExpensesTotal = computed(() =>
-  store.state.expenses
-    .filter((e) => e.date.startsWith(currentMonthStr.value))
-    .reduce((s, e) => s + toMainCurrency(e.amount, e.currencyId), 0)
-);
 
 const totalSpending = computed(() => totalMonthly.value + monthlyExpensesTotal.value);
 const budgetUsed = computed(() => budget.value > 0 ? Math.min(100, (totalSpending.value / budget.value) * 100) : null);
@@ -186,14 +211,14 @@ function buildCostMap(keyFn: (s: typeof activeSubs.value[0]) => { id: string; na
 }
 
 const categoryCosts = computed(() => buildCostMap((s) => {
-  const cat = store.state.categories.find((c) => c.id === s.categoryId);
+  const cat = catalogStore.categories.find((c) => c.id === s.categoryId);
   return { id: s.categoryId, name: cat?.name || "Other" };
 }));
 
 const pmCounts = computed(() => {
   const map: Record<string, { name: string; count: number }> = {};
   for (const s of activeSubs.value) {
-    const pm = store.state.paymentMethods.find((p) => p.id === s.paymentMethodId);
+    const pm = catalogStore.paymentMethods.find((p) => p.id === s.paymentMethodId);
     if (!map[s.paymentMethodId]) map[s.paymentMethodId] = { name: pm?.name || "Other", count: 0 };
     map[s.paymentMethodId].count++;
   }
@@ -201,7 +226,7 @@ const pmCounts = computed(() => {
 });
 
 const memberCosts = computed(() => buildCostMap((s) => {
-  const m = store.state.household.find((h) => h.id === s.payerUserId);
+  const m = catalogStore.household.find((h) => h.id === s.payerUserId);
   return { id: s.payerUserId, name: m?.name || "Other" };
 }));
 
@@ -219,11 +244,11 @@ const memberChartData = computed(() => toChartData(memberCosts.value));
 const hasCharts = computed(() => categoryCosts.value.length > 1 || pmCounts.value.length > 1 || memberCosts.value.length > 1);
 
 // Analytics
-const spendingHistory = computed(() => getMonthlySpendingHistory(store.state.subscriptions, toMainCurrency, 12, store.state.expenses));
-const forecast = computed(() => getForecast(store.state.subscriptions, toMainCurrency));
-const monthComparison = computed(() => getMonthComparison(store.state.subscriptions, toMainCurrency));
-const lifetimeCosts = computed(() => getLifetimeCosts(store.state.subscriptions, toMainCurrency));
-const categoryAverages = computed(() => getCategoryAverages(store.state.subscriptions, store.state.categories, toMainCurrency, store.state.expenses));
+const spendingHistory = computed(() => getMonthlySpendingHistory(subsStore.subscriptions, toMainCurrency, 12, analyticsExpenses.value));
+const forecast = computed(() => getForecast(subsStore.subscriptions, toMainCurrency));
+const monthComparison = computed(() => getMonthComparison(subsStore.subscriptions, toMainCurrency));
+const lifetimeCosts = computed(() => getLifetimeCosts(subsStore.subscriptions, toMainCurrency));
+const categoryAverages = computed(() => getCategoryAverages(subsStore.subscriptions, catalogStore.categories, toMainCurrency, analyticsExpenses.value));
 const hasAnalytics = computed(() => activeSubs.value.length > 0);
 </script>
 
@@ -270,27 +295,33 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
               :key="w.id"
               class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors"
             >
-              <button
-                @click="toggleWidgetVisibility(w.id)"
-                class="p-1 rounded transition-colors"
-                :class="w.visible ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)] opacity-40'"
-              >
-                <component :is="w.visible ? Eye : EyeOff" :size="14" />
-              </button>
+              <Tooltip :text="t('toggle_visibility')">
+                <button
+                  @click="toggleWidgetVisibility(w.id)"
+                  class="p-1 rounded transition-colors"
+                  :class="w.visible ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)] opacity-40'"
+                >
+                  <component :is="w.visible ? Eye : EyeOff" :size="14" />
+                </button>
+              </Tooltip>
               <span
                 class="text-sm flex-1"
                 :class="w.visible ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-muted)] line-through opacity-50'"
               >{{ t(w.def.labelKey) }}</span>
-              <button
-                @click="moveWidget(w.id, -1)"
-                :disabled="idx === 0"
-                class="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-20 transition-colors"
-              ><ChevronUp :size="14" /></button>
-              <button
-                @click="moveWidget(w.id, 1)"
-                :disabled="idx === orderedWidgets.length - 1"
-                class="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-20 transition-colors"
-              ><ChevronDown :size="14" /></button>
+              <Tooltip :text="t('move_up')">
+                <button
+                  @click="moveWidget(w.id, -1)"
+                  :disabled="idx === 0"
+                  class="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-20 transition-colors"
+                ><ChevronUp :size="14" /></button>
+              </Tooltip>
+              <Tooltip :text="t('move_down')">
+                <button
+                  @click="moveWidget(w.id, 1)"
+                  :disabled="idx === orderedWidgets.length - 1"
+                  class="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-20 transition-colors"
+                ><ChevronDown :size="14" /></button>
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -312,13 +343,13 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
         />
 
         <!-- budget -->
-        <div v-if="w.id === 'budget' && w.visible && budget > 0" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-5">
-          <h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-4">{{ t('your_budget') }}</h2>
+        <div v-if="w.id === 'budget' && w.visible && budget > 0" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+          <h2 class="text-sm sm:text-lg font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('your_budget') }}</h2>
           <div class="space-y-3">
-            <div class="w-full bg-[var(--color-surface-hover)] rounded-full h-3">
-              <div class="h-3 rounded-full transition-all duration-500" :class="(budgetUsed || 0) > 100 ? 'bg-red-500' : 'bg-[var(--color-primary)]'" :style="{ width: Math.min(budgetUsed || 0, 100) + '%' }" />
+            <div class="w-full bg-[var(--color-surface-hover)] rounded-full h-2.5 sm:h-3">
+              <div class="h-full rounded-full transition-all duration-500" :class="(budgetUsed || 0) > 100 ? 'bg-red-500' : 'bg-[var(--color-primary)]'" :style="{ width: Math.min(budgetUsed || 0, 100) + '%' }" />
             </div>
-            <div class="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 text-sm">
+            <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4 text-xs sm:text-sm">
               <div><p class="text-[var(--color-text-muted)]">{{ t('budget') }}</p><p class="font-semibold text-[var(--color-text-primary)]">{{ fmt(budget) }}</p></div>
               <div><p class="text-[var(--color-text-muted)]">{{ t('budget_used') }}</p><p class="font-semibold text-[var(--color-text-primary)]">{{ fmtPercent(budgetUsed || 0) }}</p></div>
               <div><p class="text-[var(--color-text-muted)]">{{ t('budget_remaining') }}</p><p class="font-semibold text-[var(--color-text-primary)]">{{ fmt(budgetLeft || 0) }}</p></div>
@@ -328,12 +359,12 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
         </div>
 
         <!-- savings -->
-        <div v-if="w.id === 'savings' && w.visible && inactiveSubs.length > 0" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-5">
-          <h2 class="text-lg font-semibold text-[var(--color-text-primary)] mb-3">{{ t('your_savings') }}</h2>
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div><p class="text-sm text-[var(--color-text-muted)]">{{ t('inactive_subscriptions') }}</p><p class="text-xl font-bold text-[var(--color-text-primary)]">{{ inactiveSubs.length }}</p></div>
-            <div><p class="text-sm text-[var(--color-text-muted)]">{{ t('monthly_savings') }}</p><p class="text-xl font-bold text-green-600">{{ fmt(totalSavingsMonthly) }}</p></div>
-            <div><p class="text-sm text-[var(--color-text-muted)]">{{ t('yearly_savings') }}</p><p class="text-xl font-bold text-green-600">{{ fmt(totalSavingsMonthly * 12) }}</p></div>
+        <div v-if="w.id === 'savings' && w.visible && inactiveSubs.length > 0" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+          <h2 class="text-sm sm:text-lg font-semibold text-[var(--color-text-primary)] mb-2 sm:mb-3">{{ t('your_savings') }}</h2>
+          <div class="grid grid-cols-3 gap-2 sm:gap-4">
+            <div><p class="text-[10px] sm:text-sm text-[var(--color-text-muted)]">{{ t('inactive_subscriptions') }}</p><p class="text-lg sm:text-xl font-bold text-[var(--color-text-primary)]">{{ inactiveSubs.length }}</p></div>
+            <div><p class="text-[10px] sm:text-sm text-[var(--color-text-muted)]">{{ t('monthly_savings') }}</p><p class="text-lg sm:text-xl font-bold text-green-600">{{ fmt(totalSavingsMonthly) }}</p></div>
+            <div><p class="text-[10px] sm:text-sm text-[var(--color-text-muted)]">{{ t('yearly_savings') }}</p><p class="text-lg sm:text-xl font-bold text-green-600">{{ fmt(totalSavingsMonthly * 12) }}</p></div>
           </div>
         </div>
 
@@ -352,20 +383,38 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
         <!-- expenses -->
         <ExpenseSummary v-if="w.id === 'expenses' && w.visible" />
 
+        <!-- top expenses -->
+        <TopExpensesWidget v-if="w.id === 'top_expenses' && w.visible" />
+
+        <!-- avg check -->
+        <AvgCheckWidget v-if="w.id === 'avg_check' && w.visible" />
+
+        <!-- day of week -->
+        <DayOfWeekWidget v-if="w.id === 'day_of_week' && w.visible" />
+
+        <!-- month compare -->
+        <MonthCompareWidget v-if="w.id === 'month_compare' && w.visible" />
+
+        <!-- tag expenses -->
+        <TagExpensesWidget v-if="w.id === 'tag_expenses' && w.visible" />
+
+        <!-- rate history -->
+        <RateHistoryWidget v-if="w.id === 'rate_history' && w.visible" />
+
         <!-- charts -->
-        <div v-if="w.id === 'charts' && w.visible && hasCharts" class="space-y-4">
-          <h2 class="text-lg font-semibold text-[var(--color-text-primary)]">{{ t('split_views') }}</h2>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-            <div v-if="categoryCosts.length > 1" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-5">
-              <h3 class="text-sm font-semibold text-[var(--color-text-primary)] mb-4">{{ t('category_split') }}</h3>
+        <div v-if="w.id === 'charts' && w.visible && hasCharts" class="space-y-3 sm:space-y-4">
+          <h2 class="text-sm sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('split_views') }}</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+            <div v-if="categoryCosts.length > 1" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+              <h3 class="text-xs sm:text-sm font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('category_split') }}</h3>
               <Doughnut :data="categoryChartData" :options="chartOptions" />
             </div>
-            <div v-if="pmCounts.length > 1" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-5">
-              <h3 class="text-sm font-semibold text-[var(--color-text-primary)] mb-4">{{ t('payment_method_split') }}</h3>
+            <div v-if="pmCounts.length > 1" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+              <h3 class="text-xs sm:text-sm font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('payment_method_split') }}</h3>
               <Doughnut :data="pmChartData" :options="chartOptions" />
             </div>
-            <div v-if="memberCosts.length > 1" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-5">
-              <h3 class="text-sm font-semibold text-[var(--color-text-primary)] mb-4">{{ t('household_split') }}</h3>
+            <div v-if="memberCosts.length > 1" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+              <h3 class="text-xs sm:text-sm font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('household_split') }}</h3>
               <Doughnut :data="memberChartData" :options="chartOptions" />
             </div>
           </div>
