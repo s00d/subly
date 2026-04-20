@@ -1,0 +1,14 @@
+package.json
+  h_9f37069a6b3ceb 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "1e2f73d915ffedd2415680ae82bc571606156d5f",
+  "prompts": {},
+  "humans": {
+    "h_9f37069a6b3ceb": {
+      "author": "Pavel Kuzmin"
+    }
+  }
+}
