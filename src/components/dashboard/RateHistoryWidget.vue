@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useSettingsStore } from "@/stores/settings";
 import { useCatalogStore } from "@/stores/catalog";
 import { useI18n } from "vue-i18n";
@@ -46,10 +46,20 @@ const currencies = computed(() =>
 
 const hasHistory = computed(() => Object.values(history.value).some((h) => h.length >= 1));
 
-onMounted(async () => {
+async function loadHistory() {
   if (!settingsStore.settings.rateHistoryEnabled || targetIds.value.length === 0) return;
   history.value = await dbGetRateHistoryBatch(targetIds.value, settingsStore.settings.rateHistoryDays);
-});
+}
+
+onMounted(loadHistory);
+
+watch(
+  [targetIds, () => settingsStore.settings.rateHistoryEnabled, () => settingsStore.settings.rateHistoryDays],
+  () => {
+    loadHistory();
+  },
+  { deep: true },
+);
 
 function sparkPath(data: number[], w: number, h: number): string {
   if (data.length === 0) return "";
@@ -60,7 +70,7 @@ function sparkPath(data: number[], w: number, h: number): string {
   }
   const min = Math.min(...data);
   const max = Math.max(...data);
-  const range = max - min || 1;
+  const range = max - min;
   const pad = 1;
   const iw = w - pad * 2;
   const ih = h - pad * 2;
@@ -68,7 +78,7 @@ function sparkPath(data: number[], w: number, h: number): string {
   return data
     .map((v, i) => {
       const x = pad + i * step;
-      const y = pad + ih - ((v - min) / range) * ih;
+      const y = range === 0 ? h / 2 : pad + ih - ((v - min) / range) * ih;
       return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");

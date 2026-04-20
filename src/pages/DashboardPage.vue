@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useSubscriptionsStore } from "@/stores/subscriptions";
+import { useExpensesStore } from "@/stores/expenses";
 import { useSettingsStore } from "@/stores/settings";
 import { useCatalogStore } from "@/stores/catalog";
 import { useI18n } from "vue-i18n";
@@ -36,6 +37,7 @@ ChartJS.register(ArcElement, ChartTooltip, Legend);
 
 const router = useRouter();
 const subsStore = useSubscriptionsStore();
+const expsStore = useExpensesStore();
 const settingsStore = useSettingsStore();
 const catalogStore = useCatalogStore();
 const { t } = useI18n();
@@ -176,7 +178,7 @@ const budget = computed(() => settingsStore.settings.budget);
 const monthlyExpensesTotal = ref(0);
 const analyticsExpenses = ref<Expense[]>([]);
 
-onMounted(async () => {
+async function refreshExpenseAnalytics() {
   const d = new Date();
   const monthPrefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   const yearPrefix = String(d.getFullYear());
@@ -185,7 +187,27 @@ onMounted(async () => {
 
   const sinceDate = new Date(d.getFullYear(), d.getMonth() - 12, 1).toISOString().split("T")[0];
   analyticsExpenses.value = await dbGetExpensesSince(sinceDate);
+}
+
+onMounted(async () => {
+  await refreshExpenseAnalytics();
 });
+
+watch(
+  () => subsStore.subscriptions,
+  () => {
+    loadDashboardSubscriptions();
+  },
+  { deep: true },
+);
+
+watch(
+  [() => expsStore.totalCount, () => expsStore.currentPage, () => expsStore.filter],
+  () => {
+    refreshExpenseAnalytics();
+  },
+  { deep: true },
+);
 
 const totalSpending = computed(() => totalMonthly.value + monthlyExpensesTotal.value);
 const budgetUsed = computed(() => budget.value > 0 ? Math.min(100, (totalSpending.value / budget.value) * 100) : null);

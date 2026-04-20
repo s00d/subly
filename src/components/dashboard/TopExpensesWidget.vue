@@ -1,22 +1,34 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useCatalogStore } from "@/stores/catalog";
+import { useExpensesStore } from "@/stores/expenses";
 import { dbGetTopExpenses, type TopExpense } from "@/services/database";
 import { TrendingDown } from "lucide-vue-next";
 
 const { t } = useI18n();
 const { fmt } = useCurrencyFormat();
 const catalogStore = useCatalogStore();
+const expsStore = useExpensesStore();
 
 const items = ref<TopExpense[]>([]);
 
-onMounted(async () => {
+async function loadTopExpenses() {
   const d = new Date();
   const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   items.value = await dbGetTopExpenses(prefix, 5);
-});
+}
+
+onMounted(loadTopExpenses);
+
+watch(
+  [() => expsStore.totalCount, () => expsStore.currentPage, () => expsStore.filter],
+  () => {
+    loadTopExpenses();
+  },
+  { deep: true },
+);
 
 function catName(id: string): string {
   return catalogStore.categories.find((c) => c.id === id)?.name ?? "";

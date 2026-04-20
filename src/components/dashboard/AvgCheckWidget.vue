@@ -1,20 +1,32 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
+import { useExpensesStore } from "@/stores/expenses";
 import { dbGetAvgExpenseStats, type AvgExpenseStats } from "@/services/database";
 import { Calculator } from "lucide-vue-next";
 
 const { t } = useI18n();
 const { fmt } = useCurrencyFormat();
+const expsStore = useExpensesStore();
 
 const stats = ref<AvgExpenseStats | null>(null);
 
-onMounted(async () => {
+async function loadAvgStats() {
   const d = new Date();
   const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   stats.value = await dbGetAvgExpenseStats(prefix);
-});
+}
+
+onMounted(loadAvgStats);
+
+watch(
+  [() => expsStore.totalCount, () => expsStore.currentPage, () => expsStore.filter],
+  () => {
+    loadAvgStats();
+  },
+  { deep: true },
+);
 </script>
 
 <template>

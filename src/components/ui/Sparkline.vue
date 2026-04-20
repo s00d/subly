@@ -22,7 +22,7 @@ const path = computed(() => {
   }
   const min = Math.min(...d);
   const max = Math.max(...d);
-  const range = max - min || 1;
+  const range = max - min;
   const pad = 1;
   const w = props.width - pad * 2;
   const h = props.height - pad * 2;
@@ -30,7 +30,7 @@ const path = computed(() => {
   return d
     .map((v, i) => {
       const x = pad + i * stepX;
-      const y = pad + h - ((v - min) / range) * h;
+      const y = range === 0 ? props.height / 2 : pad + h - ((v - min) / range) * h;
       return `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");

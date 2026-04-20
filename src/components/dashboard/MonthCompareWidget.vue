@@ -1,22 +1,34 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
+import { useExpensesStore } from "@/stores/expenses";
 import { dbGetExpenseMonthComparison, type MonthComparisonData } from "@/services/database";
 import { ArrowUpRight, ArrowDownRight, Equal } from "lucide-vue-next";
 
 const { t } = useI18n();
 const { fmt } = useCurrencyFormat();
+const expsStore = useExpensesStore();
 
 const data = ref<MonthComparisonData | null>(null);
 
-onMounted(async () => {
+async function loadComparison() {
   const now = new Date();
   const curPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const prevPrefix = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
   data.value = await dbGetExpenseMonthComparison(curPrefix, prevPrefix);
-});
+}
+
+onMounted(loadComparison);
+
+watch(
+  [() => expsStore.totalCount, () => expsStore.currentPage, () => expsStore.filter],
+  () => {
+    loadComparison();
+  },
+  { deep: true },
+);
 
 const diff = computed(() => {
   if (!data.value) return 0;
