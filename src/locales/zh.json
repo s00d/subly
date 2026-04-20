@@ -481,5 +481,9 @@
   "settings_tab_general": "常规",
   "settings_tab_catalogs": "目录",
   "settings_tab_integrations": "集成",
-  "settings_tab_data": "数据"
+  "settings_tab_data": "数据",
+  "select_date": "选择日期",
+  "yesterday": "昨天",
+  "today": "今天",
+  "tomorrow": "明天"
 }

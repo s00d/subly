@@ -10,13 +10,16 @@ import { parseSubscription, SubscriptionSchema } from "@/schemas/appData";
 import { mapZodErrors, type ZodFieldMeta } from "@/composables/useZodErrors";
 import Modal from "@/components/ui/Modal.vue";
 import AppInput from "@/components/ui/AppInput.vue";
+import AppDatePicker from "@/components/ui/AppDatePicker.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import LogoPicker from "@/components/ui/LogoPicker.vue";
 import TagInput from "@/components/ui/TagInput.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
-import { Sparkles } from "lucide-vue-next";
+import { Sparkles, Globe } from "lucide-vue-next";
+import { buildFaviconFromInputUrl } from "@/services/logoAssets";
+import { getNextCycleDate } from "@/services/calculations";
 
 const props = defineProps<{
   show: boolean;
@@ -118,12 +121,7 @@ function calculateNextPayment() {
   let next = new Date(start);
 
   while (next < now) {
-    switch (form.value.cycle) {
-      case 1: next.setDate(next.getDate() + form.value.frequency); break;
-      case 2: next.setDate(next.getDate() + 7 * form.value.frequency); break;
-      case 3: next.setMonth(next.getMonth() + form.value.frequency); break;
-      case 4: next.setFullYear(next.getFullYear() + form.value.frequency); break;
-    }
+    next = getNextCycleDate(next, form.value.cycle as CycleType, form.value.frequency);
   }
 
   form.value.nextPayment = next.toISOString().split("T")[0];
@@ -133,7 +131,17 @@ function clearErrors() {
   Object.keys(errors).forEach((k) => delete errors[k]);
 }
 
-function handleSubmit() {
+function applyDomainIcon() {
+  const faviconUrl = buildFaviconFromInputUrl(form.value.url || "");
+  if (!faviconUrl) {
+    toast(t("url") + " is empty or invalid", "error");
+    return;
+  }
+  form.value.logo = faviconUrl;
+  toast("Icon loaded from domain");
+}
+
+async function handleSubmit() {
   clearErrors();
 
   const base = isEdit.value && props.editSubscription
@@ -159,9 +167,9 @@ function handleSubmit() {
 
   try {
     if (isEdit.value && props.editSubscription) {
-      subsStore.updateSubscription(result.data);
+      await subsStore.updateSubscription(result.data);
     } else {
-      subsStore.addSubscription(result.data);
+      await subsStore.addSubscription(result.data);
     }
     toast(t("success"));
     emit("saved");
@@ -243,9 +251,8 @@ function handleSubmit() {
       <!-- Dates -->
       <div class="flex flex-col sm:flex-row gap-3 items-end">
         <div class="flex-1">
-          <AppInput
+          <AppDatePicker
             v-model="form.startDate!"
-            type="date"
             :label="t('start_date')"
             :error="errors.startDate"
           />
@@ -253,18 +260,16 @@ function handleSubmit() {
         <button
           type="button"
           @click="calculateNextPayment"
-          class="p-2 rounded-lg bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] hover:bg-[var(--color-primary)] hover:text-white transition-colors"
+          class="p-2 rounded-lg bg-surface-hover text-text-secondary hover:bg-primary hover:text-white transition-colors"
           :title="t('calculate_next_payment_date')"
         >
           <Sparkles :size="18" />
         </button>
         <div class="flex-1">
-          <AppInput
+          <AppDatePicker
             v-model="form.nextPayment!"
-            type="date"
             :label="t('next_payment') + ' *'"
             :error="errors.nextPayment"
-            required
           />
         </div>
       </div>
@@ -302,11 +307,21 @@ function handleSubmit() {
       />
 
       <!-- URL -->
-      <AppInput
-        v-model="form.url!"
-        :label="t('url')"
-        :placeholder="'https://...'"
-      />
+      <div class="space-y-2">
+        <AppInput
+          v-model="form.url!"
+          :label="t('url')"
+          :placeholder="'https://...'"
+        />
+        <button
+          type="button"
+          @click="applyDomainIcon"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover transition-colors"
+        >
+          <Globe :size="14" />
+          Get icon from domain
+        </button>
+      </div>
 
       <!-- Notes -->
       <AppTextarea
@@ -326,11 +341,11 @@ function handleSubmit() {
     <template #footer>
       <button
         @click="emit('close')"
-        class="px-4 py-2 rounded-lg border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+        class="px-4 py-2 rounded-lg border border-border text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors"
       >{{ t('cancel') }}</button>
       <button
         @click="handleSubmit"
-        class="px-5 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors"
+        class="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors"
       >{{ t('save') }}</button>
     </template>
   </Modal>

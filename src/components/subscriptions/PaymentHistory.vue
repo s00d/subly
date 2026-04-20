@@ -9,6 +9,7 @@ import { formatCurrency } from "@/services/calculations";
 import type { PaymentRecord, Currency } from "@/schemas/appData";
 import { History, Plus, Trash2, ChevronDown, ChevronUp, Receipt, RefreshCw } from "lucide-vue-next";
 import Tooltip from "@/components/ui/Tooltip.vue";
+import AppDatePicker from "@/components/ui/AppDatePicker.vue";
 
 const props = defineProps<{
   subscriptionId: string;
@@ -96,31 +97,31 @@ const formatDate = fmtDateMedium;
 </script>
 
 <template>
-  <div class="bg-[var(--color-surface-secondary)] rounded-lg overflow-hidden">
+  <div class="bg-surface-secondary rounded-lg overflow-hidden">
     <!-- Header -->
     <div class="flex items-center justify-between px-3 py-2.5">
       <div class="flex items-center gap-1.5">
-        <History :size="13" class="text-[var(--color-text-muted)]" />
-        <span class="text-[10px] uppercase tracking-wide font-medium text-[var(--color-text-muted)]">{{ t('payment_history') }}</span>
-        <span v-if="history.length > 0" class="text-[10px] text-[var(--color-text-muted)] ml-1">({{ history.length }})</span>
+        <History :size="13" class="text-text-muted" />
+        <span class="text-[10px] uppercase tracking-wide font-medium text-text-muted">{{ t('payment_history') }}</span>
+        <span v-if="history.length > 0" class="text-[10px] text-text-muted ml-1">({{ history.length }})</span>
       </div>
       <div class="flex items-center gap-1">
         <div v-if="history.length > 0" class="text-right mr-1">
-          <span class="text-[10px] font-medium text-[var(--color-primary)]">
+          <span class="text-[10px] font-medium text-primary">
             {{ t('total') }}: {{ fmt(totalPaid, currencyId) }}
           </span>
           <div v-if="getConvertTargets(currencyId).length > 0" class="flex flex-wrap justify-end gap-x-1.5">
             <span
               v-for="tc in getConvertTargets(currencyId)"
               :key="tc.id"
-              class="text-[9px] text-[var(--color-text-muted)]"
+              class="text-[9px] text-text-muted"
             >≈ {{ fmtCur(convertAmount(totalPaid, currencyId, tc), tc) }}</span>
           </div>
         </div>
         <Tooltip :text="t('record_payment')" position="bottom">
           <button
             @click="emit('recordPayment', subscriptionId)"
-            class="p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-[var(--color-text-muted)] hover:text-green-600 transition-colors"
+            class="p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-text-muted hover:text-green-600 transition-colors"
           >
             <RefreshCw :size="13" />
           </button>
@@ -128,7 +129,7 @@ const formatDate = fmtDateMedium;
         <Tooltip :text="t('add_payment')" position="bottom">
           <button
             @click="showAddForm = !showAddForm"
-            class="p-1 rounded hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] hover:text-[var(--color-primary)] transition-colors"
+            class="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-primary transition-colors"
           >
             <Plus :size="13" />
           </button>
@@ -145,20 +146,18 @@ const formatDate = fmtDateMedium;
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="showAddForm" class="px-3 pb-3 space-y-2 border-b border-[var(--color-border)]">
+      <div v-if="showAddForm" class="px-3 pb-3 space-y-2 border-b border-border">
         <div class="flex gap-2">
-          <input
-            v-model="addDate"
-            type="date"
-            class="flex-1 px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-          />
+          <div class="flex-1">
+            <AppDatePicker v-model="addDate" />
+          </div>
           <input
             v-model.number="addAmount"
             type="number"
             step="0.01"
             min="0"
             :placeholder="String(price)"
-            class="w-24 px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            class="w-24 px-2 py-1 rounded border border-border bg-surface text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
         <div class="flex gap-2">
@@ -166,36 +165,36 @@ const formatDate = fmtDateMedium;
             v-model="addNote"
             type="text"
             :placeholder="t('note_optional')"
-            class="flex-1 px-2 py-1 rounded border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            class="flex-1 px-2 py-1 rounded border border-border bg-surface text-xs text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-primary"
           />
           <button
             @click="addRecord"
-            class="px-3 py-1 rounded bg-[var(--color-primary)] text-white text-xs font-medium hover:bg-[var(--color-primary-hover)] transition-colors"
+            class="px-3 py-1 rounded bg-primary text-white text-xs font-medium hover:bg-primary-hover transition-colors"
           >{{ t('add') }}</button>
         </div>
       </div>
     </Transition>
 
     <!-- Records list -->
-    <div v-if="history.length > 0" class="divide-y divide-[var(--color-border)]">
+    <div v-if="history.length > 0" class="divide-y divide-border">
       <div
         v-for="record in visibleRecords"
         :key="record.id"
-        class="flex items-center gap-2.5 px-3 py-2 group hover:bg-[var(--color-surface-hover)] transition-colors"
+        class="flex items-center gap-2.5 px-3 py-2 group hover:bg-surface-hover transition-colors"
       >
-        <Receipt :size="12" class="text-[var(--color-text-muted)] shrink-0" />
-        <span class="text-xs text-[var(--color-text-muted)] whitespace-nowrap">{{ formatDate(record.date) }}</span>
+        <Receipt :size="12" class="text-text-muted shrink-0" />
+        <span class="text-xs text-text-muted whitespace-nowrap">{{ formatDate(record.date) }}</span>
         <div class="min-w-0">
-          <span class="text-xs font-semibold text-[var(--color-text-primary)]">{{ fmt(record.amount, record.currencyId) }}</span>
+          <span class="text-xs font-semibold text-text-primary">{{ fmt(record.amount, record.currencyId) }}</span>
           <div v-if="getConvertTargets(record.currencyId).length > 0" class="flex flex-wrap gap-x-1.5">
             <span
               v-for="tc in getConvertTargets(record.currencyId)"
               :key="tc.id"
-              class="text-[9px] text-[var(--color-text-muted)]"
+              class="text-[9px] text-text-muted"
             >≈ {{ fmtCur(convertAmount(record.amount, record.currencyId, tc), tc) }}</span>
           </div>
         </div>
-        <span v-if="record.note" class="text-[10px] text-[var(--color-text-muted)] truncate flex-1 min-w-0">{{ record.note }}</span>
+        <span v-if="record.note" class="text-[10px] text-text-muted truncate flex-1 min-w-0">{{ record.note }}</span>
         <div v-else class="flex-1" />
         <Tooltip :text="t('delete')" position="left">
           <button
@@ -210,14 +209,14 @@ const formatDate = fmtDateMedium;
 
     <!-- Empty state -->
     <div v-else class="px-3 py-4 text-center">
-      <p class="text-[11px] text-[var(--color-text-muted)]">{{ t('no_payment_records') }}</p>
+      <p class="text-[11px] text-text-muted">{{ t('no_payment_records') }}</p>
     </div>
 
     <!-- Show more -->
     <button
       v-if="history.length > 5"
       @click="expanded = !expanded"
-      class="w-full flex items-center justify-center gap-1 py-1.5 text-[10px] text-[var(--color-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+      class="w-full flex items-center justify-center gap-1 py-1.5 text-[10px] text-primary hover:bg-surface-hover transition-colors"
     >
       <component :is="expanded ? ChevronUp : ChevronDown" :size="12" />
       {{ expanded ? t('show_less') : t('show_all') }} ({{ history.length }})

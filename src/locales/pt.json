@@ -481,5 +481,9 @@
   "settings_tab_general": "Geral",
   "settings_tab_catalogs": "Catálogos",
   "settings_tab_integrations": "Integrações",
-  "settings_tab_data": "Dados"
+  "settings_tab_data": "Dados",
+  "select_date": "Selecionar data",
+  "yesterday": "Ontem",
+  "today": "Hoje",
+  "tomorrow": "Amanhã"
 }

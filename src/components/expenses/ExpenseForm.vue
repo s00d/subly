@@ -10,6 +10,7 @@ import { ExpenseSchema } from "@/schemas/appData";
 import { mapZodErrors, type ZodFieldMeta } from "@/composables/useZodErrors";
 import Modal from "@/components/ui/Modal.vue";
 import AppInput from "@/components/ui/AppInput.vue";
+import AppDatePicker from "@/components/ui/AppDatePicker.vue";
 import AppTextarea from "@/components/ui/AppTextarea.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import TagInput from "@/components/ui/TagInput.vue";
@@ -178,13 +179,11 @@ function handleSave() {
       </div>
 
       <!-- Date -->
-      <AppInput
+      <AppDatePicker
         :label="t('expense_date')"
         :modelValue="form.date || ''"
-        @update:modelValue="(v) => form.date = String(v)"
-        type="date"
+        @update:modelValue="(v) => form.date = v"
         :error="errors.date"
-        required
       />
 
       <!-- Category + Payment Method -->
@@ -244,11 +243,11 @@ function handleSave() {
       <!-- Actions -->
       <div class="flex justify-end gap-3 pt-2">
         <button type="button" @click="emit('close')"
-          class="px-4 py-2 text-sm rounded-lg bg-[var(--color-surface-hover)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)]">
+          class="px-4 py-2 text-sm rounded-lg bg-surface-hover text-text-secondary hover:bg-border">
           {{ t('cancel') }}
         </button>
         <button type="submit"
-          class="px-4 py-2 text-sm rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90">
+          class="px-4 py-2 text-sm rounded-lg bg-primary text-white hover:opacity-90">
           {{ t('save') }}
         </button>
       </div>

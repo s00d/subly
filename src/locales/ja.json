@@ -481,5 +481,9 @@
   "settings_tab_general": "一般",
   "settings_tab_catalogs": "カタログ",
   "settings_tab_integrations": "連携",
-  "settings_tab_data": "データ"
+  "settings_tab_data": "データ",
+  "select_date": "日付を選択",
+  "yesterday": "昨日",
+  "today": "今日",
+  "tomorrow": "明日"
 }

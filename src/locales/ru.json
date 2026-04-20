@@ -522,5 +522,9 @@
   "converter_presets": "Пресеты конвертера",
   "converter_presets_desc": "Быстрые кнопки сумм для конвертера валют",
   "add_preset": "Добавить пресет",
-  "preset_exists": "Такой пресет уже существует"
+  "preset_exists": "Такой пресет уже существует",
+  "select_date": "Выберите дату",
+  "yesterday": "Вчера",
+  "today": "Сегодня",
+  "tomorrow": "Завтра"
 }

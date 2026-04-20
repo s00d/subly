@@ -481,5 +481,9 @@
   "settings_tab_general": "सामान्य",
   "settings_tab_catalogs": "सूचियाँ",
   "settings_tab_integrations": "एकीकरण",
-  "settings_tab_data": "डेटा"
+  "settings_tab_data": "डेटा",
+  "select_date": "तारीख चुनें",
+  "yesterday": "कल",
+  "today": "आज",
+  "tomorrow": "कल"
 }

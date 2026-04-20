@@ -481,5 +481,9 @@
   "settings_tab_general": "عام",
   "settings_tab_catalogs": "الفهارس",
   "settings_tab_integrations": "التكاملات",
-  "settings_tab_data": "البيانات"
+  "settings_tab_data": "البيانات",
+  "select_date": "اختر التاريخ",
+  "yesterday": "أمس",
+  "today": "اليوم",
+  "tomorrow": "غدًا"
 }

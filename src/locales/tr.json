@@ -481,5 +481,9 @@
   "settings_tab_general": "Genel",
   "settings_tab_catalogs": "Kataloglar",
   "settings_tab_integrations": "Entegrasyonlar",
-  "settings_tab_data": "Veri"
+  "settings_tab_data": "Veri",
+  "select_date": "Tarih seç",
+  "yesterday": "Dün",
+  "today": "Bugün",
+  "tomorrow": "Yarın"
 }

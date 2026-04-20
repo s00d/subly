@@ -522,5 +522,9 @@
   "converter_presets": "Converter Presets",
   "converter_presets_desc": "Quick amount buttons for the currency converter",
   "add_preset": "Add preset",
-  "preset_exists": "This preset already exists"
+  "preset_exists": "This preset already exists",
+  "select_date": "Select date",
+  "yesterday": "Yesterday",
+  "today": "Today",
+  "tomorrow": "Tomorrow"
 }
