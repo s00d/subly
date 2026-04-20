@@ -1,0 +1,43 @@
+src/stores/subscriptions.ts
+  9a72c4e5fe55657c 11,15-22,37-42,46-53,57-66,71-80,99,126-145,182-193
+src/stores/expenses.ts
+  9a72c4e5fe55657c 10,20-27,39-44,51-58,62-65,68-74,76-78,83-96,100-117
+src/services/sync/index.ts
+  9a72c4e5fe55657c 15
+src/services/calculations.ts
+  9a72c4e5fe55657c 118-119,124-147
+src/services/database.ts
+  9a72c4e5fe55657c 465-472,479-491,892-904,911-995,998-1021
+src/services/sync/types.ts
+  9a72c4e5fe55657c 9
+src/stores/catalog.ts
+  9a72c4e5fe55657c 278,310,315-325
+src/services/logoAssets.ts
+  9a72c4e5fe55657c 87-108
+src/services/export.ts
+  9a72c4e5fe55657c 6,269-285,308-319,366-382,384,393-394,397,400,406,409,412-413,415,418,424,430,436-437,439,471
+src/services/notifications.ts
+  9a72c4e5fe55657c 62,78-82,98-102,187-192,211,258
+src/services/sync/syncManager.ts
+  9a72c4e5fe55657c 29,46,238,281,313-329,334,341,347,384-395
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "be2f61a7a2ce66fb698b41f18844a3de09c2cb89",
+  "prompts": {
+    "9a72c4e5fe55657c": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9e250c9b-bdf8-4140-9109-910d6cbd4bcf",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin",
+      "messages": [],
+      "total_additions": 1446,
+      "total_deletions": 445,
+      "accepted_lines": 1406,
+      "overriden_lines": 0
+    }
+  }
+}
