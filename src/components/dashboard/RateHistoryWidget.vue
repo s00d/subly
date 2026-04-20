@@ -181,16 +181,16 @@ const chartOptions = computed(() => ({
 <template>
   <div
     v-if="settingsStore.settings.rateHistoryEnabled && currencies.length > 0 && hasHistory"
-    class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5"
+    class="bg-surface rounded-xl border border-border p-3 sm:p-5"
   >
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-2">
-        <TrendingUp :size="16" class="text-[var(--color-primary)]" />
-        <h2 class="text-sm sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('rate_history') }}</h2>
+        <TrendingUp :size="16" class="text-primary" />
+        <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('rate_history') }}</h2>
       </div>
       <button
         @click="router.push('/currencies')"
-        class="text-xs text-[var(--color-primary)] hover:underline"
+        class="text-xs text-primary hover:underline"
       >{{ t('exchange_rates') }} →</button>
     </div>
 
@@ -199,11 +199,11 @@ const chartOptions = computed(() => ({
       <div
         v-for="cur in currencies"
         :key="cur.id"
-        class="rounded-lg border border-[var(--color-border)] p-2.5 sm:p-3 bg-[var(--color-surface-secondary)]"
+        class="rounded-lg border border-border p-2.5 sm:p-3 bg-surface-secondary"
       >
         <div class="flex items-center gap-1.5 mb-1.5">
           <span v-if="currencyFlag(cur.code)" class="text-sm">{{ currencyFlag(cur.code) }}</span>
-          <span class="text-xs font-bold text-[var(--color-text-primary)]">{{ cur.code }}</span>
+          <span class="text-xs font-bold text-text-primary">{{ cur.code }}</span>
           <span
             v-if="pctChange((history[cur.id] ?? []).map(p => p.rate))"
             class="ml-auto text-[10px] font-semibold tabular-nums"
@@ -228,13 +228,13 @@ const chartOptions = computed(() => ({
               stroke-linejoin="round"
             />
           </svg>
-          <span v-else class="text-[10px] text-[var(--color-text-muted)] flex-1">—</span>
-          <span class="text-[11px] font-mono font-semibold text-[var(--color-text-primary)] tabular-nums shrink-0">
+          <span v-else class="text-[10px] text-text-muted flex-1">—</span>
+          <span class="text-[11px] font-mono font-semibold text-text-primary tabular-nums shrink-0">
             {{ cur.rate.toFixed(2) }}
           </span>
         </div>
 
-        <div class="text-[10px] text-[var(--color-text-muted)] mt-1 truncate">
+        <div class="text-[10px] text-text-muted mt-1 truncate">
           1 {{ mainCurrency?.code }} = {{ cur.rate.toFixed(4).replace(/\.?0+$/, '') }} {{ cur.code }}
         </div>
       </div>

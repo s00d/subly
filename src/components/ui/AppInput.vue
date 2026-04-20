@@ -38,11 +38,11 @@ function onInput(e: Event) {
 const inputTv = tv({
   slots: {
     root: "w-full",
-    labelEl: "block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5",
+    labelEl: "block text-xs font-medium text-text-secondary mb-1.5",
     inputEl: [
-      "w-full rounded-lg border bg-[var(--color-surface)]",
-      "text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)]",
-      "focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent",
+      "w-full rounded-lg border bg-surface",
+      "text-text-primary placeholder-text-muted",
+      "focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent",
       "disabled:opacity-50 disabled:cursor-not-allowed transition-shadow",
     ],
     errorEl: "mt-1 text-xs text-red-500",
@@ -54,10 +54,10 @@ const inputTv = tv({
     },
     status: {
       error: { inputEl: "border-red-500 hover:border-red-500 focus:ring-red-500" },
-      normal: { inputEl: "border-[var(--color-border)] hover:border-[var(--color-text-muted)]" },
+      normal: { inputEl: "border-border hover:border-text-muted" },
     },
     disabled: {
-      true: { inputEl: "border-[var(--color-border)] bg-[var(--color-surface-hover)]" },
+      true: { inputEl: "border-border bg-surface-hover" },
     },
   },
   defaultVariants: { size: "md", status: "normal" },

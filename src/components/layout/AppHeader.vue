@@ -29,13 +29,13 @@ const pageTitle = computed(() => {
 
 const headerTv = tv({
   slots: {
-    root: "h-14 sm:h-16 bg-[var(--color-surface)] border-b border-[var(--color-border)] flex items-center px-3 sm:px-6 shrink-0 gap-2",
-    burgerBtn: "md:hidden p-1.5 -ml-1 rounded-lg text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors shrink-0",
-    title: "text-base sm:text-xl font-semibold text-[var(--color-text-primary)] truncate",
+    root: "h-14 sm:h-16 bg-surface border-b border-border flex items-center px-3 sm:px-6 shrink-0 gap-2",
+    burgerBtn: "md:hidden p-1.5 -ml-1 rounded-lg text-text-secondary hover:bg-surface-hover transition-colors shrink-0",
+    title: "text-base sm:text-xl font-semibold text-text-primary truncate",
     actionsWrap: "flex items-center gap-2 ml-auto",
     actionBtn: [
-      "w-8 h-8 rounded-lg bg-[var(--color-primary)] text-white",
-      "flex items-center justify-center hover:bg-[var(--color-primary-hover)]",
+      "w-8 h-8 rounded-lg bg-primary text-white",
+      "flex items-center justify-center hover:bg-primary-hover",
       "shadow-sm transition-colors shrink-0",
     ],
   },

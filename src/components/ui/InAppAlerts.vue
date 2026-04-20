@@ -56,8 +56,8 @@ const alertsTv = tv({
   slots: {
     root: "space-y-2 mb-4",
     headerRow: "flex items-center justify-between mb-1",
-    headerLabel: "text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wider",
-    dismissAllBtn: "text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors",
+    headerLabel: "text-xs font-medium text-text-muted uppercase tracking-wider",
+    dismissAllBtn: "text-xs text-text-muted hover:text-text-primary transition-colors",
     alertRow: "flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-2 rounded-lg border text-xs sm:text-sm",
     actionBtn: "p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0",
   },

@@ -43,24 +43,24 @@ const dayPresets = [30, 60, 90, 180, 365];
 </script>
 
 <template>
-  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
     <div class="flex items-center gap-2 mb-1">
-      <History :size="16" class="text-[var(--color-primary)]" />
-      <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('rate_history') }}</h2>
+      <History :size="16" class="text-primary" />
+      <h2 class="text-base sm:text-lg font-semibold text-text-primary">{{ t('rate_history') }}</h2>
     </div>
-    <p class="text-xs text-[var(--color-text-muted)] mb-4">{{ t('rate_history_desc') }}</p>
+    <p class="text-xs text-text-muted mb-4">{{ t('rate_history_desc') }}</p>
 
     <div class="space-y-4">
       <!-- Toggle -->
       <div class="flex items-center justify-between">
-        <span class="text-sm text-[var(--color-text-primary)]">{{ t('rate_history_enabled') }}</span>
+        <span class="text-sm text-text-primary">{{ t('rate_history_enabled') }}</span>
         <button
           @click="toggleEnabled"
           :class="[
             'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
             settingsStore.settings.rateHistoryEnabled
-              ? 'bg-[var(--color-primary)]'
-              : 'bg-[var(--color-border)]',
+              ? 'bg-primary'
+              : 'bg-border',
           ]"
         >
           <span
@@ -75,14 +75,14 @@ const dayPresets = [30, 60, 90, 180, 365];
       <!-- Days limit -->
       <div v-if="settingsStore.settings.rateHistoryEnabled" class="space-y-2">
         <div class="flex items-center justify-between">
-          <span class="text-sm text-[var(--color-text-primary)]">{{ t('rate_history_days') }}</span>
+          <span class="text-sm text-text-primary">{{ t('rate_history_days') }}</span>
           <input
             type="number"
             min="7"
             max="365"
             :value="settingsStore.settings.rateHistoryDays"
             @change="setDays(($event.target as HTMLInputElement).value)"
-            class="w-20 px-2 py-1 text-sm text-right rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] tabular-nums"
+            class="w-20 px-2 py-1 text-sm text-right rounded-lg border border-border bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-primary tabular-nums"
           />
         </div>
         <div class="flex flex-wrap gap-1">
@@ -93,17 +93,17 @@ const dayPresets = [30, 60, 90, 180, 365];
             :class="[
               'px-2.5 py-0.5 text-[11px] rounded border transition-colors',
               settingsStore.settings.rateHistoryDays === d
-                ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)]'
-                : 'bg-[var(--color-surface-secondary)] text-[var(--color-text-secondary)] border-[var(--color-border)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]',
+                ? 'bg-primary text-white border-primary'
+                : 'bg-surface-secondary text-text-secondary border-border hover:border-primary hover:text-primary',
             ]"
           >{{ d }}d</button>
         </div>
       </div>
 
       <!-- Stats + Clear -->
-      <div class="flex items-center justify-between pt-2 border-t border-[var(--color-border)]">
-        <span class="text-xs text-[var(--color-text-muted)]">
-          {{ t('rate_history_records') }}: <strong class="text-[var(--color-text-primary)] tabular-nums">{{ recordCount.toLocaleString() }}</strong>
+      <div class="flex items-center justify-between pt-2 border-t border-border">
+        <span class="text-xs text-text-muted">
+          {{ t('rate_history_records') }}: <strong class="text-text-primary tabular-nums">{{ recordCount.toLocaleString() }}</strong>
         </span>
         <div v-if="!showConfirm">
           <button
@@ -116,14 +116,14 @@ const dayPresets = [30, 60, 90, 180, 365];
           </button>
         </div>
         <div v-else class="flex items-center gap-2">
-          <span class="text-xs text-[var(--color-text-muted)]">{{ t('clear_history_confirm') }}</span>
+          <span class="text-xs text-text-muted">{{ t('clear_history_confirm') }}</span>
           <button
             @click="clearHistory"
             class="px-2.5 py-1 text-xs rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
           >{{ t('confirm') }}</button>
           <button
             @click="showConfirm = false"
-            class="px-2.5 py-1 text-xs rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] transition-colors"
+            class="px-2.5 py-1 text-xs rounded-lg border border-border text-text-secondary hover:border-primary transition-colors"
           >{{ t('cancel') }}</button>
         </div>
       </div>

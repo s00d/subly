@@ -53,52 +53,52 @@ function monthName(offset: number): string {
 </script>
 
 <template>
-  <div v-if="data && (data.currentTotal > 0 || data.previousTotal > 0)" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+  <div v-if="data && (data.currentTotal > 0 || data.previousTotal > 0)" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
     <div class="flex items-center gap-2 mb-3">
       <component
         :is="diff > 0 ? ArrowUpRight : diff < 0 ? ArrowDownRight : Equal"
         :size="16"
-        :class="diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-[var(--color-text-muted)]'"
+        :class="diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-text-muted'"
       />
-      <h2 class="text-sm sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('widget_month_compare') }}</h2>
+      <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_month_compare') }}</h2>
     </div>
 
     <div class="space-y-3">
       <!-- Current month -->
       <div>
         <div class="flex items-center justify-between mb-1">
-          <span class="text-xs text-[var(--color-text-primary)] font-medium capitalize">{{ monthName(0) }}</span>
-          <span class="text-sm font-bold text-[var(--color-text-primary)] tabular-nums">{{ fmt(data.currentTotal) }}</span>
+          <span class="text-xs text-text-primary font-medium capitalize">{{ monthName(0) }}</span>
+          <span class="text-sm font-bold text-text-primary tabular-nums">{{ fmt(data.currentTotal) }}</span>
         </div>
-        <div class="w-full h-3 bg-[var(--color-surface-hover)] rounded-full overflow-hidden">
+        <div class="w-full h-3 bg-surface-hover rounded-full overflow-hidden">
           <div
-            class="h-full rounded-full bg-[var(--color-primary)] transition-all duration-500"
+            class="h-full rounded-full bg-primary transition-all duration-500"
             :style="{ width: (data.currentTotal / barMax * 100) + '%' }"
           />
         </div>
-        <span class="text-[10px] text-[var(--color-text-muted)]">{{ data.currentCount }} {{ t('records') }}</span>
+        <span class="text-[10px] text-text-muted">{{ data.currentCount }} {{ t('records') }}</span>
       </div>
 
       <!-- Previous month -->
       <div>
         <div class="flex items-center justify-between mb-1">
-          <span class="text-xs text-[var(--color-text-muted)] font-medium capitalize">{{ monthName(-1) }}</span>
-          <span class="text-sm font-bold text-[var(--color-text-muted)] tabular-nums">{{ fmt(data.previousTotal) }}</span>
+          <span class="text-xs text-text-muted font-medium capitalize">{{ monthName(-1) }}</span>
+          <span class="text-sm font-bold text-text-muted tabular-nums">{{ fmt(data.previousTotal) }}</span>
         </div>
-        <div class="w-full h-3 bg-[var(--color-surface-hover)] rounded-full overflow-hidden">
+        <div class="w-full h-3 bg-surface-hover rounded-full overflow-hidden">
           <div
             class="h-full rounded-full bg-gray-400 transition-all duration-500"
             :style="{ width: (data.previousTotal / barMax * 100) + '%' }"
           />
         </div>
-        <span class="text-[10px] text-[var(--color-text-muted)]">{{ data.previousCount }} {{ t('records') }}</span>
+        <span class="text-[10px] text-text-muted">{{ data.previousCount }} {{ t('records') }}</span>
       </div>
 
       <!-- Diff -->
-      <div class="flex items-center justify-center gap-2 pt-2 border-t border-[var(--color-border)]">
+      <div class="flex items-center justify-center gap-2 pt-2 border-t border-border">
         <span
           class="text-sm font-bold tabular-nums"
-          :class="diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-[var(--color-text-muted)]'"
+          :class="diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-text-muted'"
         >
           {{ diff > 0 ? '+' : '' }}{{ fmt(diff) }}
         </span>

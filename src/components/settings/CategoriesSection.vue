@@ -96,12 +96,12 @@ function getCatIcon(id: string): string {
 </script>
 
 <template>
-  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
     <div class="flex items-center justify-between gap-2 mb-3">
-      <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)] shrink-0">{{ t('categories') }}</h2>
+      <h2 class="text-base sm:text-lg font-semibold text-text-primary shrink-0">{{ t('categories') }}</h2>
       <div class="relative w-32 sm:w-44">
-        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
-        <input v-model="catSearch" type="text" :placeholder="t('search')" class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-shadow" />
+        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+        <input v-model="catSearch" type="text" :placeholder="t('search')" class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow" />
       </div>
     </div>
     <div class="space-y-1.5 max-h-72 overflow-y-auto overflow-x-hidden">
@@ -109,18 +109,18 @@ function getCatIcon(id: string): string {
         v-for="(c, idx) in filteredCategories"
         :key="c.id"
         class="flex gap-2 items-center rounded-lg px-2 py-1"
-        :class="c.id === settingsStore.settings.defaultCategoryId ? 'bg-[var(--color-primary-light)]/50' : ''"
+        :class="c.id === settingsStore.settings.defaultCategoryId ? 'bg-primary-light/50' : ''"
       >
         <!-- Move buttons (not for cat-1 "No category") -->
         <div v-if="!isCatSearching && c.id !== 'cat-1'" class="flex flex-row sm:flex-col shrink-0">
-          <Tooltip :text="t('move_up')"><button @click="moveCatUp(c.id)" :disabled="idx === 0" class="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronUp :size="14" /></button></Tooltip>
-          <Tooltip :text="t('move_down')"><button @click="moveCatDown(c.id)" :disabled="idx === sortedCategories.length - 1" class="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronDown :size="14" /></button></Tooltip>
+          <Tooltip :text="t('move_up')"><button @click="moveCatUp(c.id)" :disabled="idx === 0" class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronUp :size="14" /></button></Tooltip>
+          <Tooltip :text="t('move_down')"><button @click="moveCatDown(c.id)" :disabled="idx === sortedCategories.length - 1" class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronDown :size="14" /></button></Tooltip>
         </div>
         <div v-else-if="c.id === 'cat-1'" class="w-[22px] shrink-0" />
 
         <!-- Primary star -->
         <Tooltip :text="t('set_as_primary')">
-          <button @click="settingsStore.updateSettings({ defaultCategoryId: c.id })" class="p-1 rounded-lg transition-colors shrink-0" :class="c.id === settingsStore.settings.defaultCategoryId ? 'text-yellow-500' : 'text-[var(--color-text-muted)] hover:text-yellow-500'">
+          <button @click="settingsStore.updateSettings({ defaultCategoryId: c.id })" class="p-1 rounded-lg transition-colors shrink-0" :class="c.id === settingsStore.settings.defaultCategoryId ? 'text-yellow-500' : 'text-text-muted hover:text-yellow-500'">
             <Star :size="14" :fill="c.id === settingsStore.settings.defaultCategoryId ? 'currentColor' : 'none'" />
           </button>
         </Tooltip>
@@ -129,28 +129,28 @@ function getCatIcon(id: string): string {
         <Tooltip :text="t('choose_icon')">
           <button
             @click="openIconPicker(c.id)"
-            class="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 transition-colors hover:border-[var(--color-primary)]"
-            :class="getCatIcon(c.id) ? 'border-[var(--color-primary)]/30 bg-[var(--color-primary-light)]' : 'border-[var(--color-border)]'"
+            class="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 transition-colors hover:border-primary"
+            :class="getCatIcon(c.id) ? 'border-primary/30 bg-primary-light' : 'border-border'"
           >
           <IconDisplay v-if="getCatIcon(c.id)" :icon="getCatIcon(c.id)" :size="18" />
-          <ImageIcon v-else :size="14" class="text-[var(--color-text-muted)]" />
+          <ImageIcon v-else :size="14" class="text-text-muted" />
         </button>
         </Tooltip>
 
         <!-- Name: read-only for default, editable for user-added -->
         <div class="flex-1 min-w-0">
-          <span v-if="isDefaultItem(c)" class="text-sm text-[var(--color-text-primary)] truncate block px-2 py-1">{{ c.name }}</span>
+          <span v-if="isDefaultItem(c)" class="text-sm text-text-primary truncate block px-2 py-1">{{ c.name }}</span>
           <AppInput v-else :modelValue="c.name" @update:modelValue="(v: string | number) => saveCat(c.id, String(v))" size="sm" />
         </div>
 
         <!-- Delete (not for cat-1) -->
         <Tooltip v-if="c.id !== 'cat-1'" :text="t('delete')">
-          <button @click="removeCat(c.id)" :disabled="isUsedCategory(c.id)" class="p-1.5 rounded-lg transition-colors shrink-0" :class="isUsedCategory(c.id) ? 'text-[var(--color-text-muted)] cursor-not-allowed' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'"><Trash2 :size="14" /></button>
+          <button @click="removeCat(c.id)" :disabled="isUsedCategory(c.id)" class="p-1.5 rounded-lg transition-colors shrink-0" :class="isUsedCategory(c.id) ? 'text-text-muted cursor-not-allowed' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'"><Trash2 :size="14" /></button>
         </Tooltip>
         <div v-else class="w-[34px] shrink-0" />
       </div>
     </div>
-    <button @click="addCat" class="mt-3 px-3 py-1.5 rounded-lg bg-[var(--color-primary)] text-white text-sm hover:bg-[var(--color-primary-hover)] transition-colors">
+    <button @click="addCat" class="mt-3 px-3 py-1.5 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover transition-colors">
       <Plus :size="14" class="inline mr-1" /> {{ t('add') }}
     </button>
 

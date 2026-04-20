@@ -15,7 +15,7 @@ const layoutTv = tv({
     root: "flex h-screen overflow-hidden",
     sidebar: "hidden md:flex",
     content: "flex-1 flex flex-col overflow-hidden min-w-0",
-    main: "flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-[var(--color-surface-secondary)] pb-20 md:pb-6",
+    main: "flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-surface-secondary pb-20 md:pb-6",
     tabBar: "md:hidden",
   },
 });

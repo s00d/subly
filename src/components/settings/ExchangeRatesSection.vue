@@ -140,29 +140,29 @@ async function manualUpdate() {
 
 const sectionTv = tv({
   slots: {
-    root: "bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4 sm:p-5",
+    root: "bg-surface rounded-xl border border-border p-4 sm:p-5",
     header: "flex items-center gap-2 mb-1",
-    title: "text-base sm:text-lg font-semibold text-[var(--color-text-primary)]",
-    desc: "text-xs sm:text-sm text-[var(--color-text-muted)] mb-4",
+    title: "text-base sm:text-lg font-semibold text-text-primary",
+    desc: "text-xs sm:text-sm text-text-muted mb-4",
     providerCard: "rounded-xl border overflow-hidden transition-all cursor-pointer select-none",
     providerRow: "flex items-center gap-3 p-3",
-    providerName: "text-sm font-medium text-[var(--color-text-primary)]",
-    providerNote: "text-[10px] text-[var(--color-text-muted)]",
-    providerChevron: "text-[var(--color-text-muted)] transition-transform duration-200 shrink-0",
+    providerName: "text-sm font-medium text-text-primary",
+    providerNote: "text-[10px] text-text-muted",
+    providerChevron: "text-text-muted transition-transform duration-200 shrink-0",
     credForm: "px-3 pb-3 pt-0",
-    credFormInner: "space-y-2.5 p-3 rounded-lg bg-[var(--color-surface-secondary)]",
-    credLabel: "block text-[10px] font-medium text-[var(--color-text-muted)] mb-1",
+    credFormInner: "space-y-2.5 p-3 rounded-lg bg-surface-secondary",
+    credLabel: "block text-[10px] font-medium text-text-muted mb-1",
     credInput: [
-      "w-full px-2.5 py-1.5 rounded-lg border border-[var(--color-border)]",
-      "bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]",
-      "focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]",
+      "w-full px-2.5 py-1.5 rounded-lg border border-border",
+      "bg-surface text-xs text-text-primary",
+      "focus:outline-none focus:ring-1 focus:ring-primary",
     ],
     saveBtn: [
       "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50",
-      "bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]",
+      "bg-primary text-white hover:bg-primary-hover",
     ],
-    linkBtn: "inline-flex items-center gap-1 text-[10px] text-[var(--color-primary)] hover:underline",
-    divider: "pt-4 mt-4 border-t border-[var(--color-border)]",
+    linkBtn: "inline-flex items-center gap-1 text-[10px] text-primary hover:underline",
+    divider: "pt-4 mt-4 border-t border-border",
   },
 });
 
@@ -172,36 +172,36 @@ const s = sectionTv();
 <template>
   <section :class="s.root()">
     <div :class="s.header()">
-      <ArrowRightLeft :size="18" class="text-[var(--color-primary)]" />
+      <ArrowRightLeft :size="18" class="text-primary" />
       <h2 :class="s.title()">{{ t('exchange_rates') }}</h2>
     </div>
     <p :class="s.desc()">{{ t('exchange_rates_desc') }}</p>
 
     <!-- Active provider card -->
-    <div v-if="activeProvider" class="rounded-xl border border-[var(--color-primary)] bg-[var(--color-primary-light)] p-3 mb-3">
+    <div v-if="activeProvider" class="rounded-xl border border-primary bg-primary-light p-3 mb-3">
       <div class="flex items-center gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
-            <p class="text-sm font-medium text-[var(--color-text-primary)]">{{ activeProvider.name }}</p>
+            <p class="text-sm font-medium text-text-primary">{{ activeProvider.name }}</p>
             <span class="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-[9px] font-medium">
               <Check :size="9" />
               {{ t('active') }}
             </span>
           </div>
-          <p class="text-[10px] text-[var(--color-text-muted)]">{{ activeProvider.freeTierNote }}</p>
+          <p class="text-[10px] text-text-muted">{{ activeProvider.freeTierNote }}</p>
         </div>
         <button
           @click.stop="openUrl(activeProvider.url)"
-          class="p-1.5 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-primary)] transition-colors shrink-0"
+          class="p-1.5 rounded-md text-text-muted hover:text-primary transition-colors shrink-0"
         >
           <ExternalLink :size="13" />
         </button>
       </div>
       <!-- Change provider button -->
-      <div class="flex items-center gap-2 mt-2 pt-2 border-t border-[var(--color-border)]">
+      <div class="flex items-center gap-2 mt-2 pt-2 border-t border-border">
         <button
           @click="showChangeProvider = !showChangeProvider"
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] border border-[var(--color-border)] bg-[var(--color-surface)]"
+          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors text-text-secondary hover:bg-surface-hover border border-border bg-surface"
         >
           <RefreshCw :size="12" />
           {{ t('sync_change_provider') }}
@@ -224,7 +224,7 @@ const s = sectionTv();
           v-for="provider in (activeProvider ? otherProviders : providers)"
           :key="provider.type"
           :class="s.providerCard()"
-          class="border-[var(--color-border)]"
+          class="border-border"
         >
           <div :class="s.providerRow()" @click="selectProvider(provider.type)">
             <div class="flex-1 min-w-0">
@@ -233,7 +233,7 @@ const s = sectionTv();
             </div>
             <button
               @click.stop="openUrl(provider.url)"
-              class="p-1.5 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-primary)] transition-colors"
+              class="p-1.5 rounded-md text-text-muted hover:text-primary transition-colors"
             >
               <ExternalLink :size="13" />
             </button>
@@ -280,13 +280,13 @@ const s = sectionTv();
     <!-- Target currencies -->
     <div :class="s.divider()">
       <div class="flex items-center justify-between mb-2">
-        <label class="text-sm font-semibold text-[var(--color-text-primary)]">{{ t('target_currencies') }}</label>
+        <label class="text-sm font-semibold text-text-primary">{{ t('target_currencies') }}</label>
         <div class="flex gap-2">
-          <button @click="selectAllTargets" class="text-[10px] text-[var(--color-primary)] hover:underline">{{ t('select_all') }}</button>
-          <button @click="deselectAllTargets" class="text-[10px] text-[var(--color-text-muted)] hover:underline">{{ t('deselect_all') }}</button>
+          <button @click="selectAllTargets" class="text-[10px] text-primary hover:underline">{{ t('select_all') }}</button>
+          <button @click="deselectAllTargets" class="text-[10px] text-text-muted hover:underline">{{ t('deselect_all') }}</button>
         </div>
       </div>
-      <p class="text-[10px] text-[var(--color-text-muted)] mb-2">{{ t('target_currencies_info') }}</p>
+      <p class="text-[10px] text-text-muted mb-2">{{ t('target_currencies_info') }}</p>
       <div class="flex flex-wrap gap-1.5 max-h-32 overflow-auto">
         <button
           v-for="opt in targetCurrencyOptions"
@@ -294,8 +294,8 @@ const s = sectionTv();
           @click="toggleTarget(String(opt.value))"
           class="px-2 py-1 rounded-md text-[11px] font-medium border transition-colors"
           :class="updateTargets.includes(String(opt.value))
-            ? 'bg-[var(--color-primary-light)] border-[var(--color-primary)] text-[var(--color-primary)]'
-            : 'bg-[var(--color-surface)] border-[var(--color-border)] text-[var(--color-text-muted)] hover:border-[var(--color-text-muted)]'"
+            ? 'bg-primary-light border-primary text-primary'
+            : 'bg-surface border-border text-text-muted hover:border-text-muted'"
         >
           {{ opt.label }}
         </button>
@@ -304,7 +304,7 @@ const s = sectionTv();
 
     <!-- Auto-update settings -->
     <div :class="s.divider()">
-      <h3 class="text-sm font-semibold text-[var(--color-text-primary)] mb-3">{{ t('currency_auto_update') }}</h3>
+      <h3 class="text-sm font-semibold text-text-primary mb-3">{{ t('currency_auto_update') }}</h3>
 
       <AppToggle
         :modelValue="autoUpdate"
@@ -313,12 +313,12 @@ const s = sectionTv();
         :description="t('auto_update_rates_info')"
       />
 
-      <div class="mt-3 flex items-center gap-2 text-xs text-[var(--color-text-muted)]">
+      <div class="mt-3 flex items-center gap-2 text-xs text-text-muted">
         <span>{{ t('last_update') }}: {{ lastUpdate }}</span>
         <button
           @click="manualUpdate"
           :disabled="isUpdating"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] disabled:opacity-30 transition-colors"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border text-text-secondary hover:border-primary hover:text-primary disabled:opacity-30 transition-colors"
         >
           <RefreshCw :size="12" :class="{ 'animate-spin': isUpdating }" />
           {{ t('update_now') }}

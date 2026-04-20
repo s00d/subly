@@ -36,10 +36,10 @@ function catName(id: string): string {
 </script>
 
 <template>
-  <div v-if="items.length > 0" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+  <div v-if="items.length > 0" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
     <div class="flex items-center gap-2 mb-3">
       <TrendingDown :size="16" class="text-red-500" />
-      <h2 class="text-sm sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('widget_top_expenses') }}</h2>
+      <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_top_expenses') }}</h2>
     </div>
     <div class="space-y-2">
       <div
@@ -47,12 +47,12 @@ function catName(id: string): string {
         :key="exp.id"
         class="flex items-center gap-3 rounded-lg px-2 py-1.5"
       >
-        <span class="text-xs font-bold text-[var(--color-text-muted)] w-5 text-center tabular-nums">{{ i + 1 }}</span>
+        <span class="text-xs font-bold text-text-muted w-5 text-center tabular-nums">{{ i + 1 }}</span>
         <div class="flex-1 min-w-0">
-          <p class="text-sm font-medium text-[var(--color-text-primary)] truncate">{{ exp.name }}</p>
-          <p class="text-[10px] text-[var(--color-text-muted)]">{{ catName(exp.categoryId) }} · {{ exp.date }}</p>
+          <p class="text-sm font-medium text-text-primary truncate">{{ exp.name }}</p>
+          <p class="text-[10px] text-text-muted">{{ catName(exp.categoryId) }} · {{ exp.date }}</p>
         </div>
-        <span class="text-sm font-bold text-[var(--color-text-primary)] tabular-nums shrink-0">{{ fmt(exp.amount, exp.currencyId) }}</span>
+        <span class="text-sm font-bold text-text-primary tabular-nums shrink-0">{{ fmt(exp.amount, exp.currencyId) }}</span>
       </div>
     </div>
   </div>

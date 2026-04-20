@@ -20,13 +20,13 @@ function onInput(e: Event) {
 const textareaTv = tv({
   slots: {
     root: "w-full",
-    labelEl: "block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5",
+    labelEl: "block text-xs font-medium text-text-secondary mb-1.5",
     textareaEl: [
-      "w-full px-3 py-2 rounded-lg border border-[var(--color-border)]",
-      "bg-[var(--color-surface)] text-[var(--color-text-primary)] text-sm",
-      "placeholder-[var(--color-text-muted)] resize-none",
-      "hover:border-[var(--color-text-muted)]",
-      "focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent",
+      "w-full px-3 py-2 rounded-lg border border-border",
+      "bg-surface text-text-primary text-sm",
+      "placeholder-text-muted resize-none",
+      "hover:border-text-muted",
+      "focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent",
       "disabled:opacity-50 transition-shadow",
     ],
   },

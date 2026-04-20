@@ -252,12 +252,12 @@ if (typeof window !== "undefined") {
 </script>
 
 <template>
-  <div v-if="appStore.isLoading" class="h-screen flex items-center justify-center bg-[var(--color-surface-secondary)]">
+  <div v-if="appStore.isLoading" class="h-screen flex items-center justify-center bg-surface-secondary">
     <div class="text-center">
-      <div class="w-12 h-12 rounded-xl bg-[var(--color-primary)] flex items-center justify-center mx-auto mb-3">
+      <div class="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-3">
         <span class="text-white font-bold text-xl">W</span>
       </div>
-      <p class="text-sm text-[var(--color-text-muted)]">Loading...</p>
+      <p class="text-sm text-text-muted">Loading...</p>
     </div>
   </div>
   <AppLayout v-else>

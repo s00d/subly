@@ -86,16 +86,16 @@ onUnmounted(() => {
 const dropdownTv = tv({
   slots: {
     menu: [
-      "fixed z-[200] bg-[var(--color-surface)] border border-[var(--color-border)]",
+      "fixed z-[200] bg-surface border border-border",
       "rounded-xl shadow-xl py-1 min-w-[170px] origin-top-right",
     ],
     itemBtn: "w-full flex items-center gap-2.5 px-3 py-2 text-sm transition-colors",
-    separator: "my-1 border-[var(--color-border)]",
+    separator: "my-1 border-border",
   },
   variants: {
     danger: {
       true: { itemBtn: "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20" },
-      false: { itemBtn: "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]" },
+      false: { itemBtn: "text-text-secondary hover:bg-surface-hover" },
     },
   },
   defaultVariants: { danger: false },

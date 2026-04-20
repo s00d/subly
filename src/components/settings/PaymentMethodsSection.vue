@@ -89,12 +89,12 @@ function movePmDown(id: string) {
 </script>
 
 <template>
-  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
     <div class="flex items-center justify-between gap-2 mb-3">
-      <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)] shrink-0">{{ t('payment_methods') }}</h2>
+      <h2 class="text-base sm:text-lg font-semibold text-text-primary shrink-0">{{ t('payment_methods') }}</h2>
       <div class="relative w-32 sm:w-44">
-        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
-        <input v-model="pmSearch" type="text" :placeholder="t('search')" class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-shadow" />
+        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+        <input v-model="pmSearch" type="text" :placeholder="t('search')" class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow" />
       </div>
     </div>
 
@@ -104,45 +104,45 @@ function movePmDown(id: string) {
         v-for="(pm, idx) in filteredPaymentMethods"
         :key="pm.id"
         class="flex items-center gap-2 rounded-lg px-2 py-1"
-        :class="[!pm.enabled ? 'opacity-40' : '', pm.id === settingsStore.settings.defaultPaymentMethodId ? 'bg-[var(--color-primary-light)]/50' : '']"
+        :class="[!pm.enabled ? 'opacity-40' : '', pm.id === settingsStore.settings.defaultPaymentMethodId ? 'bg-primary-light/50' : '']"
       >
         <!-- Move buttons -->
         <div v-if="!isPmSearching" class="flex flex-row sm:flex-col shrink-0">
-          <Tooltip :text="t('move_up')"><button @click="movePmUp(pm.id)" :disabled="idx === 0" class="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronUp :size="14" /></button></Tooltip>
-          <Tooltip :text="t('move_down')"><button @click="movePmDown(pm.id)" :disabled="idx === sortedPaymentMethods.length - 1" class="p-0.5 rounded text-[var(--color-text-muted)] hover:text-[var(--color-primary)] disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronDown :size="14" /></button></Tooltip>
+          <Tooltip :text="t('move_up')"><button @click="movePmUp(pm.id)" :disabled="idx === 0" class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronUp :size="14" /></button></Tooltip>
+          <Tooltip :text="t('move_down')"><button @click="movePmDown(pm.id)" :disabled="idx === sortedPaymentMethods.length - 1" class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronDown :size="14" /></button></Tooltip>
         </div>
         <!-- Default star -->
         <Tooltip :text="t('set_as_primary')">
-          <button @click="settingsStore.updateSettings({ defaultPaymentMethodId: pm.id })" class="p-1 rounded-lg transition-colors shrink-0" :class="pm.id === settingsStore.settings.defaultPaymentMethodId ? 'text-yellow-500' : 'text-[var(--color-text-muted)] hover:text-yellow-500'">
+          <button @click="settingsStore.updateSettings({ defaultPaymentMethodId: pm.id })" class="p-1 rounded-lg transition-colors shrink-0" :class="pm.id === settingsStore.settings.defaultPaymentMethodId ? 'text-yellow-500' : 'text-text-muted hover:text-yellow-500'">
             <Star :size="14" :fill="pm.id === settingsStore.settings.defaultPaymentMethodId ? 'currentColor' : 'none'" />
           </button>
         </Tooltip>
         <!-- Clickable icon -->
         <Tooltip :text="t('change_icon')">
-          <button @click="openEditIconPicker(pm.id)" class="w-8 h-8 rounded-lg border border-[var(--color-border)] flex items-center justify-center shrink-0 hover:border-[var(--color-primary)] transition-colors cursor-pointer">
+          <button @click="openEditIconPicker(pm.id)" class="w-8 h-8 rounded-lg border border-border flex items-center justify-center shrink-0 hover:border-primary transition-colors cursor-pointer">
             <IconDisplay :icon="pm.icon" :size="20" />
           </button>
         </Tooltip>
         <!-- Name: read-only for default, editable for user-added -->
         <div class="flex-1 min-w-0">
-          <span v-if="isDefaultItem(pm)" class="text-sm text-[var(--color-text-primary)] truncate block px-2 py-1">{{ pm.name }}</span>
+          <span v-if="isDefaultItem(pm)" class="text-sm text-text-primary truncate block px-2 py-1">{{ pm.name }}</span>
           <AppInput v-else :modelValue="pm.name" @update:modelValue="(v: string | number) => savePmName(pm.id, String(v))" size="sm" />
         </div>
         <!-- Toggle -->
         <Tooltip :text="pm.enabled ? t('enabled') : t('off')">
-          <button @click="togglePm(pm.id)" class="p-1.5 rounded-lg transition-colors shrink-0" :class="pm.enabled ? 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20' : 'text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)]'">
+          <button @click="togglePm(pm.id)" class="p-1.5 rounded-lg transition-colors shrink-0" :class="pm.enabled ? 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20' : 'text-text-muted hover:bg-surface-hover'">
             <Eye v-if="pm.enabled" :size="14" /><EyeOff v-else :size="14" />
           </button>
         </Tooltip>
         <!-- Delete -->
         <Tooltip :text="t('delete')">
-          <button @click="removePm(pm.id)" :disabled="isUsedPayment(pm.id)" class="p-1.5 rounded-lg transition-colors shrink-0" :class="isUsedPayment(pm.id) ? 'text-[var(--color-text-muted)] cursor-not-allowed' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'"><Trash2 :size="14" /></button>
+          <button @click="removePm(pm.id)" :disabled="isUsedPayment(pm.id)" class="p-1.5 rounded-lg transition-colors shrink-0" :class="isUsedPayment(pm.id) ? 'text-text-muted cursor-not-allowed' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'"><Trash2 :size="14" /></button>
         </Tooltip>
       </div>
     </div>
 
     <!-- Add button (same style as Categories) -->
-    <button @click="addPm" class="mt-3 px-3 py-1.5 rounded-lg bg-[var(--color-primary)] text-white text-sm hover:bg-[var(--color-primary-hover)] transition-colors">
+    <button @click="addPm" class="mt-3 px-3 py-1.5 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover transition-colors">
       <Plus :size="14" class="inline mr-1" /> {{ t('add') }}
     </button>
 

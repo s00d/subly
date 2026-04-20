@@ -45,19 +45,19 @@ function handleNav(path: string) {
 
 const sidebarTv = tv({
   slots: {
-    root: "w-56 shrink-0 bg-[var(--color-surface)] border-r border-[var(--color-border)] flex flex-col h-full",
-    logoWrap: "h-16 flex items-center px-5 border-b border-[var(--color-border)]",
-    logoIcon: "w-8 h-8 rounded-lg bg-[var(--color-primary)] flex items-center justify-center",
-    logoText: "font-semibold text-lg text-[var(--color-text-primary)]",
+    root: "w-56 shrink-0 bg-surface border-r border-border flex flex-col h-full",
+    logoWrap: "h-16 flex items-center px-5 border-b border-border",
+    logoIcon: "w-8 h-8 rounded-lg bg-primary flex items-center justify-center",
+    logoText: "font-semibold text-lg text-text-primary",
     nav: "flex-1 p-3 space-y-1",
     navItem: "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
-    footer: "p-4 border-t border-[var(--color-border)]",
-    footerText: "text-xs text-[var(--color-text-muted)]",
+    footer: "p-4 border-t border-border",
+    footerText: "text-xs text-text-muted",
   },
   variants: {
     active: {
-      true: { navItem: "bg-[var(--color-primary)] text-white shadow-sm" },
-      false: { navItem: "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-text-primary)]" },
+      true: { navItem: "bg-primary text-white shadow-sm" },
+      false: { navItem: "text-text-secondary hover:bg-surface-hover hover:text-text-primary" },
     },
   },
 });

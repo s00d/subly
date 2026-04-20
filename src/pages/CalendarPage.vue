@@ -401,16 +401,16 @@ async function handleExpOpenUrl(url: string) {
       >
         <div v-if="deleteConfirmId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div class="absolute inset-0 bg-black/50" @click="cancelDelete" />
-          <div class="relative bg-[var(--color-surface)] w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
+          <div class="relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
             <div class="flex items-center gap-3 mb-3 sm:mb-4">
               <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                 <AlertTriangle :size="18" class="text-red-500" />
               </div>
-              <h3 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('delete') }}</h3>
+              <h3 class="text-base sm:text-lg font-semibold text-text-primary">{{ t('delete') }}</h3>
             </div>
-            <p class="text-xs sm:text-sm text-[var(--color-text-secondary)] mb-4 sm:mb-6">{{ t('confirm_delete_subscription') }}</p>
+            <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('confirm_delete_subscription') }}</p>
             <div class="flex justify-end gap-2 sm:gap-3">
-              <button @click="cancelDelete" class="px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-xs sm:text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">{{ t('cancel') }}</button>
+              <button @click="cancelDelete" class="px-3 sm:px-4 py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover">{{ t('cancel') }}</button>
               <button @click="confirmDelete" class="px-3 sm:px-4 py-2 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-medium hover:bg-red-700">{{ t('delete') }}</button>
             </div>
           </div>
@@ -448,16 +448,16 @@ async function handleExpOpenUrl(url: string) {
       >
         <div v-if="deleteExpConfirmId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div class="absolute inset-0 bg-black/50" @click="cancelExpDelete" />
-          <div class="relative bg-[var(--color-surface)] w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
+          <div class="relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
             <div class="flex items-center gap-3 mb-3 sm:mb-4">
               <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                 <AlertTriangle :size="18" class="text-red-500" />
               </div>
-              <h3 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('delete') }}</h3>
+              <h3 class="text-base sm:text-lg font-semibold text-text-primary">{{ t('delete') }}</h3>
             </div>
-            <p class="text-xs sm:text-sm text-[var(--color-text-secondary)] mb-4 sm:mb-6">{{ t('confirm_delete_expense') }}</p>
+            <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('confirm_delete_expense') }}</p>
             <div class="flex justify-end gap-2 sm:gap-3">
-              <button @click="cancelExpDelete" class="px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-xs sm:text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">{{ t('cancel') }}</button>
+              <button @click="cancelExpDelete" class="px-3 sm:px-4 py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover">{{ t('cancel') }}</button>
               <button @click="confirmExpDelete" class="px-3 sm:px-4 py-2 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-medium hover:bg-red-700">{{ t('delete') }}</button>
             </div>
           </div>

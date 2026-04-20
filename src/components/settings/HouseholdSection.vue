@@ -25,8 +25,8 @@ function removeMember(id: string) {
 </script>
 
 <template>
-  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
-    <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('household') }}</h2>
+  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
+    <h2 class="text-base sm:text-lg font-semibold text-text-primary mb-3 sm:mb-4">{{ t('household') }}</h2>
     <div class="space-y-2">
       <div v-for="m in sortedHousehold" :key="m.id" class="flex gap-2 items-center">
         <div class="flex-1 min-w-0">
@@ -40,7 +40,7 @@ function removeMember(id: string) {
         </Tooltip>
       </div>
     </div>
-    <button @click="addMember" class="mt-3 px-3 py-1.5 rounded-lg bg-[var(--color-primary)] text-white text-sm hover:bg-[var(--color-primary-hover)] transition-colors">
+    <button @click="addMember" class="mt-3 px-3 py-1.5 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover transition-colors">
       <Plus :size="14" class="inline mr-1" /> {{ t('add') }}
     </button>
   </section>

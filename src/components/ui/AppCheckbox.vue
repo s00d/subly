@@ -20,15 +20,15 @@ const checkboxTv = tv({
       "w-[18px] h-[18px] shrink-0 rounded-[5px] border-2",
       "flex items-center justify-center transition-all duration-150",
     ],
-    labelEl: "text-sm text-[var(--color-text-secondary)]",
+    labelEl: "text-sm text-text-secondary",
   },
   variants: {
     disabled: {
       true: { root: "opacity-50 cursor-not-allowed" },
     },
     checked: {
-      true: { box: "bg-[var(--color-primary)] border-[var(--color-primary)]" },
-      false: { box: "border-[var(--color-border)] hover:border-[var(--color-text-muted)] bg-[var(--color-surface)]" },
+      true: { box: "bg-primary border-primary" },
+      false: { box: "border-border hover:border-text-muted bg-surface" },
     },
   },
   defaultVariants: { checked: false },

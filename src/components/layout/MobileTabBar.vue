@@ -28,15 +28,15 @@ function isActive(name: string): boolean {
 
 const tabBarTv = tv({
   slots: {
-    root: "fixed bottom-0 left-0 right-0 z-40 bg-[var(--color-surface)] border-t border-[var(--color-border)] safe-area-bottom",
+    root: "fixed bottom-0 left-0 right-0 z-40 bg-surface border-t border-border safe-area-bottom",
     inner: "flex items-center justify-around h-14",
     tab: "flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors",
     tabLabel: "text-[10px] font-medium leading-tight",
   },
   variants: {
     active: {
-      true: { tab: "text-[var(--color-primary)]" },
-      false: { tab: "text-[var(--color-text-muted)]" },
+      true: { tab: "text-primary" },
+      false: { tab: "text-text-muted" },
     },
   },
 });

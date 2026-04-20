@@ -42,10 +42,10 @@ const chartOptions = {
 </script>
 
 <template>
-  <div v-if="stats.length > 0" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+  <div v-if="stats.length > 0" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
     <div class="flex items-center gap-2 mb-3">
-      <Hash :size="16" class="text-[var(--color-primary)]" />
-      <h2 class="text-sm sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('widget_tag_expenses') }}</h2>
+      <Hash :size="16" class="text-primary" />
+      <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_tag_expenses') }}</h2>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       <div class="max-w-[220px] mx-auto">
@@ -58,8 +58,8 @@ const chartOptions = {
           class="flex items-center gap-2"
         >
           <span class="w-2.5 h-2.5 rounded-full shrink-0" :style="{ background: COLORS[i % COLORS.length] }" />
-          <span class="text-sm text-[var(--color-text-primary)] flex-1 truncate">#{{ s.tag }}</span>
-          <span class="text-sm font-semibold text-[var(--color-text-primary)] tabular-nums shrink-0">{{ fmt(s.total) }}</span>
+          <span class="text-sm text-text-primary flex-1 truncate">#{{ s.tag }}</span>
+          <span class="text-sm font-semibold text-text-primary tabular-nums shrink-0">{{ fmt(s.total) }}</span>
         </div>
       </div>
     </div>

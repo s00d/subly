@@ -183,46 +183,46 @@ async function handleResetData() {
 </script>
 
 <template>
-  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4 sm:p-5">
-    <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)] mb-2">{{ t('data_management') }}</h2>
-    <p class="text-xs sm:text-sm text-[var(--color-text-muted)] mb-4">{{ t('export_import_info') }}</p>
+  <section class="bg-surface rounded-xl border border-border p-4 sm:p-5">
+    <h2 class="text-base sm:text-lg font-semibold text-text-primary mb-2">{{ t('data_management') }}</h2>
+    <p class="text-xs sm:text-sm text-text-muted mb-4">{{ t('export_import_info') }}</p>
 
     <!-- Primary: .subly archive -->
     <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 mb-4">
-      <button @click="handleExportSubly" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-xs sm:text-sm font-medium hover:bg-[var(--color-primary-hover)] disabled:opacity-50">
+      <button @click="handleExportSubly" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg bg-primary text-white text-xs sm:text-sm font-medium hover:bg-primary-hover disabled:opacity-50">
         <Archive :size="14" /> {{ t('export_subly') }}
       </button>
-      <button @click="handleImportSubly" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-primary)] text-[var(--color-primary)] text-xs sm:text-sm font-medium hover:bg-[var(--color-primary-light)]">
+      <button @click="handleImportSubly" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-primary text-primary text-xs sm:text-sm font-medium hover:bg-primary-light">
         <Archive :size="14" /> {{ t('import_subly') }}
       </button>
     </div>
 
     <!-- Secondary: JSON / CSV -->
     <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 mb-6">
-      <button @click="handleExportJson" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs sm:text-sm font-medium hover:bg-[var(--color-surface-hover)] disabled:opacity-50">
+      <button @click="handleExportJson" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover disabled:opacity-50">
         <Download :size="14" /> {{ t('export_as_json') }}
       </button>
-      <button @click="handleExportCsv" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs sm:text-sm font-medium hover:bg-[var(--color-surface-hover)] disabled:opacity-50">
+      <button @click="handleExportCsv" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover disabled:opacity-50">
         <Download :size="14" /> {{ t('export_as_csv') }}
       </button>
-      <button @click="handleExportExpensesCsv" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs sm:text-sm font-medium hover:bg-[var(--color-surface-hover)] disabled:opacity-50">
+      <button @click="handleExportExpensesCsv" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover disabled:opacity-50">
         <FileSpreadsheet :size="14" /> {{ t('expenses') }} CSV
       </button>
-      <button @click="handleImportJson" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs sm:text-sm font-medium hover:bg-[var(--color-surface-hover)]">
+      <button @click="handleImportJson" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover">
         <Upload :size="14" /> {{ t('import_from_json') }}
       </button>
-      <button @click="handleImportCsv" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs sm:text-sm font-medium hover:bg-[var(--color-surface-hover)]">
+      <button @click="handleImportCsv" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover">
         <FileSpreadsheet :size="14" /> {{ t('import_from_csv') }}
       </button>
-      <button @click="handleImportSql" :disabled="isImportingSql" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs sm:text-sm font-medium hover:bg-[var(--color-surface-hover)] disabled:opacity-50">
+      <button @click="handleImportSql" :disabled="isImportingSql" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover disabled:opacity-50">
         <Database :size="14" /> {{ t('import_from_sql') }}
       </button>
-      <button @click="handleOpenDbFolder" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-xs sm:text-sm font-medium hover:bg-[var(--color-surface-hover)]">
+      <button @click="handleOpenDbFolder" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover">
         <FolderOpen :size="14" /> {{ t('open_db_folder') }}
       </button>
     </div>
 
-    <div class="pt-4 border-t border-[var(--color-border)]">
+    <div class="pt-4 border-t border-border">
       <div v-if="!showResetConfirm">
         <button @click="showResetConfirm = true" class="flex items-center gap-2 px-4 py-2 rounded-lg border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20">
           <RotateCcw :size="16" /> {{ t('reset_data') }}
@@ -232,7 +232,7 @@ async function handleResetData() {
         <p class="text-sm text-red-700 dark:text-red-300 mb-3">{{ t('reset_data_confirm') }}</p>
         <div class="flex gap-2">
           <button @click="handleResetData" class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">{{ t('confirm') }}</button>
-          <button @click="showResetConfirm = false" class="px-4 py-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] text-sm font-medium hover:bg-[var(--color-surface-hover)]">{{ t('cancel') }}</button>
+          <button @click="showResetConfirm = false" class="px-4 py-2 rounded-lg border border-border text-text-secondary text-sm font-medium hover:bg-surface-hover">{{ t('cancel') }}</button>
         </div>
       </div>
     </div>

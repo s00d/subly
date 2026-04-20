@@ -95,18 +95,18 @@ async function handleOpenUrl(url: string) {
     <div v-if="exp" class="space-y-4">
       <!-- Header: Name + Amount -->
       <div class="flex items-center gap-3">
-        <div class="w-11 h-11 rounded-xl bg-[var(--color-primary-light)] flex items-center justify-center shrink-0">
+        <div class="w-11 h-11 rounded-xl bg-primary-light flex items-center justify-center shrink-0">
           <IconDisplay v-if="categoryIcon" :icon="categoryIcon" :size="20" />
-          <Wallet v-else :size="20" class="text-[var(--color-primary)]" />
+          <Wallet v-else :size="20" class="text-primary" />
         </div>
         <div class="flex-1 min-w-0">
-          <h3 class="text-base font-semibold text-[var(--color-text-primary)] truncate">{{ exp.name }}</h3>
-          <p class="text-xs text-[var(--color-text-muted)]">{{ fmtDateFull(exp.date) }}</p>
+          <h3 class="text-base font-semibold text-text-primary truncate">{{ exp.name }}</h3>
+          <p class="text-xs text-text-muted">{{ fmtDateFull(exp.date) }}</p>
         </div>
         <div class="text-right shrink-0">
-          <p class="text-lg font-bold text-[var(--color-text-primary)]">{{ fmt(exp.amount, exp.currencyId) }}</p>
+          <p class="text-lg font-bold text-text-primary">{{ fmt(exp.amount, exp.currencyId) }}</p>
           <div v-if="convertedPrices.length > 0" class="mt-0.5 space-y-0">
-            <p v-for="cp in convertedPrices" :key="cp.currency.id" class="text-[11px] text-[var(--color-text-muted)] tabular-nums">
+            <p v-for="cp in convertedPrices" :key="cp.currency.id" class="text-[11px] text-text-muted tabular-nums">
               ≈ {{ fmtCur(cp.amount, cp.currency) }}
             </p>
           </div>
@@ -115,66 +115,66 @@ async function handleOpenUrl(url: string) {
 
       <!-- Tags -->
       <div v-if="exp.tags && exp.tags.length > 0" class="flex items-center gap-2 flex-wrap">
-        <Hash :size="13" class="text-[var(--color-text-muted)] shrink-0" />
+        <Hash :size="13" class="text-text-muted shrink-0" />
         <span
           v-for="tag in exp.tags"
           :key="tag"
-          class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-[var(--color-surface-secondary)] text-[var(--color-text-secondary)] border border-[var(--color-border)]"
+          class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-secondary text-text-secondary border border-border"
         >{{ tag }}</span>
       </div>
 
       <!-- Info grid -->
       <div class="grid grid-cols-2 gap-2">
         <!-- Date -->
-        <div class="bg-[var(--color-surface-secondary)] rounded-lg p-3">
+        <div class="bg-surface-secondary rounded-lg p-3">
           <div class="flex items-center gap-1.5 mb-1">
-            <Calendar :size="13" class="text-[var(--color-text-muted)]" />
-            <span class="text-[10px] uppercase tracking-wide font-medium text-[var(--color-text-muted)]">{{ t('expense_date') }}</span>
+            <Calendar :size="13" class="text-text-muted" />
+            <span class="text-[10px] uppercase tracking-wide font-medium text-text-muted">{{ t('expense_date') }}</span>
           </div>
-          <p class="text-sm font-medium text-[var(--color-text-primary)]">{{ fmtDateFull(exp.date) }}</p>
+          <p class="text-sm font-medium text-text-primary">{{ fmtDateFull(exp.date) }}</p>
         </div>
 
         <!-- Category -->
-        <div class="bg-[var(--color-surface-secondary)] rounded-lg p-3">
+        <div class="bg-surface-secondary rounded-lg p-3">
           <div class="flex items-center gap-1.5 mb-1">
-            <Tag :size="13" class="text-[var(--color-text-muted)]" />
-            <span class="text-[10px] uppercase tracking-wide font-medium text-[var(--color-text-muted)]">{{ t('category') }}</span>
+            <Tag :size="13" class="text-text-muted" />
+            <span class="text-[10px] uppercase tracking-wide font-medium text-text-muted">{{ t('category') }}</span>
           </div>
-          <p class="text-sm font-medium text-[var(--color-text-primary)] flex items-center gap-1.5">
+          <p class="text-sm font-medium text-text-primary flex items-center gap-1.5">
             <IconDisplay v-if="categoryIcon" :icon="categoryIcon" :size="14" />
             {{ categoryName || '—' }}
           </p>
         </div>
 
         <!-- Payment Method -->
-        <div class="bg-[var(--color-surface-secondary)] rounded-lg p-3">
+        <div class="bg-surface-secondary rounded-lg p-3">
           <div class="flex items-center gap-1.5 mb-1">
-            <CreditCard :size="13" class="text-[var(--color-text-muted)]" />
-            <span class="text-[10px] uppercase tracking-wide font-medium text-[var(--color-text-muted)]">{{ t('payment_method') }}</span>
+            <CreditCard :size="13" class="text-text-muted" />
+            <span class="text-[10px] uppercase tracking-wide font-medium text-text-muted">{{ t('payment_method') }}</span>
           </div>
           <div class="flex items-center gap-1.5">
             <IconDisplay v-if="paymentMethod" :icon="paymentMethod.icon" :size="16" />
-            <p class="text-sm font-medium text-[var(--color-text-primary)]">{{ paymentMethod?.name || '—' }}</p>
+            <p class="text-sm font-medium text-text-primary">{{ paymentMethod?.name || '—' }}</p>
           </div>
         </div>
 
         <!-- Payer -->
-        <div class="bg-[var(--color-surface-secondary)] rounded-lg p-3">
+        <div class="bg-surface-secondary rounded-lg p-3">
           <div class="flex items-center gap-1.5 mb-1">
-            <User :size="13" class="text-[var(--color-text-muted)]" />
-            <span class="text-[10px] uppercase tracking-wide font-medium text-[var(--color-text-muted)]">{{ t('paid_by') }}</span>
+            <User :size="13" class="text-text-muted" />
+            <span class="text-[10px] uppercase tracking-wide font-medium text-text-muted">{{ t('paid_by') }}</span>
           </div>
-          <p class="text-sm font-medium text-[var(--color-text-primary)]">{{ payerName || '—' }}</p>
+          <p class="text-sm font-medium text-text-primary">{{ payerName || '—' }}</p>
         </div>
       </div>
 
       <!-- URL -->
-      <div v-if="exp.url" class="bg-[var(--color-surface-secondary)] rounded-lg p-3">
+      <div v-if="exp.url" class="bg-surface-secondary rounded-lg p-3">
         <div class="flex items-center gap-1.5 mb-1">
-          <Link :size="13" class="text-[var(--color-text-muted)]" />
-          <span class="text-[10px] uppercase tracking-wide font-medium text-[var(--color-text-muted)]">{{ t('url') }}</span>
+          <Link :size="13" class="text-text-muted" />
+          <span class="text-[10px] uppercase tracking-wide font-medium text-text-muted">{{ t('url') }}</span>
         </div>
-        <button @click="handleOpenUrl(exp.url)" class="text-sm text-[var(--color-primary)] hover:underline truncate block max-w-full text-left">{{ exp.url }}</button>
+        <button @click="handleOpenUrl(exp.url)" class="text-sm text-primary hover:underline truncate block max-w-full text-left">{{ exp.url }}</button>
       </div>
 
       <!-- Linked subscription -->
@@ -186,12 +186,12 @@ async function handleOpenUrl(url: string) {
       </div>
 
       <!-- Notes -->
-      <div v-if="exp.notes" class="bg-[var(--color-surface-secondary)] rounded-lg p-3">
+      <div v-if="exp.notes" class="bg-surface-secondary rounded-lg p-3">
         <div class="flex items-center gap-1.5 mb-1">
-          <FileText :size="13" class="text-[var(--color-text-muted)]" />
-          <span class="text-[10px] uppercase tracking-wide font-medium text-[var(--color-text-muted)]">{{ t('notes') }}</span>
+          <FileText :size="13" class="text-text-muted" />
+          <span class="text-[10px] uppercase tracking-wide font-medium text-text-muted">{{ t('notes') }}</span>
         </div>
-        <p class="text-sm text-[var(--color-text-secondary)] whitespace-pre-wrap">{{ exp.notes }}</p>
+        <p class="text-sm text-text-secondary whitespace-pre-wrap">{{ exp.notes }}</p>
       </div>
     </div>
 
@@ -200,7 +200,7 @@ async function handleOpenUrl(url: string) {
         <Tooltip v-if="exp && exp.url" :text="t('url')">
           <button
             @click="handleOpenUrl(exp!.url)"
-            class="p-1.5 sm:p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] transition-colors shrink-0"
+            class="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-primary hover:bg-primary-light transition-colors shrink-0"
           >
             <ExternalLink :size="16" />
           </button>
@@ -208,7 +208,7 @@ async function handleOpenUrl(url: string) {
         <Tooltip v-if="exp" :text="t('edit')">
           <button
             @click="emit('edit', exp!)"
-            class="p-1.5 sm:p-2 rounded-lg text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] transition-colors shrink-0"
+            class="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-primary hover:bg-primary-light transition-colors shrink-0"
           >
             <Pencil :size="16" />
           </button>
@@ -216,7 +216,7 @@ async function handleOpenUrl(url: string) {
         <Tooltip v-if="exp" :text="t('delete')">
           <button
             @click="emit('delete', exp!.id)"
-            class="p-1.5 sm:p-2 rounded-lg text-[var(--color-text-muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
+            class="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
           >
             <Trash2 :size="16" />
           </button>
@@ -224,7 +224,7 @@ async function handleOpenUrl(url: string) {
         <div class="flex-1" />
         <button
           @click="emit('close')"
-          class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-[var(--color-border)] text-xs sm:text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] transition-colors shrink-0"
+          class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors shrink-0"
         >{{ t('cancel') }}</button>
       </div>
     </template>

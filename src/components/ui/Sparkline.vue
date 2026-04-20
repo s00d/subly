@@ -60,5 +60,5 @@ const trend = computed(() => {
       stroke-linejoin="round"
     />
   </svg>
-  <span v-else class="text-[10px] text-[var(--color-text-muted)] opacity-40">—</span>
+  <span v-else class="text-[10px] text-text-muted opacity-40">—</span>
 </template>

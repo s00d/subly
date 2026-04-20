@@ -161,46 +161,46 @@ async function handlePush() {
 
 const sectionTv = tv({
   slots: {
-    root: "bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4 sm:p-5",
+    root: "bg-surface rounded-xl border border-border p-4 sm:p-5",
     header: "flex items-center gap-2 mb-1",
-    title: "text-base sm:text-lg font-semibold text-[var(--color-text-primary)]",
-    desc: "text-xs sm:text-sm text-[var(--color-text-muted)] mb-4",
-    statusCard: "mb-4 p-4 rounded-xl bg-[var(--color-surface-secondary)] border border-[var(--color-border)]",
+    title: "text-base sm:text-lg font-semibold text-text-primary",
+    desc: "text-xs sm:text-sm text-text-muted mb-4",
+    statusCard: "mb-4 p-4 rounded-xl bg-surface-secondary border border-border",
     statusTop: "flex items-center gap-3",
-    statusIcon: "w-10 h-10 rounded-xl object-contain p-1.5 bg-[var(--color-surface)] border border-[var(--color-border)]",
+    statusIcon: "w-10 h-10 rounded-xl object-contain p-1.5 bg-surface border border-border",
     statusInfo: "flex-1 min-w-0",
-    statusName: "text-sm font-semibold text-[var(--color-text-primary)]",
-    statusMeta: "text-[10px] text-[var(--color-text-muted)] mt-0.5",
-    statusActions: "flex items-center gap-3 mt-3 pt-3 border-t border-[var(--color-border)]",
+    statusName: "text-sm font-semibold text-text-primary",
+    statusMeta: "text-[10px] text-text-muted mt-0.5",
+    statusActions: "flex items-center gap-3 mt-3 pt-3 border-t border-border",
     actionBtn: "flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50",
     dangerBtn: "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800/40",
-    providerCard: "rounded-xl border border-[var(--color-border)] overflow-hidden transition-all hover:border-[var(--color-text-muted)]",
+    providerCard: "rounded-xl border border-border overflow-hidden transition-all hover:border-text-muted",
     providerRow: "flex items-center gap-3 p-3 cursor-pointer select-none",
     providerIcon: "w-8 h-8 rounded-lg object-contain",
-    providerName: "text-sm font-medium text-[var(--color-text-primary)]",
-    providerDesc: "text-[10px] text-[var(--color-text-muted)]",
-    providerChevron: "text-[var(--color-text-muted)] transition-transform duration-200 shrink-0",
+    providerName: "text-sm font-medium text-text-primary",
+    providerDesc: "text-[10px] text-text-muted",
+    providerChevron: "text-text-muted transition-transform duration-200 shrink-0",
     credForm: "px-3 pb-3 pt-0",
-    credFormInner: "space-y-2.5 p-3 rounded-lg bg-[var(--color-surface-secondary)]",
-    credLabel: "block text-[10px] font-medium text-[var(--color-text-muted)] mb-1",
+    credFormInner: "space-y-2.5 p-3 rounded-lg bg-surface-secondary",
+    credLabel: "block text-[10px] font-medium text-text-muted mb-1",
     credInput: [
-      "w-full px-2.5 py-1.5 rounded-lg border border-[var(--color-border)]",
-      "bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)]",
-      "focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]",
+      "w-full px-2.5 py-1.5 rounded-lg border border-border",
+      "bg-surface text-xs text-text-primary",
+      "focus:outline-none focus:ring-1 focus:ring-primary",
     ],
     credActions: "flex items-center gap-2 pt-1",
     saveBtn: [
       "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50",
-      "bg-[var(--color-surface)] border border-[var(--color-border)] text-[var(--color-text-primary)]",
-      "hover:bg-[var(--color-surface-hover)]",
+      "bg-surface border border-border text-text-primary",
+      "hover:bg-surface-hover",
     ],
     connectBtn: [
       "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50",
-      "bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-hover)]",
+      "bg-primary text-white hover:bg-primary-hover",
     ],
     pendingBanner: "mb-4 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800",
     errorBanner: "mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800",
-    changeLabel: "text-xs font-medium text-[var(--color-text-muted)] mb-2 mt-4",
+    changeLabel: "text-xs font-medium text-text-muted mb-2 mt-4",
   },
 });
 
@@ -210,7 +210,7 @@ const s = sectionTv();
 <template>
   <section :class="s.root()">
     <div :class="s.header()">
-      <Cloud :size="18" class="text-[var(--color-primary)]" />
+      <Cloud :size="18" class="text-primary" />
       <h2 :class="s.title()">{{ t('cloud_sync') }}</h2>
     </div>
     <p :class="s.desc()">{{ t('cloud_sync_desc') }}</p>
@@ -237,7 +237,7 @@ const s = sectionTv();
             </div>
           </div>
           <div class="shrink-0">
-            <Loader2 v-if="syncStatus.syncing" :size="16" class="text-[var(--color-primary)] animate-spin" />
+            <Loader2 v-if="syncStatus.syncing" :size="16" class="text-primary animate-spin" />
             <AlertTriangle v-else-if="syncStatus.error" :size="16" class="text-amber-500" />
           </div>
         </div>
@@ -249,7 +249,7 @@ const s = sectionTv();
               @click="handleCheckRemote"
               :disabled="syncStatus.syncing"
               :class="s.actionBtn()"
-              class="text-[var(--color-primary)] hover:bg-[var(--color-primary-light)] border border-[var(--color-primary)]/20"
+              class="text-primary hover:bg-primary-light border border-primary/20"
             >
               <RefreshCw :size="13" :class="{ 'animate-spin': syncStatus.syncing }" />
               {{ t('sync_now') }}
@@ -323,7 +323,7 @@ const s = sectionTv();
           v-if="availableProviders.length"
           @click="showChangeProvider = !showChangeProvider"
           :class="s.actionBtn()"
-          class="text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)] border border-[var(--color-border)]"
+          class="text-text-secondary hover:bg-surface-hover border border-border"
         >
           <RefreshCw :size="13" />
           {{ t('sync_change_provider') }}

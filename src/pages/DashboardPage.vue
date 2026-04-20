@@ -278,12 +278,12 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
   <div class="space-y-4 sm:space-y-6 max-w-5xl mx-auto">
     <!-- Empty state -->
     <div v-if="!hasSubscriptions" class="text-center py-16">
-      <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-[var(--color-primary-light)] flex items-center justify-center">
-        <Wallet :size="36" class="text-[var(--color-primary)]" />
+      <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-primary-light flex items-center justify-center">
+        <Wallet :size="36" class="text-primary" />
       </div>
-      <h2 class="text-xl font-bold text-[var(--color-text-primary)] mb-2">{{ t('welcome_to_subly') }}</h2>
-      <p class="text-sm text-[var(--color-text-muted)] mb-6 max-w-md mx-auto">{{ t('get_started_info') }}</p>
-      <button @click="goToSubscriptions" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--color-primary)] text-white font-medium hover:bg-[var(--color-primary-hover)] shadow-sm">
+      <h2 class="text-xl font-bold text-text-primary mb-2">{{ t('welcome_to_subly') }}</h2>
+      <p class="text-sm text-text-muted mb-6 max-w-md mx-auto">{{ t('get_started_info') }}</p>
+      <button @click="goToSubscriptions" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-white font-medium hover:bg-primary-hover shadow-sm">
         <ArrowRight :size="18" /> {{ t('go_to_subscriptions') }}
       </button>
     </div>
@@ -294,7 +294,7 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
         <button
           @click="showWidgetConfig = !showWidgetConfig"
           class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors"
-          :class="showWidgetConfig ? 'border-[var(--color-primary)] text-[var(--color-primary)] bg-[var(--color-primary-light)]' : 'border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'"
+          :class="showWidgetConfig ? 'border-primary text-primary bg-primary-light' : 'border-border text-text-muted hover:text-text-primary'"
         >
           <Settings2 :size="14" />
           {{ t('configure_widgets') }}
@@ -310,38 +310,38 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
         leave-from-class="opacity-100"
         leave-to-class="opacity-0 -translate-y-2"
       >
-        <div v-if="showWidgetConfig" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4">
+        <div v-if="showWidgetConfig" class="bg-surface rounded-xl border border-border p-4">
           <div class="space-y-1">
             <div
               v-for="(w, idx) in orderedWidgets"
               :key="w.id"
-              class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-[var(--color-surface-hover)] transition-colors"
+              class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-hover transition-colors"
             >
               <Tooltip :text="t('toggle_visibility')">
                 <button
                   @click="toggleWidgetVisibility(w.id)"
                   class="p-1 rounded transition-colors"
-                  :class="w.visible ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)] opacity-40'"
+                  :class="w.visible ? 'text-primary' : 'text-text-muted opacity-40'"
                 >
                   <component :is="w.visible ? Eye : EyeOff" :size="14" />
                 </button>
               </Tooltip>
               <span
                 class="text-sm flex-1"
-                :class="w.visible ? 'text-[var(--color-text-primary)]' : 'text-[var(--color-text-muted)] line-through opacity-50'"
+                :class="w.visible ? 'text-text-primary' : 'text-text-muted line-through opacity-50'"
               >{{ t(w.def.labelKey) }}</span>
               <Tooltip :text="t('move_up')">
                 <button
                   @click="moveWidget(w.id, -1)"
                   :disabled="idx === 0"
-                  class="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-20 transition-colors"
+                  class="p-1 rounded text-text-muted hover:text-text-primary disabled:opacity-20 transition-colors"
                 ><ChevronUp :size="14" /></button>
               </Tooltip>
               <Tooltip :text="t('move_down')">
                 <button
                   @click="moveWidget(w.id, 1)"
                   :disabled="idx === orderedWidgets.length - 1"
-                  class="p-1 rounded text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] disabled:opacity-20 transition-colors"
+                  class="p-1 rounded text-text-muted hover:text-text-primary disabled:opacity-20 transition-colors"
                 ><ChevronDown :size="14" /></button>
               </Tooltip>
             </div>
@@ -365,28 +365,28 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
         />
 
         <!-- budget -->
-        <div v-if="w.id === 'budget' && w.visible && budget > 0" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
-          <h2 class="text-sm sm:text-lg font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('your_budget') }}</h2>
+        <div v-if="w.id === 'budget' && w.visible && budget > 0" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
+          <h2 class="text-sm sm:text-lg font-semibold text-text-primary mb-3 sm:mb-4">{{ t('your_budget') }}</h2>
           <div class="space-y-3">
-            <div class="w-full bg-[var(--color-surface-hover)] rounded-full h-2.5 sm:h-3">
-              <div class="h-full rounded-full transition-all duration-500" :class="(budgetUsed || 0) > 100 ? 'bg-red-500' : 'bg-[var(--color-primary)]'" :style="{ width: Math.min(budgetUsed || 0, 100) + '%' }" />
+            <div class="w-full bg-surface-hover rounded-full h-2.5 sm:h-3">
+              <div class="h-full rounded-full transition-all duration-500" :class="(budgetUsed || 0) > 100 ? 'bg-red-500' : 'bg-primary'" :style="{ width: Math.min(budgetUsed || 0, 100) + '%' }" />
             </div>
             <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4 text-xs sm:text-sm">
-              <div><p class="text-[var(--color-text-muted)]">{{ t('budget') }}</p><p class="font-semibold text-[var(--color-text-primary)]">{{ fmt(budget) }}</p></div>
-              <div><p class="text-[var(--color-text-muted)]">{{ t('budget_used') }}</p><p class="font-semibold text-[var(--color-text-primary)]">{{ fmtPercent(budgetUsed || 0) }}</p></div>
-              <div><p class="text-[var(--color-text-muted)]">{{ t('budget_remaining') }}</p><p class="font-semibold text-[var(--color-text-primary)]">{{ fmt(budgetLeft || 0) }}</p></div>
+              <div><p class="text-text-muted">{{ t('budget') }}</p><p class="font-semibold text-text-primary">{{ fmt(budget) }}</p></div>
+              <div><p class="text-text-muted">{{ t('budget_used') }}</p><p class="font-semibold text-text-primary">{{ fmtPercent(budgetUsed || 0) }}</p></div>
+              <div><p class="text-text-muted">{{ t('budget_remaining') }}</p><p class="font-semibold text-text-primary">{{ fmt(budgetLeft || 0) }}</p></div>
               <div v-if="overBudget"><p class="text-red-500">{{ t('over_budget') }}</p><p class="font-semibold text-red-500">{{ fmt(overBudget) }}</p></div>
             </div>
           </div>
         </div>
 
         <!-- savings -->
-        <div v-if="w.id === 'savings' && w.visible && inactiveSubs.length > 0" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
-          <h2 class="text-sm sm:text-lg font-semibold text-[var(--color-text-primary)] mb-2 sm:mb-3">{{ t('your_savings') }}</h2>
+        <div v-if="w.id === 'savings' && w.visible && inactiveSubs.length > 0" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
+          <h2 class="text-sm sm:text-lg font-semibold text-text-primary mb-2 sm:mb-3">{{ t('your_savings') }}</h2>
           <div class="grid grid-cols-3 gap-2 sm:gap-4">
-            <div><p class="text-[10px] sm:text-sm text-[var(--color-text-muted)]">{{ t('inactive_subscriptions') }}</p><p class="text-lg sm:text-xl font-bold text-[var(--color-text-primary)]">{{ inactiveSubs.length }}</p></div>
-            <div><p class="text-[10px] sm:text-sm text-[var(--color-text-muted)]">{{ t('monthly_savings') }}</p><p class="text-lg sm:text-xl font-bold text-green-600">{{ fmt(totalSavingsMonthly) }}</p></div>
-            <div><p class="text-[10px] sm:text-sm text-[var(--color-text-muted)]">{{ t('yearly_savings') }}</p><p class="text-lg sm:text-xl font-bold text-green-600">{{ fmt(totalSavingsMonthly * 12) }}</p></div>
+            <div><p class="text-[10px] sm:text-sm text-text-muted">{{ t('inactive_subscriptions') }}</p><p class="text-lg sm:text-xl font-bold text-text-primary">{{ inactiveSubs.length }}</p></div>
+            <div><p class="text-[10px] sm:text-sm text-text-muted">{{ t('monthly_savings') }}</p><p class="text-lg sm:text-xl font-bold text-green-600">{{ fmt(totalSavingsMonthly) }}</p></div>
+            <div><p class="text-[10px] sm:text-sm text-text-muted">{{ t('yearly_savings') }}</p><p class="text-lg sm:text-xl font-bold text-green-600">{{ fmt(totalSavingsMonthly * 12) }}</p></div>
           </div>
         </div>
 
@@ -425,18 +425,18 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
 
         <!-- charts -->
         <div v-if="w.id === 'charts' && w.visible && hasCharts" class="space-y-3 sm:space-y-4">
-          <h2 class="text-sm sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('split_views') }}</h2>
+          <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('split_views') }}</h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
-            <div v-if="categoryCosts.length > 1" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
-              <h3 class="text-xs sm:text-sm font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('category_split') }}</h3>
+            <div v-if="categoryCosts.length > 1" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
+              <h3 class="text-xs sm:text-sm font-semibold text-text-primary mb-3 sm:mb-4">{{ t('category_split') }}</h3>
               <Doughnut :data="categoryChartData" :options="chartOptions" />
             </div>
-            <div v-if="pmCounts.length > 1" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
-              <h3 class="text-xs sm:text-sm font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('payment_method_split') }}</h3>
+            <div v-if="pmCounts.length > 1" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
+              <h3 class="text-xs sm:text-sm font-semibold text-text-primary mb-3 sm:mb-4">{{ t('payment_method_split') }}</h3>
               <Doughnut :data="pmChartData" :options="chartOptions" />
             </div>
-            <div v-if="memberCosts.length > 1" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
-              <h3 class="text-xs sm:text-sm font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('household_split') }}</h3>
+            <div v-if="memberCosts.length > 1" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
+              <h3 class="text-xs sm:text-sm font-semibold text-text-primary mb-3 sm:mb-4">{{ t('household_split') }}</h3>
               <Doughnut :data="memberChartData" :options="chartOptions" />
             </div>
           </div>

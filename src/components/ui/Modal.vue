@@ -19,14 +19,14 @@ const modalTv = tv({
     overlay: "fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4",
     backdrop: "absolute inset-0 bg-black/50",
     panel: [
-      "relative bg-[var(--color-surface)] w-full overflow-hidden",
+      "relative bg-surface w-full overflow-hidden",
       "rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[90vh] sm:max-h-none",
     ],
-    header: "flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-[var(--color-border)]",
-    titleEl: "text-base sm:text-lg font-semibold text-[var(--color-text-primary)]",
-    closeBtn: "p-1 rounded-lg hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)]",
+    header: "flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border",
+    titleEl: "text-base sm:text-lg font-semibold text-text-primary",
+    closeBtn: "p-1 rounded-lg hover:bg-surface-hover text-text-muted",
     body: "px-4 sm:px-6 py-3 sm:py-4 max-h-[70vh] overflow-y-auto",
-    footer: "px-4 sm:px-6 py-3 sm:py-4 border-t border-[var(--color-border)] flex justify-end gap-3",
+    footer: "px-4 sm:px-6 py-3 sm:py-4 border-t border-border flex justify-end gap-3",
   },
 });
 

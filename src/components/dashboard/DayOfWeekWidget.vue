@@ -70,13 +70,13 @@ const peakDay = computed(() => {
 </script>
 
 <template>
-  <div v-if="hasData" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+  <div v-if="hasData" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-2">
-        <CalendarDays :size="16" class="text-[var(--color-primary)]" />
-        <h2 class="text-sm sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('widget_day_of_week') }}</h2>
+        <CalendarDays :size="16" class="text-primary" />
+        <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_day_of_week') }}</h2>
       </div>
-      <span v-if="peakDay" class="text-[10px] text-[var(--color-text-muted)]">{{ t('peak') }}: {{ peakDay }}</span>
+      <span v-if="peakDay" class="text-[10px] text-text-muted">{{ t('peak') }}: {{ peakDay }}</span>
     </div>
     <div class="h-48 sm:h-56">
       <Bar :data="chartData" :options="chartOptions" />

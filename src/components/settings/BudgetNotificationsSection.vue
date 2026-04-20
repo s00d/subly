@@ -127,24 +127,24 @@ loadAutostartStatus();
 </script>
 
 <template>
-  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
-    <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('budget_and_notifications') }}</h2>
+  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
+    <h2 class="text-base sm:text-lg font-semibold text-text-primary mb-3 sm:mb-4">{{ t('budget_and_notifications') }}</h2>
 
     <!-- Monthly budget -->
     <div class="flex gap-2 sm:gap-3 items-end mb-2">
       <div class="flex-1">
         <AppInput v-model="budgetInput" type="number" min="0" step="0.01" :label="t('monthly_budget')" />
       </div>
-      <button @click="saveBudget" class="px-3 sm:px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-xs sm:text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors shrink-0">{{ t('save') }}</button>
+      <button @click="saveBudget" class="px-3 sm:px-4 py-2 rounded-lg bg-primary text-white text-xs sm:text-sm font-medium hover:bg-primary-hover transition-colors shrink-0">{{ t('save') }}</button>
     </div>
-    <p class="text-xs text-[var(--color-text-muted)] mb-5">{{ t('budget_info') }}</p>
+    <p class="text-xs text-text-muted mb-5">{{ t('budget_info') }}</p>
 
     <!-- Notify days -->
     <div class="flex gap-2 sm:gap-3 items-end mb-4">
       <div class="flex-1">
         <AppInput v-model="notifyDaysBefore" type="number" :label="t('notify_days_before')" min="0" max="30" />
       </div>
-      <button @click="saveNotifyDays" class="px-3 sm:px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-xs sm:text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors shrink-0">{{ t('save') }}</button>
+      <button @click="saveNotifyDays" class="px-3 sm:px-4 py-2 rounded-lg bg-primary text-white text-xs sm:text-sm font-medium hover:bg-primary-hover transition-colors shrink-0">{{ t('save') }}</button>
     </div>
 
     <!-- Recurring notifications -->
@@ -170,7 +170,7 @@ loadAutostartStatus();
       <Tooltip :text="t('test_sound')">
         <button
           @click="handleTestSound"
-          class="p-2 rounded-lg border border-[var(--color-border)] text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors"
+          class="p-2 rounded-lg border border-border text-text-secondary hover:border-primary hover:text-primary transition-colors"
         >
           <Volume2 :size="16" />
         </button>
@@ -185,14 +185,14 @@ loadAutostartStatus();
       <div v-if="notifSchedule === 'custom'" class="w-20 sm:w-24">
         <AppInput v-model="notifCustomHour" type="number" :label="t('hour')" min="0" max="23" />
       </div>
-      <button @click="saveSchedule" class="px-3 sm:px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-xs sm:text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors shrink-0">{{ t('save') }}</button>
+      <button @click="saveSchedule" class="px-3 sm:px-4 py-2 rounded-lg bg-primary text-white text-xs sm:text-sm font-medium hover:bg-primary-hover transition-colors shrink-0">{{ t('save') }}</button>
     </div>
-    <p class="text-xs text-[var(--color-text-muted)] mb-5">{{ t('notification_schedule_info') }}</p>
+    <p class="text-xs text-text-muted mb-5">{{ t('notification_schedule_info') }}</p>
 
     <!-- Notification templates -->
-    <div class="pt-4 border-t border-[var(--color-border)] mb-4">
-      <h3 class="text-sm font-semibold text-[var(--color-text-primary)] mb-2">{{ t('notification_templates') }}</h3>
-      <p class="text-xs text-[var(--color-text-muted)] mb-3">{{ t('notification_templates_info') }}</p>
+    <div class="pt-4 border-t border-border mb-4">
+      <h3 class="text-sm font-semibold text-text-primary mb-2">{{ t('notification_templates') }}</h3>
+      <p class="text-xs text-text-muted mb-3">{{ t('notification_templates_info') }}</p>
       <div class="space-y-3">
         <AppInput v-model="notifTitle" :label="t('notification_title_template')" size="sm" />
         <AppInput v-model="notifBodyToday" :label="t('notification_body_due_today')" size="sm" />
@@ -200,11 +200,11 @@ loadAutostartStatus();
         <AppInput v-model="notifOverdueTitle" :label="t('notification_overdue_title')" size="sm" />
         <AppInput v-model="notifOverdueBody" :label="t('notification_overdue_body')" size="sm" />
         <div class="flex gap-2">
-          <button @click="saveNotifTemplates" class="px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors">{{ t('save') }}</button>
+          <button @click="saveNotifTemplates" class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors">{{ t('save') }}</button>
           <button
             @click="handleTestNotification"
             :disabled="testingSending"
-            class="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors disabled:opacity-50"
+            class="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-sm font-medium text-text-secondary hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
           >
             <Bell :size="14" />
             {{ t('test_notification') }}
@@ -214,7 +214,7 @@ loadAutostartStatus();
     </div>
 
     <!-- Autostart -->
-    <div class="pt-4 border-t border-[var(--color-border)]">
+    <div class="pt-4 border-t border-border">
       <AppToggle :modelValue="autostartEnabled" @update:modelValue="toggleAutostart" :label="t('autostart')" :description="t('autostart_info')" />
     </div>
   </section>

@@ -78,25 +78,25 @@ function closeLangModal() {
 </script>
 
 <template>
-  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-4 sm:p-5">
-    <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('appearance') }}</h2>
+  <section class="bg-surface rounded-xl border border-border p-4 sm:p-5">
+    <h2 class="text-base sm:text-lg font-semibold text-text-primary mb-3 sm:mb-4">{{ t('appearance') }}</h2>
 
-    <h3 class="text-xs sm:text-sm font-medium text-[var(--color-text-secondary)] mb-2">{{ t('theme') }}</h3>
+    <h3 class="text-xs sm:text-sm font-medium text-text-secondary mb-2">{{ t('theme') }}</h3>
     <div class="flex flex-wrap gap-2 mb-4 sm:mb-5">
       <button v-for="opt in ([{ val: 0 as const, icon: Sun, label: t('light_theme') }, { val: 1 as const, icon: Moon, label: t('dark_theme') }, { val: 2 as const, icon: Monitor, label: t('automatic') }])"
         :key="opt.val" @click="setDarkTheme(opt.val)"
         class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border text-xs sm:text-sm font-medium"
-        :class="settingsStore.settings.darkTheme === opt.val ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]' : 'border-[var(--color-border)] text-[var(--color-text-secondary)]'"
+        :class="settingsStore.settings.darkTheme === opt.val ? 'border-primary bg-primary-light text-primary' : 'border-border text-text-secondary'"
       >
         <component :is="opt.icon" :size="14" /> {{ opt.label }}
       </button>
     </div>
 
-    <h3 class="text-sm font-medium text-[var(--color-text-secondary)] mb-2">{{ t('colors') }}</h3>
+    <h3 class="text-sm font-medium text-text-secondary mb-2">{{ t('colors') }}</h3>
     <div class="flex flex-wrap gap-2 mb-5">
       <button v-for="theme in colorThemes" :key="theme.id" @click="setColorTheme(theme.id)"
         class="w-8 h-8 rounded-full border-2 flex items-center justify-center transition-transform hover:scale-110"
-        :class="[settingsStore.settings.colorTheme === theme.id ? 'border-[var(--color-text-primary)] scale-110' : 'border-transparent', theme.bg]"
+        :class="[settingsStore.settings.colorTheme === theme.id ? 'border-text-primary scale-110' : 'border-transparent', theme.bg]"
         :title="theme.id"
       >
         <Check v-if="settingsStore.settings.colorTheme === theme.id" :size="14" class="text-white" />
@@ -107,7 +107,7 @@ function closeLangModal() {
       <AppSelect :modelValue="settingsStore.settings.language" @update:modelValue="(v: string | number) => requestLangChange(String(v))" :options="languageSelectOptions" :label="t('language')" />
     </div>
 
-    <h3 class="text-sm font-medium text-[var(--color-text-secondary)] mb-2">{{ t('display_settings') }}</h3>
+    <h3 class="text-sm font-medium text-text-secondary mb-2">{{ t('display_settings') }}</h3>
     <div class="space-y-3">
       <AppToggle :modelValue="settingsStore.settings.monthlyPrice" @update:modelValue="toggleSetting('monthlyPrice')" :label="t('calculate_monthly_price')" />
       <AppToggle :modelValue="settingsStore.settings.convertCurrency" @update:modelValue="toggleSetting('convertCurrency')" :label="t('convert_prices')" />
@@ -130,35 +130,35 @@ function closeLangModal() {
     >
       <div v-if="showLangModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
         <div class="absolute inset-0 bg-black/50" @click="closeLangModal" />
-        <div class="relative bg-[var(--color-surface)] w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-md p-4 sm:p-6">
+        <div class="relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-md p-4 sm:p-6">
           <div class="flex items-center gap-3 mb-3">
             <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
               <Languages :size="20" class="text-blue-500" />
             </div>
             <div>
-              <h3 class="text-base font-semibold text-[var(--color-text-primary)]">{{ t('language_change') }}</h3>
+              <h3 class="text-base font-semibold text-text-primary">{{ t('language_change') }}</h3>
             </div>
           </div>
 
-          <p class="text-sm text-[var(--color-text-secondary)] mb-2">{{ t('language_change_desc') }}</p>
-          <p class="text-xs text-[var(--color-text-muted)] mb-5">{{ t('language_change_hint') }}</p>
+          <p class="text-sm text-text-secondary mb-2">{{ t('language_change_desc') }}</p>
+          <p class="text-xs text-text-muted mb-5">{{ t('language_change_hint') }}</p>
 
           <div class="flex flex-col sm:flex-row gap-2">
             <button
               @click="confirmWithTranslate"
-              class="flex-1 px-4 py-2.5 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors"
+              class="flex-1 px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors"
             >
               {{ t('language_change_translate') }}
             </button>
             <button
               @click="confirmWithoutTranslate"
-              class="flex-1 px-4 py-2.5 rounded-lg border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-primary)] hover:bg-[var(--color-surface-hover)] transition-colors"
+              class="flex-1 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-text-primary hover:bg-surface-hover transition-colors"
             >
               {{ t('language_change_keep') }}
             </button>
             <button
               @click="closeLangModal"
-              class="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-[var(--color-text-muted)] hover:bg-[var(--color-surface-hover)] transition-colors"
+              class="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-text-muted hover:bg-surface-hover transition-colors"
             >
               {{ t('cancel') }}
             </button>

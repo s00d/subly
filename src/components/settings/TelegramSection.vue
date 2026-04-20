@@ -41,24 +41,24 @@ async function testTelegram() {
 </script>
 
 <template>
-  <section class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
-    <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('telegram_notifications') }}</h2>
+  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
+    <h2 class="text-base sm:text-lg font-semibold text-text-primary mb-3 sm:mb-4">{{ t('telegram_notifications') }}</h2>
     <div class="space-y-3">
       <AppToggle v-model="enabled" :label="t('telegram_enabled')" :description="t('telegram_enabled_info')" />
       <AppInput v-model="botToken" :label="t('telegram_bot_token')" :placeholder="t('telegram_bot_token_placeholder')" />
       <AppInput v-model="chatId" :label="t('telegram_chat_id')" :placeholder="t('telegram_chat_id_placeholder')" />
       <div class="flex gap-2">
-        <button @click="saveTelegram" class="px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)] transition-colors">{{ t('save') }}</button>
+        <button @click="saveTelegram" class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors">{{ t('save') }}</button>
         <button
           @click="testTelegram"
           :disabled="isTesting || !botToken || !chatId"
-          class="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-secondary)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors disabled:opacity-50"
+          class="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-sm font-medium text-text-secondary hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
         >
           <Send :size="14" />
           {{ t('telegram_test') }}
         </button>
       </div>
-      <p class="text-xs text-[var(--color-text-muted)]">{{ t('telegram_info') }}</p>
+      <p class="text-xs text-text-muted">{{ t('telegram_info') }}</p>
     </div>
   </section>
 </template>

@@ -187,36 +187,36 @@ const pickerTv = tv({
     overlay: "fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4",
     backdrop: "absolute inset-0 bg-black/50",
     panel: [
-      "relative bg-[var(--color-surface)] w-full max-w-md overflow-hidden",
+      "relative bg-surface w-full max-w-md overflow-hidden",
       "rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[85vh] sm:max-h-none",
     ],
-    header: "flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-[var(--color-border)]",
-    headerTitle: "text-sm sm:text-base font-semibold text-[var(--color-text-primary)]",
-    closeBtn: "p-1 rounded-lg hover:bg-[var(--color-surface-hover)] text-[var(--color-text-muted)]",
+    header: "flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-border",
+    headerTitle: "text-sm sm:text-base font-semibold text-text-primary",
+    closeBtn: "p-1 rounded-lg hover:bg-surface-hover text-text-muted",
     searchRow: "px-4 sm:px-5 pt-3 sm:pt-4 pb-2 flex gap-2",
     searchInput: [
-      "w-full pl-8 pr-3 py-2 rounded-lg border border-[var(--color-border)]",
-      "bg-[var(--color-surface)] text-sm text-[var(--color-text-primary)]",
-      "placeholder-[var(--color-text-muted)]",
-      "focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-shadow",
+      "w-full pl-8 pr-3 py-2 rounded-lg border border-border",
+      "bg-surface text-sm text-text-primary",
+      "placeholder-text-muted",
+      "focus:outline-none focus:ring-2 focus:ring-primary transition-shadow",
     ],
     uploadBtn: [
-      "flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-border)]",
-      "text-xs sm:text-sm text-[var(--color-text-secondary)]",
-      "hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors shrink-0",
+      "flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border",
+      "text-xs sm:text-sm text-text-secondary",
+      "hover:border-primary hover:text-primary transition-colors shrink-0",
     ],
     currentWrap: "px-5 pb-2",
-    currentInner: "flex items-center gap-2 p-2 rounded-lg bg-[var(--color-primary-light)] border border-[var(--color-primary)]/20",
+    currentInner: "flex items-center gap-2 p-2 rounded-lg bg-primary-light border border-primary/20",
     gridWrap: "px-4 sm:px-5 pb-4 max-h-[50vh] overflow-y-auto",
-    sectionLabel: "text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] font-medium mb-2",
+    sectionLabel: "text-[10px] uppercase tracking-wider text-text-muted font-medium mb-2",
     grid: "grid grid-cols-8 gap-1.5",
-    iconBtn: "w-10 h-10 rounded-lg border flex items-center justify-center text-lg hover:bg-[var(--color-surface-hover)] transition-colors",
-    emptyText: "text-center py-8 text-sm text-[var(--color-text-muted)]",
+    iconBtn: "w-10 h-10 rounded-lg border flex items-center justify-center text-lg hover:bg-surface-hover transition-colors",
+    emptyText: "text-center py-8 text-sm text-text-muted",
   },
   variants: {
     selected: {
-      true: { iconBtn: "border-[var(--color-primary)] bg-[var(--color-primary-light)]" },
-      false: { iconBtn: "border-[var(--color-border)]" },
+      true: { iconBtn: "border-primary bg-primary-light" },
+      false: { iconBtn: "border-border" },
     },
   },
 });
@@ -247,7 +247,7 @@ useScrollLock(computed(() => props.show));
 
           <div :class="slots.searchRow()">
             <div class="relative flex-1">
-              <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
+              <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
               <input
                 v-model="search"
                 type="text"
@@ -266,7 +266,7 @@ useScrollLock(computed(() => props.show));
           <div v-if="modelValue" :class="slots.currentWrap()">
             <div :class="slots.currentInner()">
               <IconDisplay :icon="modelValue" :size="24" />
-              <span class="text-xs text-[var(--color-primary)] font-medium">{{ t('current') }}</span>
+              <span class="text-xs text-primary font-medium">{{ t('current') }}</span>
             </div>
           </div>
 

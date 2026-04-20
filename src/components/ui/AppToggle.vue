@@ -17,8 +17,8 @@ const toggleTv = tv({
   slots: {
     root: "flex items-center justify-between gap-3 cursor-pointer select-none",
     content: "flex-1 min-w-0",
-    labelEl: "text-sm text-[var(--color-text-secondary)]",
-    descEl: "text-xs text-[var(--color-text-muted)] mt-0.5",
+    labelEl: "text-sm text-text-secondary",
+    descEl: "text-xs text-text-muted mt-0.5",
     track: "relative w-10 h-[22px] shrink-0 rounded-full transition-colors duration-200",
     thumb: "absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white shadow-sm transition-transform duration-200",
   },
@@ -28,11 +28,11 @@ const toggleTv = tv({
     },
     checked: {
       true: {
-        track: "bg-[var(--color-primary)]",
+        track: "bg-primary",
         thumb: "translate-x-[18px]",
       },
       false: {
-        track: "bg-[var(--color-border)]",
+        track: "bg-border",
       },
     },
   },

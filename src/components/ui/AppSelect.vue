@@ -111,26 +111,26 @@ onUnmounted(() => {
 const selectTv = tv({
   slots: {
     root: "relative w-full",
-    labelEl: "block text-xs font-medium text-[var(--color-text-secondary)] mb-1.5",
+    labelEl: "block text-xs font-medium text-text-secondary mb-1.5",
     trigger: [
       "w-full flex items-center gap-2 rounded-lg border",
-      "bg-[var(--color-surface)] text-left transition-shadow",
+      "bg-surface text-left transition-shadow",
       "disabled:opacity-50 disabled:cursor-not-allowed",
     ],
     triggerText: "flex-1 truncate",
-    chevron: "shrink-0 text-[var(--color-text-muted)] transition-transform",
+    chevron: "shrink-0 text-text-muted transition-transform",
     panel: [
-      "fixed z-[200] bg-[var(--color-surface)] border border-[var(--color-border)]",
+      "fixed z-[200] bg-surface border border-border",
       "rounded-xl shadow-xl overflow-hidden",
     ],
-    searchWrap: "p-2 border-b border-[var(--color-border)]",
+    searchWrap: "p-2 border-b border-border",
     searchInput: [
-      "w-full pl-8 pr-3 py-1.5 rounded-md border border-[var(--color-border)]",
-      "bg-[var(--color-surface-secondary)] text-xs text-[var(--color-text-primary)]",
-      "placeholder-[var(--color-text-muted)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]",
+      "w-full pl-8 pr-3 py-1.5 rounded-md border border-border",
+      "bg-surface-secondary text-xs text-text-primary",
+      "placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-primary",
     ],
     list: "max-h-56 overflow-y-auto py-1",
-    emptyEl: "px-3 py-2 text-xs text-[var(--color-text-muted)] text-center",
+    emptyEl: "px-3 py-2 text-xs text-text-muted text-center",
     optionEl: "w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors disabled:opacity-40",
     errorEl: "mt-1 text-xs text-red-500",
   },
@@ -141,19 +141,19 @@ const selectTv = tv({
     },
     status: {
       error: { trigger: "border-red-500 ring-2 ring-red-500" },
-      open: { trigger: "border-[var(--color-primary)] ring-2 ring-[var(--color-primary)]" },
-      normal: { trigger: "border-[var(--color-border)] hover:border-[var(--color-text-muted)]" },
+      open: { trigger: "border-primary ring-2 ring-primary" },
+      normal: { trigger: "border-border hover:border-text-muted" },
     },
     chevronOpen: {
       true: { chevron: "rotate-180" },
     },
     selected: {
-      true: { triggerText: "text-[var(--color-text-primary)]" },
-      false: { triggerText: "text-[var(--color-text-muted)]" },
+      true: { triggerText: "text-text-primary" },
+      false: { triggerText: "text-text-muted" },
     },
     optionActive: {
-      true: { optionEl: "bg-[var(--color-primary-light)] text-[var(--color-primary)] font-medium" },
-      false: { optionEl: "text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]" },
+      true: { optionEl: "bg-primary-light text-primary font-medium" },
+      false: { optionEl: "text-text-secondary hover:bg-surface-hover" },
     },
   },
   defaultVariants: { size: "md", status: "normal" },
@@ -199,7 +199,7 @@ const slots = computed(() =>
       >
         <div v-if="searchable" :class="slots.searchWrap()">
           <div class="relative">
-            <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
+            <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
             <input
               v-model="search"
               type="text"
@@ -224,7 +224,7 @@ const slots = computed(() =>
               <span v-else>{{ opt.icon }}</span>
             </span>
             <span class="flex-1 truncate text-left">{{ opt.label }}</span>
-            <Check v-if="String(opt.value) === String(modelValue)" :size="14" class="shrink-0 text-[var(--color-primary)]" />
+            <Check v-if="String(opt.value) === String(modelValue)" :size="14" class="shrink-0 text-primary" />
           </button>
         </div>
       </div>

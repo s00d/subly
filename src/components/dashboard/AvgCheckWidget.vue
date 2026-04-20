@@ -30,23 +30,23 @@ watch(
 </script>
 
 <template>
-  <div v-if="stats && stats.count > 0" class="bg-[var(--color-surface)] rounded-xl border border-[var(--color-border)] p-3 sm:p-5">
+  <div v-if="stats && stats.count > 0" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
     <div class="flex items-center gap-2 mb-3">
-      <Calculator :size="16" class="text-[var(--color-primary)]" />
-      <h2 class="text-sm sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('widget_avg_check') }}</h2>
+      <Calculator :size="16" class="text-primary" />
+      <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_avg_check') }}</h2>
     </div>
     <div class="grid grid-cols-3 gap-3 text-center">
       <div>
-        <p class="text-[10px] sm:text-xs text-[var(--color-text-muted)]">{{ t('avg_amount') }}</p>
-        <p class="text-lg sm:text-xl font-bold text-[var(--color-primary)] tabular-nums">{{ fmt(stats.avgAmount) }}</p>
+        <p class="text-[10px] sm:text-xs text-text-muted">{{ t('avg_amount') }}</p>
+        <p class="text-lg sm:text-xl font-bold text-primary tabular-nums">{{ fmt(stats.avgAmount) }}</p>
       </div>
       <div>
-        <p class="text-[10px] sm:text-xs text-[var(--color-text-muted)]">{{ t('total') }}</p>
-        <p class="text-lg sm:text-xl font-bold text-[var(--color-text-primary)] tabular-nums">{{ fmt(stats.total) }}</p>
+        <p class="text-[10px] sm:text-xs text-text-muted">{{ t('total') }}</p>
+        <p class="text-lg sm:text-xl font-bold text-text-primary tabular-nums">{{ fmt(stats.total) }}</p>
       </div>
       <div>
-        <p class="text-[10px] sm:text-xs text-[var(--color-text-muted)]">{{ t('count') }}</p>
-        <p class="text-lg sm:text-xl font-bold text-[var(--color-text-primary)] tabular-nums">{{ stats.count }}</p>
+        <p class="text-[10px] sm:text-xs text-text-muted">{{ t('count') }}</p>
+        <p class="text-lg sm:text-xl font-bold text-text-primary tabular-nums">{{ stats.count }}</p>
       </div>
     </div>
   </div>

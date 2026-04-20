@@ -24,28 +24,28 @@ const { t } = useI18n();
       <Tooltip v-if="!isCurrentMonth" :text="t('reset')">
         <button
           @click="emit('resetMonth')"
-          class="p-1.5 sm:p-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
+          class="p-1.5 sm:p-2 rounded-lg bg-surface border border-border hover:bg-surface-hover"
         >
-          <CalendarDays :size="16" class="text-[var(--color-text-secondary)]" />
+          <CalendarDays :size="16" class="text-text-secondary" />
         </button>
       </Tooltip>
       <Tooltip v-if="!isCurrentMonth" :text="t('previous_month')">
         <button
           @click="emit('prevMonth')"
-          class="p-1.5 sm:p-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
+          class="p-1.5 sm:p-2 rounded-lg bg-surface border border-border hover:bg-surface-hover"
         >
-          <ChevronLeft :size="16" class="text-[var(--color-text-secondary)]" />
+          <ChevronLeft :size="16" class="text-text-secondary" />
         </button>
       </Tooltip>
-      <h2 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">
+      <h2 class="text-base sm:text-lg font-semibold text-text-primary">
         {{ monthName }}
       </h2>
       <Tooltip :text="t('next_month')">
         <button
           @click="emit('nextMonth')"
-          class="p-1.5 sm:p-2 rounded-lg bg-[var(--color-surface)] border border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
+          class="p-1.5 sm:p-2 rounded-lg bg-surface border border-border hover:bg-surface-hover"
         >
-          <ChevronRight :size="16" class="text-[var(--color-text-secondary)]" />
+          <ChevronRight :size="16" class="text-text-secondary" />
         </button>
       </Tooltip>
     </div>

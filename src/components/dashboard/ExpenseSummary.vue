@@ -30,43 +30,43 @@ function getCategoryName(id: string) {
 </script>
 
 <template>
-  <div class="rounded-xl bg-[var(--color-surface)] border border-[var(--color-border)] p-3 sm:p-5">
+  <div class="rounded-xl bg-surface border border-border p-3 sm:p-5">
     <div class="flex items-center justify-between mb-4">
       <div class="flex items-center gap-2">
-        <Wallet :size="18" class="text-[var(--color-primary)]" />
-        <h3 class="font-semibold text-[var(--color-text-primary)]">{{ t('widget_expenses') }}</h3>
+        <Wallet :size="18" class="text-primary" />
+        <h3 class="font-semibold text-text-primary">{{ t('widget_expenses') }}</h3>
       </div>
       <button @click="router.push('/expenses')"
-        class="flex items-center gap-1 text-xs text-[var(--color-primary)] hover:underline">
+        class="flex items-center gap-1 text-xs text-primary hover:underline">
         {{ t('view_all') }} <ArrowRight :size="12" />
       </button>
     </div>
 
     <div class="grid grid-cols-2 gap-3 mb-4">
-      <div class="p-3 rounded-lg bg-[var(--color-surface-hover)]">
-        <p class="text-xs text-[var(--color-text-muted)]">{{ t('this_month') }}</p>
-        <p class="text-lg font-bold text-[var(--color-text-primary)]">{{ fmtCurrency(agg.monthTotal, mainCode()) }}</p>
+      <div class="p-3 rounded-lg bg-surface-hover">
+        <p class="text-xs text-text-muted">{{ t('this_month') }}</p>
+        <p class="text-lg font-bold text-text-primary">{{ fmtCurrency(agg.monthTotal, mainCode()) }}</p>
       </div>
-      <div class="p-3 rounded-lg bg-[var(--color-surface-hover)]">
-        <p class="text-xs text-[var(--color-text-muted)]">{{ t('this_year') }}</p>
-        <p class="text-lg font-bold text-[var(--color-text-primary)]">{{ fmtCurrency(agg.yearTotal, mainCode()) }}</p>
+      <div class="p-3 rounded-lg bg-surface-hover">
+        <p class="text-xs text-text-muted">{{ t('this_year') }}</p>
+        <p class="text-lg font-bold text-text-primary">{{ fmtCurrency(agg.yearTotal, mainCode()) }}</p>
       </div>
     </div>
 
     <div v-if="agg.recentExpenses.length > 0" class="space-y-2">
-      <p class="text-xs font-medium text-[var(--color-text-muted)] uppercase tracking-wide">{{ t('recent_expenses') }}</p>
+      <p class="text-xs font-medium text-text-muted uppercase tracking-wide">{{ t('recent_expenses') }}</p>
       <div v-for="exp in agg.recentExpenses" :key="exp.id"
         class="flex items-center justify-between py-1.5 text-sm">
         <div class="min-w-0">
-          <span class="text-[var(--color-text-primary)] truncate block">{{ exp.name }}</span>
-          <span class="text-xs text-[var(--color-text-muted)]">{{ fmtDateShort(exp.date) }} · {{ getCategoryName(exp.categoryId) }}</span>
+          <span class="text-text-primary truncate block">{{ exp.name }}</span>
+          <span class="text-xs text-text-muted">{{ fmtDateShort(exp.date) }} · {{ getCategoryName(exp.categoryId) }}</span>
         </div>
-        <span class="shrink-0 font-medium text-[var(--color-text-primary)] ml-3">
+        <span class="shrink-0 font-medium text-text-primary ml-3">
           {{ fmtCurrency(exp.amount, catalogStore.currencies.find(c => c.id === exp.currencyId)?.code || 'USD') }}
         </span>
       </div>
     </div>
-    <div v-else class="text-center text-sm text-[var(--color-text-muted)] py-4">
+    <div v-else class="text-center text-sm text-text-muted py-4">
       {{ t('no_expenses_yet') }}
     </div>
   </div>
