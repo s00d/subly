@@ -4,9 +4,11 @@ import AppSidebar from "./AppSidebar.vue";
 import AppHeader from "./AppHeader.vue";
 import MobileTabBar from "./MobileTabBar.vue";
 import { tv } from "@/lib/tv";
+import { useScrollLock } from "@/composables/useScrollLock";
 
 const sidebarOpen = ref(false);
 provide("sidebarOpen", sidebarOpen);
+useScrollLock(sidebarOpen);
 
 const layoutTv = tv({
   slots: {

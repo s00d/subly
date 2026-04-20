@@ -28,13 +28,17 @@ const pos = ref({ top: 0, left: 0 });
 function updatePosition() {
   if (!props.anchorEl) return;
   const rect = props.anchorEl.getBoundingClientRect();
-  const menuWidth = 180;
-  const menuHeight = 300;
+  const menuRect = menuRef.value?.getBoundingClientRect();
+  const menuWidth = menuRect?.width || 180;
+  const menuHeight = menuRect?.height || 300;
 
   let top = rect.bottom + 4;
   let left = rect.right - menuWidth;
 
   if (left < 8) left = 8;
+  if (left + menuWidth > window.innerWidth - 8) {
+    left = Math.max(8, window.innerWidth - menuWidth - 8);
+  }
   if (top + menuHeight > window.innerHeight) {
     top = rect.top - menuHeight - 4;
     if (top < 8) top = 8;
@@ -70,11 +74,13 @@ watch(
 onMounted(() => {
   document.addEventListener("mousedown", onClickOutside);
   window.addEventListener("scroll", updatePosition, true);
+  window.addEventListener("resize", updatePosition);
 });
 
 onUnmounted(() => {
   document.removeEventListener("mousedown", onClickOutside);
   window.removeEventListener("scroll", updatePosition, true);
+  window.removeEventListener("resize", updatePosition);
 });
 
 const dropdownTv = tv({

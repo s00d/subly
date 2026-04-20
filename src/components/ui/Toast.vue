@@ -39,7 +39,7 @@ async function copyMessage() {
 
 const toastTv = tv({
   base: [
-    "fixed z-[100] flex items-center gap-2.5 px-4 py-3 rounded-lg border shadow-lg",
+    "fixed z-[250] flex items-center gap-2.5 px-4 py-3 rounded-lg border shadow-lg",
     "bottom-20 left-3 right-3 sm:bottom-6 sm:left-auto sm:right-6 sm:max-w-md",
   ],
   variants: {

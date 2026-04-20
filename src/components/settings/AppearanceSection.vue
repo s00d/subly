@@ -7,6 +7,7 @@ import AppSelect from "@/components/ui/AppSelect.vue";
 import AppToggle from "@/components/ui/AppToggle.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import { Sun, Moon, Monitor, Check, AlertTriangle, Languages } from "lucide-vue-next";
+import { useScrollLock } from "@/composables/useScrollLock";
 
 const settingsStore = useSettingsStore();
 const { t } = useI18n();
@@ -31,18 +32,10 @@ const colorThemes = [
 
 function setDarkTheme(val: 0 | 1 | 2) {
   settingsStore.updateSettings({ darkTheme: val });
-  if (val === 1) document.documentElement.classList.add("dark");
-  else if (val === 0) document.documentElement.classList.remove("dark");
-  else {
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    document.documentElement.classList.toggle("dark", prefersDark);
-  }
 }
 
 function setColorTheme(theme: string) {
   settingsStore.updateSettings({ colorTheme: theme });
-  document.body.className = document.body.className.replace(/theme-\w+/g, "");
-  if (theme !== "blue") document.body.classList.add(`theme-${theme}`);
 }
 
 function toggleSetting(key: "monthlyPrice" | "convertCurrency" | "showOriginalPrice" | "showSubscriptionProgress" | "disabledToBottom" | "hideDisabled") {
@@ -56,6 +49,7 @@ const languageSelectOptions = computed<SelectOption[]>(() =>
 
 const pendingLang = ref<string | null>(null);
 const showLangModal = ref(false);
+useScrollLock(showLangModal);
 
 function requestLangChange(lang: string) {
   if (lang === settingsStore.settings.language) return;

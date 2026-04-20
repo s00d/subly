@@ -5,6 +5,7 @@ import { logoAssets, type LogoAsset } from "@/services/logoAssets";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import { X, Search, Upload } from "lucide-vue-next";
 import { tv } from "@/lib/tv";
+import { useScrollLock } from "@/composables/useScrollLock";
 
 const props = defineProps<{
   show: boolean;
@@ -221,6 +222,7 @@ const pickerTv = tv({
 });
 
 const slots = pickerTv();
+useScrollLock(computed(() => props.show));
 </script>
 
 <template>

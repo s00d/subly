@@ -23,6 +23,15 @@ const emit = defineEmits<{
 
 function onInput(e: Event) {
   const target = e.target as HTMLInputElement;
+  if (props.type === "number") {
+    if (target.value === "") {
+      emit("update:modelValue", "");
+      return;
+    }
+    const parsed = Number(target.value);
+    emit("update:modelValue", Number.isFinite(parsed) ? parsed : "");
+    return;
+  }
   emit("update:modelValue", target.value);
 }
 

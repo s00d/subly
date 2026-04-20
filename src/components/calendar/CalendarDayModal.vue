@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { X, Wallet } from "lucide-vue-next";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useI18n } from "vue-i18n";
+import { useScrollLock } from "@/composables/useScrollLock";
 
-defineProps<{
+const props = defineProps<{
   show: boolean;
   title: string;
   subs: { id: string; name: string; price: number; currencyId: string }[];
@@ -18,6 +20,7 @@ const emit = defineEmits<{
 
 const { fmt } = useCurrencyFormat();
 const { t } = useI18n();
+useScrollLock(computed(() => props.show));
 </script>
 
 <template>

@@ -8,6 +8,7 @@ const props = defineProps<{
 }>();
 
 const triggerRef = ref<HTMLElement | null>(null);
+const bubbleRef = ref<HTMLElement | null>(null);
 const visible = ref(false);
 const coords = ref({ top: 0, left: 0 });
 
@@ -28,6 +29,9 @@ function clearAllTimers() {
 function computeCoords() {
   if (!triggerRef.value) return;
   const rect = triggerRef.value.getBoundingClientRect();
+  const bubbleRect = bubbleRef.value?.getBoundingClientRect();
+  const bubbleWidth = bubbleRect?.width ?? 160;
+  const bubbleHeight = bubbleRect?.height ?? 36;
   const pos = props.position || "top";
 
   let top = 0;
@@ -50,6 +54,13 @@ function computeCoords() {
       top = rect.top + rect.height / 2;
       left = rect.right + GAP;
       break;
+  }
+
+  const margin = 8;
+  if (pos === "top" || pos === "bottom") {
+    left = Math.max(margin + bubbleWidth / 2, Math.min(window.innerWidth - margin - bubbleWidth / 2, left));
+  } else {
+    top = Math.max(margin + bubbleHeight / 2, Math.min(window.innerHeight - margin - bubbleHeight / 2, top));
   }
 
   coords.value = { top, left };
@@ -94,19 +105,21 @@ function onGlobalDismiss() {
 onMounted(() => {
   window.addEventListener("scroll", onGlobalDismiss, true);
   window.addEventListener("pointerdown", onGlobalDismiss, true);
+  window.addEventListener("resize", onGlobalDismiss, true);
 });
 
 onBeforeUnmount(() => {
   clearAllTimers();
   window.removeEventListener("scroll", onGlobalDismiss, true);
   window.removeEventListener("pointerdown", onGlobalDismiss, true);
+  window.removeEventListener("resize", onGlobalDismiss, true);
 });
 
 const tooltipTv = tv({
   slots: {
     trigger: "inline-flex",
     bubble: [
-      "tooltip-bubble fixed z-[9999] pointer-events-none whitespace-nowrap",
+      "tooltip-bubble fixed z-[220] pointer-events-none whitespace-nowrap",
       "px-2.5 py-1.5 rounded-lg text-[11px] font-medium shadow-lg",
     ],
     arrow: "tooltip-arrow absolute w-2 h-2 rotate-45",
@@ -163,6 +176,7 @@ const slots = tooltipTv({ position: props.position || "top" });
     >
       <div
         v-if="visible"
+        ref="bubbleRef"
         :class="slots.bubble()"
         :style="{ top: coords.top + 'px', left: coords.left + 'px' }"
       >

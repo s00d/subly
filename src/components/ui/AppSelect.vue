@@ -44,10 +44,21 @@ const filtered = computed(() => {
 function updatePosition() {
   if (!triggerRef.value) return;
   const rect = triggerRef.value.getBoundingClientRect();
+  const panelRect = dropdownRef.value?.getBoundingClientRect();
+  const panelHeight = panelRect?.height || 280;
+  let top = rect.bottom + 4;
+  if (top + panelHeight > window.innerHeight - 8) {
+    top = Math.max(8, rect.top - panelHeight - 4);
+  }
+  let left = rect.left;
+  const width = rect.width;
+  if (left + width > window.innerWidth - 8) {
+    left = Math.max(8, window.innerWidth - width - 8);
+  }
   pos.value = {
-    top: rect.bottom + 4,
-    left: rect.left,
-    width: rect.width,
+    top,
+    left,
+    width,
   };
 }
 
@@ -81,13 +92,20 @@ function onScroll() {
   updatePosition();
 }
 
+function onResize() {
+  if (!isOpen.value) return;
+  updatePosition();
+}
+
 onMounted(() => {
   document.addEventListener("mousedown", onClickOutside);
   window.addEventListener("scroll", onScroll, true);
+  window.addEventListener("resize", onResize);
 });
 onUnmounted(() => {
   document.removeEventListener("mousedown", onClickOutside);
   window.removeEventListener("scroll", onScroll, true);
+  window.removeEventListener("resize", onResize);
 });
 
 const selectTv = tv({

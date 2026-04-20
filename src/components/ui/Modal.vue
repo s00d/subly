@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { X } from "lucide-vue-next";
 import { tv } from "@/lib/tv";
+import { useScrollLock } from "@/composables/useScrollLock";
 
-defineProps<{
+const props = defineProps<{
   title: string;
   show: boolean;
   maxWidth?: string;
@@ -29,6 +31,8 @@ const modalTv = tv({
 });
 
 const slots = modalTv();
+
+useScrollLock(computed(() => props.show));
 </script>
 
 <template>
