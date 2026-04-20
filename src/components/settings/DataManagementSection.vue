@@ -107,13 +107,19 @@ async function handleImportCsv() {
       defaultPaymentMethodId: settingsStore.settings.defaultPaymentMethodId || catalogStore.paymentMethods[0]?.id || "",
       defaultPayerUserId: catalogStore.household[0]?.id || "",
     });
-    if (subs && subs.length > 0) {
+    if (subs === null) {
+      toast(t("import_error"), "error");
+      return;
+    }
+    if (subs.length === 0) {
+      toast("CSV file is empty");
+      return;
+    }
+    if (subs.length > 0) {
       for (const sub of subs) {
-        subsStore.addSubscription(sub);
+        await subsStore.addSubscription(sub);
       }
       toast(t("csv_import_success").replace("{count}", String(subs.length)));
-    } else {
-      toast(t("import_error"), "error");
     }
   } catch (e) {
     console.error(e);

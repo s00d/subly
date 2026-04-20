@@ -9,11 +9,12 @@ import { checkAndNotify } from "@/services/notifications";
 import { shouldUpdateRates, updateCurrencyRates } from "@/services/rates";
 import type { RatesProviderType } from "@/services/rates";
 import { setupPushNotifications, startPushNotificationListener } from "@/services/pushNotifications";
-import { initSync, setSyncCallbacks, syncStatus, pullRemote, dismissPendingUpdate } from "@/services/sync";
+import { initSync, setSyncCallbacks, syncStatus, pullRemote, dismissPendingUpdate, flushSyncBeforeExit } from "@/services/sync";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { useAlerts } from "@/composables/useAlerts";
 import { setupTray, setTraySubscriptionClickHandler } from "@/services/tray";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import InAppAlerts from "@/components/ui/InAppAlerts.vue";
 
@@ -52,6 +53,26 @@ async function initTray() {
 }
 
 let notificationInterval: ReturnType<typeof setInterval> | null = null;
+let unlistenCloseRequested: (() => void) | null = null;
+let closingWithSync = false;
+let mediaQueryList: MediaQueryList | null = null;
+let mediaQueryListener: ((e: MediaQueryListEvent) => void) | null = null;
+
+function logUnhandledRejection(event: PromiseRejectionEvent) {
+  console.error("[Global] Unhandled promise rejection", {
+    reason: event.reason,
+  });
+}
+
+function logWindowError(event: ErrorEvent) {
+  console.error("[Global] Unhandled runtime error", {
+    message: event.message,
+    source: event.filename,
+    line: event.lineno,
+    column: event.colno,
+    error: event.error,
+  });
+}
 
 async function runNotificationCheck() {
   try {
@@ -152,11 +173,32 @@ onMounted(async () => {
   }
 
   document.addEventListener("keydown", handleKeyDown);
+  window.addEventListener("unhandledrejection", logUnhandledRejection);
+  window.addEventListener("error", logWindowError);
+
+  try {
+    const appWindow = getCurrentWindow();
+    unlistenCloseRequested = await appWindow.onCloseRequested(async (event) => {
+      if (closingWithSync || !syncStatus.enabled) return;
+      event.preventDefault();
+      closingWithSync = true;
+      await flushSyncBeforeExit();
+      await appWindow.close();
+    });
+  } catch (e) {
+    console.warn("Close sync hook skipped:", e);
+  }
 });
 
 onUnmounted(() => {
   document.removeEventListener("keydown", handleKeyDown);
+  window.removeEventListener("unhandledrejection", logUnhandledRejection);
+  window.removeEventListener("error", logWindowError);
   if (notificationInterval) clearInterval(notificationInterval);
+  if (unlistenCloseRequested) unlistenCloseRequested();
+  if (mediaQueryList && mediaQueryListener) {
+    mediaQueryList.removeEventListener("change", mediaQueryListener);
+  }
 });
 
 watch(
@@ -201,9 +243,11 @@ watch(() => settingsStore.settings.darkTheme, applyTheme);
 watch(() => settingsStore.settings.colorTheme, applyColorTheme);
 
 if (typeof window !== "undefined") {
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+  mediaQueryList = window.matchMedia("(prefers-color-scheme: dark)");
+  mediaQueryListener = () => {
     if (settingsStore.settings.darkTheme === 2) applyTheme();
-  });
+  };
+  mediaQueryList.addEventListener("change", mediaQueryListener);
 }
 </script>
 

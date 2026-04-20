@@ -11,6 +11,7 @@ import { dbLoadSubscriptionsFiltered, type SubscriptionFilter } from "@/services
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useToast } from "@/composables/useToast";
+import { useScrollLock } from "@/composables/useScrollLock";
 import type { Subscription } from "@/schemas/appData";
 import SubscriptionForm from "@/components/subscriptions/SubscriptionForm.vue";
 import SubscriptionDetail from "@/components/subscriptions/SubscriptionDetail.vue";
@@ -146,6 +147,14 @@ const selectionMode = ref(false);
 const selectedIds = ref<Set<string>>(new Set());
 const showBatchCategoryModal = ref(false);
 const batchCategoryId = ref("");
+const batchDeleteConfirmIds = ref<string[]>([]);
+const deleteConfirmId = ref<string | null>(null);
+const hasBlockingOverlay = computed(() =>
+  Boolean(deleteConfirmId.value)
+  || batchDeleteConfirmIds.value.length > 0
+  || showBatchCategoryModal.value,
+);
+useScrollLock(hasBlockingOverlay);
 
 function toggleSelectionMode() {
   selectionMode.value = !selectionMode.value;
@@ -212,14 +221,12 @@ async function confirmBatchCategory() {
   fetchFilteredSubs();
 }
 
-const batchDeleteConfirmIds = ref<string[]>([]);
-
 // Native context menu
 async function showContextMenu(sub: Subscription, event: MouseEvent) {
   if (selectionMode.value) return;
 
   const items: (MenuItemOptions | PredefinedMenuItemOptions)[] = [
-    { id: "favorite", text: sub.favorite ? t("remove_from_favorites") : t("add_to_favorites"), action: async () => { await subsStore.toggleFavorite(sub.id); fetchFilteredSubs(); } },
+    { id: "favorite", text: sub.favorite ? t("remove_from_favorites") : t("add_to_favorites"), action: async () => { await subsStore.toggleFavorite(sub.id); await fetchFilteredSubs(); } },
   ];
   if (!sub.inactive) {
     items.push({ id: "record_payment", text: t("record_payment"), action: () => handleRecordPayment(sub.id) });
@@ -270,6 +277,11 @@ async function fetchFilteredSubs() {
   subsLoading.value = true;
   try {
     filteredSubscriptions.value = await dbLoadSubscriptionsFiltered(buildSubFilter());
+  } catch (e) {
+    console.error("[SubscriptionsPage] fetchFilteredSubs failed", {
+      filter: buildSubFilter(),
+      error: e,
+    });
   } finally {
     subsLoading.value = false;
   }
@@ -321,9 +333,6 @@ function openEdit(sub: Subscription) {
   showForm.value = true;
 }
 
-// Delete confirmation
-const deleteConfirmId = ref<string | null>(null);
-
 function requestDelete(id: string) {
   showDetail.value = false;
   detailSubId.value = null;
@@ -371,9 +380,9 @@ async function handleCopyName(sub: Subscription) {
   catch (e) { console.error("Failed to copy:", e); }
 }
 
-function onSaved() {
+async function onSaved() {
   toast(editingSub.value ? t("subscription_updated") : t("subscription_added"));
-  fetchFilteredSubs();
+  await fetchFilteredSubs();
 }
 
 // Filter options
@@ -417,31 +426,31 @@ async function onDetailToggleFavorite(id: string) {
     <!-- Search row (always visible) -->
     <div class="flex items-center gap-2 mb-2">
       <div class="relative flex-1 min-w-0">
-        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)]" />
+        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
         <input
           v-model="searchQuery"
           type="text"
           :placeholder="t('search')"
-          class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] text-xs text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] hover:border-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] transition-shadow"
+          class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted hover:border-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
         />
       </div>
       <!-- View mode + batch toggle always visible -->
-      <div class="flex items-center border border-[var(--color-border)] rounded-lg overflow-hidden shrink-0">
+      <div class="flex items-center border border-border rounded-lg overflow-hidden shrink-0">
         <Tooltip :text="t('view_compact')">
-          <button @click="setViewMode('compact')" class="p-1.5 transition-colors" :class="viewMode === 'compact' ? 'bg-[var(--color-primary-light)] text-[var(--color-primary)]' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'"><Rows3 :size="15" /></button>
+          <button @click="setViewMode('compact')" class="p-1.5 transition-colors" :class="viewMode === 'compact' ? 'bg-primary-light text-primary' : 'text-text-muted hover:text-text-primary'"><Rows3 :size="15" /></button>
         </Tooltip>
         <Tooltip :text="t('view_default')">
-          <button @click="setViewMode('default')" class="p-1.5 transition-colors border-x border-[var(--color-border)]" :class="viewMode === 'default' ? 'bg-[var(--color-primary-light)] text-[var(--color-primary)]' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'"><LayoutList :size="15" /></button>
+          <button @click="setViewMode('default')" class="p-1.5 transition-colors border-x border-border" :class="viewMode === 'default' ? 'bg-primary-light text-primary' : 'text-text-muted hover:text-text-primary'"><LayoutList :size="15" /></button>
         </Tooltip>
         <Tooltip :text="t('view_expanded')">
-          <button @click="setViewMode('expanded')" class="p-1.5 transition-colors" :class="viewMode === 'expanded' ? 'bg-[var(--color-primary-light)] text-[var(--color-primary)]' : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'"><LayoutGrid :size="15" /></button>
+          <button @click="setViewMode('expanded')" class="p-1.5 transition-colors" :class="viewMode === 'expanded' ? 'bg-primary-light text-primary' : 'text-text-muted hover:text-text-primary'"><LayoutGrid :size="15" /></button>
         </Tooltip>
       </div>
       <Tooltip :text="t('select')">
         <button
           @click="toggleSelectionMode"
           class="p-1.5 rounded-lg border transition-colors shrink-0"
-          :class="selectionMode ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]' : 'border-[var(--color-border)] text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'"
+          :class="selectionMode ? 'border-primary bg-primary-light text-primary' : 'border-border text-text-muted hover:text-text-primary'"
         >
           <CheckSquare :size="16" />
         </button>
@@ -479,10 +488,10 @@ async function onDetailToggleFavorite(id: string) {
       leave-from-class="opacity-100 translate-y-0"
       leave-to-class="opacity-0 -translate-y-2"
     >
-      <div v-if="selectionMode" class="flex items-center gap-1.5 sm:gap-2 mb-3 px-2 sm:px-3 py-2 rounded-lg bg-[var(--color-primary-light)] border border-[var(--color-primary)]/20 overflow-x-auto">
-        <span class="text-xs font-medium text-[var(--color-primary)]">{{ selectedIds.size }} {{ t('selected_count') }}</span>
-        <button @click="selectAll" class="text-[10px] font-medium text-[var(--color-primary)] hover:underline">{{ t('select_all') }}</button>
-        <button @click="deselectAll" class="text-[10px] font-medium text-[var(--color-text-muted)] hover:underline">{{ t('deselect_all') }}</button>
+      <div v-if="selectionMode" class="flex items-center gap-1.5 sm:gap-2 mb-3 px-2 sm:px-3 py-2 rounded-lg bg-primary-light border border-primary/20 overflow-x-auto">
+        <span class="text-xs font-medium text-primary">{{ selectedIds.size }} {{ t('selected_count') }}</span>
+        <button @click="selectAll" class="text-[10px] font-medium text-primary hover:underline">{{ t('select_all') }}</button>
+        <button @click="deselectAll" class="text-[10px] font-medium text-text-muted hover:underline">{{ t('deselect_all') }}</button>
         <div class="flex-1" />
         <button
           @click="batchActivate"
@@ -509,13 +518,13 @@ async function onDetailToggleFavorite(id: string) {
 
     <!-- Empty state -->
     <div v-if="filteredSubscriptions.length === 0" class="text-center py-16">
-      <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-[var(--color-surface-hover)] flex items-center justify-center">
-        <CreditCard :size="36" class="text-[var(--color-text-muted)]" />
+      <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-surface-hover flex items-center justify-center">
+        <CreditCard :size="36" class="text-text-muted" />
       </div>
-      <p class="text-[var(--color-text-muted)] mb-4">{{ t('no_subscriptions_yet') }}</p>
+      <p class="text-text-muted mb-4">{{ t('no_subscriptions_yet') }}</p>
       <button
         @click="openAdd"
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)]"
+        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover"
       >
         <Plus :size="18" />
         {{ t('add_first_subscription') }}
@@ -528,10 +537,10 @@ async function onDetailToggleFavorite(id: string) {
         <!-- Group header -->
         <div v-if="groupBy !== 'none' && group.label" class="flex items-center gap-2 mb-2 mt-4 first:mt-0">
           <IconDisplay v-if="groupBy === 'category' && getCategoryIcon(group.key)" :icon="getCategoryIcon(group.key)" :size="16" />
-          <FolderOpen v-else :size="14" class="text-[var(--color-primary)]" />
-          <span class="text-xs font-semibold text-[var(--color-text-primary)] uppercase tracking-wide">{{ group.label }}</span>
-          <span class="text-[10px] text-[var(--color-text-muted)]">({{ group.subs.length }})</span>
-          <div class="flex-1 h-px bg-[var(--color-border)]" />
+          <FolderOpen v-else :size="14" class="text-primary" />
+          <span class="text-xs font-semibold text-text-primary uppercase tracking-wide">{{ group.label }}</span>
+          <span class="text-[10px] text-text-muted">({{ group.subs.length }})</span>
+          <div class="flex-1 h-px bg-border" />
         </div>
 
         <!-- Grid for expanded mode -->
@@ -539,33 +548,33 @@ async function onDetailToggleFavorite(id: string) {
           <div
             v-for="sub in group.subs"
             :key="sub.id"
-            class="bg-[var(--color-surface)] rounded-xl border overflow-hidden transition-colors"
+            class="bg-surface rounded-xl border overflow-hidden transition-colors"
             :class="[
               sub.inactive ? 'opacity-50' : '',
-              selectedIds.has(sub.id) ? 'border-[var(--color-primary)] ring-1 ring-[var(--color-primary)]/30' : 'border-[var(--color-border)]',
+              selectedIds.has(sub.id) ? 'border-primary ring-1 ring-primary/30' : 'border-border',
             ]"
           >
             <!-- COMPACT VIEW -->
             <div v-if="viewMode === 'compact'" class="flex items-center gap-2 px-3 py-2 cursor-pointer" @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)" @contextmenu.prevent="showContextMenu(sub, $event)">
               <div v-if="selectionMode" class="shrink-0" @click.stop="toggleSelected(sub.id)">
                 <div class="w-4 h-4 rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
-                  :class="selectedIds.has(sub.id) ? 'bg-[var(--color-primary)] border-[var(--color-primary)] text-white' : 'border-[var(--color-border)] hover:border-[var(--color-primary)]'"
+                  :class="selectedIds.has(sub.id) ? 'bg-primary border-primary text-white' : 'border-border hover:border-primary'"
                 ><svg v-if="selectedIds.has(sub.id)" width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
               </div>
               <Tooltip v-if="!selectionMode" :text="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')">
-                <button @click.stop="subsStore.toggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-yellow-500' : 'text-[var(--color-border)] hover:text-yellow-400'">
+                <button @click.stop="subsStore.toggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-yellow-500' : 'text-border hover:text-yellow-400'">
                   <Star :size="12" :fill="sub.favorite ? 'currentColor' : 'none'" />
                 </button>
               </Tooltip>
-              <div class="w-6 h-6 rounded bg-[var(--color-primary-light)] flex items-center justify-center text-[10px] font-bold text-[var(--color-primary)] shrink-0 overflow-hidden">
+              <div class="w-6 h-6 rounded bg-primary-light flex items-center justify-center text-[10px] font-bold text-primary shrink-0 overflow-hidden">
                 <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
                 <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
               </div>
-              <p class="text-xs font-medium text-[var(--color-text-primary)] truncate min-w-0 flex-1">{{ sub.name }}</p>
+              <p class="text-xs font-medium text-text-primary truncate min-w-0 flex-1">{{ sub.name }}</p>
               <span v-if="!sub.inactive" class="text-[10px] font-bold shrink-0"
-                :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'text-red-500' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'text-orange-500' : 'text-[var(--color-text-muted)]'"
+                :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'text-red-500' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'text-orange-500' : 'text-text-muted'"
               >{{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}</span>
-              <p class="text-xs font-semibold text-[var(--color-text-primary)] shrink-0">{{ fmt(sub.price, sub.currencyId) }}</p>
+              <p class="text-xs font-semibold text-text-primary shrink-0">{{ fmt(sub.price, sub.currencyId) }}</p>
             </div>
 
             <!-- EXPANDED VIEW (card) -->
@@ -574,23 +583,23 @@ async function onDetailToggleFavorite(id: string) {
                 <div class="flex items-start gap-3 mb-3">
                   <div v-if="selectionMode" class="shrink-0 mt-1" @click.stop="toggleSelected(sub.id)">
                     <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
-                      :class="selectedIds.has(sub.id) ? 'bg-[var(--color-primary)] border-[var(--color-primary)] text-white' : 'border-[var(--color-border)] hover:border-[var(--color-primary)]'"
+                      :class="selectedIds.has(sub.id) ? 'bg-primary border-primary text-white' : 'border-border hover:border-primary'"
                     ><svg v-if="selectedIds.has(sub.id)" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                   </div>
-                  <div class="w-12 h-12 rounded-lg bg-[var(--color-primary-light)] flex items-center justify-center text-lg font-bold text-[var(--color-primary)] shrink-0 overflow-hidden">
+                  <div class="w-12 h-12 rounded-lg bg-primary-light flex items-center justify-center text-lg font-bold text-primary shrink-0 overflow-hidden">
                     <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
                     <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
                   </div>
                   <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
-                      <p class="text-sm font-semibold text-[var(--color-text-primary)] truncate">{{ sub.name }}</p>
+                      <p class="text-sm font-semibold text-text-primary truncate">{{ sub.name }}</p>
                       <Tooltip v-if="!selectionMode" :text="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')">
-                        <button @click.stop="subsStore.toggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-yellow-500' : 'text-[var(--color-border)] hover:text-yellow-400'">
+                        <button @click.stop="subsStore.toggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-yellow-500' : 'text-border hover:text-yellow-400'">
                           <Star :size="14" :fill="sub.favorite ? 'currentColor' : 'none'" />
                         </button>
                       </Tooltip>
                     </div>
-                    <p class="text-xs text-[var(--color-text-muted)] flex items-center gap-1">
+                    <p class="text-xs text-text-muted flex items-center gap-1">
                       <IconDisplay v-if="getCategoryIcon(sub.categoryId)" :icon="getCategoryIcon(sub.categoryId)" :size="12" />
                       {{ getCategoryName(sub.categoryId) }}
                     </p>
@@ -599,31 +608,31 @@ async function onDetailToggleFavorite(id: string) {
 
                 <div class="flex items-end justify-between">
                   <div>
-                    <p class="text-lg font-bold text-[var(--color-text-primary)]">{{ fmt(sub.price, sub.currencyId) }}</p>
-                    <p class="text-[10px] text-[var(--color-text-muted)]">{{ getBillingCycleText(sub.cycle, sub.frequency, t) }}</p>
+                    <p class="text-lg font-bold text-text-primary">{{ fmt(sub.price, sub.currencyId) }}</p>
+                    <p class="text-[10px] text-text-muted">{{ getBillingCycleText(sub.cycle, sub.frequency, t) }}</p>
                   </div>
                   <div class="text-right">
-                    <p class="text-xs font-medium" :class="isOverdue(sub) ? 'text-red-500' : 'text-[var(--color-text-primary)]'">{{ formatDate(sub.nextPayment) }}</p>
+                    <p class="text-xs font-medium" :class="isOverdue(sub) ? 'text-red-500' : 'text-text-primary'">{{ formatDate(sub.nextPayment) }}</p>
                     <span v-if="!sub.inactive" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none mt-0.5"
-                      :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-[var(--color-primary-light)] text-[var(--color-primary)]'"
+                      :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-primary-light text-primary'"
                     >{{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}</span>
                   </div>
                 </div>
 
                 <!-- Tags in expanded mode -->
                 <div v-if="(sub.tags || []).length > 0" class="flex items-center gap-1 mt-2 flex-wrap">
-                  <span v-for="tag in sub.tags" :key="tag" class="inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] border border-[var(--color-border)]">#{{ tag }}</span>
+                  <span v-for="tag in sub.tags" :key="tag" class="inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium bg-surface-hover text-text-muted border border-border">#{{ tag }}</span>
                 </div>
 
                 <!-- Payment method -->
                 <div class="flex items-center gap-1.5 mt-2">
                   <IconDisplay :icon="getPaymentMethod(sub.paymentMethodId)?.icon || '💳'" :size="16" />
-                  <span class="text-[10px] text-[var(--color-text-muted)]">{{ getPaymentMethod(sub.paymentMethodId)?.name }}</span>
+                  <span class="text-[10px] text-text-muted">{{ getPaymentMethod(sub.paymentMethodId)?.name }}</span>
                 </div>
               </div>
-              <div v-if="settingsStore.settings.showSubscriptionProgress && !sub.inactive" class="h-1 bg-[var(--color-surface-hover)]">
+              <div v-if="settingsStore.settings.showSubscriptionProgress && !sub.inactive" class="h-1 bg-surface-hover">
                 <div class="h-full transition-all duration-300"
-                  :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'bg-red-500' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'bg-orange-400' : 'bg-[var(--color-primary)]'"
+                  :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'bg-red-500' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'bg-orange-400' : 'bg-primary'"
                   :style="{ width: ((30 - getDaysUntilPayment(sub.nextPayment)) / 30 * 100) + '%' }"
                 />
               </div>
@@ -634,49 +643,49 @@ async function onDetailToggleFavorite(id: string) {
               <div class="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 cursor-pointer" @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)" @contextmenu.prevent="showContextMenu(sub, $event)">
                 <div v-if="selectionMode" class="shrink-0" @click.stop="toggleSelected(sub.id)">
                   <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
-                    :class="selectedIds.has(sub.id) ? 'bg-[var(--color-primary)] border-[var(--color-primary)] text-white' : 'border-[var(--color-border)] hover:border-[var(--color-primary)]'"
+                    :class="selectedIds.has(sub.id) ? 'bg-primary border-primary text-white' : 'border-border hover:border-primary'"
                   ><svg v-if="selectedIds.has(sub.id)" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                 </div>
                 <Tooltip v-if="!selectionMode" :text="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')">
-                  <button @click.stop="subsStore.toggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors hidden sm:block" :class="sub.favorite ? 'text-yellow-500' : 'text-[var(--color-border)] hover:text-yellow-400'">
+                  <button @click.stop="subsStore.toggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors hidden sm:block" :class="sub.favorite ? 'text-yellow-500' : 'text-border hover:text-yellow-400'">
                     <Star :size="16" :fill="sub.favorite ? 'currentColor' : 'none'" />
                   </button>
                 </Tooltip>
-                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-[var(--color-primary-light)] flex items-center justify-center text-xs sm:text-sm font-bold text-[var(--color-primary)] shrink-0 overflow-hidden">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary-light flex items-center justify-center text-xs sm:text-sm font-bold text-primary shrink-0 overflow-hidden">
                   <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
                   <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
                 </div>
                 <div class="min-w-0 flex-1">
-                  <p class="text-xs sm:text-sm font-medium text-[var(--color-text-primary)] truncate">{{ sub.name }}</p>
+                  <p class="text-xs sm:text-sm font-medium text-text-primary truncate">{{ sub.name }}</p>
                   <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="text-[10px] sm:text-xs text-[var(--color-text-muted)]">
+                    <span class="text-[10px] sm:text-xs text-text-muted">
                       {{ getBillingCycleText(sub.cycle, sub.frequency, t) }}
                       <span v-if="!sub.autoRenew" class="ml-1 text-orange-500">({{ t('manual_renewal') }})</span>
                     </span>
-                    <span v-for="tag in (sub.tags || []).slice(0, 3)" :key="tag" class="hidden sm:inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium bg-[var(--color-surface-hover)] text-[var(--color-text-muted)] border border-[var(--color-border)]">#{{ tag }}</span>
-                    <span v-if="(sub.tags || []).length > 3" class="hidden sm:inline text-[9px] text-[var(--color-text-muted)]">+{{ sub.tags.length - 3 }}</span>
+                    <span v-for="tag in (sub.tags || []).slice(0, 3)" :key="tag" class="hidden sm:inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium bg-surface-hover text-text-muted border border-border">#{{ tag }}</span>
+                    <span v-if="(sub.tags || []).length > 3" class="hidden sm:inline text-[9px] text-text-muted">+{{ sub.tags.length - 3 }}</span>
                   </div>
                 </div>
                 <div class="text-right shrink-0">
                   <div class="flex items-center gap-1 sm:gap-1.5 justify-end">
-                    <p class="text-xs sm:text-sm font-medium" :class="isOverdue(sub) ? 'text-red-500' : 'text-[var(--color-text-primary)]'">
+                    <p class="text-xs sm:text-sm font-medium" :class="isOverdue(sub) ? 'text-red-500' : 'text-text-primary'">
                       <span class="hidden sm:inline">{{ formatDate(sub.nextPayment) }}</span>
                     </p>
                     <span v-if="!sub.inactive" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none"
-                      :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-[var(--color-primary-light)] text-[var(--color-primary)]'"
+                      :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-primary-light text-primary'"
                     >{{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}</span>
                   </div>
                 </div>
                 <div class="text-right shrink-0">
-                  <p class="text-xs sm:text-sm font-semibold text-[var(--color-text-primary)]">{{ fmt(sub.price, sub.currencyId) }}</p>
+                  <p class="text-xs sm:text-sm font-semibold text-text-primary">{{ fmt(sub.price, sub.currencyId) }}</p>
                 </div>
                 <div class="shrink-0 hidden sm:block" :title="getPaymentMethod(sub.paymentMethodId)?.name">
                   <IconDisplay :icon="getPaymentMethod(sub.paymentMethodId)?.icon || '💳'" :size="22" />
                 </div>
               </div>
-              <div v-if="settingsStore.settings.showSubscriptionProgress && !sub.inactive" class="h-1 bg-[var(--color-surface-hover)]">
+              <div v-if="settingsStore.settings.showSubscriptionProgress && !sub.inactive" class="h-1 bg-surface-hover">
                 <div class="h-full transition-all duration-300"
-                  :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'bg-red-500' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'bg-orange-400' : 'bg-[var(--color-primary)]'"
+                  :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'bg-red-500' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'bg-orange-400' : 'bg-primary'"
                   :style="{ width: ((30 - getDaysUntilPayment(sub.nextPayment)) / 30 * 100) + '%' }"
                   :title="getDaysUntilPayment(sub.nextPayment) + ' ' + t('days')"
                 />
@@ -721,18 +730,18 @@ async function onDetailToggleFavorite(id: string) {
       >
         <div v-if="deleteConfirmId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div class="absolute inset-0 bg-black/50" @click="cancelDelete" />
-          <div class="relative bg-[var(--color-surface)] w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
+          <div class="relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
             <div class="flex items-center gap-3 mb-3 sm:mb-4">
               <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                 <AlertTriangle :size="18" class="text-red-500" />
               </div>
-              <h3 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('delete') }}</h3>
+              <h3 class="text-base sm:text-lg font-semibold text-text-primary">{{ t('delete') }}</h3>
             </div>
-            <p class="text-xs sm:text-sm text-[var(--color-text-secondary)] mb-4 sm:mb-6">{{ t('confirm_delete_subscription') }}</p>
+            <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('confirm_delete_subscription') }}</p>
             <div class="flex justify-end gap-2 sm:gap-3">
               <button
                 @click="cancelDelete"
-                class="px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-xs sm:text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]"
+                class="px-3 sm:px-4 py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover"
               >{{ t('cancel') }}</button>
               <button
                 @click="confirmDelete"
@@ -756,16 +765,16 @@ async function onDetailToggleFavorite(id: string) {
       >
         <div v-if="batchDeleteConfirmIds.length > 0" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div class="absolute inset-0 bg-black/50" @click="batchDeleteConfirmIds = []" />
-          <div class="relative bg-[var(--color-surface)] w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
+          <div class="relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
             <div class="flex items-center gap-3 mb-3 sm:mb-4">
               <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                 <AlertTriangle :size="18" class="text-red-500" />
               </div>
-              <h3 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)]">{{ t('batch_delete') }}</h3>
+              <h3 class="text-base sm:text-lg font-semibold text-text-primary">{{ t('batch_delete') }}</h3>
             </div>
-            <p class="text-xs sm:text-sm text-[var(--color-text-secondary)] mb-4 sm:mb-6">{{ t('batch_confirm_delete').replace('{count}', String(batchDeleteConfirmIds.length)) }}</p>
+            <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('batch_confirm_delete').replace('{count}', String(batchDeleteConfirmIds.length)) }}</p>
             <div class="flex justify-end gap-2 sm:gap-3">
-              <button @click="batchDeleteConfirmIds = []" class="px-3 sm:px-4 py-2 rounded-lg border border-[var(--color-border)] text-xs sm:text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">{{ t('cancel') }}</button>
+              <button @click="batchDeleteConfirmIds = []" class="px-3 sm:px-4 py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover">{{ t('cancel') }}</button>
               <button @click="confirmBatchDelete" class="px-3 sm:px-4 py-2 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-medium hover:bg-red-700">{{ t('delete') }}</button>
             </div>
           </div>
@@ -785,17 +794,17 @@ async function onDetailToggleFavorite(id: string) {
       >
         <div v-if="showBatchCategoryModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
           <div class="absolute inset-0 bg-black/50" @click="showBatchCategoryModal = false" />
-          <div class="relative bg-[var(--color-surface)] w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
-            <h3 class="text-base sm:text-lg font-semibold text-[var(--color-text-primary)] mb-3 sm:mb-4">{{ t('batch_change_category') }}</h3>
-            <p class="text-xs sm:text-sm text-[var(--color-text-muted)] mb-3">{{ selectedIds.size }} {{ t('selected_count') }}</p>
+          <div class="relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
+            <h3 class="text-base sm:text-lg font-semibold text-text-primary mb-3 sm:mb-4">{{ t('batch_change_category') }}</h3>
+            <p class="text-xs sm:text-sm text-text-muted mb-3">{{ selectedIds.size }} {{ t('selected_count') }}</p>
             <AppSelect
               v-model="batchCategoryId"
               :options="categoryFilterOptions.filter((o) => o.value !== '')"
               :label="t('category')"
             />
             <div class="flex justify-end gap-3 mt-5">
-              <button @click="showBatchCategoryModal = false" class="px-4 py-2 rounded-lg border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-secondary)] hover:bg-[var(--color-surface-hover)]">{{ t('cancel') }}</button>
-              <button @click="confirmBatchCategory" class="px-5 py-2 rounded-lg bg-[var(--color-primary)] text-white text-sm font-medium hover:bg-[var(--color-primary-hover)]">{{ t('save') }}</button>
+              <button @click="showBatchCategoryModal = false" class="px-4 py-2 rounded-lg border border-border text-sm font-medium text-text-secondary hover:bg-surface-hover">{{ t('cancel') }}</button>
+              <button @click="confirmBatchCategory" class="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover">{{ t('save') }}</button>
             </div>
           </div>
         </div>

@@ -7,6 +7,7 @@ import { useHeaderActions } from "@/composables/useHeaderActions";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useToast } from "@/composables/useToast";
+import { useScrollLock } from "@/composables/useScrollLock";
 import { getPaymentDatesInMonth, convertPrice } from "@/services/calculations";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import CalendarHeader from "@/components/calendar/CalendarHeader.vue";
@@ -30,6 +31,14 @@ const { clearActions } = useHeaderActions();
 const { fmt: fmtMain, getCurrencyRate } = useCurrencyFormat();
 const { fmtMonthYear, fmtDateMedium } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
+const pageLogPrefix = "[CalendarPage]";
+
+function logPageError(scope: string, error: unknown, extra?: Record<string, unknown>) {
+  console.error(`${pageLogPrefix} ${scope}`, {
+    error,
+    ...extra,
+  });
+}
 
 onMounted(() => clearActions());
 
@@ -81,7 +90,11 @@ const monthExpenses = ref<Expense[]>([]);
 
 async function loadMonthExpenses() {
   const monthStr = `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, "0")}`;
-  monthExpenses.value = await dbGetExpensesForMonth(monthStr);
+  try {
+    monthExpenses.value = await dbGetExpensesForMonth(monthStr);
+  } catch (e) {
+    logPageError("loadMonthExpenses failed", e, { month: monthStr });
+  }
 }
 
 watch([currentYear, currentMonth], loadMonthExpenses);
@@ -237,7 +250,9 @@ function cancelDelete() {
 
 function handleOpenUrl(url: string) {
   const fullUrl = url.startsWith("http") ? url : `https://${url}`;
-  openUrl(fullUrl).catch(console.warn);
+  openUrl(fullUrl).catch((e) => {
+    logPageError("handleOpenUrl failed", e, { url: fullUrl });
+  });
 }
 
 function onSaved() {
@@ -273,12 +288,19 @@ function handleExpEdit(exp: Expense) {
 }
 
 async function onExpSaved() {
-  toast(editingExp.value ? t("expense_updated") : t("expense_added"));
-  await loadMonthExpenses();
+  try {
+    toast(editingExp.value ? t("expense_updated") : t("expense_added"));
+    await loadMonthExpenses();
+  } catch (e) {
+    logPageError("onExpSaved failed", e);
+    toast(t("error"), "error");
+  }
 }
 
 // --- Expense delete ---
 const deleteExpConfirmId = ref<string | null>(null);
+const hasBlockingOverlay = computed(() => Boolean(deleteConfirmId.value) || Boolean(deleteExpConfirmId.value));
+useScrollLock(hasBlockingOverlay);
 
 function handleExpDelete(id: string) {
   closeExpDetail();
@@ -286,12 +308,18 @@ function handleExpDelete(id: string) {
 }
 
 async function confirmExpDelete() {
-  if (deleteExpConfirmId.value) {
-    await expsStore.deleteExpense(deleteExpConfirmId.value);
-    toast(t("expense_deleted"));
-    await loadMonthExpenses();
+  try {
+    if (deleteExpConfirmId.value) {
+      await expsStore.deleteExpense(deleteExpConfirmId.value);
+      toast(t("expense_deleted"));
+      await loadMonthExpenses();
+    }
+  } catch (e) {
+    logPageError("confirmExpDelete failed", e, { expenseId: deleteExpConfirmId.value });
+    toast(t("error"), "error");
+  } finally {
+    deleteExpConfirmId.value = null;
   }
-  deleteExpConfirmId.value = null;
 }
 
 function cancelExpDelete() {
@@ -300,7 +328,9 @@ function cancelExpDelete() {
 
 async function handleExpOpenUrl(url: string) {
   const fullUrl = url.startsWith("http") ? url : `https://${url}`;
-  openUrl(fullUrl).catch(console.warn);
+  openUrl(fullUrl).catch((e) => {
+    logPageError("handleExpOpenUrl failed", e, { url: fullUrl });
+  });
 }
 </script>
 
