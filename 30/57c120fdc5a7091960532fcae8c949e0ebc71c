@@ -1,0 +1,27 @@
+src/components/dashboard/UpcomingPayments.vue
+  9a72c4e5fe55657c 21
+src/components/settings/AppearanceSection.vue
+  9a72c4e5fe55657c 99
+src/components/ui/AppSelect.vue
+  9a72c4e5fe55657c 144
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "3057c120fdc5a7091960532fcae8c949e0ebc71c",
+  "prompts": {
+    "9a72c4e5fe55657c": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9e250c9b-bdf8-4140-9109-910d6cbd4bcf",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
