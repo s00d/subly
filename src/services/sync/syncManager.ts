@@ -26,6 +26,7 @@ interface SyncConfig {
   webdavUrl: string;
   webdavUsername: string;
   webdavPassword: string;
+  remoteRevision: string;
 }
 
 const defaultConfig: SyncConfig = {
@@ -42,6 +43,7 @@ const defaultConfig: SyncConfig = {
   webdavUrl: "",
   webdavUsername: "",
   webdavPassword: "",
+  remoteRevision: "",
 };
 
 let bgInterval: ReturnType<typeof setInterval> | null = null;
@@ -233,6 +235,7 @@ export async function checkRemote(): Promise<boolean> {
 
     const remoteTs = remoteMeta.updatedAt || remoteMeta.lastSyncedAt || 0;
     syncStatus.remoteUpdatedAt = remoteTs;
+    config.remoteRevision = remoteMeta.revision || config.remoteRevision;
 
     if (remoteTs > config.localUpdatedAt && remoteMeta.deviceId !== config.deviceId) {
       syncStatus.pendingUpdate = true;
@@ -275,6 +278,7 @@ export async function pullRemote(): Promise<boolean> {
 
     config.lastSynced = Date.now();
     config.localUpdatedAt = remoteTs;
+    config.remoteRevision = remote.meta.revision || String(remoteTs);
     syncStatus.lastSynced = config.lastSynced;
     syncStatus.localUpdatedAt = config.localUpdatedAt;
     syncStatus.pendingUpdate = false;
@@ -306,21 +310,41 @@ export async function pushLocal(): Promise<boolean> {
       return false;
     }
 
+    const remoteMeta = await provider.getRemoteMeta();
+    if (remoteMeta) {
+      const remoteTs = remoteMeta.updatedAt || remoteMeta.lastSyncedAt || 0;
+      const remoteRevision = remoteMeta.revision || String(remoteTs);
+      const hasConflict =
+        remoteMeta.deviceId !== config.deviceId &&
+        remoteTs > config.localUpdatedAt &&
+        Boolean(config.remoteRevision) &&
+        remoteRevision !== config.remoteRevision;
+      if (hasConflict) {
+        syncStatus.pendingUpdate = true;
+        syncStatus.error = "Remote data changed on another device. Pull latest changes first.";
+        return false;
+      }
+      config.remoteRevision = remoteRevision;
+    }
+
     const localData = getLocalData?.();
     if (!localData) return false;
 
     const now = Date.now();
+    const revision = `rev_${now}_${config.deviceId}`;
     const payload: SyncPayload = {
       data: localData,
       meta: {
         lastSyncedAt: now,
         updatedAt: config.localUpdatedAt || now,
         deviceId: config.deviceId,
+        revision,
       },
     };
     await provider.upload(payload);
 
     config.lastSynced = now;
+    config.remoteRevision = revision;
     syncStatus.lastSynced = now;
     syncStatus.remoteUpdatedAt = payload.meta.updatedAt;
     syncStatus.pendingUpdate = false;
@@ -355,6 +379,18 @@ export async function syncNow(): Promise<boolean> {
  */
 export async function uploadNow(): Promise<boolean> {
   return pushLocal();
+}
+
+export async function flushSyncBeforeExit(timeoutMs = 2500): Promise<boolean> {
+  if (!config.enabled || !config.provider) return true;
+  if (syncStatus.syncing) return false;
+
+  return await Promise.race<boolean>([
+    pushLocal(),
+    new Promise<boolean>((resolve) => {
+      setTimeout(() => resolve(false), timeoutMs);
+    }),
+  ]);
 }
 
 /** Dismiss the pending update notification without pulling. */

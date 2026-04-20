@@ -462,12 +462,33 @@ export async function dbUpdateExpense(e: Expense): Promise<void> {
 }
 
 export async function dbDeleteExpense(id: string): Promise<void> {
+  const linked = await db.selectFrom("expenses")
+    .select(["subscriptionId", "paymentRecordId"])
+    .where("id", "=", id)
+    .executeTakeFirst();
+
+  if (linked?.paymentRecordId) {
+    await db.deleteFrom("paymentRecords").where("id", "=", linked.paymentRecordId).execute();
+  }
   await db.deleteFrom("expenses").where("id", "=", id).execute();
   triggerSync();
 }
 
 export async function dbDeleteExpensesBatch(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
+  const linkedRows = await db.selectFrom("expenses")
+    .select(["paymentRecordId"])
+    .where("id", "in", ids)
+    .where("paymentRecordId", "!=", "")
+    .execute();
+  const linkedPaymentRecordIds = Array.from(new Set(
+    linkedRows
+      .map((row) => row.paymentRecordId)
+      .filter((v): v is string => Boolean(v)),
+  ));
+  if (linkedPaymentRecordIds.length > 0) {
+    await db.deleteFrom("paymentRecords").where("id", "in", linkedPaymentRecordIds).execute();
+  }
   await db.deleteFrom("expenses").where("id", "in", ids).execute();
   triggerSync();
 }
@@ -868,42 +889,135 @@ export interface TagExpenseStat {
 }
 
 export async function dbGetExpensesByTags(monthPrefix: string): Promise<TagExpenseStat[]> {
-  const rows = await db.selectFrom("expenses")
-    .select(["tags", "amount"])
-    .where("date", "like", `${monthPrefix}%`)
-    .where("tags", "!=", "")
-    .where("tags", "!=", "[]")
-    .execute();
-
-  const map: Record<string, number> = {};
-  for (const row of rows) {
-    let parsed: string[] = [];
-    try { parsed = JSON.parse(row.tags); } catch { continue; }
-    for (const tag of parsed) {
-      map[tag] = (map[tag] ?? 0) + Number(row.amount);
-    }
-  }
-  return Object.entries(map)
-    .map(([tag, total]) => ({ tag, total }))
-    .sort((a, b) => b.total - a.total);
+  const rawDb = getRawDb();
+  const sqlText = `
+    SELECT j.value as tag, SUM(e.amount) as total
+    FROM expenses e, json_each(e.tags) j
+    WHERE e.date LIKE ? AND e.tags != '' AND e.tags != '[]'
+    GROUP BY j.value
+    ORDER BY total DESC
+  `;
+  const rows = await rawDb.select<Array<{ tag: string; total: number | string }>>(sqlText, [`${monthPrefix}%`]);
+  return rows.map((row) => ({
+    tag: row.tag,
+    total: Number(row.total),
+  }));
 }
 
 // =============================================
 // Execute raw SQL from file content
 // =============================================
 
+function splitSqlStatements(script: string): string[] {
+  const statements: string[] = [];
+  let current = "";
+  let inSingle = false;
+  let inDouble = false;
+  let inBacktick = false;
+  let inLineComment = false;
+  let inBlockComment = false;
+
+  for (let i = 0; i < script.length; i++) {
+    const ch = script[i];
+    const next = script[i + 1];
+
+    if (inLineComment) {
+      if (ch === "\n") {
+        inLineComment = false;
+        current += ch;
+      }
+      continue;
+    }
+
+    if (inBlockComment) {
+      if (ch === "*" && next === "/") {
+        inBlockComment = false;
+        i++;
+      }
+      continue;
+    }
+
+    if (!inSingle && !inDouble && !inBacktick) {
+      if (ch === "-" && next === "-") {
+        inLineComment = true;
+        i++;
+        continue;
+      }
+      if (ch === "/" && next === "*") {
+        inBlockComment = true;
+        i++;
+        continue;
+      }
+    }
+
+    if (ch === "'" && !inDouble && !inBacktick) {
+      if (inSingle && next === "'") {
+        current += "''";
+        i++;
+        continue;
+      }
+      inSingle = !inSingle;
+      current += ch;
+      continue;
+    }
+
+    if (ch === "\"" && !inSingle && !inBacktick) {
+      if (inDouble && next === "\"") {
+        current += "\"\"";
+        i++;
+        continue;
+      }
+      inDouble = !inDouble;
+      current += ch;
+      continue;
+    }
+
+    if (ch === "`" && !inSingle && !inDouble) {
+      inBacktick = !inBacktick;
+      current += ch;
+      continue;
+    }
+
+    if (ch === ";" && !inSingle && !inDouble && !inBacktick) {
+      const stmt = current.trim();
+      if (stmt) statements.push(stmt);
+      current = "";
+      continue;
+    }
+
+    current += ch;
+  }
+
+  const tail = current.trim();
+  if (tail) statements.push(tail);
+  return statements;
+}
+
 export async function executeSqlFile(sqlContent: string): Promise<{ statementsRun: number }> {
   const rawDb = getRawDb();
-  const statements = sqlContent
-    .replace(/--[^\n]*/g, "")
-    .split(";")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-
-  let statementsRun = 0;
-  for (const stmt of statements) {
-    await rawDb.execute(stmt);
-    statementsRun++;
+  const script = sqlContent.trim();
+  if (!script) {
+    return { statementsRun: 0 };
   }
-  return { statementsRun };
+
+  const statements = splitSqlStatements(script);
+  if (statements.length === 0) {
+    return { statementsRun: 0 };
+  }
+
+  try {
+    await rawDb.execute("BEGIN IMMEDIATE TRANSACTION");
+    for (const stmt of statements) {
+      await rawDb.execute(stmt);
+    }
+    await rawDb.execute("COMMIT");
+    return { statementsRun: statements.length };
+  } catch (error) {
+    try {
+      await rawDb.execute("ROLLBACK");
+    } catch {
+      // ignore rollback failures
+    }
+    throw error;
+  }
 }

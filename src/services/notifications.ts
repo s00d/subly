@@ -59,7 +59,7 @@ export async function checkNotificationPermission(): Promise<boolean> {
  * - "any"     → always allowed
  * - "morning" → 7:00–11:59
  * - "evening" → 17:00–21:59
- * - "custom"  → exact hour (± 30 min window for interval tolerance)
+ * - "custom"  → target hour (± 30 min window for interval tolerance)
  */
 export function isWithinSchedule(settings: Settings): boolean {
   const schedule = settings.notificationSchedule || "any";
@@ -75,8 +75,11 @@ export function isWithinSchedule(settings: Settings): boolean {
       return hour >= 17 && hour < 22;
     case "custom": {
       const target = settings.notificationCustomHour ?? 9;
-      // Allow ±1 hour window to account for check interval
-      return hour >= target && hour <= target + 1;
+      const nowMinutes = now.getHours() * 60 + now.getMinutes();
+      const targetMinutes = target * 60;
+      const delta = Math.abs(nowMinutes - targetMinutes);
+      const minDelta = Math.min(delta, 1440 - delta);
+      return minDelta <= 30;
     }
     default:
       return true;
@@ -90,6 +93,11 @@ function alreadyNotifiedToday(lastNotifiedDate: string): boolean {
   if (!lastNotifiedDate) return false;
   const today = new Date().toISOString().split("T")[0];
   return lastNotifiedDate === today;
+}
+
+function wasNotifiedForCurrentPayment(lastNotifiedDate: string, nextPaymentDate: string): boolean {
+  if (!lastNotifiedDate) return false;
+  return lastNotifiedDate >= nextPaymentDate;
 }
 
 // =============================================
@@ -176,7 +184,12 @@ export async function checkAndNotify(
     // Determine if we should send a push/telegram (not just an alert)
     // Recurring: send every day within the window if not already sent today
     // Non-recurring: only send on the exact daysBefore match
-    const shouldSendPush = withinSchedule && !alreadyNotifiedToday(sub.lastNotifiedDate || "");
+    const notifiedToday = alreadyNotifiedToday(sub.lastNotifiedDate || "");
+    const notifiedForCurrentPayment = wasNotifiedForCurrentPayment(
+      sub.lastNotifiedDate || "",
+      sub.nextPayment,
+    );
+    const shouldSendPush = withinSchedule && !notifiedToday;
 
     // Upcoming / due today
     if (diffDays >= 0 && diffDays <= daysBefore) {
@@ -195,7 +208,7 @@ export async function checkAndNotify(
       // Decide whether to send push
       const shouldSendForThisSub = recurring
         ? shouldSendPush                      // recurring: every day (once per day)
-        : (shouldSendPush && diffDays === daysBefore); // non-recurring: only on exact day
+        : (shouldSendPush && !notifiedForCurrentPayment); // non-recurring: once for current payment window
 
       if (shouldSendForThisSub) {
         const vars = { name: sub.name, days: diffDays, price: sub.price };
@@ -242,7 +255,7 @@ export async function checkAndNotify(
 
       const shouldSendOverdue = recurring
         ? shouldSendPush
-        : (shouldSendPush && !alreadyNotifiedToday(sub.lastNotifiedDate || ""));
+        : (shouldSendPush && !notifiedForCurrentPayment);
 
       if (shouldSendOverdue) {
         const vars = { name: sub.name, days: Math.abs(diffDays), price: sub.price };

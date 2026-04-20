@@ -8,9 +8,18 @@ import {
   dbInsertExpense, dbDeleteExpenseByPaymentRecord, dbLoadSubscriptions,
 } from "@/services/database";
 import { parseExpense } from "@/schemas/appData";
+import { getNextCycleDate } from "@/services/calculations";
 
 export const useSubscriptionsStore = defineStore("subscriptions", () => {
   const subscriptions = ref<Subscription[]>([]);
+  const storeLogPrefix = "[SubscriptionsStore]";
+
+  function logStoreError(scope: string, error: unknown, extra?: Record<string, unknown>) {
+    console.error(`${storeLogPrefix} ${scope}`, {
+      error,
+      ...extra,
+    });
+  }
 
   const activeSubscriptions = computed(() =>
     subscriptions.value.filter((s) => !s.inactive),
@@ -25,30 +34,50 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
   }
 
   async function reload() {
-    subscriptions.value = await dbLoadSubscriptions();
+    try {
+      subscriptions.value = await dbLoadSubscriptions();
+    } catch (e) {
+      logStoreError("reload failed", e);
+      throw e;
+    }
   }
 
   async function addSubscription(raw: Partial<Subscription> & { id: string; name: string; currencyId: string; nextPayment: string; startDate: string }) {
-    const sub = parseSubscription(raw);
-    subscriptions.value.push(sub);
-    await dbInsertSubscription(sub);
+    try {
+      const sub = parseSubscription(raw);
+      subscriptions.value.push(sub);
+      await dbInsertSubscription(sub);
+    } catch (e) {
+      logStoreError("addSubscription failed", e, { id: raw.id, name: raw.name });
+      throw e;
+    }
   }
 
   async function updateSubscription(raw: Partial<Subscription> & { id: string }) {
-    const idx = subscriptions.value.findIndex((s) => s.id === raw.id);
-    if (idx !== -1) {
-      const updated = parseSubscription({ ...subscriptions.value[idx], ...raw });
-      subscriptions.value[idx] = updated;
-      await dbUpdateSubscription(updated);
+    try {
+      const idx = subscriptions.value.findIndex((s) => s.id === raw.id);
+      if (idx !== -1) {
+        const updated = parseSubscription({ ...subscriptions.value[idx], ...raw });
+        subscriptions.value[idx] = updated;
+        await dbUpdateSubscription(updated);
+      }
+    } catch (e) {
+      logStoreError("updateSubscription failed", e, { id: raw.id });
+      throw e;
     }
   }
 
   async function deleteSubscription(id: string) {
-    subscriptions.value = subscriptions.value.filter((s) => s.id !== id);
-    subscriptions.value.forEach((s) => {
-      if (s.replacementSubscriptionId === id) s.replacementSubscriptionId = null;
-    });
-    await dbDeleteSubscription(id);
+    try {
+      subscriptions.value = subscriptions.value.filter((s) => s.id !== id);
+      subscriptions.value.forEach((s) => {
+        if (s.replacementSubscriptionId === id) s.replacementSubscriptionId = null;
+      });
+      await dbDeleteSubscription(id);
+    } catch (e) {
+      logStoreError("deleteSubscription failed", e, { id });
+      throw e;
+    }
   }
 
   async function cloneSubscription(id: string): Promise<Subscription | null> {
@@ -67,13 +96,7 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
   }
 
   function advanceNextPayment(sub: Subscription) {
-    const next = new Date(sub.nextPayment);
-    switch (sub.cycle) {
-      case 1: next.setDate(next.getDate() + sub.frequency); break;
-      case 2: next.setDate(next.getDate() + 7 * sub.frequency); break;
-      case 3: next.setMonth(next.getMonth() + sub.frequency); break;
-      case 4: next.setFullYear(next.getFullYear() + sub.frequency); break;
-    }
+    const next = getNextCycleDate(new Date(sub.nextPayment), sub.cycle, sub.frequency);
     sub.nextPayment = next.toISOString().split("T")[0];
   }
 
@@ -100,21 +123,26 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
   }
 
   async function recordPayment(id: string, amount?: number, note?: string) {
-    const sub = subscriptions.value.find((s) => s.id === id);
-    if (!sub) return;
-    const record: PaymentRecord = {
-      id: crypto.randomUUID(),
-      date: new Date().toISOString().split("T")[0],
-      amount: amount ?? sub.price,
-      currencyId: sub.currencyId,
-      note: note || "",
-    };
-    if (!sub.paymentHistory) sub.paymentHistory = [];
-    sub.paymentHistory.unshift(record);
-    advanceNextPayment(sub);
-    await dbUpdateSubscription(sub);
-    await dbInsertPaymentRecord(sub.id, record);
-    await createExpenseFromPayment(sub, record);
+    try {
+      const sub = subscriptions.value.find((s) => s.id === id);
+      if (!sub) return;
+      const record: PaymentRecord = {
+        id: crypto.randomUUID(),
+        date: new Date().toISOString().split("T")[0],
+        amount: amount ?? sub.price,
+        currencyId: sub.currencyId,
+        note: note || "",
+      };
+      if (!sub.paymentHistory) sub.paymentHistory = [];
+      sub.paymentHistory.unshift(record);
+      advanceNextPayment(sub);
+      await dbUpdateSubscription(sub);
+      await dbInsertPaymentRecord(sub.id, record);
+      await createExpenseFromPayment(sub, record);
+    } catch (e) {
+      logStoreError("recordPayment failed", e, { id, amount });
+      throw e;
+    }
   }
 
   async function addPaymentRecord(subId: string, record: PaymentRecord) {
@@ -151,13 +179,18 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
   }
 
   async function batchDelete(ids: string[]) {
-    subscriptions.value = subscriptions.value.filter((s) => !ids.includes(s.id));
-    subscriptions.value.forEach((s) => {
-      if (s.replacementSubscriptionId && ids.includes(s.replacementSubscriptionId)) {
-        s.replacementSubscriptionId = null;
-      }
-    });
-    await dbDeleteSubscriptionsBatch(ids);
+    try {
+      subscriptions.value = subscriptions.value.filter((s) => !ids.includes(s.id));
+      subscriptions.value.forEach((s) => {
+        if (s.replacementSubscriptionId && ids.includes(s.replacementSubscriptionId)) {
+          s.replacementSubscriptionId = null;
+        }
+      });
+      await dbDeleteSubscriptionsBatch(ids);
+    } catch (e) {
+      logStoreError("batchDelete failed", e, { ids });
+      throw e;
+    }
   }
 
   async function batchSetInactive(ids: string[], inactive: boolean) {

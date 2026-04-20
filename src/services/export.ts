@@ -3,6 +3,7 @@ import { validateImportData } from "@/schemas/appData";
 import { save, open } from "@tauri-apps/plugin-dialog";
 import { writeTextFile, readTextFile, writeFile, readFile } from "@tauri-apps/plugin-fs";
 import JSZip from "jszip";
+import Papa from "papaparse";
 
 // =============================================
 // Helpers
@@ -264,32 +265,24 @@ export async function exportAsCsv(
   paymentMethods: { id: string; name: string }[],
   household: { id: string; name: string }[],
 ): Promise<boolean> {
-  const headers = [
-    "Name", "Price", "Currency", "Cycle", "Frequency", "Next Payment",
-    "Start Date", "Auto Renew", "Category", "Payment Method", "Paid By",
-    "Notes", "URL", "Inactive",
-  ];
-
   const cycleNames: Record<number, string> = { 1: "Daily", 2: "Weekly", 3: "Monthly", 4: "Yearly" };
-
-  const rows = subscriptions.map((s) => [
-    `"${s.name.replace(/"/g, '""')}"`,
-    s.price.toString(),
-    currencies.find((c) => c.id === s.currencyId)?.code || "",
-    cycleNames[s.cycle] || "",
-    s.frequency.toString(),
-    s.nextPayment,
-    s.startDate,
-    s.autoRenew ? "Yes" : "No",
-    categories.find((c) => c.id === s.categoryId)?.name || "",
-    paymentMethods.find((p) => p.id === s.paymentMethodId)?.name || "",
-    household.find((h) => h.id === s.payerUserId)?.name || "",
-    `"${(s.notes || "").replace(/"/g, '""')}"`,
-    s.url || "",
-    s.inactive ? "Yes" : "No",
-  ]);
-
-  const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const rows = subscriptions.map((s) => ({
+    Name: s.name,
+    Price: s.price.toString(),
+    Currency: currencies.find((c) => c.id === s.currencyId)?.code || "",
+    Cycle: cycleNames[s.cycle] || "",
+    Frequency: s.frequency.toString(),
+    "Next Payment": s.nextPayment,
+    "Start Date": s.startDate,
+    "Auto Renew": s.autoRenew ? "Yes" : "No",
+    Category: categories.find((c) => c.id === s.categoryId)?.name || "",
+    "Payment Method": paymentMethods.find((p) => p.id === s.paymentMethodId)?.name || "",
+    "Paid By": household.find((h) => h.id === s.payerUserId)?.name || "",
+    Notes: s.notes || "",
+    URL: s.url || "",
+    Inactive: s.inactive ? "Yes" : "No",
+  }));
+  const csv = Papa.unparse(rows, { escapeFormulae: true });
 
   const filePath = await save({
     filters: [{ name: "CSV", extensions: ["csv"] }],
@@ -312,21 +305,18 @@ export async function exportExpensesCsv(
   paymentMethods: { id: string; name: string }[],
   household: { id: string; name: string }[],
 ): Promise<boolean> {
-  const headers = ["Name", "Amount", "Currency", "Date", "Category", "Payment Method", "Paid By", "Tags", "Notes"];
-
-  const rows = expenses.map((e) => [
-    `"${e.name.replace(/"/g, '""')}"`,
-    e.amount.toString(),
-    currencies.find((c) => c.id === e.currencyId)?.code || "",
-    e.date,
-    categories.find((c) => c.id === e.categoryId)?.name || "",
-    paymentMethods.find((p) => p.id === e.paymentMethodId)?.name || "",
-    household.find((h) => h.id === e.payerUserId)?.name || "",
-    `"${e.tags.join(", ")}"`,
-    `"${(e.notes || "").replace(/"/g, '""')}"`,
-  ]);
-
-  const csv = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const rows = expenses.map((e) => ({
+    Name: e.name,
+    Amount: e.amount.toString(),
+    Currency: currencies.find((c) => c.id === e.currencyId)?.code || "",
+    Date: e.date,
+    Category: categories.find((c) => c.id === e.categoryId)?.name || "",
+    "Payment Method": paymentMethods.find((p) => p.id === e.paymentMethodId)?.name || "",
+    "Paid By": household.find((h) => h.id === e.payerUserId)?.name || "",
+    Tags: e.tags.join(", "),
+    Notes: e.notes || "",
+  }));
+  const csv = Papa.unparse(rows, { escapeFormulae: true });
 
   const filePath = await save({
     filters: [{ name: "CSV", extensions: ["csv"] }],
@@ -342,41 +332,6 @@ export async function exportExpensesCsv(
 // =============================================
 // Import — CSV
 // =============================================
-
-/**
- * Parse a CSV line respecting quoted fields.
- */
-function parseCsvLine(line: string): string[] {
-  const fields: string[] = [];
-  let current = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (i + 1 < line.length && line[i + 1] === '"') {
-          current += '"';
-          i++;
-        } else {
-          inQuotes = false;
-        }
-      } else {
-        current += ch;
-      }
-    } else {
-      if (ch === '"') {
-        inQuotes = true;
-      } else if (ch === ",") {
-        fields.push(current.trim());
-        current = "";
-      } else {
-        current += ch;
-      }
-    }
-  }
-  fields.push(current.trim());
-  return fields;
-}
 
 export interface CsvImportContext {
   categories: { id: string; name: string }[];
@@ -408,39 +363,26 @@ export async function importFromCsv(
   if (!selected) return null;
 
   try {
-    const content = await readTextFile(selected as string);
-    const lines = content.split(/\r?\n/).filter((l) => l.trim());
-    if (lines.length < 2) return null; // need header + at least 1 row
+    const content = (await readTextFile(selected as string)).replace(/^\uFEFF/, "");
+    const parsed = Papa.parse<Record<string, string>>(content, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (h: string) => h.toLowerCase().replace(/[^a-z0-9_]/g, "_"),
+    });
+    if (parsed.errors.length > 0) {
+      console.warn("CSV parse errors:", parsed.errors);
+    }
+    const rows = parsed.data.filter((r: Record<string, string>) =>
+      Object.values(r).some((v) => String(v ?? "").trim() !== ""),
+    );
+    if (rows.length === 0) return [];
 
-    const headerLine = lines[0];
-    const headers = parseCsvLine(headerLine).map((h) => h.toLowerCase().replace(/[^a-z0-9_]/g, "_"));
-
-    // Build column index map
-    const col = (name: string): number => {
-      const variants = [name, name.replace(/ /g, "_")];
-      for (const v of variants) {
-        const idx = headers.indexOf(v);
-        if (idx >= 0) return idx;
+    const getField = (row: Record<string, string>, ...keys: string[]) => {
+      for (const key of keys) {
+        if (row[key] != null) return row[key] ?? "";
       }
-      return -1;
+      return "";
     };
-
-    const iName = col("name");
-    const iPrice = col("price");
-    const iCurrency = col("currency");
-    const iCycle = col("cycle");
-    const iFrequency = col("frequency");
-    const iNextPayment = col("next_payment");
-    const iStartDate = col("start_date");
-    const iAutoRenew = col("auto_renew");
-    const iCategory = col("category");
-    const iPaymentMethod = col("payment_method");
-    const iPaidBy = col("paid_by");
-    const iNotes = col("notes");
-    const iUrl = col("url");
-    const iInactive = col("inactive");
-
-    if (iName < 0) return null; // Name is required
 
     const cycleMap: Record<string, number> = {
       daily: 1, weekly: 2, monthly: 3, yearly: 4,
@@ -448,56 +390,53 @@ export async function importFromCsv(
 
     const subscriptions: Subscription[] = [];
 
-    for (let i = 1; i < lines.length; i++) {
-      const fields = parseCsvLine(lines[i]);
-      if (fields.length === 0 || (fields.length === 1 && !fields[0])) continue;
-
-      const name = iName >= 0 ? fields[iName] : "";
+    for (const row of rows) {
+      const name = getField(row, "name").trim();
       if (!name) continue; // skip empty rows
 
-      const priceStr = iPrice >= 0 ? fields[iPrice] : "0";
+      const priceStr = getField(row, "price");
       const price = parseFloat(priceStr) || 0;
 
-      const currencyCode = iCurrency >= 0 ? fields[iCurrency] : "";
+      const currencyCode = getField(row, "currency");
       const currencyMatch = ctx.currencies.find(
         (c) => c.code.toLowerCase() === currencyCode.toLowerCase(),
       );
       const currencyId = currencyMatch?.id || ctx.defaultCurrencyId;
 
-      const cycleStr = iCycle >= 0 ? fields[iCycle]?.toLowerCase() : "monthly";
+      const cycleStr = getField(row, "cycle")?.toLowerCase() || "monthly";
       const cycle = cycleMap[cycleStr || "monthly"] || 3;
 
-      const freqStr = iFrequency >= 0 ? fields[iFrequency] : "1";
+      const freqStr = getField(row, "frequency") || "1";
       const frequency = parseInt(freqStr, 10) || 1;
 
-      const nextPayment = iNextPayment >= 0 ? normalizeDate(fields[iNextPayment]) : new Date().toISOString().split("T")[0];
-      const startDate = iStartDate >= 0 ? normalizeDate(fields[iStartDate]) : nextPayment;
+      const nextPayment = normalizeDate(getField(row, "next_payment", "next_payment_date"));
+      const startDate = normalizeDate(getField(row, "start_date")) || nextPayment;
 
-      const autoRenewStr = iAutoRenew >= 0 ? fields[iAutoRenew]?.toLowerCase() : "yes";
+      const autoRenewStr = getField(row, "auto_renew")?.toLowerCase() || "yes";
       const autoRenew = autoRenewStr !== "no" && autoRenewStr !== "false" && autoRenewStr !== "0";
 
-      const categoryName = iCategory >= 0 ? fields[iCategory] : "";
+      const categoryName = getField(row, "category");
       const categoryMatch = ctx.categories.find(
         (c) => c.name.toLowerCase() === categoryName.toLowerCase(),
       );
       const categoryId = categoryMatch?.id || ctx.defaultCategoryId;
 
-      const pmName = iPaymentMethod >= 0 ? fields[iPaymentMethod] : "";
+      const pmName = getField(row, "payment_method");
       const pmMatch = ctx.paymentMethods.find(
         (p) => p.name.toLowerCase() === pmName.toLowerCase(),
       );
       const paymentMethodId = pmMatch?.id || ctx.defaultPaymentMethodId;
 
-      const payerName = iPaidBy >= 0 ? fields[iPaidBy] : "";
+      const payerName = getField(row, "paid_by");
       const payerMatch = ctx.household.find(
         (h) => h.name.toLowerCase() === payerName.toLowerCase(),
       );
       const payerUserId = payerMatch?.id || ctx.defaultPayerUserId;
 
-      const notes = iNotes >= 0 ? fields[iNotes] || "" : "";
-      const url = iUrl >= 0 ? fields[iUrl] || "" : "";
+      const notes = getField(row, "notes");
+      const url = getField(row, "url");
 
-      const inactiveStr = iInactive >= 0 ? fields[iInactive]?.toLowerCase() : "no";
+      const inactiveStr = getField(row, "inactive")?.toLowerCase() || "no";
       const inactive = inactiveStr === "yes" || inactiveStr === "true" || inactiveStr === "1";
 
       subscriptions.push({
@@ -529,7 +468,7 @@ export async function importFromCsv(
       });
     }
 
-    return subscriptions.length > 0 ? subscriptions : null;
+    return subscriptions;
   } catch (e) {
     console.error("Failed to import CSV:", e);
     return null;

@@ -84,3 +84,25 @@ export const logoAssets: LogoAsset[] = [
 export function isImageIcon(icon: string): boolean {
   return icon.startsWith("/") || icon.startsWith("http") || icon.startsWith("data:");
 }
+
+export function extractDomainFromUrl(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  try {
+    const url = new URL(trimmed.includes("://") ? trimmed : `https://${trimmed}`);
+    return url.hostname || null;
+  } catch {
+    return null;
+  }
+}
+
+export function buildGoogleFaviconUrl(domain: string, size = 128): string {
+  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${size}`;
+}
+
+export function buildFaviconFromInputUrl(input: string, size = 128): string | null {
+  const domain = extractDomainFromUrl(input);
+  if (!domain) return null;
+  return buildGoogleFaviconUrl(domain, size);
+}

@@ -88,8 +88,6 @@ export function getPaymentDatesInMonth(
   const startOfMonth = new Date(year, month, 1);
   const endOfMonth = new Date(year, month + 1, 0);
 
-  const incrementMs = getIncrementMs(sub.cycle, sub.frequency);
-
   // Walk backwards to find start before month
   let current = new Date(nextPayment);
   while (current > startOfMonth) {
@@ -117,21 +115,36 @@ function addCycleIncrement(date: Date, cycle: CycleType, frequency: number, dire
   switch (cycle) {
     case 1: d.setDate(d.getDate() + frequency * mult); break;
     case 2: d.setDate(d.getDate() + 7 * frequency * mult); break;
-    case 3: d.setMonth(d.getMonth() + frequency * mult); break;
-    case 4: d.setFullYear(d.getFullYear() + frequency * mult); break;
+    case 3: return addMonthsPreservingMonthEnd(d, frequency * mult);
+    case 4: return addMonthsPreservingMonthEnd(d, 12 * frequency * mult);
   }
   return d;
 }
 
-function getIncrementMs(cycle: CycleType, frequency: number): number {
-  const day = 86400000;
-  switch (cycle) {
-    case 1: return day * frequency;
-    case 2: return day * 7 * frequency;
-    case 3: return day * 30 * frequency;
-    case 4: return day * 365 * frequency;
-    default: return day * 30;
-  }
+export function getNextCycleDate(date: Date, cycle: CycleType, frequency: number): Date {
+  return addCycleIncrement(date, cycle, frequency, 1);
+}
+
+function addMonthsPreservingMonthEnd(date: Date, monthsDelta: number): Date {
+  const source = new Date(date);
+  const sourceDay = source.getDate();
+  const sourceLastDay = new Date(source.getFullYear(), source.getMonth() + 1, 0).getDate();
+  const isMonthEndAnchor = sourceDay === sourceLastDay;
+
+  const targetYear = source.getFullYear();
+  const targetMonth = source.getMonth() + monthsDelta;
+  const targetLastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+  const targetDay = isMonthEndAnchor ? targetLastDay : Math.min(sourceDay, targetLastDay);
+
+  return new Date(
+    targetYear,
+    targetMonth,
+    targetDay,
+    source.getHours(),
+    source.getMinutes(),
+    source.getSeconds(),
+    source.getMilliseconds(),
+  );
 }
 
 /**

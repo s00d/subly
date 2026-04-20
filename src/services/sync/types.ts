@@ -6,6 +6,7 @@ export interface SyncMeta {
   lastSyncedAt: number;
   updatedAt: number;
   deviceId: string;
+  revision?: string;
 }
 
 export interface SyncPayload {

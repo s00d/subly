@@ -275,6 +275,7 @@ export const useCatalogStore = defineStore("catalog", () => {
 
   async function retranslateDefaults() {
     const subs = useSubscriptionsStore();
+    const changedTagNames: Array<{ oldName: string; newName: string }> = [];
 
     for (const cat of categories.value) {
       if (cat.i18nKey) {
@@ -306,9 +307,22 @@ export const useCatalogStore = defineStore("catalog", () => {
               if (idx !== -1) sub.tags[idx] = newName;
             }
             tag.name = newName;
+            changedTagNames.push({ oldName, newName });
           }
         }
       }
+    }
+
+    await Promise.all([
+      ...categories.value.map((cat) => dbUpsertCategory(cat)),
+      ...currencies.value.map((cur) => dbUpsertCurrency(cur)),
+      ...paymentMethods.value.map((pm) => dbUpsertPaymentMethod(pm)),
+      ...tags.value.map((tag) => dbUpsertTag(tag)),
+      ...subs.subscriptions.map((sub) => dbUpdateSubscription(sub)),
+    ]);
+
+    for (const pair of changedTagNames) {
+      await dbUpdateExpenseTagsBatch(pair.oldName, pair.newName);
     }
   }
 

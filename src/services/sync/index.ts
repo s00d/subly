@@ -12,6 +12,7 @@ export {
   handleOAuthCode,
   syncNow,
   uploadNow,
+  flushSyncBeforeExit,
   checkRemote,
   pullRemote,
   pushLocal,
