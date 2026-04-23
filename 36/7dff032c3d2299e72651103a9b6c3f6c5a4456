@@ -1,0 +1,66 @@
+src/pages/SubscriptionsPage.vue
+  c5feab9b42155271 22,42,45-58,60,114,174,333-339,450-488,490,584-585,627,685
+src/components/subscriptions/SubscriptionForm.vue
+  c5feab9b42155271 21,134-135,137
+src/components/layout/AppHeader.vue
+  c5feab9b42155271 36,41-58,68,71
+src/services/logoAssets.ts
+  c5feab9b42155271 104-119,125-160
+src/composables/useHeaderActions.ts
+  c5feab9b42155271 8
+src/pages/ExpensesPage.vue
+  c5feab9b42155271 23,37,46-59,61,72,147,246-248,349-368,370,428,446,452,493
+package.json
+  h_9f37069a6b3ceb 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "367dff032c3d2299e72651103a9b6c3f6c5a4456",
+  "prompts": {
+    "405a9d1fc27e9f64": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2a5e2f04-3aa3-4c63-a338-2c80f6ac9045",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin",
+      "messages": [],
+      "total_additions": 1196,
+      "total_deletions": 536,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "4b4e0dee53c2e5ee": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8a38e59b-b696-44a2-94c8-bb26aff5abd4",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin",
+      "messages": [],
+      "total_additions": 236,
+      "total_deletions": 408,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "c5feab9b42155271": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "00da9f19-c3db-4047-b14a-1156e4452e1f",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin",
+      "messages": [],
+      "total_additions": 246,
+      "total_deletions": 169,
+      "accepted_lines": 197,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_9f37069a6b3ceb": {
+      "author": "Pavel Kuzmin"
+    }
+  }
+}
