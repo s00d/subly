@@ -1,0 +1,36 @@
+package.json
+  h_9f37069a6b3ceb 4
+src/components/expenses/ExpenseForm.vue
+  c5feab9b42155271 11,19-20,38,42-43,75,113-129,250-267
+src/components/expenses/ExpenseDetail.vue
+  c5feab9b42155271 209
+src/pages/ExpensesPage.vue
+  c5feab9b42155271 333
+src/components/subscriptions/SubscriptionForm.vue
+  c5feab9b42155271 22,75,156-167,638-639,641-642
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "ccde66838239c3f06eafb9252a0e4eb01a99e275",
+  "prompts": {
+    "c5feab9b42155271": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "00da9f19-c3db-4047-b14a-1156e4452e1f",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin",
+      "messages": [],
+      "total_additions": 62,
+      "total_deletions": 11,
+      "accepted_lines": 66,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_9f37069a6b3ceb": {
+      "author": "Pavel Kuzmin"
+    }
+  }
+}
