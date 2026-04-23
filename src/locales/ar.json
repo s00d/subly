@@ -485,5 +485,15 @@
   "select_date": "اختر التاريخ",
   "yesterday": "أمس",
   "today": "اليوم",
-  "tomorrow": "غدًا"
+  "tomorrow": "غدًا",
+  "bulk_add_mode": "إضافة جماعية عبر CSV",
+  "bulk_add_csv": "CSV الاشتراكات",
+  "bulk_add_csv_hint": "ألصق CSV بالرأس المطلوب لإنشاء عدة اشتراكات دفعة واحدة.",
+  "bulk_add_csv_example": "مثال التنسيق",
+  "bulk_add_import": "استيراد CSV",
+  "bulk_add_import_success": "تم استيراد {count} اشتراك.",
+  "bulk_add_import_partial": "تم الاستيراد: {success}، فشل: {failed}.",
+  "bulk_add_import_failed": "فشل استيراد CSV.",
+  "bulk_add_invalid_header": "رأس CSV غير صالح. المتوقع: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
+  "bulk_add_invalid_row": "السطر {row}: {error}"
 }

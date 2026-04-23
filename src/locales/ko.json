@@ -485,5 +485,15 @@
   "select_date": "날짜 선택",
   "yesterday": "어제",
   "today": "오늘",
-  "tomorrow": "내일"
+  "tomorrow": "내일",
+  "bulk_add_mode": "CSV 대량 추가",
+  "bulk_add_csv": "구독 CSV",
+  "bulk_add_csv_hint": "필수 헤더가 포함된 CSV를 붙여 넣어 여러 구독을 한 번에 생성하세요.",
+  "bulk_add_csv_example": "형식 예시",
+  "bulk_add_import": "CSV 가져오기",
+  "bulk_add_import_success": "구독 {count}개를 가져왔습니다.",
+  "bulk_add_import_partial": "가져옴: {success}, 실패: {failed}.",
+  "bulk_add_import_failed": "CSV 가져오기에 실패했습니다.",
+  "bulk_add_invalid_header": "CSV 헤더가 올바르지 않습니다. 예상: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
+  "bulk_add_invalid_row": "{row}행: {error}"
 }

@@ -485,5 +485,15 @@
   "select_date": "Seleccionar fecha",
   "yesterday": "Ayer",
   "today": "Hoy",
-  "tomorrow": "Mañana"
+  "tomorrow": "Mañana",
+  "bulk_add_mode": "Alta masiva CSV",
+  "bulk_add_csv": "CSV de suscripciones",
+  "bulk_add_csv_hint": "Pega un CSV con el encabezado requerido para crear varias suscripciones a la vez.",
+  "bulk_add_csv_example": "Ejemplo de formato",
+  "bulk_add_import": "Importar CSV",
+  "bulk_add_import_success": "Suscripciones importadas: {count}.",
+  "bulk_add_import_partial": "Importadas: {success}, con error: {failed}.",
+  "bulk_add_import_failed": "Falló la importación CSV.",
+  "bulk_add_invalid_header": "Encabezado CSV inválido. Se espera: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
+  "bulk_add_invalid_row": "Fila {row}: {error}"
 }

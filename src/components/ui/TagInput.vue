@@ -5,10 +5,12 @@ import { useI18n } from "vue-i18n";
 import { X, Plus } from "lucide-vue-next";
 import { tv } from "@/lib/tv";
 
-const props = defineProps<{
-  modelValue: string[];
+const props = withDefaults(defineProps<{
+  modelValue?: string[];
   label?: string;
-}>();
+}>(), {
+  modelValue: () => [],
+});
 
 const emit = defineEmits<{
   "update:modelValue": [value: string[]];
@@ -19,10 +21,11 @@ const { t } = useI18n();
 
 const inputValue = ref("");
 const showSuggestions = ref(false);
+const safeModelValue = computed(() => (Array.isArray(props.modelValue) ? props.modelValue : []));
 
 const quickTags = computed(() =>
   catalogStore.favoriteTags
-    .filter((tag) => !props.modelValue.includes(tag.name))
+    .filter((tag) => !safeModelValue.value.includes(tag.name))
     .map((tag) => tag.name),
 );
 
@@ -30,26 +33,26 @@ const suggestions = computed(() => {
   const allTags = catalogStore.tags;
   if (!inputValue.value.trim()) {
     return allTags
-      .filter((tag) => !props.modelValue.includes(tag.name))
+      .filter((tag) => !safeModelValue.value.includes(tag.name))
       .map((tag) => tag.name);
   }
   const q = inputValue.value.toLowerCase();
   return allTags
-    .filter((tag) => tag.name.toLowerCase().includes(q) && !props.modelValue.includes(tag.name))
+    .filter((tag) => tag.name.toLowerCase().includes(q) && !safeModelValue.value.includes(tag.name))
     .map((tag) => tag.name);
 });
 
 function addTag(tagName: string) {
   const n = tagName.trim();
-  if (!n || props.modelValue.includes(n)) return;
-  emit("update:modelValue", [...props.modelValue, n]);
+  if (!n || safeModelValue.value.includes(n)) return;
+  emit("update:modelValue", [...safeModelValue.value, n]);
   if (!catalogStore.tags.some((t) => t.name === n)) catalogStore.addTag(n);
   inputValue.value = "";
   showSuggestions.value = false;
 }
 
 function removeTag(tagName: string) {
-  emit("update:modelValue", props.modelValue.filter((t) => t !== tagName));
+  emit("update:modelValue", safeModelValue.value.filter((t) => t !== tagName));
 }
 
 function onKeyDown(e: KeyboardEvent) {
@@ -111,8 +114,8 @@ const slots = tagInputTv();
   <div :class="slots.root()">
     <label v-if="label" :class="slots.labelEl()">{{ label }}</label>
 
-    <div :class="slots.tagList()" v-if="modelValue.length > 0">
-      <span v-for="tag in modelValue" :key="tag" :class="slots.tag()">
+    <div :class="slots.tagList()" v-if="safeModelValue.length > 0">
+      <span v-for="tag in safeModelValue" :key="tag" :class="slots.tag()">
         {{ tag }}
         <button type="button" @click="removeTag(tag)" :class="slots.tagRemoveBtn()">
           <X :size="10" />

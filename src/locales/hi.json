@@ -485,5 +485,15 @@
   "select_date": "तारीख चुनें",
   "yesterday": "कल",
   "today": "आज",
-  "tomorrow": "कल"
+  "tomorrow": "कल",
+  "bulk_add_mode": "CSV बल्क ऐड",
+  "bulk_add_csv": "सब्सक्रिप्शन CSV",
+  "bulk_add_csv_hint": "एक साथ कई सब्सक्रिप्शन बनाने के लिए आवश्यक हेडर वाला CSV पेस्ट करें।",
+  "bulk_add_csv_example": "फॉर्मेट उदाहरण",
+  "bulk_add_import": "CSV आयात करें",
+  "bulk_add_import_success": "{count} सब्सक्रिप्शन आयात किए गए।",
+  "bulk_add_import_partial": "आयात: {success}, विफल: {failed}।",
+  "bulk_add_import_failed": "CSV आयात विफल हुआ।",
+  "bulk_add_invalid_header": "अमान्य CSV हेडर। अपेक्षित: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
+  "bulk_add_invalid_row": "पंक्ति {row}: {error}"
 }

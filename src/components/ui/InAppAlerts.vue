@@ -2,8 +2,8 @@
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
+import { useClipboard } from "@/composables/useClipboard";
 import type { InAppAlert } from "@/services/notifications";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Bell, AlertTriangle, Clock, X, Copy } from "lucide-vue-next";
 import { tv } from "@/lib/tv";
 
@@ -19,6 +19,7 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const { fmt } = useCurrencyFormat();
 const { toast } = useToast();
+const { copyToClipboard } = useClipboard();
 
 function alertIcon(type: InAppAlert["type"]) {
   switch (type) {
@@ -39,16 +40,11 @@ function alertText(alert: InAppAlert): string {
 }
 
 async function copyAlert(alert: InAppAlert) {
-  try {
-    await writeText(alertText(alert));
+  const copied = await copyToClipboard(alertText(alert));
+  if (copied) {
     toast(t("copied_to_clipboard"));
-  } catch {
-    try {
-      await navigator.clipboard.writeText(alertText(alert));
-      toast(t("copied_to_clipboard"));
-    } catch {
-      toast(t("error"), "error");
-    }
+  } else {
+    toast(t("error"), "error");
   }
 }
 

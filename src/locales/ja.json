@@ -485,5 +485,15 @@
   "select_date": "日付を選択",
   "yesterday": "昨日",
   "today": "今日",
-  "tomorrow": "明日"
+  "tomorrow": "明日",
+  "bulk_add_mode": "CSV一括追加",
+  "bulk_add_csv": "サブスクリプションCSV",
+  "bulk_add_csv_hint": "必要なヘッダー付きCSVを貼り付けて、複数のサブスクを一括作成します。",
+  "bulk_add_csv_example": "フォーマット例",
+  "bulk_add_import": "CSVをインポート",
+  "bulk_add_import_success": "{count} 件のサブスクをインポートしました。",
+  "bulk_add_import_partial": "インポート: {success}、失敗: {failed}。",
+  "bulk_add_import_failed": "CSVのインポートに失敗しました。",
+  "bulk_add_invalid_header": "CSVヘッダーが不正です。期待値: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
+  "bulk_add_invalid_row": "{row} 行目: {error}"
 }

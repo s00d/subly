@@ -526,5 +526,15 @@
   "select_date": "Выберите дату",
   "yesterday": "Вчера",
   "today": "Сегодня",
-  "tomorrow": "Завтра"
+  "tomorrow": "Завтра",
+  "bulk_add_mode": "Массовое CSV добавление",
+  "bulk_add_csv": "CSV подписок",
+  "bulk_add_csv_hint": "Вставьте CSV с обязательным заголовком, чтобы добавить несколько подписок сразу.",
+  "bulk_add_csv_example": "Пример формата",
+  "bulk_add_import": "Импорт CSV",
+  "bulk_add_import_success": "Импортировано подписок: {count}.",
+  "bulk_add_import_partial": "Импортировано: {success}, ошибок: {failed}.",
+  "bulk_add_import_failed": "Не удалось импортировать CSV.",
+  "bulk_add_invalid_header": "Неверный заголовок CSV. Ожидается: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
+  "bulk_add_invalid_row": "Строка {row}: {error}"
 }

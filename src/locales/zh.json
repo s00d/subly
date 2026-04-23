@@ -485,5 +485,15 @@
   "select_date": "选择日期",
   "yesterday": "昨天",
   "today": "今天",
-  "tomorrow": "明天"
+  "tomorrow": "明天",
+  "bulk_add_mode": "批量CSV添加",
+  "bulk_add_csv": "订阅CSV",
+  "bulk_add_csv_hint": "粘贴带有必需表头的 CSV，一次创建多条订阅。",
+  "bulk_add_csv_example": "格式示例",
+  "bulk_add_import": "导入CSV",
+  "bulk_add_import_success": "已导入 {count} 条订阅。",
+  "bulk_add_import_partial": "已导入：{success}，失败：{failed}。",
+  "bulk_add_import_failed": "CSV 导入失败。",
+  "bulk_add_invalid_header": "CSV 表头无效。应为：name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
+  "bulk_add_invalid_row": "第 {row} 行：{error}"
 }

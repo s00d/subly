@@ -485,5 +485,15 @@
   "select_date": "Datum auswählen",
   "yesterday": "Gestern",
   "today": "Heute",
-  "tomorrow": "Morgen"
+  "tomorrow": "Morgen",
+  "bulk_add_mode": "CSV-Massenimport",
+  "bulk_add_csv": "Abonnement-CSV",
+  "bulk_add_csv_hint": "CSV mit dem erforderlichen Header einfügen, um mehrere Abos auf einmal zu erstellen.",
+  "bulk_add_csv_example": "Formatbeispiel",
+  "bulk_add_import": "CSV importieren",
+  "bulk_add_import_success": "Abonnements importiert: {count}.",
+  "bulk_add_import_partial": "Importiert: {success}, fehlgeschlagen: {failed}.",
+  "bulk_add_import_failed": "CSV-Import fehlgeschlagen.",
+  "bulk_add_invalid_header": "Ungültiger CSV-Header. Erwartet: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
+  "bulk_add_invalid_row": "Zeile {row}: {error}"
 }

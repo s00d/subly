@@ -12,6 +12,7 @@ import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useToast } from "@/composables/useToast";
 import { useScrollLock } from "@/composables/useScrollLock";
+import { useClipboard } from "@/composables/useClipboard";
 import type { Subscription } from "@/schemas/appData";
 import SubscriptionForm from "@/components/subscriptions/SubscriptionForm.vue";
 import SubscriptionDetail from "@/components/subscriptions/SubscriptionDetail.vue";
@@ -24,7 +25,6 @@ import Tooltip from "@/components/ui/Tooltip.vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Menu } from "@tauri-apps/api/menu";
 import type { MenuItemOptions, PredefinedMenuItemOptions } from "@tauri-apps/api/menu";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 
 const subsStore = useSubscriptionsStore();
 const settingsStore = useSettingsStore();
@@ -36,6 +36,7 @@ const { setActions, clearActions } = useHeaderActions();
 const { fmt } = useCurrencyFormat();
 const { fmtDateMedium } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
+const { copyToClipboard } = useClipboard();
 
 const now = ref(Date.now());
 let nowInterval: ReturnType<typeof setInterval> | null = null;
@@ -400,8 +401,9 @@ async function handleOpenUrl(url: string) {
 }
 
 async function handleCopyName(sub: Subscription) {
-  try { await writeText(sub.name); toast(t("copied_to_clipboard")); }
-  catch (e) { console.error("Failed to copy:", e); }
+  const copied = await copyToClipboard(sub.name);
+  if (copied) toast(t("copied_to_clipboard"));
+  else toast(t("error"), "error");
 }
 
 async function onSaved() {

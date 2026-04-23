@@ -485,5 +485,15 @@
   "select_date": "Tarih seç",
   "yesterday": "Dün",
   "today": "Bugün",
-  "tomorrow": "Yarın"
+  "tomorrow": "Yarın",
+  "bulk_add_mode": "Toplu CSV ekleme",
+  "bulk_add_csv": "Abonelik CSV",
+  "bulk_add_csv_hint": "Birden fazla aboneliği tek seferde oluşturmak için gerekli başlıklı CSV yapıştırın.",
+  "bulk_add_csv_example": "Biçim örneği",
+  "bulk_add_import": "CSV içe aktar",
+  "bulk_add_import_success": "İçe aktarılan abonelik: {count}.",
+  "bulk_add_import_partial": "İçe aktarıldı: {success}, başarısız: {failed}.",
+  "bulk_add_import_failed": "CSV içe aktarma başarısız oldu.",
+  "bulk_add_invalid_header": "Geçersiz CSV başlığı. Beklenen: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
+  "bulk_add_invalid_row": "Satır {row}: {error}"
 }

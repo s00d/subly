@@ -485,5 +485,15 @@
   "select_date": "Selecionar data",
   "yesterday": "Ontem",
   "today": "Hoje",
-  "tomorrow": "Amanhã"
+  "tomorrow": "Amanhã",
+  "bulk_add_mode": "Adição em massa CSV",
+  "bulk_add_csv": "CSV de assinaturas",
+  "bulk_add_csv_hint": "Cole um CSV com o cabeçalho obrigatório para criar várias assinaturas de uma vez.",
+  "bulk_add_csv_example": "Exemplo de formato",
+  "bulk_add_import": "Importar CSV",
+  "bulk_add_import_success": "Assinaturas importadas: {count}.",
+  "bulk_add_import_partial": "Importadas: {success}, com falha: {failed}.",
+  "bulk_add_import_failed": "Falha ao importar CSV.",
+  "bulk_add_invalid_header": "Cabeçalho CSV inválido. Esperado: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
+  "bulk_add_invalid_row": "Linha {row}: {error}"
 }

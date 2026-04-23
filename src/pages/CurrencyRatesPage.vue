@@ -4,10 +4,10 @@ import { useI18n } from "vue-i18n";
 import { useSettingsStore } from "@/stores/settings";
 import { useCatalogStore } from "@/stores/catalog";
 import { useToast } from "@/composables/useToast";
+import { useClipboard } from "@/composables/useClipboard";
 import { useHeaderActions } from "@/composables/useHeaderActions";
 import { updateCurrencyRates } from "@/services/rates";
 import type { RatesProviderType } from "@/services/rates";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import Toast from "@/components/ui/Toast.vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import AppSlider from "@/components/ui/AppSlider.vue";
@@ -24,6 +24,7 @@ const settingsStore = useSettingsStore();
 const catalogStore = useCatalogStore();
 const converterStore = useConverterStore();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
+const { copyToClipboard } = useClipboard();
 const { clearActions } = useHeaderActions();
 
 onMounted(() => {
@@ -210,10 +211,10 @@ function deselectAllTargets() {
 }
 
 async function copyRow(text: string, id: string) {
-  try {
-    await writeText(text);
-  } catch {
-    try { await navigator.clipboard.writeText(text); } catch { toast(t("error"), "error"); return; }
+  const copied = await copyToClipboard(text);
+  if (!copied) {
+    toast(t("error"), "error");
+    return;
   }
   copiedId.value = id;
   setTimeout(() => { if (copiedId.value === id) copiedId.value = null; }, 1200);
@@ -259,10 +260,10 @@ async function copyAllConversion() {
     return `${flag ? flag + " " : ""}${cur.code}: ${val} ${cur.symbol}`;
   });
   const text = lines.join("\n");
-  try {
-    await writeText(text);
-  } catch {
-    try { await navigator.clipboard.writeText(text); } catch { toast(t("error"), "error"); return; }
+  const copied = await copyToClipboard(text);
+  if (!copied) {
+    toast(t("error"), "error");
+    return;
   }
   toast(t("copied_to_clipboard"));
 }
@@ -482,7 +483,7 @@ async function copyAllConversion() {
       </div>
 
       <!-- List -->
-      <div class="max-h-[32rem] overflow-y-auto -mx-1 px-1">
+      <div class="max-h-128 overflow-y-auto -mx-1 px-1">
         <div
           v-for="rate in allRates"
           :key="rate.id"

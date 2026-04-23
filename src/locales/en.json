@@ -526,5 +526,15 @@
   "select_date": "Select date",
   "yesterday": "Yesterday",
   "today": "Today",
-  "tomorrow": "Tomorrow"
+  "tomorrow": "Tomorrow",
+  "bulk_add_mode": "Bulk CSV Add",
+  "bulk_add_csv": "CSV subscriptions",
+  "bulk_add_csv_hint": "Paste CSV with the required header to create multiple subscriptions at once.",
+  "bulk_add_csv_example": "Format example",
+  "bulk_add_import": "Import CSV",
+  "bulk_add_import_success": "Imported {count} subscription(s).",
+  "bulk_add_import_partial": "Imported: {success}, failed: {failed}.",
+  "bulk_add_import_failed": "CSV import failed.",
+  "bulk_add_invalid_header": "Invalid CSV header. Expected: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
+  "bulk_add_invalid_row": "Row {row}: {error}"
 }

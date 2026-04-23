@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { watch } from "vue";
-import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { useClipboard } from "@/composables/useClipboard";
 import { CheckCircle, XCircle, Info, AlertTriangle, X, Copy } from "lucide-vue-next";
 import { tv } from "@/lib/tv";
 
@@ -21,6 +21,7 @@ const icons = {
 };
 
 let timer: ReturnType<typeof setTimeout> | null = null;
+const { copyToClipboard } = useClipboard();
 
 watch(() => props.show, (val) => {
   if (timer) { clearTimeout(timer); timer = null; }
@@ -30,11 +31,7 @@ watch(() => props.show, (val) => {
 });
 
 async function copyMessage() {
-  try {
-    await writeText(props.message);
-  } catch {
-    try { await navigator.clipboard.writeText(props.message); } catch { /* ignore */ }
-  }
+  await copyToClipboard(props.message);
 }
 
 const toastTv = tv({
