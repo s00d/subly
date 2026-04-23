@@ -330,11 +330,11 @@ function getPaymentMethod(id: string) {
   return catalogStore.paymentMethods.find((p) => p.id === id);
 }
 
-function getDaysBadgeClass(nextPayment: string): string {
+function getDaysBadgeState(nextPayment: string): "days-badge--danger" | "days-badge--warn" | "days-badge--normal" {
   const days = getDaysUntilPayment(nextPayment);
-  if (days <= 3) return "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400";
-  if (days <= 7) return "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400";
-  return "bg-primary-light text-primary";
+  if (days <= 3) return "days-badge--danger";
+  if (days <= 7) return "days-badge--warn";
+  return "days-badge--normal";
 }
 
 const formatDate = fmtDateMedium;
@@ -581,9 +581,13 @@ async function onDetailToggleFavorite(id: string) {
                 <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
               </div>
               <p class="text-xs font-medium text-text-primary truncate min-w-0 flex-1">{{ sub.name }}</p>
-              <span v-if="!sub.inactive" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none shrink-0"
-                :class="getDaysBadgeClass(sub.nextPayment)"
-              >{{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}</span>
+              <span
+                v-if="!sub.inactive"
+                class="days-badge inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none shrink-0"
+                :class="getDaysBadgeState(sub.nextPayment)"
+              >
+                {{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}
+              </span>
               <p class="text-xs font-semibold text-text-primary shrink-0">{{ fmt(sub.price, sub.currencyId) }}</p>
             </div>
 
@@ -623,9 +627,13 @@ async function onDetailToggleFavorite(id: string) {
                   </div>
                   <div class="text-right">
                     <p class="text-xs font-medium" :class="isOverdue(sub) ? 'text-red-500' : 'text-text-primary'">{{ formatDate(sub.nextPayment) }}</p>
-                    <span v-if="!sub.inactive" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none mt-0.5"
-                      :class="getDaysBadgeClass(sub.nextPayment)"
-                    >{{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}</span>
+                    <span
+                      v-if="!sub.inactive"
+                      class="days-badge inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none mt-0.5"
+                      :class="getDaysBadgeState(sub.nextPayment)"
+                    >
+                      {{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}
+                    </span>
                   </div>
                 </div>
 
@@ -681,9 +689,13 @@ async function onDetailToggleFavorite(id: string) {
                     <p class="text-xs sm:text-sm font-medium" :class="isOverdue(sub) ? 'text-red-500' : 'text-text-primary'">
                       <span class="hidden sm:inline">{{ formatDate(sub.nextPayment) }}</span>
                     </p>
-                    <span v-if="!sub.inactive" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none"
-                      :class="getDaysBadgeClass(sub.nextPayment)"
-                    >{{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}</span>
+                    <span
+                      v-if="!sub.inactive"
+                      class="days-badge inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none"
+                      :class="getDaysBadgeState(sub.nextPayment)"
+                    >
+                      {{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}
+                    </span>
                   </div>
                 </div>
                 <div class="text-right shrink-0">
@@ -824,3 +836,32 @@ async function onDetailToggleFavorite(id: string) {
     <Toast :show="showToast" :message="toastMsg" :type="toastType" @close="closeToast" />
   </div>
 </template>
+
+<style scoped>
+.days-badge {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+  border-width: 2px;
+  border-style: solid;
+}
+
+.days-badge--danger {
+  border-color: #f87171;
+}
+
+.days-badge--warn {
+  border-color: #fb923c;
+}
+
+.days-badge--normal {
+  border-color: var(--color-primary-hover);
+}
+
+:global(.dark) .days-badge--danger {
+  border-color: #ef4444;
+}
+
+:global(.dark) .days-badge--warn {
+  border-color: #f97316;
+}
+</style>

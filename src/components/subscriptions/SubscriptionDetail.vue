@@ -148,11 +148,14 @@ const formatDateShort = fmtDateMedium;
       <div class="flex flex-wrap gap-2">
         <button
           @click="emit('toggleFavorite', sub.id)"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer"
-          :class="sub.favorite ? 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' : 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 hover:text-yellow-500'"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer border"
+          :class="sub.favorite
+            ? 'bg-surface-hover border-border text-text-primary'
+            : 'bg-surface-hover border-border text-text-secondary hover:text-text-primary hover:bg-surface-secondary'"
           :title="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')"
         >
-          <Star :size="12" :fill="sub.favorite ? 'currentColor' : 'none'" /> {{ t('favorite') }}
+          <Star :size="12" :fill="sub.favorite ? 'currentColor' : 'none'" class="text-amber-500" />
+          {{ t('favorite') }}
         </button>
         <span v-if="sub.inactive" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
           <Power :size="12" /> {{ t('inactive') }}
@@ -161,10 +164,22 @@ const formatDateShort = fmtDateMedium;
           <AlertTriangle :size="12" /> {{ t('overdue') }}
         </span>
         <span v-if="!sub.inactive"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium"
-          :class="daysLeft <= 3 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : daysLeft <= 7 ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-primary-light text-primary'"
+          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-surface-hover text-text-primary border"
+          :class="daysLeft <= 3
+            ? 'border-red-200 dark:border-red-800'
+            : daysLeft <= 7
+              ? 'border-orange-200 dark:border-orange-800'
+              : 'border-border'"
         >
-          <Clock :size="12" /> {{ daysLeft }}{{ t('days_short') }} {{ t('next_payment').toLowerCase() }}
+          <Clock
+            :size="12"
+            :class="daysLeft <= 3
+              ? 'text-red-500 dark:text-red-400'
+              : daysLeft <= 7
+                ? 'text-orange-500 dark:text-orange-400'
+                : 'text-primary'"
+          />
+          {{ daysLeft }}{{ t('days_short') }} {{ t('next_payment').toLowerCase() }}
         </span>
       </div>
 
@@ -279,53 +294,54 @@ const formatDateShort = fmtDateMedium;
     </div>
 
     <template #footer>
-      <div class="flex items-center gap-0.5 sm:gap-1 w-full overflow-x-auto scrollbar-none">
-        <Tooltip v-if="sub && !sub.inactive" :text="t('record_payment')">
-          <button
-            @click="emit('recordPayment', sub!.id)"
-            class="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors shrink-0"
-          >
-            <CircleDollarSign :size="16" />
-          </button>
-        </Tooltip>
-        <Tooltip v-if="sub" :text="t('renew')">
-          <button
-            @click="emit('renew', sub!.id)"
-            class="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors shrink-0"
-          >
-            <RefreshCw :size="16" />
-          </button>
-        </Tooltip>
-        <Tooltip v-if="sub" :text="t('clone')">
-          <button
-            @click="emit('clone', sub!.id)"
-            class="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-primary hover:bg-primary-light transition-colors shrink-0"
-          >
-            <Copy :size="16" />
-          </button>
-        </Tooltip>
-        <Tooltip v-if="sub" :text="t('edit_subscription')">
-          <button
-            @click="emit('edit', sub!)"
-            class="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-primary hover:bg-primary-light transition-colors shrink-0"
-          >
-            <Pencil :size="16" />
-          </button>
-        </Tooltip>
-        <Tooltip v-if="sub" :text="t('delete')">
-          <button
-            @click="emit('delete', sub!.id)"
-            class="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
-          >
-            <Trash2 :size="16" />
-          </button>
-        </Tooltip>
+      <div class="w-full flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+          <Tooltip v-if="sub && !sub.inactive" :text="t('record_payment')" position="top">
+            <button
+              @click="emit('recordPayment', sub!.id)"
+              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
+            >
+              <CircleDollarSign :size="16" />
+            </button>
+          </Tooltip>
+          <Tooltip v-if="sub" :text="t('renew')" position="top">
+            <button
+              @click="emit('renew', sub!.id)"
+              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
+            >
+              <RefreshCw :size="16" />
+            </button>
+          </Tooltip>
+          <Tooltip v-if="sub" :text="t('clone')" position="top">
+            <button
+              @click="emit('clone', sub!.id)"
+              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
+            >
+              <Copy :size="16" />
+            </button>
+          </Tooltip>
+          <Tooltip v-if="sub" :text="t('edit_subscription')" position="top">
+            <button
+              @click="emit('edit', sub!)"
+              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
+            >
+              <Pencil :size="16" />
+            </button>
+          </Tooltip>
+          <Tooltip v-if="sub" :text="t('delete')" position="top">
+            <button
+              @click="emit('delete', sub!.id)"
+              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
+            >
+              <Trash2 :size="16" />
+            </button>
+          </Tooltip>
+        </div>
 
         <div class="flex-1" />
-
         <button
           @click="emit('close')"
-          class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors shrink-0"
+          class="h-9 px-3 sm:px-4 rounded-xl border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors shrink-0"
         >{{ t('cancel') }}</button>
       </div>
     </template>

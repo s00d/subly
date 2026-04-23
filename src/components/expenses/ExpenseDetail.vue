@@ -196,35 +196,37 @@ async function handleOpenUrl(url: string) {
     </div>
 
     <template #footer>
-      <div class="flex items-center gap-0.5 sm:gap-1 w-full overflow-x-auto scrollbar-none">
-        <Tooltip v-if="exp && exp.url" :text="t('url')">
-          <button
-            @click="handleOpenUrl(exp!.url)"
-            class="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-primary hover:bg-primary-light transition-colors shrink-0"
-          >
-            <ExternalLink :size="16" />
-          </button>
-        </Tooltip>
-        <Tooltip v-if="exp" :text="t('edit')">
-          <button
-            @click="emit('edit', exp!)"
-            class="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-primary hover:bg-primary-light transition-colors shrink-0"
-          >
-            <Pencil :size="16" />
-          </button>
-        </Tooltip>
-        <Tooltip v-if="exp" :text="t('delete')">
-          <button
-            @click="emit('delete', exp!.id)"
-            class="p-1.5 sm:p-2 rounded-lg text-text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"
-          >
-            <Trash2 :size="16" />
-          </button>
-        </Tooltip>
+      <div class="w-full flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+          <Tooltip v-if="exp && exp.url" :text="t('url')" position="top">
+            <button
+              @click="handleOpenUrl(exp!.url)"
+              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
+            >
+              <ExternalLink :size="16" />
+            </button>
+          </Tooltip>
+          <Tooltip v-if="exp" :text="t('edit')" position="top">
+            <button
+              @click="emit('edit', exp!)"
+              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
+            >
+              <Pencil :size="16" />
+            </button>
+          </Tooltip>
+          <Tooltip v-if="exp" :text="t('delete')" position="top">
+            <button
+              @click="emit('delete', exp!.id)"
+              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
+            >
+              <Trash2 :size="16" />
+            </button>
+          </Tooltip>
+        </div>
         <div class="flex-1" />
         <button
           @click="emit('close')"
-          class="px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors shrink-0"
+          class="h-9 px-3 sm:px-4 rounded-xl border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors shrink-0"
         >{{ t('cancel') }}</button>
       </div>
     </template>
