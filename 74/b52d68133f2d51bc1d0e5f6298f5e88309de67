@@ -1,0 +1,46 @@
+src/components/subscriptions/SubscriptionForm.vue
+  c5feab9b42155271 3,12,22,41-42,44-45,70-94,107-111,202-459,464-498,564-565,575,580,651,655-665,667,669
+src/components/ui/InAppAlerts.vue
+  c5feab9b42155271 5,22,43-44,46-47
+src/pages/CurrencyRatesPage.vue
+  c5feab9b42155271 7,27,214-217,263-266,486
+src/pages/SubscriptionsPage.vue
+  c5feab9b42155271 15,39,404-406
+src-tauri/capabilities/desktop.json
+  c5feab9b42155271 16
+package.json
+  h_9f37069a6b3ceb 4
+src/components/ui/Toast.vue
+  c5feab9b42155271 3,24,34
+src/composables/useClipboard.ts
+  c5feab9b42155271 1-26
+src/components/ui/TagInput.vue
+  c5feab9b42155271 8-9,11-13,24,28,36,41,47-48,55,117-118
+src-tauri/capabilities/default.json
+  c5feab9b42155271 20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "74b52d68133f2d51bc1d0e5f6298f5e88309de67",
+  "prompts": {
+    "c5feab9b42155271": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "00da9f19-c3db-4047-b14a-1156e4452e1f",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin",
+      "messages": [],
+      "total_additions": 567,
+      "total_deletions": 220,
+      "accepted_lines": 420,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_9f37069a6b3ceb": {
+      "author": "Pavel Kuzmin"
+    }
+  }
+}
