@@ -652,21 +652,21 @@ async function copyBulkTemplate() {
     </form>
 
     <template #footer>
+      <button
+        @click="bulkMode = !bulkMode"
+        class="mr-auto px-3 py-2 rounded-lg border border-border text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors inline-flex items-center"
+        :title="bulkMode ? t('add_subscription') : t('bulk_add_mode')"
+      ><Table2 :size="16" /></button>
       <div class="flex items-center gap-2">
         <button
           @click="emit('close')"
           class="px-4 py-2 rounded-lg border border-border text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors"
         >{{ t('cancel') }}</button>
         <button
-          @click="bulkMode = !bulkMode"
-          class="px-3 py-2 rounded-lg border border-border text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors inline-flex items-center"
-          :title="bulkMode ? t('add_subscription') : t('bulk_add_mode')"
-        ><Table2 :size="16" /></button>
+          @click="bulkMode ? handleBulkImport() : handleSubmit()"
+          class="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors"
+        >{{ bulkMode ? t('bulk_add_import') : t('save') }}</button>
       </div>
-      <button
-        @click="bulkMode ? handleBulkImport() : handleSubmit()"
-        class="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors"
-      >{{ bulkMode ? t('bulk_add_import') : t('save') }}</button>
     </template>
   </Modal>
 </template>
