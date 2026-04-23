@@ -8,6 +8,7 @@ import { useToast } from "@/composables/useToast";
 import type { Expense } from "@/schemas/appData";
 import { ExpenseSchema } from "@/schemas/appData";
 import { mapZodErrors, type ZodFieldMeta } from "@/composables/useZodErrors";
+import { useClipboard } from "@/composables/useClipboard";
 import Modal from "@/components/ui/Modal.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppDatePicker from "@/components/ui/AppDatePicker.vue";
@@ -15,6 +16,8 @@ import AppTextarea from "@/components/ui/AppTextarea.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import TagInput from "@/components/ui/TagInput.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
+import { Globe, Loader2 } from "lucide-vue-next";
+import { resolveFaviconFromInputUrl } from "@/services/logoAssets";
 
 const props = defineProps<{
   show: boolean;
@@ -32,9 +35,12 @@ const settingsStore = useSettingsStore();
 const catalogStore = useCatalogStore();
 const { t } = useI18n();
 const { toast } = useToast();
+const { copyToClipboard } = useClipboard();
 
 const form = ref<Partial<Expense>>({});
 const errors = reactive<Record<string, string>>({});
+const iconPreview = ref("");
+const isResolvingIcon = ref(false);
 
 const fieldMeta: ZodFieldMeta = {
   name: "string",
@@ -66,6 +72,7 @@ watch(() => props.show, (val) => {
   if (val) {
     if (props.editExpense) {
       form.value = { ...props.editExpense };
+      iconPreview.value = "";
     } else {
       resetForm();
       if (props.prefill) {
@@ -101,6 +108,23 @@ const payerOptions = computed<SelectOption[]>(() =>
 
 function clearErrors() {
   Object.keys(errors).forEach((k) => delete errors[k]);
+}
+
+async function applyDomainIcon() {
+  if (isResolvingIcon.value) return;
+  isResolvingIcon.value = true;
+  try {
+    const faviconUrl = await resolveFaviconFromInputUrl(form.value.url || "");
+    if (!faviconUrl) {
+      toast("Could not load icon from this domain", "error");
+      return;
+    }
+    iconPreview.value = faviconUrl;
+    await copyToClipboard(faviconUrl);
+    toast("Icon URL copied from domain");
+  } finally {
+    isResolvingIcon.value = false;
+  }
 }
 
 function handleSave() {
@@ -223,6 +247,24 @@ function handleSave() {
         :placeholder="'https://...'"
         type="url"
       />
+      <div class="flex items-center gap-2">
+        <button
+          type="button"
+          @click="applyDomainIcon"
+          :disabled="isResolvingIcon"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <Loader2 v-if="isResolvingIcon" :size="14" class="animate-spin" />
+          <Globe v-else :size="14" />
+          Get icon from domain
+        </button>
+        <img
+          v-if="iconPreview"
+          :src="iconPreview"
+          alt="Domain icon preview"
+          class="w-6 h-6 rounded border border-border object-contain"
+        />
+      </div>
 
       <!-- Tags -->
       <TagInput

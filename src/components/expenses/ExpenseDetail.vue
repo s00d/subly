@@ -206,7 +206,7 @@ async function handleOpenUrl(url: string) {
               <ExternalLink :size="16" />
             </button>
           </Tooltip>
-          <Tooltip v-if="exp" :text="t('edit')" position="top">
+          <Tooltip v-if="exp" :text="t('edit_expense')" position="top">
             <button
               @click="emit('edit', exp!)"
               class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"

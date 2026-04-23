@@ -330,7 +330,7 @@ async function showContextMenu(exp: Expense, event: MouseEvent) {
   if (selectionMode.value) return;
 
   const items: (MenuItemOptions | PredefinedMenuItemOptions)[] = [
-    { id: "edit", text: t("edit"), action: () => openEdit(exp) },
+    { id: "edit", text: t("edit_expense"), action: () => openEdit(exp) },
   ];
   if (exp.url) {
     items.push({ id: "url", text: t("url"), action: () => handleOpenUrl(exp.url) });

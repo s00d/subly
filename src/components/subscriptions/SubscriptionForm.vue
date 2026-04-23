@@ -19,7 +19,7 @@ import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import LogoPicker from "@/components/ui/LogoPicker.vue";
 import TagInput from "@/components/ui/TagInput.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
-import { Sparkles, Globe, Copy, Table2 } from "lucide-vue-next";
+import { Sparkles, Globe, Copy, Table2, Loader2 } from "lucide-vue-next";
 import { resolveFaviconFromInputUrl } from "@/services/logoAssets";
 import { getNextCycleDate } from "@/services/calculations";
 
@@ -72,6 +72,7 @@ const errors = reactive<Record<string, string>>({});
 const bulkMode = ref(false);
 const bulkCsv = ref("");
 const bulkImportErrors = ref<string[]>([]);
+const isResolvingIcon = ref(false);
 let bulkValidationTimer: ReturnType<typeof setTimeout> | null = null;
 
 const fieldMeta: ZodFieldMeta = {
@@ -152,13 +153,19 @@ function clearErrors() {
 }
 
 async function applyDomainIcon() {
-  const faviconUrl = await resolveFaviconFromInputUrl(form.value.url || "");
-  if (!faviconUrl) {
-    toast("Could not load icon from this domain", "error");
-    return;
+  if (isResolvingIcon.value) return;
+  isResolvingIcon.value = true;
+  try {
+    const faviconUrl = await resolveFaviconFromInputUrl(form.value.url || "");
+    if (!faviconUrl) {
+      toast("Could not load icon from this domain", "error");
+      return;
+    }
+    form.value.logo = faviconUrl;
+    toast("Icon loaded from domain");
+  } finally {
+    isResolvingIcon.value = false;
   }
-  form.value.logo = faviconUrl;
-  toast("Icon loaded from domain");
 }
 
 async function handleSubmit() {
@@ -628,9 +635,11 @@ async function copyBulkTemplate() {
         <button
           type="button"
           @click="applyDomainIcon"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover transition-colors"
+          :disabled="isResolvingIcon"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <Globe :size="14" />
+          <Loader2 v-if="isResolvingIcon" :size="14" class="animate-spin" />
+          <Globe v-else :size="14" />
           Get icon from domain
         </button>
       </div>
