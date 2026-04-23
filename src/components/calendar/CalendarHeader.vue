@@ -7,6 +7,7 @@ defineProps<{
   monthName: string;
   year: number;
   isCurrentMonth: boolean;
+  compact?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -19,12 +20,13 @@ const { t } = useI18n();
 </script>
 
 <template>
-  <div class="flex items-center justify-between mb-4 sm:mb-6">
+  <div class="flex items-center justify-between" :class="compact ? 'mb-3 sm:mb-4' : 'mb-4 sm:mb-6'">
     <div class="flex items-center gap-2 sm:gap-3">
       <Tooltip v-if="!isCurrentMonth" :text="t('reset')">
         <button
           @click="emit('resetMonth')"
-          class="p-1.5 sm:p-2 rounded-lg bg-surface border border-border hover:bg-surface-hover"
+          class="rounded-lg bg-surface border border-border hover:bg-surface-hover"
+          :class="compact ? 'p-1.5' : 'p-1.5 sm:p-2'"
         >
           <CalendarDays :size="16" class="text-text-secondary" />
         </button>
@@ -32,7 +34,8 @@ const { t } = useI18n();
       <Tooltip v-if="!isCurrentMonth" :text="t('previous_month')">
         <button
           @click="emit('prevMonth')"
-          class="p-1.5 sm:p-2 rounded-lg bg-surface border border-border hover:bg-surface-hover"
+          class="rounded-lg bg-surface border border-border hover:bg-surface-hover"
+          :class="compact ? 'p-1.5' : 'p-1.5 sm:p-2'"
         >
           <ChevronLeft :size="16" class="text-text-secondary" />
         </button>
@@ -43,7 +46,8 @@ const { t } = useI18n();
       <Tooltip :text="t('next_month')">
         <button
           @click="emit('nextMonth')"
-          class="p-1.5 sm:p-2 rounded-lg bg-surface border border-border hover:bg-surface-hover"
+          class="rounded-lg bg-surface border border-border hover:bg-surface-hover"
+          :class="compact ? 'p-1.5' : 'p-1.5 sm:p-2'"
         >
           <ChevronRight :size="16" class="text-text-secondary" />
         </button>

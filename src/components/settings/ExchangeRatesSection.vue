@@ -10,7 +10,7 @@ import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import Toast from "@/components/ui/Toast.vue";
 import { getRatesProviders, updateCurrencyRates } from "@/services/rates";
 import type { RatesProviderType, RatesProviderMeta } from "@/services/rates";
-import { RefreshCw, Check, ChevronDown, ExternalLink, ArrowRightLeft } from "lucide-vue-next";
+import { RefreshCw, Check, CheckSquare, Square, ChevronDown, ExternalLink, ArrowRightLeft } from "lucide-vue-next";
 import { tv } from "@/lib/tv";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
@@ -282,8 +282,12 @@ const s = sectionTv();
       <div class="flex items-center justify-between mb-2">
         <label class="text-sm font-semibold text-text-primary">{{ t('target_currencies') }}</label>
         <div class="flex gap-2">
-          <button @click="selectAllTargets" class="text-[10px] text-primary hover:underline">{{ t('select_all') }}</button>
-          <button @click="deselectAllTargets" class="text-[10px] text-text-muted hover:underline">{{ t('deselect_all') }}</button>
+          <button @click="selectAllTargets" class="p-1 rounded text-primary hover:bg-primary/10 transition-colors" :title="t('select_all')">
+            <CheckSquare :size="13" />
+          </button>
+          <button @click="deselectAllTargets" class="p-1 rounded text-text-muted hover:bg-surface-hover transition-colors" :title="t('deselect_all')">
+            <Square :size="13" />
+          </button>
         </div>
       </div>
       <p class="text-[10px] text-text-muted mb-2">{{ t('target_currencies_info') }}</p>

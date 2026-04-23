@@ -19,7 +19,7 @@ import IconDisplay from "@/components/ui/IconDisplay.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import Toast from "@/components/ui/Toast.vue";
 import {
-  Plus, Search, Trash2, CheckSquare,
+  Plus, Search, Trash2, CheckSquare, Square,
   Wallet, AlertTriangle, ChevronLeft, ChevronRight,
   Rows3, LayoutList, LayoutGrid, Filter,
 } from "lucide-vue-next";
@@ -378,8 +378,12 @@ async function showContextMenu(exp: Expense, event: MouseEvent) {
     <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 -translate-y-2">
       <div v-if="selectionMode" class="flex items-center gap-1.5 sm:gap-2 mb-3 px-2 sm:px-3 py-2 rounded-lg bg-primary-light border border-primary/20 overflow-x-auto">
         <span class="text-xs font-medium text-primary">{{ selectedIds.size }} {{ t('selected_count') }}</span>
-        <button @click="selectAll" class="text-[10px] font-medium text-primary hover:underline">{{ t('select_all') }}</button>
-        <button @click="deselectAll" class="text-[10px] font-medium text-text-muted hover:underline">{{ t('deselect_all') }}</button>
+        <button @click="selectAll" class="p-1 rounded text-primary hover:bg-primary/10 transition-colors" :title="t('select_all')">
+          <CheckSquare :size="13" />
+        </button>
+        <button @click="deselectAll" class="p-1 rounded text-text-muted hover:bg-surface-hover transition-colors" :title="t('deselect_all')">
+          <Square :size="13" />
+        </button>
         <div class="flex-1" />
         <button @click="batchDeleteSelected" :disabled="selectedIds.size === 0"
           class="px-2.5 py-1 rounded-md text-[11px] font-medium bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 disabled:opacity-30 transition-colors"

@@ -6,12 +6,13 @@ export interface CalendarCell {
   day: number;
   isEmpty: boolean;
   isToday: boolean;
-  subs: { id: string; name: string; price: number; currencyId: string }[];
-  expenses?: { id: string; name: string; amount: number; currencyId: string }[];
+  subs: { id: string; name: string; price: number; currencyId: string; logo?: string }[];
+  expenses?: { id: string; name: string; amount: number; currencyId: string; icon?: string }[];
 }
 
 defineProps<{
   cells: CalendarCell[];
+  compact?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -31,7 +32,8 @@ const weekDays = () => [t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat
       <div
         v-for="day in weekDays()"
         :key="day"
-        class="py-1.5 sm:py-2 text-center text-[10px] sm:text-xs font-medium text-text-muted uppercase"
+        class="text-center text-[10px] sm:text-xs font-medium text-text-muted uppercase"
+        :class="compact ? 'py-1' : 'py-1.5 sm:py-2'"
       >{{ day }}</div>
     </div>
 
@@ -40,12 +42,15 @@ const weekDays = () => [t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat
       <div
         v-for="(cell, idx) in cells"
         :key="idx"
-        class="min-h-[48px] sm:min-h-[80px] p-0.5 sm:p-1.5 border-b border-r border-border"
-        :class="{
-          'bg-surface-hover/50': cell.isEmpty,
-          'bg-blue-50/50 dark:bg-blue-900/10': cell.isToday,
-          'cursor-pointer hover:bg-surface-hover': !cell.isEmpty && (cell.subs.length > 0 || (cell.expenses && cell.expenses.length > 0)),
-        }"
+        class="border-b border-r border-border"
+        :class="[
+          compact ? 'min-h-[42px] sm:min-h-[64px] p-0.5 sm:p-1' : 'min-h-[48px] sm:min-h-[80px] p-0.5 sm:p-1.5',
+          {
+            'bg-surface-hover/50': cell.isEmpty,
+            'bg-blue-50/50 dark:bg-blue-900/10': cell.isToday,
+            'cursor-pointer hover:bg-surface-hover': !cell.isEmpty && (cell.subs.length > 0 || (cell.expenses && cell.expenses.length > 0)),
+          },
+        ]"
         @click="!cell.isEmpty && (cell.subs.length > 0 || (cell.expenses && cell.expenses.length > 0)) && emit('selectDay', cell)"
       >
         <div v-if="!cell.isEmpty">
@@ -67,9 +72,9 @@ const weekDays = () => [t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat
               <span class="ml-auto shrink-0 opacity-80">{{ fmt(sub.price, sub.currencyId) }}</span>
             </div>
             <div v-for="exp in (cell.expenses || []).slice(0, 2)" :key="exp.id"
-              class="flex items-center gap-0.5 text-[10px] leading-tight px-1 py-0.5 rounded bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400 font-medium mb-0.5">
+              class="flex items-center gap-0.5 text-[10px] leading-tight px-1 py-0.5 rounded border border-border bg-surface text-text-primary font-medium mb-0.5">
               <span class="truncate">{{ exp.name }}</span>
-              <span class="ml-auto shrink-0 opacity-80">{{ fmt(exp.amount, exp.currencyId) }}</span>
+              <span class="ml-auto shrink-0 text-amber-500">{{ fmt(exp.amount, exp.currencyId) }}</span>
             </div>
             <div v-if="cell.subs.length + (cell.expenses?.length || 0) > 4" class="text-[10px] text-text-muted">
               +{{ cell.subs.length + (cell.expenses?.length || 0) - 4 }}

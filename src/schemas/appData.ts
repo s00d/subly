@@ -160,6 +160,10 @@ export const SettingsSchema = z.object({
   subscriptionGroupBy: z.enum(["none", "category", "payment_method"]).default("none"),
   // Expense list view
   expenseViewMode: z.enum(["default", "compact", "expanded"]).default("default"),
+  // Currency rates/converter view
+  currencyViewMode: z.enum(["default", "compact", "expanded"]).default("default"),
+  // Calendar view
+  calendarViewMode: z.enum(["default", "compact", "expanded"]).default("default"),
   // Converter presets
   converterPresets: z.array(z.number()).default([100, 500, 1000, 5000]),
   // Rate history
@@ -255,6 +259,8 @@ export const AppDataSchema = z.object({
     subscriptionViewMode: "default",
     subscriptionGroupBy: "none",
     expenseViewMode: "default",
+    currencyViewMode: "default",
+    calendarViewMode: "default",
     converterPresets: [100, 500, 1000, 5000],
     rateHistoryEnabled: true,
     rateHistoryDays: 90,

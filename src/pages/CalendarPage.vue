@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useSubscriptionsStore } from "@/stores/subscriptions";
 import { useExpensesStore } from "@/stores/expenses";
+import { useSettingsStore } from "@/stores/settings";
+import { useCatalogStore } from "@/stores/catalog";
 import { useI18n } from "vue-i18n";
 import { useHeaderActions } from "@/composables/useHeaderActions";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
@@ -22,12 +24,14 @@ import ExpenseForm from "@/components/expenses/ExpenseForm.vue";
 import Toast from "@/components/ui/Toast.vue";
 import type { Subscription, Expense } from "@/schemas/appData";
 import { dbGetExpensesForMonth } from "@/services/database";
-import { AlertTriangle } from "lucide-vue-next";
+import { AlertTriangle, LayoutList, LayoutGrid, Rows3, CreditCard, Wallet } from "lucide-vue-next";
 
 const subsStore = useSubscriptionsStore();
 const expsStore = useExpensesStore();
+const settingsStore = useSettingsStore();
+const catalogStore = useCatalogStore();
 const { t } = useI18n();
-const { clearActions } = useHeaderActions();
+const { setActions, clearActions } = useHeaderActions();
 const { fmt: fmtMain, getCurrencyRate } = useCurrencyFormat();
 const { fmtMonthYear, fmtDateMedium } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
@@ -40,22 +44,64 @@ function logPageError(scope: string, error: unknown, extra?: Record<string, unkn
   });
 }
 
-onMounted(() => clearActions());
+onMounted(() => {
+  updateHeaderActions();
+});
+onUnmounted(() => {
+  clearActions();
+});
 
 // --- Navigation ---
 const now = new Date();
 const currentMonth = ref(now.getMonth());
 const currentYear = ref(now.getFullYear());
+const compactWeekIndex = ref(0);
 
-const currentMonthLabel = computed(() =>
-  fmtMonthYear(new Date(currentYear.value, currentMonth.value, 1)),
-);
+const currentMonthLabel = computed(() => {
+  if (isCompactView.value) {
+    const week = compactWeekCells.value;
+    if (week.length === 0) return fmtMonthYear(new Date(currentYear.value, currentMonth.value, 1));
+    const firstDay = week.find((cell) => !cell.isEmpty)?.day;
+    const lastDay = [...week].reverse().find((cell) => !cell.isEmpty)?.day;
+    if (!firstDay || !lastDay) return fmtMonthYear(new Date(currentYear.value, currentMonth.value, 1));
+    const start = fmtDateMedium(new Date(currentYear.value, currentMonth.value, firstDay).toISOString());
+    const end = fmtDateMedium(new Date(currentYear.value, currentMonth.value, lastDay).toISOString());
+    return `${start} - ${end}`;
+  }
+  return fmtMonthYear(new Date(currentYear.value, currentMonth.value, 1));
+});
+const viewMode = computed(() => settingsStore.settings.calendarViewMode || "default");
+const isCompactView = computed(() => viewMode.value === "compact");
 
 const isCurrentMonth = computed(() =>
-  currentMonth.value === now.getMonth() && currentYear.value === now.getFullYear()
+  isCompactView.value
+    ? currentWeekMonthIndex.value === compactWeekIndex.value
+      && currentMonth.value === now.getMonth()
+      && currentYear.value === now.getFullYear()
+    : currentMonth.value === now.getMonth() && currentYear.value === now.getFullYear()
 );
 
 function prevMonth() {
+  if (isCompactView.value) {
+    const weeks = monthWeeks.value;
+    if (weeks.length === 0) return;
+    if (currentMonth.value === now.getMonth() && currentYear.value === now.getFullYear() && compactWeekIndex.value <= currentWeekMonthIndex.value) {
+      return;
+    }
+    if (compactWeekIndex.value > 0) {
+      compactWeekIndex.value -= 1;
+      return;
+    }
+    if (currentMonth.value === 0) {
+      currentMonth.value = 11;
+      currentYear.value -= 1;
+    } else {
+      currentMonth.value -= 1;
+    }
+    compactWeekIndex.value = Math.max(monthWeeks.value.length - 1, 0);
+    return;
+  }
+
   if (isCurrentMonth.value) return;
   if (currentMonth.value === 0) {
     currentMonth.value = 11;
@@ -72,6 +118,21 @@ function prevMonth() {
 }
 
 function nextMonth() {
+  if (isCompactView.value) {
+    if (compactWeekIndex.value < monthWeeks.value.length - 1) {
+      compactWeekIndex.value += 1;
+      return;
+    }
+    if (currentMonth.value === 11) {
+      currentMonth.value = 0;
+      currentYear.value++;
+    } else {
+      currentMonth.value++;
+    }
+    compactWeekIndex.value = 0;
+    return;
+  }
+
   if (currentMonth.value === 11) {
     currentMonth.value = 0;
     currentYear.value++;
@@ -83,7 +144,25 @@ function nextMonth() {
 function resetMonth() {
   currentMonth.value = now.getMonth();
   currentYear.value = now.getFullYear();
+  compactWeekIndex.value = currentWeekMonthIndex.value;
 }
+
+function setViewMode(mode: "default" | "compact" | "expanded") {
+  settingsStore.updateSettings({ calendarViewMode: mode });
+}
+
+function updateHeaderActions() {
+  const viewIcon = viewMode.value === "compact" ? Rows3 : viewMode.value === "expanded" ? LayoutGrid : LayoutList;
+  const nextViewMode = viewMode.value === "compact" ? "default" : viewMode.value === "default" ? "expanded" : "compact";
+  const currentViewTitle = viewMode.value === "compact" ? t("view_compact") : viewMode.value === "expanded" ? t("view_expanded") : t("view_default");
+  const nextViewTitle = nextViewMode === "compact" ? t("view_compact") : nextViewMode === "expanded" ? t("view_expanded") : t("view_default");
+
+  setActions([
+    { id: "cycle-calendar-view", icon: viewIcon, title: `${currentViewTitle} → ${nextViewTitle}`, onClick: () => setViewMode(nextViewMode), style: "accent" },
+  ]);
+}
+
+watch(viewMode, updateHeaderActions);
 
 // --- Grid ---
 const monthExpenses = ref<Expense[]>([]);
@@ -118,15 +197,17 @@ const calendarGrid = computed<CalendarCell[]>(() => {
     const days = getPaymentDatesInMonth(sub, year, month);
     for (const d of days) {
       if (!subsByDay[d]) subsByDay[d] = [];
-      subsByDay[d].push({ id: sub.id, name: sub.name, price: sub.price, currencyId: sub.currencyId });
+      subsByDay[d].push({ id: sub.id, name: sub.name, price: sub.price, currencyId: sub.currencyId, logo: sub.logo });
     }
   }
 
-  const expByDay: Record<number, { id: string; name: string; amount: number; currencyId: string }[]> = {};
+  const expByDay: Record<number, { id: string; name: string; amount: number; currencyId: string; icon?: string }[]> = {};
   for (const exp of monthExpenses.value) {
     const d = parseInt(exp.date.split("-")[2], 10);
     if (!expByDay[d]) expByDay[d] = [];
-    expByDay[d].push({ id: exp.id, name: exp.name, amount: exp.amount, currencyId: exp.currencyId });
+    const categoryIcon = catalogStore.categories.find((c) => c.id === exp.categoryId)?.icon || "";
+    const paymentIcon = catalogStore.paymentMethods.find((p) => p.id === exp.paymentMethodId)?.icon || "";
+    expByDay[d].push({ id: exp.id, name: exp.name, amount: exp.amount, currencyId: exp.currencyId, icon: categoryIcon || paymentIcon });
   }
 
   const cells: CalendarCell[] = [];
@@ -147,6 +228,38 @@ const calendarGrid = computed<CalendarCell[]>(() => {
   }
   return cells;
 });
+const monthWeeks = computed<CalendarCell[][]>(() => {
+  const weeks: CalendarCell[][] = [];
+  for (let i = 0; i < calendarGrid.value.length; i += 7) {
+    weeks.push(calendarGrid.value.slice(i, i + 7));
+  }
+  return weeks;
+});
+const currentWeekMonthIndex = computed(() => {
+  const todayDay = now.getDate();
+  if (currentMonth.value !== now.getMonth() || currentYear.value !== now.getFullYear()) return 0;
+  return monthWeeks.value.findIndex((week) => week.some((cell) => !cell.isEmpty && cell.day === todayDay));
+});
+const compactWeekCells = computed<CalendarCell[]>(() => {
+  const weeks = monthWeeks.value;
+  if (weeks.length === 0) return [];
+  const safeIndex = Math.min(Math.max(compactWeekIndex.value, 0), weeks.length - 1);
+  return weeks[safeIndex];
+});
+const weekDayLabels = computed(() => [
+  t("mon"),
+  t("tue"),
+  t("wed"),
+  t("thu"),
+  t("fri"),
+  t("sat"),
+  t("sun"),
+]);
+watch([currentYear, currentMonth], () => {
+  compactWeekIndex.value = currentMonth.value === now.getMonth() && currentYear.value === now.getFullYear()
+    ? Math.max(currentWeekMonthIndex.value, 0)
+    : 0;
+}, { immediate: true });
 
 // --- Stats ---
 const monthStats = computed(() => {
@@ -187,6 +300,13 @@ const dayModalTitle = computed(() => {
   if (!selectedDay.value) return "";
   return fmtDateMedium(new Date(currentYear.value, currentMonth.value, selectedDay.value.day).toISOString());
 });
+const expandedDays = computed(() => calendarGrid.value.filter(
+  (cell) => !cell.isEmpty && (cell.subs.length > 0 || (cell.expenses?.length || 0) > 0),
+));
+
+function expandedDayTitle(day: number): string {
+  return fmtDateMedium(new Date(currentYear.value, currentMonth.value, day).toISOString());
+}
 
 // --- Subscription detail ---
 const detailSub = ref<Subscription | null>(null);
@@ -340,12 +460,104 @@ async function handleExpOpenUrl(url: string) {
       :monthName="currentMonthLabel"
       :year="currentYear"
       :isCurrentMonth="isCurrentMonth"
+      :compact="isCompactView"
       @prevMonth="prevMonth"
       @nextMonth="nextMonth"
       @resetMonth="resetMonth"
     />
 
+    <div v-if="viewMode === 'expanded'" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div
+        v-for="cell in expandedDays"
+        :key="`expanded-day-${cell.day}`"
+        class="bg-surface rounded-xl border border-border p-3 sm:p-4 cursor-pointer hover:bg-surface-hover transition-colors"
+        @click="openDayDetail(cell)"
+      >
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-semibold text-text-primary">{{ expandedDayTitle(cell.day) }}</h3>
+          <span class="text-[11px] text-text-muted">{{ cell.subs.length + (cell.expenses?.length || 0) }}</span>
+        </div>
+        <div v-if="cell.subs.length" class="space-y-1.5 mb-2">
+          <button
+            v-for="sub in cell.subs"
+            :key="sub.id"
+            @click.stop="openSubDetail(sub.id)"
+            class="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+          >
+            <span class="inline-flex items-center gap-1.5 min-w-0">
+              <CreditCard :size="12" class="shrink-0" />
+              <span class="truncate">{{ sub.name }}</span>
+            </span>
+            <span class="shrink-0 opacity-90">{{ fmtMain(sub.price, sub.currencyId) }}</span>
+          </button>
+        </div>
+        <div v-if="cell.expenses?.length" class="space-y-1.5">
+          <button
+            v-for="exp in cell.expenses"
+            :key="exp.id"
+            @click.stop="openExpDetail(exp.id)"
+            class="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg border border-border bg-surface text-text-primary text-xs font-medium hover:bg-surface-hover transition-colors"
+          >
+            <span class="inline-flex items-center gap-1.5 min-w-0">
+              <Wallet :size="12" class="shrink-0 text-amber-500" />
+              <span class="truncate">{{ exp.name }}</span>
+            </span>
+            <span class="shrink-0 text-amber-500">{{ fmtMain(exp.amount, exp.currencyId) }}</span>
+          </button>
+        </div>
+      </div>
+      <div v-if="expandedDays.length === 0" class="md:col-span-2 bg-surface rounded-xl border border-border p-6 text-center text-sm text-text-muted">
+        {{ t("no_data") }}
+      </div>
+    </div>
+    <div v-else-if="isCompactView" class="space-y-2">
+      <button
+        v-for="(cell, idx) in compactWeekCells"
+        :key="`compact-week-${idx}-${cell.day}`"
+        class="w-full text-left bg-surface rounded-xl border border-border px-3 py-2.5 transition-colors"
+        :class="[
+          cell.isToday ? 'border-primary/40 bg-primary-light/30' : 'hover:bg-surface-hover',
+          !cell.isEmpty && (cell.subs.length > 0 || (cell.expenses?.length || 0) > 0) ? 'cursor-pointer' : 'cursor-default',
+        ]"
+        @click="!cell.isEmpty && (cell.subs.length > 0 || (cell.expenses?.length || 0) > 0) && openDayDetail(cell)"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="text-xs text-text-muted uppercase shrink-0">{{ weekDayLabels[idx] }}</span>
+            <span v-if="!cell.isEmpty" class="text-sm font-semibold text-text-primary">{{ cell.day }}</span>
+            <span v-else class="text-sm text-text-muted">-</span>
+          </div>
+          <div class="text-[11px] text-text-muted shrink-0">
+            {{ cell.subs.length }} / {{ cell.expenses?.length || 0 }}
+          </div>
+        </div>
+        <div v-if="!cell.isEmpty && (cell.subs.length > 0 || (cell.expenses?.length || 0) > 0)" class="mt-1.5 space-y-1">
+          <div
+            v-for="sub in cell.subs.slice(0, 2)"
+            :key="`compact-sub-${sub.id}`"
+            class="flex items-center gap-1.5 px-2 py-1 rounded bg-blue-600 text-white text-[11px] font-medium"
+          >
+            <CreditCard :size="11" class="shrink-0" />
+            <span class="truncate">{{ sub.name }}</span>
+            <span class="ml-auto shrink-0 opacity-90">{{ fmtMain(sub.price, sub.currencyId) }}</span>
+          </div>
+          <div
+            v-for="exp in (cell.expenses || []).slice(0, 2)"
+            :key="`compact-exp-${exp.id}`"
+            class="flex items-center gap-1.5 px-2 py-1 rounded border border-border bg-surface text-text-primary text-[11px] font-medium"
+          >
+            <Wallet :size="11" class="shrink-0 text-amber-500" />
+            <span class="truncate">{{ exp.name }}</span>
+            <span class="ml-auto shrink-0 text-amber-500">{{ fmtMain(exp.amount, exp.currencyId) }}</span>
+          </div>
+          <div v-if="cell.subs.length + (cell.expenses?.length || 0) > 4" class="text-[10px] text-text-muted pl-1">
+            +{{ cell.subs.length + (cell.expenses?.length || 0) - 4 }}
+          </div>
+        </div>
+      </button>
+    </div>
     <CalendarGrid
+      v-else
       :cells="calendarGrid"
       @selectDay="openDayDetail"
     />
@@ -354,6 +566,7 @@ async function handleExpOpenUrl(url: string) {
       :count="monthStats.count"
       :totalCost="fmtMain(monthStats.totalCost)"
       :totalDue="fmtMain(monthStats.totalDue)"
+      :compact="isCompactView"
     />
 
     <!-- Day detail modal -->

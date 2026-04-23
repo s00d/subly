@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { X, Wallet } from "lucide-vue-next";
+import { X, Wallet, CreditCard } from "lucide-vue-next";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useI18n } from "vue-i18n";
 import { useScrollLock } from "@/composables/useScrollLock";
+import IconDisplay from "@/components/ui/IconDisplay.vue";
 
 const props = defineProps<{
   show: boolean;
   title: string;
-  subs: { id: string; name: string; price: number; currencyId: string }[];
-  expenses?: { id: string; name: string; amount: number; currencyId: string }[];
+  subs: { id: string; name: string; price: number; currencyId: string; logo?: string }[];
+  expenses?: { id: string; name: string; amount: number; currencyId: string; icon?: string }[];
 }>();
 
 const emit = defineEmits<{
@@ -50,8 +51,9 @@ useScrollLock(computed(() => props.show));
               @click="emit('selectSub', sub.id)"
               class="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-surface-secondary border border-border cursor-pointer hover:border-primary hover:bg-primary-light/30 transition-colors"
             >
-              <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary-light flex items-center justify-center text-xs sm:text-sm font-bold text-primary shrink-0">
-                {{ sub.name.charAt(0).toUpperCase() }}
+              <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-primary-light flex items-center justify-center shrink-0">
+                <IconDisplay v-if="sub.logo" :icon="sub.logo" :size="16" />
+                <CreditCard v-else :size="14" class="text-primary sm:[&]:w-4 sm:[&]:h-4" />
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-xs sm:text-sm font-medium text-text-primary truncate">{{ sub.name }}</p>
@@ -71,7 +73,8 @@ useScrollLock(computed(() => props.show));
                 class="flex items-center gap-2.5 sm:gap-3 p-2.5 sm:p-3 rounded-lg bg-surface-secondary border border-border cursor-pointer hover:border-orange-400 dark:hover:border-orange-500 transition-colors"
               >
                 <div class="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center shrink-0">
-                  <Wallet :size="14" class="text-orange-500 sm:[&]:w-4 sm:[&]:h-4" />
+                  <IconDisplay v-if="exp.icon" :icon="exp.icon" :size="16" />
+                  <Wallet v-else :size="14" class="text-orange-500 sm:[&]:w-4 sm:[&]:h-4" />
                 </div>
                 <div class="flex-1 min-w-0">
                   <p class="text-xs sm:text-sm font-medium text-text-primary truncate">{{ exp.name }}</p>

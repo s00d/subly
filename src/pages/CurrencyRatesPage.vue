@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from "vue";
+import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useSettingsStore } from "@/stores/settings";
 import { useCatalogStore } from "@/stores/catalog";
@@ -14,7 +14,7 @@ import AppSlider from "@/components/ui/AppSlider.vue";
 import ExpenseForm from "@/components/expenses/ExpenseForm.vue";
 import {
   RefreshCw, ClipboardCopy, ArrowRightLeft, TrendingUp,
-  Search, Star, Check, Plus, RotateCcw, ChevronUp, ChevronDown, ArrowUpDown,
+  Search, Star, Check, Plus, RotateCcw, ChevronUp, ChevronDown, ArrowUpDown, LayoutList, LayoutGrid, Rows3, Hash, Type, CircleDollarSign, CheckSquare, Square,
 } from "lucide-vue-next";
 import { useConverterStore } from "@/stores/converter";
 import { currencyFlag } from "@/services/currencyFlags";
@@ -25,9 +25,12 @@ const catalogStore = useCatalogStore();
 const converterStore = useConverterStore();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 const { copyToClipboard } = useClipboard();
-const { clearActions } = useHeaderActions();
+const { setActions, clearActions } = useHeaderActions();
 
 onMounted(() => {
+  updateHeaderActions();
+});
+onUnmounted(() => {
   clearActions();
 });
 
@@ -44,8 +47,36 @@ const rateSortOptions: { key: RateSortKey; labelKey: string }[] = [
   { key: "rate", labelKey: "sort_by_rate" },
 ];
 
+function getSortIcon(key: RateSortKey) {
+  if (key === "enabled") return Star;
+  if (key === "code") return Hash;
+  if (key === "name") return Type;
+  return CircleDollarSign;
+}
+
 const showExpenseForm = ref(false);
 const expensePrefill = ref<{ amount: number; currencyId: string; name: string } | null>(null);
+const viewMode = computed(() => settingsStore.settings.currencyViewMode || "default");
+const isCompactView = computed(() => viewMode.value === "compact");
+
+function setViewMode(mode: "default" | "compact" | "expanded") {
+  settingsStore.updateSettings({ currencyViewMode: mode });
+}
+
+function updateHeaderActions() {
+  const viewIcon = viewMode.value === "compact" ? Rows3 : viewMode.value === "expanded" ? LayoutGrid : LayoutList;
+  const nextViewMode = viewMode.value === "compact" ? "default" : viewMode.value === "default" ? "expanded" : "compact";
+  const currentViewTitle = viewMode.value === "compact" ? t("view_compact") : viewMode.value === "expanded" ? t("view_expanded") : t("view_default");
+  const nextViewTitle = nextViewMode === "compact" ? t("view_compact") : nextViewMode === "expanded" ? t("view_expanded") : t("view_default");
+
+  setActions([
+    { id: "currency-update", icon: RefreshCw, title: t("update_now"), onClick: handleUpdate, style: "primary" },
+    { id: "cycle-currency-view", icon: viewIcon, title: `${currentViewTitle} → ${nextViewTitle}`, onClick: () => setViewMode(nextViewMode), style: "accent" },
+  ]);
+}
+
+watch(viewMode, updateHeaderActions);
+watch(isUpdating, updateHeaderActions);
 
 const baseAmount = computed({
   get: () => converterStore.baseAmount,
@@ -278,14 +309,6 @@ async function copyAllConversion() {
         <h1 class="text-xl font-bold text-text-primary">{{ t('exchange_rates') }}</h1>
         <p class="text-xs text-text-muted mt-0.5">{{ t('last_update') }}: {{ lastUpdate }}</p>
       </div>
-      <button
-        @click="handleUpdate"
-        :disabled="isUpdating"
-        class="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover disabled:opacity-50 transition-colors shrink-0"
-      >
-        <RefreshCw :size="14" :class="{ 'animate-spin': isUpdating }" />
-        <span class="hidden sm:inline">{{ t('update_now') }}</span>
-      </button>
     </div>
 
     <!-- Converter empty state -->
@@ -296,13 +319,17 @@ async function copyAllConversion() {
     </div>
 
     <!-- Converter -->
-    <div v-else class="bg-surface rounded-xl border border-border p-4">
-      <div class="flex items-center justify-between mb-3">
+    <div
+      v-else
+      class="bg-surface rounded-xl border border-border"
+      :class="isCompactView ? 'p-3' : viewMode === 'expanded' ? 'p-3 sm:p-5' : 'p-3 sm:p-4'"
+    >
+      <div class="flex items-center justify-between" :class="isCompactView ? 'mb-2' : 'mb-3'">
         <div class="flex items-center gap-2 text-sm font-semibold text-text-primary">
           <ArrowRightLeft :size="15" class="text-primary" />
           {{ t('currency_converter') }}
         </div>
-        <div class="flex items-center gap-1">
+        <div v-if="!isCompactView" class="flex items-center gap-1">
           <Tooltip :text="t('copy')">
             <button
               @click="copyAllConversion"
@@ -323,7 +350,7 @@ async function copyAllConversion() {
       </div>
 
       <!-- Quick presets -->
-      <div class="flex flex-wrap gap-1.5 mb-3">
+      <div class="flex flex-wrap gap-1.5" :class="isCompactView ? 'mb-2' : 'mb-3'">
         <button
           v-for="preset in settingsStore.settings.converterPresets"
           :key="preset"
@@ -339,14 +366,96 @@ async function copyAllConversion() {
         </button>
       </div>
 
-      <div class="space-y-2">
+      <div v-if="viewMode === 'expanded'" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         <div
           v-for="(cur, idx) in converterCurrencies"
           :key="cur.id"
-          class="flex items-center gap-1.5 sm:gap-2"
+          class="rounded-xl border border-border bg-surface-secondary/40 p-3"
         >
-          <!-- Reorder buttons -->
-          <div class="flex flex-row sm:flex-col shrink-0">
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <div class="min-w-0">
+              <div class="text-sm font-bold text-text-primary leading-tight">
+                <span v-if="currencyFlag(cur.code)" class="mr-0.5">{{ currencyFlag(cur.code) }}</span>{{ cur.code }}
+              </div>
+              <div class="text-xs text-text-muted truncate">{{ cur.name }}</div>
+            </div>
+            <div class="flex items-center gap-0.5 shrink-0">
+              <Tooltip :text="t('move_up')">
+                <button
+                  @click="converterStore.moveUp(cur.id)"
+                  :disabled="idx === 0"
+                  class="p-1 rounded text-text-muted hover:text-primary disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                ><ChevronUp :size="14" /></button>
+              </Tooltip>
+              <Tooltip :text="t('move_down')">
+                <button
+                  @click="converterStore.moveDown(cur.id)"
+                  :disabled="idx === converterCurrencies.length - 1"
+                  class="p-1 rounded text-text-muted hover:text-primary disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                ><ChevronDown :size="14" /></button>
+              </Tooltip>
+            </div>
+          </div>
+
+          <div class="relative">
+            <input
+              type="text"
+              inputmode="decimal"
+              pattern="[0-9]*[.,]?[0-9]*"
+              :value="getDisplayValue(cur)"
+              @input="onInput(cur, ($event.target as HTMLInputElement).value)"
+              @focus="onFocus(cur, $event.target as HTMLInputElement)"
+              @blur="onBlur"
+              class="w-full pl-3 pr-12 py-2.5 text-lg font-bold rounded-lg bg-surface border border-border text-text-primary text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-shadow"
+            />
+            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-base font-semibold text-primary pointer-events-none select-none">
+              {{ cur.symbol }}
+            </span>
+          </div>
+          <AppSlider
+            :modelValue="getRawValue(cur)"
+            @update:modelValue="onSlider(cur, $event)"
+            :min="0"
+            :max="sliderParams(cur).max"
+            :step="sliderParams(cur).step"
+          />
+          <div v-if="!cur.isBase" class="text-[10px] text-text-muted tabular-nums mt-1">
+            1 {{ mainCurrency?.code }} = {{ cur.rate.toFixed(4).replace(/\.?0+$/, '') }} {{ cur.code }}
+            <span class="opacity-60 mx-1">·</span>
+            1 {{ cur.code }} = {{ (1 / cur.rate).toFixed(4).replace(/\.?0+$/, '') }} {{ mainCurrency?.code }}
+          </div>
+
+          <div class="flex items-center justify-end gap-1 mt-2">
+            <Tooltip :text="t('add_expense')">
+              <button
+                @click="openExpenseForm(cur)"
+                class="p-1.5 rounded-lg transition-all text-text-muted hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+              >
+                <Plus :size="14" />
+              </button>
+            </Tooltip>
+            <Tooltip :text="t('copy')">
+              <button
+                @click="copyRow(`${getDisplayValue(cur)} ${cur.code}`, `conv-${cur.id}`)"
+                class="p-1.5 rounded-lg transition-all"
+                :class="copiedId === `conv-${cur.id}`
+                  ? 'text-green-500'
+                  : 'text-text-muted hover:text-primary hover:bg-primary-light'"
+              >
+                <component :is="copiedId === `conv-${cur.id}` ? Check : ClipboardCopy" :size="14" />
+              </button>
+            </Tooltip>
+          </div>
+        </div>
+      </div>
+      <div v-else :class="isCompactView ? 'space-y-1.5' : 'space-y-2'">
+        <div
+          v-for="(cur, idx) in converterCurrencies"
+          :key="cur.id"
+          class="flex items-center"
+          :class="isCompactView ? 'gap-1' : 'gap-1.5 sm:gap-2'"
+        >
+          <div v-if="!isCompactView" class="flex flex-row sm:flex-col shrink-0">
             <Tooltip :text="t('move_up')">
               <button
                 @click="converterStore.moveUp(cur.id)"
@@ -362,16 +471,12 @@ async function copyAllConversion() {
               ><ChevronDown :size="14" /></button>
             </Tooltip>
           </div>
-
-          <!-- Flag + Code + name label -->
-          <div class="shrink-0 w-16 sm:w-20">
+          <div class="shrink-0" :class="isCompactView ? 'w-14 sm:w-16' : 'w-14 sm:w-20'">
             <span class="text-sm font-bold text-text-primary block leading-tight">
               <span v-if="currencyFlag(cur.code)" class="mr-0.5">{{ currencyFlag(cur.code) }}</span>{{ cur.code }}
             </span>
-            <span class="text-[10px] text-text-muted leading-tight truncate block">{{ cur.name }}</span>
+            <span class="text-[10px] text-text-muted leading-tight truncate block max-w-14 sm:max-w-none">{{ cur.name }}</span>
           </div>
-
-          <!-- Input + symbol + slider -->
           <div class="flex-1 min-w-0">
             <div class="relative">
               <input
@@ -401,13 +506,11 @@ async function copyAllConversion() {
               1 {{ cur.code }} = {{ (1 / cur.rate).toFixed(4).replace(/\.?0+$/, '') }} {{ mainCurrency?.code }}
             </div>
           </div>
-
-          <!-- Actions row -->
-          <div class="flex flex-row shrink-0 gap-0.5">
+          <div v-if="!isCompactView" class="flex flex-row shrink-0 gap-0.5">
             <Tooltip :text="t('add_expense')">
               <button
                 @click="openExpenseForm(cur)"
-                class="p-1.5 rounded-lg transition-all text-text-muted hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+                class="p-1 rounded-lg sm:p-1.5 transition-all text-text-muted hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
               >
                 <Plus :size="14" />
               </button>
@@ -415,7 +518,7 @@ async function copyAllConversion() {
             <Tooltip :text="t('copy')">
               <button
                 @click="copyRow(`${getDisplayValue(cur)} ${cur.code}`, `conv-${cur.id}`)"
-                class="p-1.5 rounded-lg transition-all"
+                class="p-1 rounded-lg sm:p-1.5 transition-all"
                 :class="copiedId === `conv-${cur.id}`
                   ? 'text-green-500'
                   : 'text-text-muted hover:text-primary hover:bg-primary-light'"
@@ -429,8 +532,11 @@ async function copyAllConversion() {
     </div>
 
     <!-- All rates -->
-    <div class="bg-surface rounded-xl border border-border p-4">
-      <div class="flex items-center justify-between mb-3">
+    <div
+      class="bg-surface rounded-xl border border-border"
+      :class="isCompactView ? 'p-3' : viewMode === 'expanded' ? 'p-3 sm:p-5' : 'p-3 sm:p-4'"
+    >
+      <div class="flex items-center justify-between" :class="isCompactView ? 'mb-2' : 'mb-3'">
         <div class="flex items-center gap-2 text-sm font-semibold text-text-primary">
           <TrendingUp :size="15" class="text-primary" />
           {{ t('all_rates') }}
@@ -443,12 +549,20 @@ async function copyAllConversion() {
             @click="selectAllTargets"
             :disabled="selectedTargetIds.length === otherCurrencies.length"
             class="px-2 py-0.5 text-[11px] rounded border border-border text-text-secondary hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >{{ t('select_all') }}</button>
+            :title="t('select_all')"
+          >
+            <CheckSquare :size="13" class="sm:hidden" />
+            <span class="hidden sm:inline">{{ t('select_all') }}</span>
+          </button>
           <button
             @click="deselectAllTargets"
             :disabled="selectedTargetIds.length === 0"
             class="px-2 py-0.5 text-[11px] rounded border border-border text-text-secondary hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >{{ t('deselect_all') }}</button>
+            :title="t('deselect_all')"
+          >
+            <Square :size="13" class="sm:hidden" />
+            <span class="hidden sm:inline">{{ t('deselect_all') }}</span>
+          </button>
           <span class="text-xs text-text-muted tabular-nums ml-1">
             1 {{ mainCurrency?.code }} =
           </span>
@@ -456,40 +570,92 @@ async function copyAllConversion() {
       </div>
 
       <!-- Search + Sort -->
-      <div class="flex items-center gap-2 mb-3">
+      <div class="flex items-center gap-1.5 sm:gap-2" :class="isCompactView ? 'mb-2' : 'mb-3'">
         <div class="relative flex-1">
           <Search :size="14" class="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
             v-model="searchQuery"
             type="text"
             :placeholder="t('search') + '...'"
-            class="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-surface text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-text-muted"
+            class="w-full pl-8 sm:pl-9 pr-2.5 sm:pr-3 py-1.5 sm:py-2 rounded-lg border border-border bg-surface text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-text-muted"
           />
         </div>
         <div class="flex items-center gap-0.5 shrink-0">
-          <ArrowUpDown :size="13" class="text-text-muted mr-0.5" />
+          <ArrowUpDown :size="12" class="text-text-muted mr-0.5" />
           <button
             v-for="opt in rateSortOptions"
             :key="opt.key"
             @click="rateSortBy = opt.key"
+            :title="t(opt.labelKey)"
             :class="[
-              'px-2 py-1 text-[11px] rounded border transition-colors',
+              'px-1.5 sm:px-2 py-1 text-[10px] sm:text-[11px] rounded border transition-colors inline-flex items-center justify-center gap-1',
               rateSortBy === opt.key
                 ? 'bg-primary text-white border-primary'
                 : 'bg-surface-secondary text-text-secondary border-border hover:border-primary hover:text-primary',
             ]"
-          >{{ t(opt.labelKey) }}</button>
+          >
+            <component :is="getSortIcon(opt.key)" :size="12" class="sm:hidden" />
+            <span class="hidden sm:inline">{{ t(opt.labelKey) }}</span>
+          </button>
         </div>
       </div>
 
       <!-- List -->
-      <div class="max-h-128 overflow-y-auto -mx-1 px-1">
+      <div v-if="viewMode === 'expanded'" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
         <div
           v-for="rate in allRates"
           :key="rate.id"
-          class="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-surface-hover transition-colors group border-b border-border/50 last:border-b-0"
+          class="rounded-xl border border-border bg-surface-secondary/40 p-3"
         >
-          <!-- Star toggle -->
+          <div class="flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="text-sm font-bold text-text-primary">
+                <span v-if="currencyFlag(rate.code)" class="mr-0.5">{{ currencyFlag(rate.code) }}</span>{{ rate.code }}
+              </div>
+              <div class="text-xs text-text-muted truncate">{{ rate.name }}</div>
+            </div>
+            <Tooltip :text="rate.enabled ? t('disable') : t('enable')">
+              <button
+                @click="toggleTarget(rate.id)"
+                class="p-1 rounded transition-colors shrink-0"
+                :class="rate.enabled
+                  ? 'text-yellow-500 hover:text-yellow-600'
+                  : 'text-text-muted opacity-40 hover:opacity-70'"
+              >
+                <Star :size="14" :fill="rate.enabled ? 'currentColor' : 'none'" />
+              </button>
+            </Tooltip>
+          </div>
+          <div class="mt-2 text-lg font-mono font-semibold text-text-primary tabular-nums">
+            {{ rate.rateFormatted }}
+          </div>
+          <div class="text-xs font-mono text-text-muted tabular-nums mt-0.5">
+            1/{{ rate.inverse }}
+          </div>
+          <div class="flex justify-end mt-2">
+            <Tooltip :text="t('copy')">
+              <button
+                @click="copyRow(`1 ${mainCurrency?.code} = ${rate.rateFormatted} ${rate.code}`, `rate-${rate.id}`)"
+                class="p-1.5 rounded-lg transition-all shrink-0"
+                :class="copiedId === `rate-${rate.id}`
+                  ? 'text-green-500'
+                  : 'text-text-muted hover:text-primary'"
+              >
+                <component :is="copiedId === `rate-${rate.id}` ? Check : ClipboardCopy" :size="13" />
+              </button>
+            </Tooltip>
+          </div>
+        </div>
+        <p v-if="allRates.length === 0" class="col-span-full text-center text-sm text-text-muted py-6">
+          {{ t('no_results') }}
+        </p>
+      </div>
+      <div v-else class="max-h-128 overflow-y-auto -mx-1 px-0.5 sm:px-1">
+        <div
+          v-for="rate in allRates"
+          :key="rate.id"
+          class="flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg hover:bg-surface-hover transition-colors group border-b border-border/50 last:border-b-0"
+        >
           <Tooltip :text="rate.enabled ? t('disable') : t('enable')">
             <button
               @click="toggleTarget(rate.id)"
@@ -501,23 +667,13 @@ async function copyAllConversion() {
               <Star :size="14" :fill="rate.enabled ? 'currentColor' : 'none'" />
             </button>
           </Tooltip>
-
-          <!-- Flag + Code -->
-          <span class="text-sm font-bold text-text-primary w-16 shrink-0">
+          <span class="text-sm font-bold text-text-primary w-14 sm:w-16 shrink-0">
             <span v-if="currencyFlag(rate.code)" class="mr-0.5">{{ currencyFlag(rate.code) }}</span>{{ rate.code }}
           </span>
-
-          <!-- Name -->
-          <span class="text-sm text-text-muted flex-1 min-w-0 truncate">{{ rate.name }}</span>
-
-          <!-- Rate -->
-          <span class="text-sm font-mono font-semibold text-text-primary tabular-nums">{{ rate.rateFormatted }}</span>
-
-          <!-- Inverse -->
+          <span class="text-xs sm:text-sm text-text-muted flex-1 min-w-0 truncate">{{ rate.name }}</span>
+          <span class="text-xs sm:text-sm font-mono font-semibold text-text-primary tabular-nums">{{ rate.rateFormatted }}</span>
           <span class="text-xs font-mono text-text-muted tabular-nums w-18 text-right hidden sm:block">1/{{ rate.inverse }}</span>
-
-          <!-- Copy -->
-          <Tooltip :text="t('copy')">
+          <Tooltip v-if="!isCompactView" :text="t('copy')">
             <button
               @click="copyRow(`1 ${mainCurrency?.code} = ${rate.rateFormatted} ${rate.code}`, `rate-${rate.id}`)"
               class="p-1 rounded-lg transition-all shrink-0"
@@ -529,7 +685,6 @@ async function copyAllConversion() {
             </button>
           </Tooltip>
         </div>
-
         <p v-if="allRates.length === 0" class="text-center text-sm text-text-muted py-6">
           {{ t('no_results') }}
         </p>

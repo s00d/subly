@@ -20,7 +20,7 @@ import Toast from "@/components/ui/Toast.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
-import { Plus, Search, Pencil, Trash2, Copy, RefreshCw, ExternalLink, CreditCard, AlertTriangle, Star, CheckSquare, Hash, CircleDollarSign, LayoutList, LayoutGrid, Rows3, FolderOpen, Filter } from "lucide-vue-next";
+import { Plus, Search, Pencil, Trash2, Copy, RefreshCw, ExternalLink, CreditCard, AlertTriangle, Star, CheckSquare, Square, Hash, CircleDollarSign, LayoutList, LayoutGrid, Rows3, FolderOpen, Filter } from "lucide-vue-next";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Menu } from "@tauri-apps/api/menu";
@@ -502,8 +502,12 @@ async function onDetailToggleFavorite(id: string) {
     >
       <div v-if="selectionMode" class="flex items-center gap-1.5 sm:gap-2 mb-3 px-2 sm:px-3 py-2 rounded-lg bg-primary-light border border-primary/20 overflow-x-auto">
         <span class="text-xs font-medium text-primary">{{ selectedIds.size }} {{ t('selected_count') }}</span>
-        <button @click="selectAll" class="text-[10px] font-medium text-primary hover:underline">{{ t('select_all') }}</button>
-        <button @click="deselectAll" class="text-[10px] font-medium text-text-muted hover:underline">{{ t('deselect_all') }}</button>
+        <button @click="selectAll" class="p-1 rounded text-primary hover:bg-primary/10 transition-colors" :title="t('select_all')">
+          <CheckSquare :size="13" />
+        </button>
+        <button @click="deselectAll" class="p-1 rounded text-text-muted hover:bg-surface-hover transition-colors" :title="t('deselect_all')">
+          <Square :size="13" />
+        </button>
         <div class="flex-1" />
         <button
           @click="batchActivate"
