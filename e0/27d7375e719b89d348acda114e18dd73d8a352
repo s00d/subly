@@ -1,0 +1,30 @@
+src/components/subscriptions/SubscriptionForm.vue
+  c5feab9b42155271 655-659,666-668
+package.json
+  h_9f37069a6b3ceb 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "e027d7375e719b89d348acda114e18dd73d8a352",
+  "prompts": {
+    "c5feab9b42155271": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "00da9f19-c3db-4047-b14a-1156e4452e1f",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin",
+      "messages": [],
+      "total_additions": 14,
+      "total_deletions": 14,
+      "accepted_lines": 17,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_9f37069a6b3ceb": {
+      "author": "Pavel Kuzmin"
+    }
+  }
+}
