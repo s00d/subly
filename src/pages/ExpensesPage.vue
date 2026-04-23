@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useExpensesStore, PAGE_SIZE } from "@/stores/expenses";
+import { useSubscriptionsStore } from "@/stores/subscriptions";
 import { useCatalogStore } from "@/stores/catalog";
 import { useSettingsStore } from "@/stores/settings";
 import { useI18n } from "vue-i18n";
@@ -27,6 +28,7 @@ import type { MenuItemOptions, PredefinedMenuItemOptions } from "@tauri-apps/api
 import { openUrl } from "@tauri-apps/plugin-opener";
 
 const expsStore = useExpensesStore();
+const subsStore = useSubscriptionsStore();
 const catalogStore = useCatalogStore();
 const settingsStore = useSettingsStore();
 const { t } = useI18n();
@@ -243,8 +245,11 @@ const sortOptions = computed<SelectOption[]>(() => [
 function getCurrency(id: string) { return catalogStore.currencies.find((c) => c.id === id); }
 function getCategory(id: string) { return catalogStore.categories.find((c) => c.id === id); }
 function getPaymentMethod(id: string) { return catalogStore.paymentMethods.find((p) => p.id === id); }
+function getSubscription(id: string) { return subsStore.subscriptions.find((s) => s.id === id); }
 function getExpenseIcon(exp: Expense): string {
-  return getCategory(exp.categoryId)?.icon || getPaymentMethod(exp.paymentMethodId)?.icon || "";
+  return (exp.subscriptionId ? getSubscription(exp.subscriptionId)?.logo : "")
+    || getCategory(exp.categoryId)?.icon
+    || "";
 }
 function formatDate(d: string) { return fmtDateMedium(d); }
 function formatAmount(amount: number, currencyId: string) {

@@ -576,7 +576,7 @@ async function onDetailToggleFavorite(id: string) {
                   <Star :size="12" :fill="sub.favorite ? 'currentColor' : 'none'" />
                 </button>
               </Tooltip>
-              <div class="w-6 h-6 rounded bg-primary-light flex items-center justify-center text-[10px] font-bold text-primary shrink-0 overflow-hidden">
+              <div class="w-6 h-6 rounded bg-primary-light border border-border flex items-center justify-center text-[10px] font-bold text-primary shrink-0 overflow-hidden">
                 <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
                 <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
               </div>
@@ -600,7 +600,7 @@ async function onDetailToggleFavorite(id: string) {
                       :class="selectedIds.has(sub.id) ? 'bg-primary border-primary text-white' : 'border-border hover:border-primary'"
                     ><svg v-if="selectedIds.has(sub.id)" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
                   </div>
-                  <div class="w-12 h-12 rounded-lg bg-primary-light flex items-center justify-center text-lg font-bold text-primary shrink-0 overflow-hidden">
+                  <div class="w-12 h-12 rounded-lg bg-primary-light border border-border flex items-center justify-center text-lg font-bold text-primary shrink-0 overflow-hidden">
                     <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
                     <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
                   </div>
@@ -669,7 +669,7 @@ async function onDetailToggleFavorite(id: string) {
                     <Star :size="16" :fill="sub.favorite ? 'currentColor' : 'none'" />
                   </button>
                 </Tooltip>
-                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary-light flex items-center justify-center text-xs sm:text-sm font-bold text-primary shrink-0 overflow-hidden">
+                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary-light border border-border flex items-center justify-center text-xs sm:text-sm font-bold text-primary shrink-0 overflow-hidden">
                   <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
                   <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
                 </div>

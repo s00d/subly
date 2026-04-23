@@ -3,13 +3,26 @@ use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_sql::{Builder as SqlBuilder, Migration, MigrationKind};
 
 fn migration(version: i64, description: &'static str, sql: &'static str) -> Migration {
-    Migration { version, description, sql, kind: MigrationKind::Up }
+    Migration {
+        version,
+        description,
+        sql,
+        kind: MigrationKind::Up,
+    }
 }
 
 fn get_migrations() -> Vec<Migration> {
     vec![
-        migration(1, "create_initial_tables", include_str!("migrations/001_create_initial_tables.sql")),
-        migration(2, "add_rate_history", include_str!("migrations/002_add_rate_history.sql")),
+        migration(
+            1,
+            "create_initial_tables",
+            include_str!("migrations/001_create_initial_tables.sql"),
+        ),
+        migration(
+            2,
+            "add_rate_history",
+            include_str!("migrations/002_add_rate_history.sql"),
+        ),
     ]
 }
 
@@ -88,6 +101,7 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_notifications::init())
         .plugin(tauri_plugin_dialog::init())
