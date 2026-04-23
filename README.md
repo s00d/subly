@@ -46,9 +46,15 @@
 ### Demo Video (click preview)
 
 <p align="center">
-  <a href="store-assets/video/store-walkthrough-desktop-with-audio.mp4">
+  <a href="https://github.com/s00d/subly/raw/main/store-assets/video/store-walkthrough-desktop-with-audio.mp4">
     <img src="store-assets/mac_app_store/mac_1280x800/01_dashboard_overview.png" alt="Open desktop walkthrough video" width="420" />
   </a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/s00d/subly/raw/main/store-assets/video/store-walkthrough-desktop-with-audio.mp4">Open desktop walkthrough (with audio)</a>
+  ·
+  <a href="https://github.com/s00d/subly/raw/main/store-assets/video/store-walkthrough-desktop.mp4">Open desktop walkthrough (no audio)</a>
 </p>
 
 ---
