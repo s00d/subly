@@ -101,8 +101,61 @@ export function buildGoogleFaviconUrl(domain: string, size = 128): string {
   return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=${size}`;
 }
 
+export function buildFaviconCandidates(domain: string, size = 128): string[] {
+  const cleanDomain = domain.trim().toLowerCase();
+  if (!cleanDomain) return [];
+
+  const host = cleanDomain.replace(/^www\./, "");
+  const safeSize = Math.max(16, Math.min(256, Math.round(size || 128)));
+
+  return [
+    `https://${host}/favicon.ico`,
+    `https://${host}/apple-touch-icon.png`,
+    `https://icons.duckduckgo.com/ip3/${encodeURIComponent(host)}.ico`,
+    `https://icon.horse/icon/${encodeURIComponent(host)}`,
+    buildGoogleFaviconUrl(host, safeSize),
+  ];
+}
+
 export function buildFaviconFromInputUrl(input: string, size = 128): string | null {
   const domain = extractDomainFromUrl(input);
   if (!domain) return null;
   return buildGoogleFaviconUrl(domain, size);
+}
+
+function canLoadImage(url: string, timeoutMs = 3500): Promise<boolean> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    let settled = false;
+
+    const finalize = (result: boolean) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      img.onload = null;
+      img.onerror = null;
+      resolve(result);
+    };
+
+    const timer = window.setTimeout(() => finalize(false), timeoutMs);
+    img.onload = () => finalize(true);
+    img.onerror = () => finalize(false);
+    img.referrerPolicy = "no-referrer";
+    img.decoding = "async";
+    img.src = url;
+  });
+}
+
+export async function resolveFaviconFromInputUrl(input: string, size = 128): Promise<string | null> {
+  const domain = extractDomainFromUrl(input);
+  if (!domain) return null;
+
+  const candidates = buildFaviconCandidates(domain, size);
+  for (const url of candidates) {
+    if (await canLoadImage(url)) {
+      return url;
+    }
+  }
+
+  return null;
 }

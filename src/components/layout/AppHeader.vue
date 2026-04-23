@@ -33,15 +33,29 @@ const headerTv = tv({
     burgerBtn: "md:hidden p-1.5 -ml-1 rounded-lg text-text-secondary hover:bg-surface-hover transition-colors shrink-0",
     title: "text-base sm:text-xl font-semibold text-text-primary truncate",
     actionsWrap: "flex items-center gap-2 ml-auto",
-    actionBtn: [
-      "w-8 h-8 rounded-lg bg-primary text-white",
-      "flex items-center justify-center hover:bg-primary-hover",
-      "shadow-sm transition-colors shrink-0",
-    ],
+    actionBtn: "w-8 h-8 rounded-lg flex items-center justify-center shadow-sm transition-colors shrink-0",
   },
 });
 
 const slots = headerTv();
+
+function getActionBtnClass(style?: "primary" | "neutral" | "accent" | "success" | "warning" | "danger"): string {
+  switch (style) {
+    case "primary":
+      return "bg-primary text-white hover:bg-primary-hover";
+    case "accent":
+      return "bg-indigo-500 text-white hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500";
+    case "success":
+      return "bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-500";
+    case "warning":
+      return "bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500";
+    case "danger":
+      return "bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-500";
+    case "neutral":
+    default:
+      return "bg-surface-hover text-text-secondary hover:text-text-primary hover:bg-surface-secondary border border-border";
+  }
+}
 </script>
 
 <template>
@@ -51,10 +65,10 @@ const slots = headerTv();
     </button>
     <h1 :class="slots.title()">{{ pageTitle }}</h1>
     <div :class="slots.actionsWrap()">
-      <Tooltip v-for="action in actions" :key="action.id" :text="action.title">
+      <Tooltip v-for="action in actions" :key="action.id" :text="action.title" position="bottom">
         <button
           @click="action.onClick"
-          :class="slots.actionBtn()"
+          :class="[slots.actionBtn(), getActionBtnClass(action.style)]"
         >
           <component :is="action.icon" :size="18" />
         </button>

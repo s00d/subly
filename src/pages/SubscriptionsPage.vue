@@ -19,7 +19,7 @@ import Toast from "@/components/ui/Toast.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
-import { Plus, Search, Pencil, Trash2, Copy, RefreshCw, ExternalLink, CreditCard, AlertTriangle, Star, CheckSquare, Hash, CircleDollarSign, LayoutList, LayoutGrid, Rows3, FolderOpen } from "lucide-vue-next";
+import { Plus, Search, Pencil, Trash2, Copy, RefreshCw, ExternalLink, CreditCard, AlertTriangle, Star, CheckSquare, Hash, CircleDollarSign, LayoutList, LayoutGrid, Rows3, FolderOpen, Filter } from "lucide-vue-next";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Menu } from "@tauri-apps/api/menu";
@@ -39,10 +39,25 @@ const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 
 const now = ref(Date.now());
 let nowInterval: ReturnType<typeof setInterval> | null = null;
+const showFilters = ref(false);
 
 // Register header action
+function updateHeaderActions() {
+  const viewIcon = viewMode.value === "compact" ? Rows3 : viewMode.value === "expanded" ? LayoutGrid : LayoutList;
+  const nextViewMode = viewMode.value === "compact" ? "default" : viewMode.value === "default" ? "expanded" : "compact";
+  const currentViewTitle = viewMode.value === "compact" ? t("view_compact") : viewMode.value === "expanded" ? t("view_expanded") : t("view_default");
+  const nextViewTitle = nextViewMode === "compact" ? t("view_compact") : nextViewMode === "expanded" ? t("view_expanded") : t("view_default");
+
+  setActions([
+    { id: "toggle-sub-filters", icon: Filter, title: showFilters.value ? `${t("filter")} ✓` : `${t("filter")} ✕`, onClick: () => { showFilters.value = !showFilters.value; }, style: showFilters.value ? "warning" : "neutral" },
+    { id: "cycle-sub-view", icon: viewIcon, title: `${currentViewTitle} → ${nextViewTitle}`, onClick: () => setViewMode(nextViewMode), style: "accent" },
+    { id: "sub-selection-mode", icon: CheckSquare, title: selectionMode.value ? `${t("select")} ✓` : `${t("select")} ✕`, onClick: toggleSelectionMode, style: selectionMode.value ? "success" : "neutral" },
+    { id: "add-sub", icon: Plus, title: t("new_subscription"), onClick: openAdd, style: "primary" },
+  ]);
+}
+
 onMounted(() => {
-  setActions([{ id: "add-sub", icon: Plus, title: t("new_subscription"), onClick: openAdd }]);
+  updateHeaderActions();
   handleSubQueryParam();
   fetchFilteredSubs();
   nowInterval = setInterval(() => { now.value = Date.now(); }, 60_000);
@@ -96,6 +111,7 @@ const groupBy = computed(() => settingsStore.settings.subscriptionGroupBy || "no
 function setViewMode(mode: "default" | "compact" | "expanded") {
   settingsStore.updateSettings({ subscriptionViewMode: mode });
 }
+watch([showFilters, viewMode], updateHeaderActions);
 
 function setGroupBy(g: "none" | "category" | "payment_method") {
   settingsStore.updateSettings({ subscriptionGroupBy: g });
@@ -155,6 +171,7 @@ const hasBlockingOverlay = computed(() =>
   || showBatchCategoryModal.value,
 );
 useScrollLock(hasBlockingOverlay);
+watch(selectionMode, updateHeaderActions);
 
 function toggleSelectionMode() {
   selectionMode.value = !selectionMode.value;
@@ -313,6 +330,13 @@ function getPaymentMethod(id: string) {
   return catalogStore.paymentMethods.find((p) => p.id === id);
 }
 
+function getDaysBadgeClass(nextPayment: string): string {
+  const days = getDaysUntilPayment(nextPayment);
+  if (days <= 3) return "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400";
+  if (days <= 7) return "bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400";
+  return "bg-primary-light text-primary";
+}
+
 const formatDate = fmtDateMedium;
 
 // Actions
@@ -423,61 +447,47 @@ async function onDetailToggleFavorite(id: string) {
 
 <template>
   <div class="max-w-5xl mx-auto">
-    <!-- Search row (always visible) -->
-    <div class="flex items-center gap-2 mb-2">
-      <div class="relative flex-1 min-w-0">
-        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input
-          v-model="searchQuery"
-          type="text"
-          :placeholder="t('search')"
-          class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted hover:border-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
-        />
+    <!-- Filters -->
+    <Transition
+      enter-active-class="transition ease-out duration-200"
+      enter-from-class="opacity-0 -translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition ease-in duration-150"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 -translate-y-2"
+    >
+      <div v-if="showFilters" class="mb-3 p-3 rounded-xl border border-border bg-surface-hover/80 backdrop-blur-sm shadow-sm space-y-2">
+        <div class="relative min-w-0">
+          <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            v-model="searchQuery"
+            type="text"
+            :placeholder="t('search')"
+            class="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted hover:border-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+          />
+        </div>
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+          <div class="w-28 shrink-0">
+            <AppSelect v-model="sortBy" :options="sortOptions" size="sm" />
+          </div>
+          <div class="w-28 shrink-0">
+            <AppSelect v-model="filterCategory" :options="categoryFilterOptions" size="sm" />
+          </div>
+          <div class="w-28 shrink-0">
+            <AppSelect v-model="filterPayment" :options="paymentFilterOptions" size="sm" />
+          </div>
+          <div class="w-28 shrink-0">
+            <AppSelect v-model="filterState" :options="stateFilterOptions" size="sm" />
+          </div>
+          <div v-if="catalogStore.tags.length > 0" class="w-28 shrink-0" >
+            <AppSelect v-model="filterTag" :options="tagFilterOptions" size="sm" />
+          </div>
+          <div class="w-32 shrink-0">
+            <AppSelect :modelValue="groupBy" @update:modelValue="(v: string | number) => setGroupBy(String(v) as 'none' | 'category' | 'payment_method')" :options="groupByOptions" size="sm" />
+          </div>
+        </div>
       </div>
-      <!-- View mode + batch toggle always visible -->
-      <div class="flex items-center border border-border rounded-lg overflow-hidden shrink-0">
-        <Tooltip :text="t('view_compact')">
-          <button @click="setViewMode('compact')" class="p-1.5 transition-colors" :class="viewMode === 'compact' ? 'bg-primary-light text-primary' : 'text-text-muted hover:text-text-primary'"><Rows3 :size="15" /></button>
-        </Tooltip>
-        <Tooltip :text="t('view_default')">
-          <button @click="setViewMode('default')" class="p-1.5 transition-colors border-x border-border" :class="viewMode === 'default' ? 'bg-primary-light text-primary' : 'text-text-muted hover:text-text-primary'"><LayoutList :size="15" /></button>
-        </Tooltip>
-        <Tooltip :text="t('view_expanded')">
-          <button @click="setViewMode('expanded')" class="p-1.5 transition-colors" :class="viewMode === 'expanded' ? 'bg-primary-light text-primary' : 'text-text-muted hover:text-text-primary'"><LayoutGrid :size="15" /></button>
-        </Tooltip>
-      </div>
-      <Tooltip :text="t('select')">
-        <button
-          @click="toggleSelectionMode"
-          class="p-1.5 rounded-lg border transition-colors shrink-0"
-          :class="selectionMode ? 'border-primary bg-primary-light text-primary' : 'border-border text-text-muted hover:text-text-primary'"
-        >
-          <CheckSquare :size="16" />
-        </button>
-      </Tooltip>
-    </div>
-
-    <!-- Filters row (scrollable on mobile) -->
-    <div class="flex items-center gap-2 mb-3 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
-      <div class="w-28 shrink-0">
-        <AppSelect v-model="sortBy" :options="sortOptions" size="sm" />
-      </div>
-      <div class="w-28 shrink-0">
-        <AppSelect v-model="filterCategory" :options="categoryFilterOptions" size="sm" />
-      </div>
-      <div class="w-28 shrink-0">
-        <AppSelect v-model="filterPayment" :options="paymentFilterOptions" size="sm" />
-      </div>
-      <div class="w-28 shrink-0">
-        <AppSelect v-model="filterState" :options="stateFilterOptions" size="sm" />
-      </div>
-      <div v-if="catalogStore.tags.length > 0" class="w-28 shrink-0" >
-        <AppSelect v-model="filterTag" :options="tagFilterOptions" size="sm" />
-      </div>
-      <div class="w-32 shrink-0">
-        <AppSelect :modelValue="groupBy" @update:modelValue="(v: string | number) => setGroupBy(String(v) as 'none' | 'category' | 'payment_method')" :options="groupByOptions" size="sm" />
-      </div>
-    </div>
+    </Transition>
 
     <!-- Batch toolbar -->
     <Transition
@@ -571,8 +581,8 @@ async function onDetailToggleFavorite(id: string) {
                 <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
               </div>
               <p class="text-xs font-medium text-text-primary truncate min-w-0 flex-1">{{ sub.name }}</p>
-              <span v-if="!sub.inactive" class="text-[10px] font-bold shrink-0"
-                :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'text-red-500' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'text-orange-500' : 'text-text-muted'"
+              <span v-if="!sub.inactive" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none shrink-0"
+                :class="getDaysBadgeClass(sub.nextPayment)"
               >{{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}</span>
               <p class="text-xs font-semibold text-text-primary shrink-0">{{ fmt(sub.price, sub.currencyId) }}</p>
             </div>
@@ -614,7 +624,7 @@ async function onDetailToggleFavorite(id: string) {
                   <div class="text-right">
                     <p class="text-xs font-medium" :class="isOverdue(sub) ? 'text-red-500' : 'text-text-primary'">{{ formatDate(sub.nextPayment) }}</p>
                     <span v-if="!sub.inactive" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none mt-0.5"
-                      :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-primary-light text-primary'"
+                      :class="getDaysBadgeClass(sub.nextPayment)"
                     >{{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}</span>
                   </div>
                 </div>
@@ -672,7 +682,7 @@ async function onDetailToggleFavorite(id: string) {
                       <span class="hidden sm:inline">{{ formatDate(sub.nextPayment) }}</span>
                     </p>
                     <span v-if="!sub.inactive" class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none"
-                      :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-primary-light text-primary'"
+                      :class="getDaysBadgeClass(sub.nextPayment)"
                     >{{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}</span>
                   </div>
                 </div>

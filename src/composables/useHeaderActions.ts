@@ -5,6 +5,7 @@ export interface HeaderAction {
   icon: Component;
   title: string;
   onClick: () => void;
+  style?: "primary" | "neutral" | "accent" | "success" | "warning" | "danger";
 }
 
 const actions = ref<HeaderAction[]>([]);

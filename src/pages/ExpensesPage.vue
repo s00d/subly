@@ -17,11 +17,10 @@ import AppSelect from "@/components/ui/AppSelect.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import Toast from "@/components/ui/Toast.vue";
-import Tooltip from "@/components/ui/Tooltip.vue";
 import {
   Plus, Search, Trash2, CheckSquare,
   Wallet, AlertTriangle, ChevronLeft, ChevronRight,
-  Rows3, LayoutList, LayoutGrid,
+  Rows3, LayoutList, LayoutGrid, Filter,
 } from "lucide-vue-next";
 import { Menu } from "@tauri-apps/api/menu";
 import type { MenuItemOptions, PredefinedMenuItemOptions } from "@tauri-apps/api/menu";
@@ -35,6 +34,7 @@ const { setActions, clearActions } = useHeaderActions();
 const { fmtDateMedium, fmtCurrency } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 const pageLogPrefix = "[ExpensesPage]";
+const showFilters = ref(false);
 
 function logPageError(scope: string, error: unknown, extra?: Record<string, unknown>) {
   console.error(`${pageLogPrefix} ${scope}`, {
@@ -43,8 +43,22 @@ function logPageError(scope: string, error: unknown, extra?: Record<string, unkn
   });
 }
 
+function updateHeaderActions() {
+  const viewIcon = viewMode.value === "compact" ? Rows3 : viewMode.value === "expanded" ? LayoutGrid : LayoutList;
+  const nextViewMode = viewMode.value === "compact" ? "default" : viewMode.value === "default" ? "expanded" : "compact";
+  const currentViewTitle = viewMode.value === "compact" ? t("view_compact") : viewMode.value === "expanded" ? t("view_expanded") : t("view_default");
+  const nextViewTitle = nextViewMode === "compact" ? t("view_compact") : nextViewMode === "expanded" ? t("view_expanded") : t("view_default");
+
+  setActions([
+    { id: "toggle-expense-filters", icon: Filter, title: showFilters.value ? `${t("filter")} ✓` : `${t("filter")} ✕`, onClick: () => { showFilters.value = !showFilters.value; }, style: showFilters.value ? "warning" : "neutral" },
+    { id: "cycle-expense-view", icon: viewIcon, title: `${currentViewTitle} → ${nextViewTitle}`, onClick: () => setViewMode(nextViewMode), style: "accent" },
+    { id: "expense-selection-mode", icon: CheckSquare, title: selectionMode.value ? `${t("select")} ✓` : `${t("select")} ✕`, onClick: toggleSelectionMode, style: selectionMode.value ? "success" : "neutral" },
+    { id: "add-expense", icon: Plus, title: t("add_expense"), onClick: openAdd, style: "primary" },
+  ]);
+}
+
 onMounted(() => {
-  setActions([{ id: "add-expense", icon: Plus, title: t("add_expense"), onClick: openAdd }]);
+  updateHeaderActions();
   applyFilters();
 });
 onUnmounted(() => clearActions());
@@ -55,6 +69,7 @@ const viewMode = computed(() => settingsStore.settings.expenseViewMode || "defau
 function setViewMode(mode: "default" | "compact" | "expanded") {
   settingsStore.updateSettings({ expenseViewMode: mode });
 }
+watch([showFilters, viewMode], updateHeaderActions);
 
 // ---- Filters ----
 const searchQuery = ref("");
@@ -129,6 +144,7 @@ const detailExp = computed(() =>
 // ---- Selection for batch ----
 const selectionMode = ref(false);
 const selectedIds = ref<Set<string>>(new Set());
+watch(selectionMode, updateHeaderActions);
 
 function toggleSelect(id: string) {
   const s = new Set(selectedIds.value);
@@ -227,6 +243,9 @@ const sortOptions = computed<SelectOption[]>(() => [
 function getCurrency(id: string) { return catalogStore.currencies.find((c) => c.id === id); }
 function getCategory(id: string) { return catalogStore.categories.find((c) => c.id === id); }
 function getPaymentMethod(id: string) { return catalogStore.paymentMethods.find((p) => p.id === id); }
+function getExpenseIcon(exp: Expense): string {
+  return getCategory(exp.categoryId)?.icon || getPaymentMethod(exp.paymentMethodId)?.icon || "";
+}
 function formatDate(d: string) { return fmtDateMedium(d); }
 function formatAmount(amount: number, currencyId: string) {
   const cur = getCurrency(currencyId);
@@ -327,48 +346,28 @@ async function showContextMenu(exp: Expense, event: MouseEvent) {
 
 <template>
   <div class="max-w-5xl mx-auto">
-    <!-- Search row -->
-    <div class="flex items-center gap-2 mb-2">
-      <div class="relative flex-1 min-w-0">
-        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input
-          v-model="searchQuery"
-          type="text"
-          :placeholder="t('search')"
-          class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted hover:border-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
-        />
+    <!-- Filters -->
+    <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 -translate-y-2">
+      <div v-if="showFilters" class="mb-3 p-3 rounded-xl border border-border bg-surface-hover/80 backdrop-blur-sm shadow-sm space-y-2">
+        <div class="relative min-w-0">
+          <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            v-model="searchQuery"
+            type="text"
+            :placeholder="t('search')"
+            class="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted hover:border-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+          />
+        </div>
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+          <div class="w-28 shrink-0"><AppSelect v-model="sortBy" :options="sortOptions" size="sm" /></div>
+          <div class="w-28 shrink-0"><AppSelect v-model="filterCategory" :options="categoryOptions" size="sm" /></div>
+          <div class="w-28 shrink-0"><AppSelect v-model="filterPayment" :options="paymentOptions" size="sm" /></div>
+          <div v-if="catalogStore.tags.length > 0" class="w-28 shrink-0"><AppSelect v-model="filterTag" :options="tagOptions" size="sm" /></div>
+          <input v-model="dateFrom" type="date" class="shrink-0 w-28 px-2 py-1 text-[11px] rounded-lg bg-surface border border-border text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
+          <input v-model="dateTo" type="date" class="shrink-0 w-28 px-2 py-1 text-[11px] rounded-lg bg-surface border border-border text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
+        </div>
       </div>
-      <div class="flex items-center border border-border rounded-lg overflow-hidden shrink-0">
-        <Tooltip :text="t('view_compact')">
-          <button @click="setViewMode('compact')" class="p-1.5 transition-colors" :class="viewMode === 'compact' ? 'bg-primary-light text-primary' : 'text-text-muted hover:text-text-primary'"><Rows3 :size="15" /></button>
-        </Tooltip>
-        <Tooltip :text="t('view_default')">
-          <button @click="setViewMode('default')" class="p-1.5 transition-colors border-x border-border" :class="viewMode === 'default' ? 'bg-primary-light text-primary' : 'text-text-muted hover:text-text-primary'"><LayoutList :size="15" /></button>
-        </Tooltip>
-        <Tooltip :text="t('view_expanded')">
-          <button @click="setViewMode('expanded')" class="p-1.5 transition-colors" :class="viewMode === 'expanded' ? 'bg-primary-light text-primary' : 'text-text-muted hover:text-text-primary'"><LayoutGrid :size="15" /></button>
-        </Tooltip>
-      </div>
-      <Tooltip :text="t('select')">
-        <button
-          @click="toggleSelectionMode"
-          class="p-1.5 rounded-lg border transition-colors shrink-0"
-          :class="selectionMode ? 'border-primary bg-primary-light text-primary' : 'border-border text-text-muted hover:text-text-primary'"
-        >
-          <CheckSquare :size="16" />
-        </button>
-      </Tooltip>
-    </div>
-
-    <!-- Filters row -->
-    <div class="flex items-center gap-2 mb-3 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
-      <div class="w-28 shrink-0"><AppSelect v-model="sortBy" :options="sortOptions" size="sm" /></div>
-      <div class="w-28 shrink-0"><AppSelect v-model="filterCategory" :options="categoryOptions" size="sm" /></div>
-      <div class="w-28 shrink-0"><AppSelect v-model="filterPayment" :options="paymentOptions" size="sm" /></div>
-      <div v-if="catalogStore.tags.length > 0" class="w-28 shrink-0"><AppSelect v-model="filterTag" :options="tagOptions" size="sm" /></div>
-      <input v-model="dateFrom" type="date" class="shrink-0 w-28 px-2 py-1 text-[11px] rounded-lg bg-surface border border-border text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
-      <input v-model="dateTo" type="date" class="shrink-0 w-28 px-2 py-1 text-[11px] rounded-lg bg-surface border border-border text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
-    </div>
+    </Transition>
 
     <!-- Batch toolbar -->
     <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 -translate-y-2">
@@ -426,7 +425,7 @@ async function showContextMenu(exp: Expense, event: MouseEvent) {
             ><svg v-if="selectedIds.has(exp.id)" width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
           </div>
           <div class="w-6 h-6 rounded bg-primary-light flex items-center justify-center text-[10px] font-bold text-primary shrink-0 overflow-hidden">
-            <IconDisplay v-if="getCategory(exp.categoryId)?.icon" :icon="getCategory(exp.categoryId)!.icon" :size="12" />
+            <IconDisplay v-if="getExpenseIcon(exp)" :icon="getExpenseIcon(exp)" :size="12" />
             <span v-else>{{ exp.name.charAt(0).toUpperCase() }}</span>
           </div>
           <p class="text-xs font-medium text-text-primary truncate min-w-0 flex-1">{{ exp.name }}</p>
@@ -444,13 +443,13 @@ async function showContextMenu(exp: Expense, event: MouseEvent) {
                 ><svg v-if="selectedIds.has(exp.id)" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
               </div>
               <div class="w-12 h-12 rounded-lg bg-primary-light flex items-center justify-center text-lg font-bold text-primary shrink-0 overflow-hidden">
-                <IconDisplay v-if="getCategory(exp.categoryId)?.icon" :icon="getCategory(exp.categoryId)!.icon" :size="22" />
+                <IconDisplay v-if="getExpenseIcon(exp)" :icon="getExpenseIcon(exp)" :size="22" />
                 <span v-else>{{ exp.name.charAt(0).toUpperCase() }}</span>
               </div>
               <div class="min-w-0 flex-1">
                 <p class="text-sm font-semibold text-text-primary truncate">{{ exp.name }}</p>
                 <p class="text-xs text-text-muted flex items-center gap-1">
-                  <IconDisplay v-if="getCategory(exp.categoryId)?.icon" :icon="getCategory(exp.categoryId)!.icon" :size="12" />
+                  <IconDisplay v-if="getExpenseIcon(exp)" :icon="getExpenseIcon(exp)" :size="12" />
                   {{ getCategory(exp.categoryId)?.name || '' }}
                 </p>
               </div>
@@ -491,7 +490,7 @@ async function showContextMenu(exp: Expense, event: MouseEvent) {
             </div>
 
             <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary-light flex items-center justify-center text-xs sm:text-sm font-bold text-primary shrink-0 overflow-hidden">
-              <IconDisplay v-if="getCategory(exp.categoryId)?.icon" :icon="getCategory(exp.categoryId)!.icon" :size="18" />
+              <IconDisplay v-if="getExpenseIcon(exp)" :icon="getExpenseIcon(exp)" :size="18" />
               <span v-else>{{ exp.name.charAt(0).toUpperCase() }}</span>
             </div>
 

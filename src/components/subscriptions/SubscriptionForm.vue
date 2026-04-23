@@ -18,7 +18,7 @@ import LogoPicker from "@/components/ui/LogoPicker.vue";
 import TagInput from "@/components/ui/TagInput.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import { Sparkles, Globe } from "lucide-vue-next";
-import { buildFaviconFromInputUrl } from "@/services/logoAssets";
+import { resolveFaviconFromInputUrl } from "@/services/logoAssets";
 import { getNextCycleDate } from "@/services/calculations";
 
 const props = defineProps<{
@@ -131,10 +131,10 @@ function clearErrors() {
   Object.keys(errors).forEach((k) => delete errors[k]);
 }
 
-function applyDomainIcon() {
-  const faviconUrl = buildFaviconFromInputUrl(form.value.url || "");
+async function applyDomainIcon() {
+  const faviconUrl = await resolveFaviconFromInputUrl(form.value.url || "");
   if (!faviconUrl) {
-    toast(t("url") + " is empty or invalid", "error");
+    toast("Could not load icon from this domain", "error");
     return;
   }
   form.value.logo = faviconUrl;
