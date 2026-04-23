@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "85cb9efbde3966b3ea2bed71c0311e27a474bd1d",
+  "prompts": {
+    "c5feab9b42155271": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "00da9f19-c3db-4047-b14a-1156e4452e1f",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin",
+      "messages": [],
+      "total_additions": 1287,
+      "total_deletions": 236,
+      "accepted_lines": 0,
+      "overriden_lines": 5
+    }
+  }
+}
