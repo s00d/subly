@@ -211,7 +211,36 @@ sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev 
 
 ## Screenshots
 
-> _TODO: add screenshots_
+### macOS Preview
+
+<p align="center">
+  <a href="store-assets/mac_app_store/mac_1280x800/01_dashboard_overview.png">
+    <img src="store-assets/mac_app_store/mac_1280x800/01_dashboard_overview.png" alt="Dashboard" width="280" />
+  </a>
+  <a href="store-assets/mac_app_store/mac_1280x800/02_subscriptions_list.png">
+    <img src="store-assets/mac_app_store/mac_1280x800/02_subscriptions_list.png" alt="Subscriptions" width="280" />
+  </a>
+  <a href="store-assets/mac_app_store/mac_1280x800/03_expenses_list.png">
+    <img src="store-assets/mac_app_store/mac_1280x800/03_expenses_list.png" alt="Expenses" width="280" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="store-assets/mac_app_store/mac_1280x800/04_calendar_month.png">
+    <img src="store-assets/mac_app_store/mac_1280x800/04_calendar_month.png" alt="Calendar" width="280" />
+  </a>
+  <a href="store-assets/mac_app_store/mac_1280x800/05_rates_screen.png">
+    <img src="store-assets/mac_app_store/mac_1280x800/05_rates_screen.png" alt="Rates" width="280" />
+  </a>
+  <a href="store-assets/mac_app_store/mac_1280x800/06_settings_overview.png">
+    <img src="store-assets/mac_app_store/mac_1280x800/06_settings_overview.png" alt="Settings" width="280" />
+  </a>
+</p>
+
+### Demo Videos (macOS)
+
+- [Desktop walkthrough (no audio)](store-assets/video/store-walkthrough-desktop.mp4)
+- [Desktop walkthrough (with audio)](store-assets/video/store-walkthrough-desktop-with-audio.mp4)
 
 ---
 
