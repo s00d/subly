@@ -1,0 +1,48 @@
+src/pages/SubscriptionsPage.vue
+  c5feab9b42155271 23,505-510
+src/components/calendar/CalendarHeader.vue
+  c5feab9b42155271 10,23,28-29,37-38,49-50
+src/pages/CalendarPage.vue
+  c5feab9b42155271 2,5-6,27,31-32,34,47-52,58-74,77-81,85-104,121-135,147-151,154-166,200,204,208-210,231-262,303-309,463,469-558,560,569
+package.json
+  h_9f37069a6b3ceb 4
+src/components/settings/ExchangeRatesSection.vue
+  c5feab9b42155271 13,285-290
+src/schemas/appData.ts
+  c5feab9b42155271 163-166,262-263
+src/pages/ExpensesPage.vue
+  c5feab9b42155271 22,381-386
+src/components/calendar/CalendarGrid.vue
+  c5feab9b42155271 9-10,15,35-36,45-53,75,77
+src/components/calendar/CalendarMonthStats.vue
+  c5feab9b42155271 8,15-17,20,24,28
+src/components/calendar/CalendarDayModal.vue
+  c5feab9b42155271 3,7,12-13,54-56,76-77
+src/pages/CurrencyRatesPage.vue
+  c5feab9b42155271 2,17,28,31-33,50-56,59-79,322-327,332,353,369-451,455-456,458,474,478,509,513,521,535-539,552-556,561-565,573,580,584,589,591,596-599,604-653,657,670,673-674,676
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.2",
+  "base_commit_sha": "bed338267f934e553202522d18e7cb8e0485a442",
+  "prompts": {
+    "c5feab9b42155271": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "00da9f19-c3db-4047-b14a-1156e4452e1f",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin",
+      "messages": [],
+      "total_additions": 534,
+      "total_deletions": 135,
+      "accepted_lines": 509,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_9f37069a6b3ceb": {
+      "author": "Pavel Kuzmin"
+    }
+  }
+}
