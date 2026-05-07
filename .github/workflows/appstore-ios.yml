@@ -1,0 +1,71 @@
+name: App Store iOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload_to_appstore:
+        description: "Upload IPA to App Store Connect"
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  ios:
+    name: Build iOS IPA
+    runs-on: macos-latest
+    env:
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      SUBLY_API_KEY_BASE64: ${{ secrets.SUBLY_API_KEY_BASE64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Write App Store Connect API key
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/src-tauri/private_keys"
+          KEY_PATH="$GITHUB_WORKSPACE/src-tauri/private_keys/AuthKey_${APPLE_API_KEY}.p8"
+          echo "$SUBLY_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
+          echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Build iOS (App Store Connect export)
+        env:
+          APPLE_DEVELOPMENT_TEAM: ${{ env.APPLE_TEAM_ID }}
+        run: pnpm tauri ios build --export-method app-store-connect
+
+      - name: Resolve IPA path
+        run: |
+          IPA_PATH=$(ls src-tauri/gen/apple/build/arm64/*.ipa | sed -n '1p')
+          if [ -z "$IPA_PATH" ]; then
+            echo "No IPA found in src-tauri/gen/apple/build/arm64/"
+            exit 1
+          fi
+          echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa
+          path: src-tauri/gen/apple/build/arm64/*.ipa
+
+      - name: Upload IPA to App Store Connect
+        if: ${{ inputs.upload_to_appstore }}
+        run: |
+          xcrun altool --upload-app --type ios --file "${IPA_PATH}" --apiKey "${APPLE_API_KEY}" --apiIssuer "${APPLE_API_ISSUER}"
