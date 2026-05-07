@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { tv } from "@/lib/tv";
+import { tv, ui } from "@/lib/tv";
 
 const props = defineProps<{
   modelValue: string | number;
   type?: string;
   placeholder?: string;
+  /** Нативный `title` на `<input>` (подсказка при наведении). */
+  tooltip?: string;
   disabled?: boolean;
   required?: boolean;
   min?: number | string;
@@ -38,14 +40,11 @@ function onInput(e: Event) {
 const inputTv = tv({
   slots: {
     root: "w-full",
-    labelEl: "block text-xs font-medium text-text-secondary mb-1.5",
+    labelEl: ui.fieldLabel(),
     inputEl: [
-      "w-full rounded-lg border bg-surface",
-      "text-text-primary placeholder-text-muted",
-      "focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent",
-      "disabled:opacity-50 disabled:cursor-not-allowed transition-shadow",
+      ui.field(),
     ],
-    errorEl: "mt-1 text-xs text-red-500",
+    errorEl: ui.fieldError(),
   },
   variants: {
     size: {
@@ -53,11 +52,11 @@ const inputTv = tv({
       md: { inputEl: "px-3 py-2 text-sm" },
     },
     status: {
-      error: { inputEl: "border-red-500 hover:border-red-500 focus:ring-red-500" },
-      normal: { inputEl: "border-border hover:border-text-muted" },
+      error: { inputEl: "border-red-500 hover:border-red-500 focus:ring-red-500/20 focus:border-red-500" },
+      normal: {},
     },
     disabled: {
-      true: { inputEl: "border-border bg-surface-hover" },
+      true: { inputEl: "bg-surface-secondary" },
     },
   },
   defaultVariants: { size: "md", status: "normal" },
@@ -79,6 +78,7 @@ const slots = computed(() =>
       :type="type || 'text'"
       :value="modelValue"
       :placeholder="placeholder"
+      :title="tooltip"
       :disabled="disabled"
       :required="required"
       :min="min"

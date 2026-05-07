@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { X } from "lucide-vue-next";
-import { tv } from "@/lib/tv";
+import { X } from "@lucide/vue";
+import { tv, ui } from "@/lib/tv";
 import { useScrollLock } from "@/composables/useScrollLock";
 
 const props = defineProps<{
@@ -22,11 +22,11 @@ const modalTv = tv({
       "relative bg-surface w-full overflow-hidden",
       "rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[90vh] sm:max-h-none",
     ],
-    header: "flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-border",
-    titleEl: "text-base sm:text-lg font-semibold text-text-primary",
-    closeBtn: "p-1 rounded-lg hover:bg-surface-hover text-text-muted",
-    body: "px-4 sm:px-6 py-3 sm:py-4 max-h-[70vh] overflow-y-auto",
-    footer: "px-4 sm:px-6 py-3 sm:py-4 border-t border-border flex justify-end gap-3",
+    header: "flex items-center justify-between px-4 sm:px-5 py-2.5 sm:py-3 border-b border-border",
+    titleEl: ui.sectionTitle(),
+    closeBtn: "p-1 rounded-lg hover:bg-surface-hover text-text-muted transition-colors",
+    body: "px-4 sm:px-5 py-2.5 sm:py-3 max-h-[70vh] overflow-y-auto",
+    footer: "px-4 sm:px-5 py-2.5 sm:py-3 border-t border-border flex justify-end gap-2.5",
   },
 });
 
@@ -37,18 +37,11 @@ useScrollLock(computed(() => props.show));
 
 <template>
   <Teleport to="body">
-    <Transition
-      enter-active-class="transition ease-out duration-200"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition ease-in duration-150"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
+    <Transition name="app-modal">
       <div v-if="show" :class="slots.overlay()">
-        <div :class="slots.backdrop()" @click="emit('close')" />
+        <div :class="[slots.backdrop(), 'app-modal-backdrop']" @click="emit('close')" />
         <div
-          :class="slots.panel()"
+          :class="[slots.panel(), 'app-modal-panel']"
           :style="{ maxWidth: maxWidth || '32rem' }"
         >
           <div :class="slots.header()">

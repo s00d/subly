@@ -1,5 +1,5 @@
 import { ref } from "vue";
-import type { InAppAlert } from "@/services/notifications";
+import type { InAppAlert } from "@/services/notificationsClient";
 
 const alerts = ref<InAppAlert[]>([]);
 

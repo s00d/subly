@@ -1,34 +1,36 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import { useSubscriptionsStore } from "@/stores/subscriptions";
-import { useSettingsStore } from "@/stores/settings";
-import { useCatalogStore } from "@/stores/catalog";
 import { useI18n } from "vue-i18n";
 import { useHeaderActions } from "@/composables/useHeaderActions";
-import { getPricePerMonth, getDaysUntilPayment, getBillingCycleText, isOverdue } from "@/services/calculations";
-import { dbLoadSubscriptionsFiltered, type SubscriptionFilter } from "@/services/database";
+import {
+  type SubscriptionFilter,
+} from "@/services/subscriptionsClient";
+import { storeToRefs } from "pinia";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useToast } from "@/composables/useToast";
 import { useScrollLock } from "@/composables/useScrollLock";
 import { useClipboard } from "@/composables/useClipboard";
-import type { Subscription } from "@/schemas/appData";
+import { type Subscription, type Settings, type SubscriptionListItem } from "@/schemas/appData";
 import SubscriptionForm from "@/components/subscriptions/SubscriptionForm.vue";
 import SubscriptionDetail from "@/components/subscriptions/SubscriptionDetail.vue";
 import Toast from "@/components/ui/Toast.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
-import { Plus, Search, Pencil, Trash2, Copy, RefreshCw, ExternalLink, CreditCard, AlertTriangle, Star, CheckSquare, Square, Hash, CircleDollarSign, LayoutList, LayoutGrid, Rows3, FolderOpen, Filter } from "lucide-vue-next";
+import UniversalListRow from "@/components/ui/UniversalListRow.vue";
+import { Plus, Search, Pencil, Trash2, Copy, RefreshCw, ExternalLink, CreditCard, AlertTriangle, Star, CheckSquare, Square, Hash, CircleDollarSign, LayoutList, LayoutGrid, Rows3, FolderOpen, Filter } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Menu } from "@tauri-apps/api/menu";
 import type { MenuItemOptions, PredefinedMenuItemOptions } from "@tauri-apps/api/menu";
+import { useAppMetaStore } from "@/stores/appMetaStore";
+import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
+import { useNowStore } from "@/stores/nowStore";
+import { ui } from "@/lib/tv";
+import { formatErrorForToast } from "@/utils/formatError";
 
-const subsStore = useSubscriptionsStore();
-const settingsStore = useSettingsStore();
-const catalogStore = useCatalogStore();
 const route = useRoute();
 const vueRouter = useRouter();
 const { t } = useI18n();
@@ -37,10 +39,19 @@ const { fmt } = useCurrencyFormat();
 const { fmtDateMedium } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 const { copyToClipboard } = useClipboard();
-
-const now = ref(Date.now());
-let nowInterval: ReturnType<typeof setInterval> | null = null;
+const nowStore = useNowStore();
+const { now } = storeToRefs(nowStore);
 const showFilters = ref(false);
+const metaStore = useAppMetaStore();
+const subscriptionsStore = useSubscriptionsStore();
+const metaRefs = storeToRefs(metaStore);
+const settings = computed(() => metaRefs.settings.value);
+const categories = computed(() => metaRefs.categories.value ?? []);
+const paymentMethods = computed(() => metaRefs.paymentMethods.value ?? []);
+const tags = computed(() => metaRefs.tags.value ?? []);
+const currencies = computed(() => metaRefs.currencies.value ?? []);
+const household = computed(() => metaRefs.household.value ?? []);
+const subscriptions = computed(() => subscriptionsStore.items);
 
 // Register header action
 function updateHeaderActions() {
@@ -58,14 +69,15 @@ function updateHeaderActions() {
 }
 
 onMounted(() => {
-  updateHeaderActions();
-  handleSubQueryParam();
-  fetchFilteredSubs();
-  nowInterval = setInterval(() => { now.value = Date.now(); }, 60_000);
+  loadInitial().then(() => {
+    nowStore.ensureStarted();
+    updateHeaderActions();
+    handleSubQueryParam();
+    fetchFilteredSubs();
+  });
 });
 onUnmounted(() => {
   clearActions();
-  if (nowInterval) clearInterval(nowInterval);
 });
 
 // Watch for route query changes (e.g. from tray navigation)
@@ -74,7 +86,7 @@ watch(() => route.query.sub, () => handleSubQueryParam());
 function handleSubQueryParam() {
   const subId = route.query.sub as string | undefined;
   if (subId) {
-    const sub = subsStore.subscriptions.find((s) => s.id === subId);
+    const sub = subscriptions.value.find((s) => s.id === subId);
     if (sub) {
       openDetail(sub);
     }
@@ -93,7 +105,7 @@ const detailSubId = ref<string | null>(null);
 const detailSub = computed(() => {
   if (!detailSubId.value) return null;
   return filteredSubscriptions.value.find((s) => s.id === detailSubId.value)
-    ?? subsStore.subscriptions.find((s) => s.id === detailSubId.value)
+    ?? subscriptions.value.find((s) => s.id === detailSubId.value)
     ?? null;
 });
 
@@ -106,30 +118,30 @@ const filterState = ref<string>("");
 const filterTag = ref<string>("");
 
 // View mode & grouping
-const viewMode = computed(() => settingsStore.settings.subscriptionViewMode || "default");
-const groupBy = computed(() => settingsStore.settings.subscriptionGroupBy || "none");
+const viewMode = computed(() => settings.value?.subscriptionViewMode || "default");
+const groupBy = computed(() => settings.value?.subscriptionGroupBy || "none");
 
 function setViewMode(mode: "default" | "compact" | "expanded") {
-  settingsStore.updateSettings({ subscriptionViewMode: mode });
+  updateSettings({ subscriptionViewMode: mode });
 }
 watch([showFilters, viewMode], updateHeaderActions);
 
 function setGroupBy(g: "none" | "category" | "payment_method") {
-  settingsStore.updateSettings({ subscriptionGroupBy: g });
+  updateSettings({ subscriptionGroupBy: g });
 }
 
 // Grouped subscriptions
 interface SubGroup {
   key: string;
   label: string;
-  subs: Subscription[];
+  subs: SubscriptionListItem[];
 }
 
 const groupedSubscriptions = computed<SubGroup[]>(() => {
   const subs = filteredSubscriptions.value;
   if (groupBy.value === "none") return [{ key: "__all", label: "", subs }];
 
-  const map = new Map<string, { label: string; subs: Subscription[] }>();
+  const map = new Map<string, { label: string; subs: SubscriptionListItem[] }>();
 
   for (const s of subs) {
     let key: string;
@@ -200,7 +212,7 @@ function batchDeleteSelected() {
 
 async function confirmBatchDelete() {
   if (batchDeleteConfirmIds.value.length > 0) {
-    await subsStore.batchDelete(batchDeleteConfirmIds.value);
+    await subscriptionsStore.batchDelete(batchDeleteConfirmIds.value);
     toast(t("batch_deleted").replace("{count}", String(batchDeleteConfirmIds.value.length)));
     selectedIds.value = new Set();
     selectionMode.value = false;
@@ -211,7 +223,7 @@ async function confirmBatchDelete() {
 
 async function batchDeactivate() {
   const ids = [...selectedIds.value];
-  await subsStore.batchSetInactive(ids, true);
+  await subscriptionsStore.batchSetInactive(ids, true);
   toast(t("batch_updated").replace("{count}", String(ids.length)));
   selectedIds.value = new Set();
   fetchFilteredSubs();
@@ -219,20 +231,20 @@ async function batchDeactivate() {
 
 async function batchActivate() {
   const ids = [...selectedIds.value];
-  await subsStore.batchSetInactive(ids, false);
+  await subscriptionsStore.batchSetInactive(ids, false);
   toast(t("batch_updated").replace("{count}", String(ids.length)));
   selectedIds.value = new Set();
   fetchFilteredSubs();
 }
 
 function openBatchCategoryModal() {
-  batchCategoryId.value = settingsStore.settings.defaultCategoryId || "cat-1";
+  batchCategoryId.value = settings.value?.defaultCategoryId || "cat-1";
   showBatchCategoryModal.value = true;
 }
 
 async function confirmBatchCategory() {
   const ids = [...selectedIds.value];
-  await subsStore.batchSetCategory(ids, batchCategoryId.value);
+  await subscriptionsStore.batchSetCategory(ids, batchCategoryId.value);
   toast(t("batch_updated").replace("{count}", String(ids.length)));
   showBatchCategoryModal.value = false;
   selectedIds.value = new Set();
@@ -244,7 +256,7 @@ async function showContextMenu(sub: Subscription, event: MouseEvent) {
   if (selectionMode.value) return;
 
   const items: (MenuItemOptions | PredefinedMenuItemOptions)[] = [
-    { id: "favorite", text: sub.favorite ? t("remove_from_favorites") : t("add_to_favorites"), action: async () => { await subsStore.toggleFavorite(sub.id); await fetchFilteredSubs(); } },
+    { id: "favorite", text: sub.favorite ? t("remove_from_favorites") : t("add_to_favorites"), action: async () => { await handleToggleFavorite(sub.id); } },
   ];
   if (!sub.inactive) {
     items.push({ id: "record_payment", text: t("record_payment"), action: () => handleRecordPayment(sub.id) });
@@ -267,19 +279,28 @@ async function showContextMenu(sub: Subscription, event: MouseEvent) {
     const menu = await Menu.new({ items });
     await menu.popup();
   } catch (e) {
-    console.warn("Context menu failed:", e);
+    console.error("[SubscriptionsPage] context menu failed", e);
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 
-// Filtered subscriptions from SQL
-const filteredSubscriptions = ref<Subscription[]>([]);
-const subsLoading = ref(false);
+// Filtered subscriptions from backend DTO query
+const filteredSubscriptions = computed<SubscriptionListItem[]>(
+  () => subscriptionsStore.items,
+);
+const totalSubscriptionsAmount = computed(() =>
+  filteredSubscriptions.value.reduce((sum, sub) => {
+    const value = Number(sub.monthlyPrice ?? sub.price ?? 0);
+    return sum + (Number.isFinite(value) ? value : 0);
+  }, 0),
+);
+const subscriptionsSummaryCurrencyId = computed(() => settings.value?.mainCurrencyId || "cur-1");
 
 function buildSubFilter(): SubscriptionFilter {
   const f: SubscriptionFilter = {
     sortBy: (sortBy.value || "next_payment") as SubscriptionFilter["sortBy"],
-    disabledToBottom: settingsStore.settings.disabledToBottom,
-    hideDisabled: settingsStore.settings.hideDisabled,
+    disabledToBottom: settings.value?.disabledToBottom,
+    hideDisabled: settings.value?.hideDisabled,
   };
   if (filterState.value === "active" || filterState.value === "inactive") {
     f.state = filterState.value;
@@ -292,16 +313,14 @@ function buildSubFilter(): SubscriptionFilter {
 }
 
 async function fetchFilteredSubs() {
-  subsLoading.value = true;
   try {
-    filteredSubscriptions.value = await dbLoadSubscriptionsFiltered(buildSubFilter());
+    await subscriptionsStore.loadBrief(buildSubFilter());
   } catch (e) {
     console.error("[SubscriptionsPage] fetchFilteredSubs failed", {
       filter: buildSubFilter(),
       error: e,
     });
-  } finally {
-    subsLoading.value = false;
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 
@@ -316,29 +335,68 @@ watch([searchQuery, filterCategory, filterPayment, filterTag, filterState, sortB
 // Tag filter options
 const tagFilterOptions = computed<SelectOption[]>(() => [
   { value: "", label: t("filter_by_tag") },
-  ...catalogStore.tags.map((tag) => ({ value: tag.name, label: tag.name })),
+  ...tags.value.map((tag) => ({ value: tag.name, label: tag.name })),
 ]);
 
 function getCategoryName(id: string): string {
-  return catalogStore.categories.find((c) => c.id === id)?.name || "";
+  return categories.value.find((c) => c.id === id)?.name || "";
 }
 
 function getCategoryIcon(id: string): string {
-  return catalogStore.categories.find((c) => c.id === id)?.icon || "";
+  return categories.value.find((c) => c.id === id)?.icon || "";
 }
 
 function getPaymentMethod(id: string) {
-  return catalogStore.paymentMethods.find((p) => p.id === id);
+  return paymentMethods.value.find((p) => p.id === id);
 }
 
-function getDaysBadgeState(nextPayment: string): "days-badge--danger" | "days-badge--warn" | "days-badge--normal" {
-  const days = getDaysUntilPayment(nextPayment);
+function getSubDaysLeft(sub: SubscriptionListItem): number {
+  return Number(sub.daysLeft ?? 0);
+}
+
+function isSubOverdue(sub: SubscriptionListItem): boolean {
+  return Boolean(sub.overdue);
+}
+
+function getDaysBadgeState(sub: SubscriptionListItem): "days-badge--danger" | "days-badge--warn" | "days-badge--normal" {
+  const days = getSubDaysLeft(sub);
   if (days <= 3) return "days-badge--danger";
   if (days <= 7) return "days-badge--warn";
   return "days-badge--normal";
 }
 
+function billingCycleText(cycle: number, frequency: number): string {
+  switch (cycle) {
+    case 1: return frequency === 1 ? t("daily") : `${frequency} ${t("days")}`;
+    case 2: return frequency === 1 ? t("weekly") : `${frequency} ${t("weeks")}`;
+    case 3: return frequency === 1 ? t("monthly") : `${frequency} ${t("months")}`;
+    case 4: return frequency === 1 ? t("yearly") : `${frequency} ${t("years")}`;
+    default: return "";
+  }
+}
+
 const formatDate = fmtDateMedium;
+const subscriptionLookupData = computed(() => {
+  if (!settings.value) return null;
+  return {
+    categories: categories.value,
+    paymentMethods: paymentMethods.value,
+    household: household.value,
+    currencies: currencies.value,
+    settings: settings.value,
+  };
+});
+const subscriptionFormLookupData = computed(() => {
+  if (!settings.value) return null;
+  return {
+    settings: settings.value,
+    currencies: currencies.value,
+    paymentMethods: paymentMethods.value,
+    household: household.value,
+    categories: categories.value,
+    tags: tags.value,
+  };
+});
 
 // Actions
 function openAdd() {
@@ -366,7 +424,7 @@ function requestDelete(id: string) {
 
 async function confirmDelete() {
   if (deleteConfirmId.value) {
-    await subsStore.deleteSubscription(deleteConfirmId.value);
+    await subscriptionsStore.deleteById(deleteConfirmId.value);
     toast(t("subscription_deleted"));
     fetchFilteredSubs();
   }
@@ -377,33 +435,43 @@ function cancelDelete() { deleteConfirmId.value = null; }
 
 async function handleClone(id: string) {
   showDetail.value = false;
-  await subsStore.cloneSubscription(id);
+  await subscriptionsStore.cloneById(id);
   toast(t("subscription_added"));
   fetchFilteredSubs();
 }
 
 async function handleRenew(id: string) {
   showDetail.value = false;
-  await subsStore.renewSubscription(id);
+  await subscriptionsStore.recordPayment(id);
   toast(t("payment_recorded"));
   fetchFilteredSubs();
 }
 
 async function handleRecordPayment(id: string) {
-  await subsStore.recordPayment(id);
+  await subscriptionsStore.recordPayment(id);
   toast(t("payment_recorded"));
   fetchFilteredSubs();
 }
 
 async function handleOpenUrl(url: string) {
   const fullUrl = url.startsWith("http") ? url : `https://${url}`;
-  try { await openUrl(fullUrl); } catch (e) { console.error("Failed to open URL:", e); }
+  try {
+    await openUrl(fullUrl);
+  } catch (e) {
+    console.error("[SubscriptionsPage] failed to open URL", { url: fullUrl, error: e });
+    toast(formatErrorForToast(e, t), "error");
+  }
 }
 
 async function handleCopyName(sub: Subscription) {
   const copied = await copyToClipboard(sub.name);
   if (copied) toast(t("copied_to_clipboard"));
-  else toast(t("error"), "error");
+  else toast(t("clipboard_copy_failed"), "error");
+}
+
+async function handleToggleFavorite(id: string) {
+  await subscriptionsStore.toggleFavorite(id);
+  await fetchFilteredSubs();
 }
 
 async function onSaved() {
@@ -420,12 +488,12 @@ const sortOptions = computed<SelectOption[]>(() => [
 
 const categoryFilterOptions = computed<SelectOption[]>(() => [
   { value: "", label: t("category") },
-  ...catalogStore.sortedCategories.map((c) => ({ value: c.id, label: c.name, icon: c.icon || undefined })),
+  ...[...categories.value].sort((a, b) => a.sortOrder - b.sortOrder).map((c) => ({ value: c.id, label: c.name, icon: c.icon || undefined })),
 ]);
 
 const paymentFilterOptions = computed<SelectOption[]>(() => [
   { value: "", label: t("payment_method") },
-  ...catalogStore.enabledPaymentMethods.map((pm) => ({ value: pm.id, label: pm.name, icon: pm.icon })),
+  ...paymentMethods.value.filter((pm) => pm.enabled).map((pm) => ({ value: pm.id, label: pm.name, icon: pm.icon })),
 ]);
 
 const stateFilterOptions = computed<SelectOption[]>(() => [
@@ -442,9 +510,20 @@ function onDetailDelete(id: string) { requestDelete(id); }
 function onDetailOpenUrl(url: string) { handleOpenUrl(url); }
 function onDetailRecordPayment(id: string) { handleRecordPayment(id); }
 async function onDetailToggleFavorite(id: string) {
-  await subsStore.toggleFavorite(id);
+  await subscriptionsStore.toggleFavorite(id);
   fetchFilteredSubs();
 }
+
+async function updateSettings(updates: Partial<Settings>) {
+  if (!settings.value) return;
+  await metaStore.updateSettings({ ...settings.value, ...updates });
+}
+
+async function loadInitial() {
+  await metaStore.ensureLoaded();
+  await subscriptionsStore.loadBrief();
+}
+
 </script>
 
 <template>
@@ -458,7 +537,7 @@ async function onDetailToggleFavorite(id: string) {
       leave-from-class="opacity-100 translate-y-0"
       leave-to-class="opacity-0 -translate-y-2"
     >
-      <div v-if="showFilters" class="mb-3 p-3 rounded-xl border border-border bg-surface-hover/80 backdrop-blur-sm shadow-sm space-y-2">
+      <div v-if="showFilters" class="mb-3 p-2.5 sm:p-4 rounded-xl border border-border bg-surface space-y-2">
         <div class="relative min-w-0">
           <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
           <input
@@ -481,7 +560,7 @@ async function onDetailToggleFavorite(id: string) {
           <div class="w-28 shrink-0">
             <AppSelect v-model="filterState" :options="stateFilterOptions" size="sm" />
           </div>
-          <div v-if="catalogStore.tags.length > 0" class="w-28 shrink-0" >
+          <div v-if="tags.length > 0" class="w-28 shrink-0" >
             <AppSelect v-model="filterTag" :options="tagFilterOptions" size="sm" />
           </div>
           <div class="w-32 shrink-0">
@@ -500,9 +579,9 @@ async function onDetailToggleFavorite(id: string) {
       leave-from-class="opacity-100 translate-y-0"
       leave-to-class="opacity-0 -translate-y-2"
     >
-      <div v-if="selectionMode" class="flex items-center gap-1.5 sm:gap-2 mb-3 px-2 sm:px-3 py-2 rounded-lg bg-primary-light border border-primary/20 overflow-x-auto">
-        <span class="text-xs font-medium text-primary">{{ selectedIds.size }} {{ t('selected_count') }}</span>
-        <button @click="selectAll" class="p-1 rounded text-primary hover:bg-primary/10 transition-colors" :title="t('select_all')">
+      <div v-if="selectionMode" class="flex items-center gap-1.5 sm:gap-2 mb-3 px-2 sm:px-3 py-2 rounded-lg bg-surface-secondary border border-border overflow-x-auto">
+        <span class="text-xs font-medium text-text-primary">{{ selectedIds.size }} {{ t('selected_count') }}</span>
+        <button @click="selectAll" class="p-1 rounded text-text-secondary hover:bg-surface transition-colors" :title="t('select_all')">
           <CheckSquare :size="13" />
         </button>
         <button @click="deselectAll" class="p-1 rounded text-text-muted hover:bg-surface-hover transition-colors" :title="t('deselect_all')">
@@ -512,22 +591,22 @@ async function onDetailToggleFavorite(id: string) {
         <button
           @click="batchActivate"
           :disabled="selectedIds.size === 0"
-          class="px-2.5 py-1 rounded-md text-[11px] font-medium bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50 disabled:opacity-30 transition-colors"
+          class="px-2.5 py-1 rounded-md text-[11px] font-medium border border-border text-text-secondary hover:bg-surface disabled:opacity-30 transition-colors"
         >{{ t('batch_activate') }}</button>
         <button
           @click="batchDeactivate"
           :disabled="selectedIds.size === 0"
-          class="px-2.5 py-1 rounded-md text-[11px] font-medium bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:hover:bg-orange-900/50 disabled:opacity-30 transition-colors"
+          class="px-2.5 py-1 rounded-md text-[11px] font-medium border border-border text-text-secondary hover:bg-surface disabled:opacity-30 transition-colors"
         >{{ t('batch_deactivate') }}</button>
         <button
           @click="openBatchCategoryModal"
           :disabled="selectedIds.size === 0"
-          class="px-2.5 py-1 rounded-md text-[11px] font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50 disabled:opacity-30 transition-colors"
+          class="px-2.5 py-1 rounded-md text-[11px] font-medium border border-border text-text-secondary hover:bg-surface disabled:opacity-30 transition-colors"
         >{{ t('batch_change_category') }}</button>
         <button
           @click="batchDeleteSelected"
           :disabled="selectedIds.size === 0"
-          class="px-2.5 py-1 rounded-md text-[11px] font-medium bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50 disabled:opacity-30 transition-colors"
+          class="px-2.5 py-1 rounded-md text-[11px] font-medium border border-border text-text-secondary hover:bg-surface disabled:opacity-30 transition-colors"
         >{{ t('batch_delete') }}</button>
       </div>
     </Transition>
@@ -549,6 +628,17 @@ async function onDetailToggleFavorite(id: string) {
 
     <!-- Subscription list -->
     <div v-else>
+      <!-- Summary bar -->
+      <div class="flex items-center justify-between px-3 py-2 mb-3 rounded-lg bg-surface border border-border">
+        <div class="flex items-center gap-2 text-xs text-text-muted">
+          <CircleDollarSign :size="14" />
+          <span>{{ filteredSubscriptions.length }} {{ t('subscriptions').toLowerCase() }}</span>
+        </div>
+        <div class="text-sm font-semibold text-text-primary tabular-nums">
+          {{ fmt(totalSubscriptionsAmount, subscriptionsSummaryCurrencyId) }}
+        </div>
+      </div>
+
       <template v-for="group in groupedSubscriptions" :key="group.key">
         <!-- Group header -->
         <div v-if="groupBy !== 'none' && group.label" class="flex items-center gap-2 mb-2 mt-4 first:mt-0">
@@ -570,36 +660,101 @@ async function onDetailToggleFavorite(id: string) {
               selectedIds.has(sub.id) ? 'border-primary ring-1 ring-primary/30' : 'border-border',
             ]"
           >
-            <!-- COMPACT VIEW -->
-            <div v-if="viewMode === 'compact'" class="flex items-center gap-2 px-3 py-2 cursor-pointer" @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)" @contextmenu.prevent="showContextMenu(sub, $event)">
-              <div v-if="selectionMode" class="shrink-0" @click.stop="toggleSelected(sub.id)">
-                <div class="w-4 h-4 rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
-                  :class="selectedIds.has(sub.id) ? 'bg-primary border-primary text-white' : 'border-border hover:border-primary'"
-                ><svg v-if="selectedIds.has(sub.id)" width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-              </div>
-              <Tooltip v-if="!selectionMode" :text="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')">
-                <button @click.stop="subsStore.toggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-yellow-500' : 'text-border hover:text-yellow-400'">
-                  <Star :size="12" :fill="sub.favorite ? 'currentColor' : 'none'" />
-                </button>
-              </Tooltip>
-              <div class="w-6 h-6 rounded bg-primary-light border border-border flex items-center justify-center text-[10px] font-bold text-primary shrink-0 overflow-hidden">
-                <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
-                <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
-              </div>
-              <p class="text-xs font-medium text-text-primary truncate min-w-0 flex-1">{{ sub.name }}</p>
-              <span
-                v-if="!sub.inactive"
-                class="days-badge inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none shrink-0"
-                :class="getDaysBadgeState(sub.nextPayment)"
-              >
-                {{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}
-              </span>
-              <p class="text-xs font-semibold text-text-primary shrink-0">{{ fmt(sub.price, sub.currencyId) }}</p>
-            </div>
-
-            <!-- EXPANDED VIEW (card) -->
-            <template v-else-if="viewMode === 'expanded'">
-              <div class="p-4 cursor-pointer" @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)" @contextmenu.prevent="showContextMenu(sub, $event)">
+            <UniversalListRow
+              :mode="viewMode as 'compact' | 'default' | 'expanded'"
+              @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)"
+              @contextmenu="showContextMenu(sub, $event)"
+            >
+              <template #selection>
+                <div
+                  v-if="selectionMode && viewMode !== 'expanded'"
+                  class="shrink-0"
+                  @click.stop="toggleSelected(sub.id)"
+                >
+                  <div
+                    class="rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
+                    :class="[
+                      viewMode === 'compact' ? 'w-4 h-4' : 'w-5 h-5',
+                      selectedIds.has(sub.id) ? 'bg-primary border-primary text-white' : 'border-border hover:border-primary',
+                    ]"
+                  >
+                    <svg v-if="selectedIds.has(sub.id)" :width="viewMode === 'compact' ? 10 : 12" :height="viewMode === 'compact' ? 10 : 12" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                </div>
+              </template>
+              <template #leading>
+                <template v-if="viewMode === 'compact'">
+                  <Tooltip v-if="!selectionMode" :text="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')">
+                    <button @click.stop="handleToggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-yellow-500' : 'text-border hover:text-yellow-400'">
+                      <Star :size="12" :fill="sub.favorite ? 'currentColor' : 'none'" />
+                    </button>
+                  </Tooltip>
+                  <div class="w-6 h-6 rounded bg-primary-light border border-border flex items-center justify-center text-[10px] font-bold text-primary shrink-0 overflow-hidden">
+                    <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
+                    <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
+                  </div>
+                </template>
+                <template v-else-if="viewMode === 'default'">
+                  <Tooltip v-if="!selectionMode" :text="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')">
+                    <button @click.stop="handleToggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors hidden sm:block" :class="sub.favorite ? 'text-yellow-500' : 'text-border hover:text-yellow-400'">
+                      <Star :size="16" :fill="sub.favorite ? 'currentColor' : 'none'" />
+                    </button>
+                  </Tooltip>
+                  <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary-light border border-border flex items-center justify-center text-xs sm:text-sm font-bold text-primary shrink-0 overflow-hidden">
+                    <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
+                    <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
+                  </div>
+                </template>
+              </template>
+              <template #main>
+                <p v-if="viewMode === 'compact'" class="text-xs font-medium text-text-primary truncate">{{ sub.name }}</p>
+                <div v-else-if="viewMode === 'default'" class="min-w-0">
+                  <p class="text-xs sm:text-sm font-medium text-text-primary truncate">{{ sub.name }}</p>
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="text-[10px] sm:text-xs text-text-muted">
+                      {{ billingCycleText(sub.cycle, sub.frequency) }}
+                      <span v-if="!sub.autoRenew" class="ml-1 text-orange-500">({{ t('manual_renewal') }})</span>
+                    </span>
+                    <span v-for="tag in (sub.tags || []).slice(0, 3)" :key="tag" class="hidden sm:inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium bg-surface-hover text-text-muted border border-border">#{{ tag }}</span>
+                    <span v-if="(sub.tags || []).length > 3" class="hidden sm:inline text-[9px] text-text-muted">+{{ sub.tags.length - 3 }}</span>
+                  </div>
+                </div>
+              </template>
+              <template #meta>
+                <span
+                  v-if="viewMode === 'compact' && !sub.inactive"
+                  class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none shrink-0 w-[56px] tabular-nums"
+                  :class="getDaysBadgeState(sub)"
+                >
+                  {{ getSubDaysLeft(sub) }}{{ t('days_short') }}
+                </span>
+                <div v-else-if="viewMode === 'default'" class="text-right shrink-0 w-[124px] sm:w-[142px]">
+                  <div class="flex items-center gap-1 sm:gap-1.5 justify-end">
+                    <p class="text-xs sm:text-sm font-medium tabular-nums" :class="isSubOverdue(sub) ? 'text-red-500' : 'text-text-primary'">
+                      <span class="hidden sm:inline tabular-nums whitespace-nowrap">{{ formatDate(sub.nextPayment) }}</span>
+                    </p>
+                    <span
+                      v-if="!sub.inactive"
+                      class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none w-[56px] tabular-nums"
+                      :class="getDaysBadgeState(sub)"
+                    >
+                      {{ getSubDaysLeft(sub) }}{{ t('days_short') }}
+                    </span>
+                  </div>
+                </div>
+              </template>
+              <template #value>
+                <p v-if="viewMode === 'compact'" class="text-xs font-semibold text-text-primary shrink-0 w-[96px] text-right tabular-nums whitespace-nowrap">{{ fmt(sub.price, sub.currencyId) }}</p>
+                <div v-else-if="viewMode === 'default'" class="text-right shrink-0 w-[96px] sm:w-[112px]">
+                  <p class="text-xs sm:text-sm font-semibold text-text-primary tabular-nums whitespace-nowrap">{{ fmt(sub.price, sub.currencyId) }}</p>
+                </div>
+              </template>
+              <template #trailing>
+                <div v-if="viewMode === 'default'" class="shrink-0 hidden sm:block" :title="getPaymentMethod(sub.paymentMethodId)?.name">
+                  <IconDisplay :icon="getPaymentMethod(sub.paymentMethodId)?.icon || '💳'" :size="22" />
+                </div>
+              </template>
+              <template #expanded>
                 <div class="flex items-start gap-3 mb-3">
                   <div v-if="selectionMode" class="shrink-0 mt-1" @click.stop="toggleSelected(sub.id)">
                     <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
@@ -614,7 +769,7 @@ async function onDetailToggleFavorite(id: string) {
                     <div class="flex items-center gap-2">
                       <p class="text-sm font-semibold text-text-primary truncate">{{ sub.name }}</p>
                       <Tooltip v-if="!selectionMode" :text="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')">
-                        <button @click.stop="subsStore.toggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-yellow-500' : 'text-border hover:text-yellow-400'">
+                        <button @click.stop="handleToggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-yellow-500' : 'text-border hover:text-yellow-400'">
                           <Star :size="14" :fill="sub.favorite ? 'currentColor' : 'none'" />
                         </button>
                       </Tooltip>
@@ -629,16 +784,16 @@ async function onDetailToggleFavorite(id: string) {
                 <div class="flex items-end justify-between">
                   <div>
                     <p class="text-lg font-bold text-text-primary">{{ fmt(sub.price, sub.currencyId) }}</p>
-                    <p class="text-[10px] text-text-muted">{{ getBillingCycleText(sub.cycle, sub.frequency, t) }}</p>
+                    <p class="text-[10px] text-text-muted">{{ billingCycleText(sub.cycle, sub.frequency) }}</p>
                   </div>
-                  <div class="text-right">
-                    <p class="text-xs font-medium" :class="isOverdue(sub) ? 'text-red-500' : 'text-text-primary'">{{ formatDate(sub.nextPayment) }}</p>
+                  <div class="text-right w-[136px]">
+                    <p class="text-xs font-medium tabular-nums whitespace-nowrap" :class="isSubOverdue(sub) ? 'text-red-500' : 'text-text-primary'">{{ formatDate(sub.nextPayment) }}</p>
                     <span
                       v-if="!sub.inactive"
-                      class="days-badge inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none mt-0.5"
-                      :class="getDaysBadgeState(sub.nextPayment)"
+                      class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none mt-0.5 w-[56px] tabular-nums"
+                      :class="getDaysBadgeState(sub)"
                     >
-                      {{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}
+                      {{ getSubDaysLeft(sub) }}{{ t('days_short') }}
                     </span>
                   </div>
                 </div>
@@ -653,72 +808,16 @@ async function onDetailToggleFavorite(id: string) {
                   <IconDisplay :icon="getPaymentMethod(sub.paymentMethodId)?.icon || '💳'" :size="16" />
                   <span class="text-[10px] text-text-muted">{{ getPaymentMethod(sub.paymentMethodId)?.name }}</span>
                 </div>
-              </div>
-              <div v-if="settingsStore.settings.showSubscriptionProgress && !sub.inactive" class="h-1 bg-surface-hover">
-                <div class="h-full transition-all duration-300"
-                  :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'bg-red-500' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'bg-orange-400' : 'bg-primary'"
-                  :style="{ width: ((30 - getDaysUntilPayment(sub.nextPayment)) / 30 * 100) + '%' }"
-                />
-              </div>
-            </template>
-
-            <!-- DEFAULT VIEW -->
-            <template v-else>
-              <div class="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 cursor-pointer" @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)" @contextmenu.prevent="showContextMenu(sub, $event)">
-                <div v-if="selectionMode" class="shrink-0" @click.stop="toggleSelected(sub.id)">
-                  <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
-                    :class="selectedIds.has(sub.id) ? 'bg-primary border-primary text-white' : 'border-border hover:border-primary'"
-                  ><svg v-if="selectedIds.has(sub.id)" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              </template>
+              <template #after>
+                <div v-if="settings?.showSubscriptionProgress && !sub.inactive" class="h-1 bg-surface-hover">
+                  <div class="h-full transition-all duration-300"
+                    :class="getSubDaysLeft(sub) <= 3 ? 'bg-red-500' : getSubDaysLeft(sub) <= 7 ? 'bg-orange-400' : 'bg-primary'"
+                    :style="{ width: ((30 - getSubDaysLeft(sub)) / 30 * 100) + '%' }"
+                  />
                 </div>
-                <Tooltip v-if="!selectionMode" :text="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')">
-                  <button @click.stop="subsStore.toggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors hidden sm:block" :class="sub.favorite ? 'text-yellow-500' : 'text-border hover:text-yellow-400'">
-                    <Star :size="16" :fill="sub.favorite ? 'currentColor' : 'none'" />
-                  </button>
-                </Tooltip>
-                <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary-light border border-border flex items-center justify-center text-xs sm:text-sm font-bold text-primary shrink-0 overflow-hidden">
-                  <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
-                  <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
-                </div>
-                <div class="min-w-0 flex-1">
-                  <p class="text-xs sm:text-sm font-medium text-text-primary truncate">{{ sub.name }}</p>
-                  <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="text-[10px] sm:text-xs text-text-muted">
-                      {{ getBillingCycleText(sub.cycle, sub.frequency, t) }}
-                      <span v-if="!sub.autoRenew" class="ml-1 text-orange-500">({{ t('manual_renewal') }})</span>
-                    </span>
-                    <span v-for="tag in (sub.tags || []).slice(0, 3)" :key="tag" class="hidden sm:inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium bg-surface-hover text-text-muted border border-border">#{{ tag }}</span>
-                    <span v-if="(sub.tags || []).length > 3" class="hidden sm:inline text-[9px] text-text-muted">+{{ sub.tags.length - 3 }}</span>
-                  </div>
-                </div>
-                <div class="text-right shrink-0">
-                  <div class="flex items-center gap-1 sm:gap-1.5 justify-end">
-                    <p class="text-xs sm:text-sm font-medium" :class="isOverdue(sub) ? 'text-red-500' : 'text-text-primary'">
-                      <span class="hidden sm:inline">{{ formatDate(sub.nextPayment) }}</span>
-                    </p>
-                    <span
-                      v-if="!sub.inactive"
-                      class="days-badge inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none"
-                      :class="getDaysBadgeState(sub.nextPayment)"
-                    >
-                      {{ getDaysUntilPayment(sub.nextPayment) }}{{ t('days_short') }}
-                    </span>
-                  </div>
-                </div>
-                <div class="text-right shrink-0">
-                  <p class="text-xs sm:text-sm font-semibold text-text-primary">{{ fmt(sub.price, sub.currencyId) }}</p>
-                </div>
-                <div class="shrink-0 hidden sm:block" :title="getPaymentMethod(sub.paymentMethodId)?.name">
-                  <IconDisplay :icon="getPaymentMethod(sub.paymentMethodId)?.icon || '💳'" :size="22" />
-                </div>
-              </div>
-              <div v-if="settingsStore.settings.showSubscriptionProgress && !sub.inactive" class="h-1 bg-surface-hover">
-                <div class="h-full transition-all duration-300"
-                  :class="getDaysUntilPayment(sub.nextPayment) <= 3 ? 'bg-red-500' : getDaysUntilPayment(sub.nextPayment) <= 7 ? 'bg-orange-400' : 'bg-primary'"
-                  :style="{ width: ((30 - getDaysUntilPayment(sub.nextPayment)) / 30 * 100) + '%' }"
-                  :title="getDaysUntilPayment(sub.nextPayment) + ' ' + t('days')"
-                />
-              </div>
-            </template>
+              </template>
+            </UniversalListRow>
           </div>
         </div>
       </template>
@@ -726,8 +825,10 @@ async function onDetailToggleFavorite(id: string) {
 
     <!-- Detail Panel -->
     <SubscriptionDetail
+      v-if="subscriptionLookupData"
       :show="showDetail"
       :subscription="detailSub"
+      :lookupData="subscriptionLookupData"
       @close="showDetail = false"
       @edit="onDetailEdit"
       @clone="onDetailClone"
@@ -740,30 +841,25 @@ async function onDetailToggleFavorite(id: string) {
 
     <!-- Form -->
     <SubscriptionForm
+      v-if="subscriptionFormLookupData"
       :show="showForm"
       :edit-subscription="editingSub"
+      :lookupData="subscriptionFormLookupData"
       @close="showForm = false"
       @saved="onSaved"
     />
 
     <!-- Delete Confirmation Modal -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="app-modal">
         <div v-if="deleteConfirmId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div class="absolute inset-0 bg-black/50" @click="cancelDelete" />
-          <div class="relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
+          <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="cancelDelete" />
+          <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
             <div class="flex items-center gap-3 mb-3 sm:mb-4">
               <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                 <AlertTriangle :size="18" class="text-red-500" />
               </div>
-              <h3 class="text-base sm:text-lg font-semibold text-text-primary">{{ t('delete') }}</h3>
+              <h3 :class="ui.sectionTitle()">{{ t('delete') }}</h3>
             </div>
             <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('confirm_delete_subscription') }}</p>
             <div class="flex justify-end gap-2 sm:gap-3">
@@ -783,22 +879,15 @@ async function onDetailToggleFavorite(id: string) {
 
     <!-- Batch Delete Confirmation -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="app-modal">
         <div v-if="batchDeleteConfirmIds.length > 0" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div class="absolute inset-0 bg-black/50" @click="batchDeleteConfirmIds = []" />
-          <div class="relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
+          <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="batchDeleteConfirmIds = []" />
+          <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
             <div class="flex items-center gap-3 mb-3 sm:mb-4">
               <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                 <AlertTriangle :size="18" class="text-red-500" />
               </div>
-              <h3 class="text-base sm:text-lg font-semibold text-text-primary">{{ t('batch_delete') }}</h3>
+              <h3 :class="ui.sectionTitle()">{{ t('batch_delete') }}</h3>
             </div>
             <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('batch_confirm_delete').replace('{count}', String(batchDeleteConfirmIds.length)) }}</p>
             <div class="flex justify-end gap-2 sm:gap-3">
@@ -812,18 +901,11 @@ async function onDetailToggleFavorite(id: string) {
 
     <!-- Batch Change Category Modal -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="app-modal">
         <div v-if="showBatchCategoryModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div class="absolute inset-0 bg-black/50" @click="showBatchCategoryModal = false" />
-          <div class="relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
-            <h3 class="text-base sm:text-lg font-semibold text-text-primary mb-3 sm:mb-4">{{ t('batch_change_category') }}</h3>
+          <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="showBatchCategoryModal = false" />
+          <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
+            <h3 :class="[ui.sectionTitle(), 'mb-3 sm:mb-4']">{{ t('batch_change_category') }}</h3>
             <p class="text-xs sm:text-sm text-text-muted mb-3">{{ selectedIds.size }} {{ t('selected_count') }}</p>
             <AppSelect
               v-model="batchCategoryId"

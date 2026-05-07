@@ -1,479 +1,323 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import {
   syncStatus,
   getProviders,
-  getSyncConfig,
-  setProviderCredentials,
-  enableSync,
-  disableSync,
+  getSyncSettings,
+  saveProviderSettings,
+  enableProvider,
+  disableProvider,
   pullRemote,
   pushLocal,
+  pushLocalForce,
   checkRemote,
   dismissPendingUpdate,
-} from "@/services/sync";
-import type { SyncProviderType } from "@/services/sync";
-import {
-  RefreshCw, Cloud, CloudOff, Check, AlertTriangle,
-  Loader2, Save, Download, Upload, ChevronDown,
-} from "lucide-vue-next";
-import Tooltip from "@/components/ui/Tooltip.vue";
-import { tv } from "@/lib/tv";
+} from "@/services/syncClient";
+import type { SyncProviderType, SyncProviderSchema } from "@/services/syncClient";
+import Modal from "@/components/ui/Modal.vue";
+import { ChevronRight, Cloud, CloudOff, Download, Save, Upload } from "@lucide/vue";
+import { ui } from "@/lib/tv";
+import { formatErrorForToast } from "@/utils/formatError";
+import { buildSyncCredentialsSchema } from "@/schemas/zod/syncCredentials";
+import { zodIssueToMessageKey, type ZodFieldMeta } from "@/composables/useZodErrors";
 
 const { t } = useI18n();
 const { toast } = useToast();
-
-const allProviders = getProviders();
-const isConnecting = ref(false);
+const allProviders = computed(() => getProviders());
 const expandedProvider = ref<SyncProviderType | null>(null);
-const showChangeProvider = ref(false);
-
-const gdriveClientId = ref("");
-const gdriveClientSecret = ref("");
-const dropboxAppKey = ref("");
-const dropboxAppSecret = ref("");
-const onedriveClientId = ref("");
-const webdavUrl = ref("");
-const webdavUsername = ref("");
-const webdavPassword = ref("");
+const isConnecting = ref(false);
+const isSaving = ref<SyncProviderType | null>(null);
+const formValues = reactive<Record<string, Record<string, string>>>({});
+const fieldErrors = reactive<Record<string, string>>({});
+const showRevisionConflict = ref(false);
 
 onMounted(() => {
-  const cfg = getSyncConfig();
-  gdriveClientId.value = cfg.gdriveClientId;
-  gdriveClientSecret.value = cfg.gdriveClientSecret;
-  dropboxAppKey.value = cfg.dropboxAppKey;
-  dropboxAppSecret.value = cfg.dropboxAppSecret;
-  onedriveClientId.value = cfg.onedriveClientId;
-  webdavUrl.value = cfg.webdavUrl;
-  webdavUsername.value = cfg.webdavUsername;
-  webdavPassword.value = cfg.webdavPassword;
+  const cfg = getSyncSettings();
+  allProviders.value.forEach((provider) => {
+    const values: Record<string, string> = {};
+    (provider.fields ?? []).forEach((f) => {
+      values[f.key] = (cfg as unknown as Record<string, string>)[f.key] ?? "";
+    });
+    formValues[provider.type] = values;
+  });
 });
 
-const activeProviderInfo = computed(() =>
-  syncStatus.enabled && syncStatus.provider
-    ? allProviders.find((p) => p.type === syncStatus.provider) ?? null
-    : null,
-);
+const activeProvider = computed(() => allProviders.value.find((p) => p.type === syncStatus.provider) ?? null);
+const visibleProviders = computed(() => allProviders.value.filter((p) => p.type !== syncStatus.provider));
 
-const availableProviders = computed(() =>
-  allProviders.filter((p) => p.type !== syncStatus.provider),
-);
-
-const lastSyncedFormatted = computed(() => {
-  if (!syncStatus.lastSynced) return t("sync_never");
-  return new Date(syncStatus.lastSynced).toLocaleString();
-});
-
-const lastSyncedRemoteFormatted = computed(() => {
-  if (!syncStatus.remoteUpdatedAt) return t("sync_never");
-  return new Date(syncStatus.remoteUpdatedAt).toLocaleString();
-});
-
-function canConnect(type: SyncProviderType): boolean {
-  if (type === "gdrive") return !!gdriveClientId.value && !!gdriveClientSecret.value;
-  if (type === "dropbox") return !!dropboxAppKey.value && !!dropboxAppSecret.value;
-  if (type === "onedrive") return !!onedriveClientId.value;
-  if (type === "webdav") return !!webdavUrl.value && !!webdavUsername.value;
-  return true;
+function providerLabel(type: SyncProviderType): string {
+  return t(`sync_provider_${type}`);
 }
 
-function toggleExpand(type: SyncProviderType) {
-  expandedProvider.value = expandedProvider.value === type ? null : type;
-}
-
-async function saveCredentials(type: SyncProviderType) {
-  if (type === "gdrive") {
-    await setProviderCredentials("gdrive", {
-      clientId: gdriveClientId.value,
-      clientSecret: gdriveClientSecret.value,
-    });
-  } else if (type === "dropbox") {
-    await setProviderCredentials("dropbox", {
-      appKey: dropboxAppKey.value,
-      appSecret: dropboxAppSecret.value,
-    });
-  } else if (type === "onedrive") {
-    await setProviderCredentials("onedrive", {
-      clientId: onedriveClientId.value,
-    });
-  } else if (type === "webdav") {
-    await setProviderCredentials("webdav", {
-      serverUrl: webdavUrl.value,
-      username: webdavUsername.value,
-      password: webdavPassword.value,
-    });
+function syncMetaForProvider(provider: SyncProviderSchema): ZodFieldMeta {
+  const m: ZodFieldMeta = {};
+  for (const f of provider.fields ?? []) {
+    m[f.key] = "string";
   }
+  return m;
+}
+
+function validateProviderFields(provider: SyncProviderSchema, silentClear = false): boolean {
+  const fields = provider.fields ?? [];
+  if (fields.length === 0) return true;
+  const schema = buildSyncCredentialsSchema(provider);
+  const raw = formValues[provider.type] ?? {};
+  const meta = syncMetaForProvider(provider);
+  for (const f of fields) {
+    fieldErrors[`${provider.type}:${f.key}`] = "";
+  }
+  const parsed = schema.safeParse(raw);
+  if (parsed.success) return true;
+  for (const issue of parsed.error.issues) {
+    const fk = issue.path[0];
+    if (typeof fk !== "string") continue;
+    const ek = `${provider.type}:${fk}`;
+    if (!fieldErrors[ek]) {
+      fieldErrors[ek] = zodIssueToMessageKey(issue, meta, t);
+    }
+  }
+  return false;
+}
+
+function canSave(provider: SyncProviderSchema): boolean {
+  const fields = provider.fields ?? [];
+  if (fields.length === 0) return true;
+  const schema = buildSyncCredentialsSchema(provider);
+  return schema.safeParse(formValues[provider.type] ?? {}).success;
+}
+
+let syncValidateTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleValidateExpandedProvider() {
+  if (syncValidateTimer != null) clearTimeout(syncValidateTimer);
+  syncValidateTimer = setTimeout(() => {
+    syncValidateTimer = null;
+    const type = expandedProvider.value;
+    if (!type) return;
+    const provider = allProviders.value.find((p) => p.type === type);
+    if (provider) validateProviderFields(provider);
+  }, 120);
+}
+
+watch(
+  () => formValues,
+  () => {
+    if (!expandedProvider.value) return;
+    scheduleValidateExpandedProvider();
+  },
+  { deep: true },
+);
+
+watch(expandedProvider, (type) => {
+  if (!type) return;
+  const provider = allProviders.value.find((p) => p.type === type);
+  if (provider) validateProviderFields(provider);
+});
+
+async function saveProvider(provider: SyncProviderSchema) {
+  if (!validateProviderFields(provider)) return;
+  isSaving.value = provider.type;
+  await saveProviderSettings(provider.type, formValues[provider.type] ?? {});
+  isSaving.value = null;
   toast(t("sync_credentials_saved"));
 }
 
-async function handleConnect(type: SyncProviderType) {
+async function connectProvider(type: SyncProviderType) {
   isConnecting.value = true;
   try {
-    const ok = await enableSync(type);
-    if (ok) {
-      expandedProvider.value = null;
-      showChangeProvider.value = false;
+    const res = await enableProvider(type);
+    if (res.ok) {
       toast(t("sync_success"));
+      expandedProvider.value = null;
     } else {
-      toast(t("sync_not_available"), "error");
+      toast((res.messageKey && t(res.messageKey)) || t("sync_not_available"), "error");
     }
-  } catch {
-    toast(t("sync_error"), "error");
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   } finally {
     isConnecting.value = false;
   }
 }
 
 async function handleDisconnect() {
-  await disableSync();
-  showChangeProvider.value = false;
+  await disableProvider();
   toast(t("sync_disabled"));
 }
 
 async function handleCheckRemote() {
-  const hasUpdate = await checkRemote();
-  if (hasUpdate) {
-    toast(t("sync_remote_newer"));
-  } else {
-    toast(t("sync_success"));
+  try {
+    const hasUpdate = await checkRemote();
+    toast(hasUpdate ? t("sync_remote_newer") : t("sync_success"));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 
+function toastSyncFailure(res: { messageKey?: string }) {
+  const msg =
+    (res.messageKey && t(res.messageKey)) ||
+    syncStatus.error ||
+    t("sync_operation_failed");
+  toast(msg, "error");
+}
+
 async function handlePull() {
-  const ok = await pullRemote();
-  if (ok) {
-    toast(t("sync_pull_success"));
-  } else if (syncStatus.error) {
-    toast(syncStatus.error, "error");
+  try {
+    const res = await pullRemote();
+    if (res.ok) toast(t("sync_pull_success"));
+    else toastSyncFailure(res);
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 
 async function handlePush() {
-  const ok = await pushLocal();
-  if (ok) {
-    toast(t("sync_push_success"));
-  } else if (syncStatus.error) {
-    toast(syncStatus.error, "error");
+  try {
+    const res = await pushLocal();
+    if (res.ok) toast(t("sync_push_success"));
+    else if (res.messageKey === "sync_push_revision_conflict") showRevisionConflict.value = true;
+    else toastSyncFailure(res);
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 
-const sectionTv = tv({
-  slots: {
-    root: "bg-surface rounded-xl border border-border p-4 sm:p-5",
-    header: "flex items-center gap-2 mb-1",
-    title: "text-base sm:text-lg font-semibold text-text-primary",
-    desc: "text-xs sm:text-sm text-text-muted mb-4",
-    statusCard: "mb-4 p-4 rounded-xl bg-surface-secondary border border-border",
-    statusTop: "flex items-center gap-3",
-    statusIcon: "w-10 h-10 rounded-xl object-contain p-1.5 bg-surface border border-border",
-    statusInfo: "flex-1 min-w-0",
-    statusName: "text-sm font-semibold text-text-primary",
-    statusMeta: "text-[10px] text-text-muted mt-0.5",
-    statusActions: "flex items-center gap-3 mt-3 pt-3 border-t border-border",
-    actionBtn: "flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50",
-    dangerBtn: "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 border border-red-200 dark:border-red-800/40",
-    providerCard: "rounded-xl border border-border overflow-hidden transition-all hover:border-text-muted",
-    providerRow: "flex items-center gap-3 p-3 cursor-pointer select-none",
-    providerIcon: "w-8 h-8 rounded-lg object-contain",
-    providerName: "text-sm font-medium text-text-primary",
-    providerDesc: "text-[10px] text-text-muted",
-    providerChevron: "text-text-muted transition-transform duration-200 shrink-0",
-    credForm: "px-3 pb-3 pt-0",
-    credFormInner: "space-y-2.5 p-3 rounded-lg bg-surface-secondary",
-    credLabel: "block text-[10px] font-medium text-text-muted mb-1",
-    credInput: [
-      "w-full px-2.5 py-1.5 rounded-lg border border-border",
-      "bg-surface text-xs text-text-primary",
-      "focus:outline-none focus:ring-1 focus:ring-primary",
-    ],
-    credActions: "flex items-center gap-2 pt-1",
-    saveBtn: [
-      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50",
-      "bg-surface border border-border text-text-primary",
-      "hover:bg-surface-hover",
-    ],
-    connectBtn: [
-      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50",
-      "bg-primary text-white hover:bg-primary-hover",
-    ],
-    pendingBanner: "mb-4 p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800",
-    errorBanner: "mb-4 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800",
-    changeLabel: "text-xs font-medium text-text-muted mb-2 mt-4",
-  },
-});
+async function handleConflictPullMerge() {
+  showRevisionConflict.value = false;
+  await handlePull();
+}
 
-const s = sectionTv();
+async function handleConflictForcePush() {
+  showRevisionConflict.value = false;
+  try {
+    const res = await pushLocalForce();
+    if (res.ok) toast(t("sync_push_success"));
+    else toastSyncFailure(res);
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  }
+}
 </script>
 
 <template>
-  <section :class="s.root()">
-    <div :class="s.header()">
+  <section class="bg-surface rounded-xl border border-border p-4 sm:p-5">
+    <div class="flex items-center gap-2 mb-1">
       <Cloud :size="18" class="text-primary" />
-      <h2 :class="s.title()">{{ t('cloud_sync') }}</h2>
+      <h2 :class="ui.sectionTitle()">{{ t("cloud_sync") }}</h2>
     </div>
-    <p :class="s.desc()">{{ t('cloud_sync_desc') }}</p>
+    <p class="text-xs sm:text-sm text-text-muted mb-4">{{ t("cloud_sync_desc") }}</p>
 
-    <!-- ============ CONNECTED STATE ============ -->
-    <template v-if="activeProviderInfo">
-      <div :class="s.statusCard()">
-        <div :class="s.statusTop()">
-          <img :src="activeProviderInfo.icon" :alt="activeProviderInfo.name" :class="s.statusIcon()" />
-          <div :class="s.statusInfo()">
-            <div class="flex items-center gap-2">
-              <span :class="s.statusName()">{{ activeProviderInfo.name }}</span>
-              <span class="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-[10px] font-medium">
-                <Check :size="10" />
-                {{ t('sync_connected') }}
-              </span>
-            </div>
-            <div :class="s.statusMeta()">
-              <span>{{ t('sync_last_synced') }}: {{ lastSyncedFormatted }}</span>
-              <template v-if="syncStatus.remoteUpdatedAt">
-                <span class="mx-1">·</span>
-                <span>{{ t('sync_last_synced') }} ({{ t('sync_push') }}): {{ lastSyncedRemoteFormatted }}</span>
-              </template>
-            </div>
-          </div>
-          <div class="shrink-0">
-            <Loader2 v-if="syncStatus.syncing" :size="16" class="text-primary animate-spin" />
-            <AlertTriangle v-else-if="syncStatus.error" :size="16" class="text-amber-500" />
-          </div>
-        </div>
-
-        <!-- Sync action buttons -->
-        <div :class="s.statusActions()">
-          <Tooltip :text="t('sync_now')">
-            <button
-              @click="handleCheckRemote"
-              :disabled="syncStatus.syncing"
-              :class="s.actionBtn()"
-              class="text-primary hover:bg-primary-light border border-primary/20"
-            >
-              <RefreshCw :size="13" :class="{ 'animate-spin': syncStatus.syncing }" />
-              {{ t('sync_now') }}
-            </button>
-          </Tooltip>
-          <Tooltip :text="t('sync_pull')">
-            <button
-              @click="handlePull"
-              :disabled="syncStatus.syncing"
-              :class="s.actionBtn()"
-              class="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40"
-            >
-              <Download :size="13" />
-              {{ t('sync_pull') }}
-            </button>
-          </Tooltip>
-          <Tooltip :text="t('sync_push')">
-            <button
-              @click="handlePush"
-              :disabled="syncStatus.syncing"
-              :class="s.actionBtn()"
-              class="text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 border border-green-200 dark:border-green-800/40"
-            >
-              <Upload :size="13" />
-              {{ t('sync_push') }}
-            </button>
-          </Tooltip>
-        </div>
-      </div>
-
-      <!-- Pending update banner -->
-      <div v-if="syncStatus.pendingUpdate" :class="s.pendingBanner()">
-        <div class="flex items-start sm:items-center gap-3 flex-col sm:flex-row">
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-blue-800 dark:text-blue-200">{{ t('sync_remote_newer') }}</p>
-            <p class="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5">{{ t('sync_remote_newer_desc') }}</p>
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <button
-              @click="handlePull"
-              :disabled="syncStatus.syncing"
-              class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-            >
-              {{ t('sync_pull') }}
-            </button>
-            <button
-              @click="dismissPendingUpdate()"
-              class="px-3 py-1.5 rounded-lg text-blue-600 dark:text-blue-400 text-xs font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
-            >
-              {{ t('sync_dismiss') }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Error -->
-      <div v-if="syncStatus.error" :class="s.errorBanner()">
-        <p class="text-xs text-red-600 dark:text-red-400">{{ syncStatus.error }}</p>
-      </div>
-
-      <!-- Disconnect + Change provider row -->
-      <div class="flex items-center gap-2 mt-3">
-        <button
-          @click="handleDisconnect"
-          :class="[s.actionBtn(), s.dangerBtn()]"
-        >
-          <CloudOff :size="13" />
-          {{ t('sync_disconnect') }}
-        </button>
-        <button
-          v-if="availableProviders.length"
-          @click="showChangeProvider = !showChangeProvider"
-          :class="s.actionBtn()"
-          class="text-text-secondary hover:bg-surface-hover border border-border"
-        >
-          <RefreshCw :size="13" />
-          {{ t('sync_change_provider') }}
-          <ChevronDown :size="13" class="transition-transform duration-200" :style="{ transform: showChangeProvider ? 'rotate(180deg)' : '' }" />
+    <div v-if="activeProvider" class="mb-4 p-4 rounded-xl bg-surface-secondary border border-border">
+      <div class="flex items-center justify-between">
+        <div class="text-sm text-text-primary font-medium">{{ providerLabel(activeProvider.type) }}</div>
+        <button @click="handleDisconnect" class="px-3 py-1.5 rounded-lg text-xs border border-red-300 text-red-600">
+          <CloudOff :size="12" class="inline-block mr-1" />{{ t("sync_disconnect") }}
         </button>
       </div>
-    </template>
+      <div class="mt-3 flex gap-2">
+        <button @click="handleCheckRemote" class="px-3 py-1.5 rounded-lg text-xs border border-border">{{ t("sync_now") }}</button>
+        <button @click="handlePull" class="px-3 py-1.5 rounded-lg text-xs border border-blue-300 text-blue-700">
+          <Download :size="12" class="inline-block mr-1" />{{ t("sync_pull") }}
+        </button>
+        <button @click="handlePush" class="px-3 py-1.5 rounded-lg text-xs border border-green-300 text-green-700">
+          <Upload :size="12" class="inline-block mr-1" />{{ t("sync_push") }}
+        </button>
+      </div>
+      <p v-if="activeProvider" class="mt-2 text-[11px] text-text-muted leading-snug">
+        {{ t("sync_connected_push_hint") }}
+      </p>
+      <div v-if="syncStatus.pendingUpdate" class="mt-3 text-xs text-blue-700">
+        {{ t("sync_remote_newer_desc") }}
+        <button @click="dismissPendingUpdate()" class="ml-2 underline">{{ t("sync_dismiss") }}</button>
+      </div>
+    </div>
 
-    <!-- ============ PROVIDER LIST ============ -->
-    <Transition
-      enter-active-class="transition-all duration-200 ease-out"
-      enter-from-class="max-h-0 opacity-0"
-      enter-to-class="max-h-[1000px] opacity-100"
-      leave-active-class="transition-all duration-150 ease-in"
-      leave-from-class="max-h-[1000px] opacity-100"
-      leave-to-class="max-h-0 opacity-0"
-    >
-      <div class="space-y-2 overflow-hidden" v-if="activeProviderInfo ? showChangeProvider : true" :class="activeProviderInfo ? 'mt-3' : ''">
-        <div
-          v-for="provider in (activeProviderInfo ? availableProviders : allProviders)"
-          :key="provider.type"
-          :class="s.providerCard()"
+    <div class="space-y-3">
+      <div v-for="provider in visibleProviders" :key="provider.type" class="rounded-xl border border-border">
+        <button
+          type="button"
+          class="w-full p-3 text-left flex items-center justify-between gap-2"
+          @click="expandedProvider = expandedProvider === provider.type ? null : provider.type"
         >
-          <!-- Provider header row -->
-          <div :class="s.providerRow()" @click="toggleExpand(provider.type)">
-            <img :src="provider.icon" :alt="provider.name" :class="s.providerIcon()" />
-            <div class="flex-1 min-w-0">
-              <p :class="s.providerName()">{{ provider.name }}</p>
-              <p :class="s.providerDesc()">
-                {{ provider.type === 'icloud' ? 'macOS / iOS' :
-                   provider.type === 'webdav' ? 'Nextcloud, ownCloud, Synology…' :
-                   provider.type === 'onedrive' ? 'Microsoft' :
-                   provider.type === 'gdrive' ? 'Google' :
-                   provider.type === 'dropbox' ? 'Dropbox Inc.' : '' }}
+          <span class="text-sm font-medium text-text-primary">{{ providerLabel(provider.type) }}</span>
+          <ChevronRight
+            :size="16"
+            class="text-text-muted shrink-0 transition-transform"
+            :class="expandedProvider === provider.type ? 'rotate-90' : ''"
+          />
+        </button>
+
+        <div v-if="expandedProvider === provider.type" class="px-3 pb-3 space-y-2">
+          <p class="text-xs text-text-muted leading-relaxed border-b border-border pb-3 mb-1">
+            {{ t(`sync_setup_${provider.type}`) }}
+          </p>
+          <template v-for="field in (provider.fields ?? [])" :key="field.key">
+            <div>
+              <label class="block text-[10px] text-text-muted mb-1">{{ t(field.label) }}</label>
+              <input
+                v-model="formValues[provider.type][field.key]"
+                :type="field.inputType || (field.secret ? 'password' : 'text')"
+                :placeholder="field.placeholder ? t(field.placeholder) : ''"
+                class="w-full px-2.5 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary"
+              />
+              <p v-if="field.helpText" class="mt-1 text-[10px] text-text-muted">{{ t(field.helpText) }}</p>
+              <p v-if="fieldErrors[`${provider.type}:${field.key}`]" class="mt-1 text-[10px] text-red-500">
+                {{ fieldErrors[`${provider.type}:${field.key}`] }}
               </p>
             </div>
-            <!-- Quick connect for icloud (no credentials needed) -->
+          </template>
+          <div class="flex gap-2 pt-1">
             <button
-              v-if="provider.type === 'icloud'"
-              @click.stop="handleConnect(provider.type)"
-              :disabled="isConnecting"
-              :class="s.connectBtn()"
+              v-if="(provider.fields ?? []).length > 0"
+              @click="saveProvider(provider)"
+              :disabled="isSaving === provider.type || !canSave(provider)"
+              class="px-3 py-1.5 rounded-lg text-xs border border-border disabled:opacity-50"
             >
-              {{ isConnecting ? '...' : t('sync_connect') }}
+              <Save :size="12" class="inline-block mr-1" />{{ isSaving === provider.type ? t("sync_saving") : t("sync_save_credentials") }}
             </button>
-            <ChevronDown
-              v-else
-              :size="16"
-              :class="s.providerChevron()"
-              :style="{ transform: expandedProvider === provider.type ? 'rotate(180deg)' : '' }"
-            />
+            <button
+              @click="connectProvider(provider.type)"
+              :disabled="isConnecting || !canSave(provider)"
+              class="px-3 py-1.5 rounded-lg text-xs bg-primary text-white disabled:opacity-50"
+            >
+              {{ t("sync_connect") }}
+            </button>
           </div>
-
-          <!-- Expanded credentials -->
-          <Transition
-            enter-active-class="transition-all duration-200 ease-out"
-            enter-from-class="max-h-0 opacity-0"
-            enter-to-class="max-h-96 opacity-100"
-            leave-active-class="transition-all duration-150 ease-in"
-            leave-from-class="max-h-96 opacity-100"
-            leave-to-class="max-h-0 opacity-0"
-          >
-            <div v-if="expandedProvider === provider.type && provider.type !== 'icloud'" class="overflow-hidden">
-              <div :class="s.credForm()">
-                <div :class="s.credFormInner()">
-                  <!-- Google Drive -->
-                  <template v-if="provider.type === 'gdrive'">
-                    <div>
-                      <label :class="s.credLabel()">{{ t('sync_client_id') }}</label>
-                      <input v-model="gdriveClientId" type="text" :class="s.credInput()" placeholder="xxxx.apps.googleusercontent.com" />
-                    </div>
-                    <div>
-                      <label :class="s.credLabel()">{{ t('sync_client_secret') }}</label>
-                      <input v-model="gdriveClientSecret" type="password" :class="s.credInput()" />
-                    </div>
-                    <div :class="s.credActions()">
-                      <button @click="saveCredentials('gdrive')" :disabled="!gdriveClientId || !gdriveClientSecret" :class="s.saveBtn()">
-                        <Save :size="12" /> {{ t('sync_save_credentials') }}
-                      </button>
-                      <button @click="handleConnect('gdrive')" :disabled="isConnecting || !canConnect('gdrive')" :class="s.connectBtn()">
-                        {{ isConnecting ? '...' : t('sync_connect') }}
-                      </button>
-                    </div>
-                  </template>
-
-                  <!-- Dropbox -->
-                  <template v-if="provider.type === 'dropbox'">
-                    <div>
-                      <label :class="s.credLabel()">{{ t('sync_app_key') }}</label>
-                      <input v-model="dropboxAppKey" type="text" :class="s.credInput()" />
-                    </div>
-                    <div>
-                      <label :class="s.credLabel()">{{ t('sync_app_secret') }}</label>
-                      <input v-model="dropboxAppSecret" type="password" :class="s.credInput()" />
-                    </div>
-                    <div :class="s.credActions()">
-                      <button @click="saveCredentials('dropbox')" :disabled="!dropboxAppKey || !dropboxAppSecret" :class="s.saveBtn()">
-                        <Save :size="12" /> {{ t('sync_save_credentials') }}
-                      </button>
-                      <button @click="handleConnect('dropbox')" :disabled="isConnecting || !canConnect('dropbox')" :class="s.connectBtn()">
-                        {{ isConnecting ? '...' : t('sync_connect') }}
-                      </button>
-                    </div>
-                  </template>
-
-                  <!-- OneDrive -->
-                  <template v-if="provider.type === 'onedrive'">
-                    <div>
-                      <label :class="s.credLabel()">{{ t('sync_client_id') }}</label>
-                      <input v-model="onedriveClientId" type="text" :class="s.credInput()" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" />
-                    </div>
-                    <div :class="s.credActions()">
-                      <button @click="saveCredentials('onedrive')" :disabled="!onedriveClientId" :class="s.saveBtn()">
-                        <Save :size="12" /> {{ t('sync_save_credentials') }}
-                      </button>
-                      <button @click="handleConnect('onedrive')" :disabled="isConnecting || !canConnect('onedrive')" :class="s.connectBtn()">
-                        {{ isConnecting ? '...' : t('sync_connect') }}
-                      </button>
-                    </div>
-                  </template>
-
-                  <!-- WebDAV -->
-                  <template v-if="provider.type === 'webdav'">
-                    <div>
-                      <label :class="s.credLabel()">{{ t('sync_webdav_url') }}</label>
-                      <input v-model="webdavUrl" type="url" :class="s.credInput()" placeholder="https://cloud.example.com/remote.php/dav/files/user" />
-                    </div>
-                    <div>
-                      <label :class="s.credLabel()">{{ t('sync_webdav_username') }}</label>
-                      <input v-model="webdavUsername" type="text" :class="s.credInput()" />
-                    </div>
-                    <div>
-                      <label :class="s.credLabel()">{{ t('sync_webdav_password') }}</label>
-                      <input v-model="webdavPassword" type="password" :class="s.credInput()" />
-                    </div>
-                    <div :class="s.credActions()">
-                      <button @click="saveCredentials('webdav')" :disabled="!webdavUrl || !webdavUsername" :class="s.saveBtn()">
-                        <Save :size="12" /> {{ t('sync_save_credentials') }}
-                      </button>
-                      <button @click="handleConnect('webdav')" :disabled="isConnecting || !canConnect('webdav')" :class="s.connectBtn()">
-                        {{ isConnecting ? '...' : t('sync_connect') }}
-                      </button>
-                    </div>
-                  </template>
-                </div>
-              </div>
-            </div>
-          </Transition>
         </div>
       </div>
-    </Transition>
+    </div>
+
+    <Modal
+      :show="showRevisionConflict"
+      :title="t('sync_push_revision_title')"
+      maxWidth="24rem"
+      @close="showRevisionConflict = false"
+    >
+      <p class="text-sm text-text-primary mb-4">{{ t("sync_push_revision_body") }}</p>
+      <div class="flex flex-col sm:flex-row gap-2 justify-end">
+        <button
+          type="button"
+          class="px-3 py-2 rounded-lg text-xs border border-border order-2 sm:order-1"
+          @click="showRevisionConflict = false"
+        >
+          {{ t("cancel") }}
+        </button>
+        <button
+          type="button"
+          class="px-3 py-2 rounded-lg text-xs border border-blue-300 text-blue-700 order-1 sm:order-2"
+          @click="handleConflictPullMerge"
+        >
+          {{ t("sync_conflict_pull_merge") }}
+        </button>
+        <button
+          type="button"
+          class="px-3 py-2 rounded-lg text-xs bg-amber-600 text-white order-3"
+          @click="handleConflictForcePush"
+        >
+          {{ t("sync_conflict_force_push") }}
+        </button>
+      </div>
+    </Modal>
   </section>
 </template>

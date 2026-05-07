@@ -1,13 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
+import VChart from "vue-echarts";
+import type { EChartsCoreOption } from "echarts/core";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
-import { dbGetExpensesByTags, type TagExpenseStat } from "@/services/database";
-import { Doughnut } from "vue-chartjs";
-import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend } from "chart.js";
-import { Hash } from "lucide-vue-next";
-
-ChartJS.register(ArcElement, ChartTooltip, Legend);
+import { Hash } from "@lucide/vue";
 
 const COLORS = [
   "#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6",
@@ -16,42 +13,67 @@ const COLORS = [
 
 const { t } = useI18n();
 const { fmt } = useCurrencyFormat();
+const props = defineProps<{
+  stats?: Array<{ tag: string; total: number }>;
+}>();
+const stats = computed(() => props.stats ?? []);
 
-const stats = ref<TagExpenseStat[]>([]);
-
-onMounted(async () => {
-  const d = new Date();
-  const prefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  stats.value = await dbGetExpensesByTags(prefix);
-});
-
-const chartData = computed(() => ({
-  labels: stats.value.map((s) => s.tag),
-  datasets: [{
-    data: stats.value.map((s) => Math.round(s.total * 100) / 100),
-    backgroundColor: COLORS.slice(0, stats.value.length),
-  }],
-}));
-
-const chartOptions = {
-  responsive: true,
-  plugins: {
-    legend: { position: "bottom" as const, labels: { padding: 10, font: { size: 11 } } },
+const chartOption = computed((): EChartsCoreOption => ({
+  animationDuration: 450,
+  tooltip: {
+    trigger: "item",
+    formatter: (params: unknown) => {
+      const p = params as { name?: string; value?: number; percent?: number };
+      const name = p.name ?? "";
+      const val = typeof p.value === "number" ? p.value : 0;
+      const pct = typeof p.percent === "number" ? p.percent.toFixed(1) : "";
+      return `#${name}<br/>${fmt(val)} (${pct}%)`;
+    },
   },
-};
+  legend: {
+    show: false,
+  },
+  series: [
+    {
+      type: "pie",
+      radius: ["42%", "68%"],
+      center: ["50%", "50%"],
+      avoidLabelOverlap: true,
+      itemStyle: {
+        borderRadius: 6,
+        borderColor: "var(--color-surface, #fff)",
+        borderWidth: 2,
+      },
+      emphasis: {
+        scale: true,
+        itemStyle: {
+          shadowBlur: 14,
+          shadowOffsetY: 2,
+          shadowColor: "rgba(0,0,0,0.12)",
+        },
+      },
+      label: { show: false },
+      data: stats.value.map((s, i) => ({
+        name: s.tag,
+        value: Math.round(s.total * 100) / 100,
+        itemStyle: { color: COLORS[i % COLORS.length] },
+      })),
+    },
+  ],
+}));
 </script>
 
 <template>
-  <div v-if="stats.length > 0" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
+  <div v-if="stats.length > 0" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
     <div class="flex items-center gap-2 mb-3">
       <Hash :size="16" class="text-primary" />
       <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_tag_expenses') }}</h2>
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div class="max-w-[220px] mx-auto">
-        <Doughnut :data="chartData" :options="chartOptions" />
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="max-w-[220px] mx-auto h-44 sm:h-48">
+        <VChart class="h-full w-full" :option="chartOption" autoresize />
       </div>
-      <div class="space-y-1.5 overflow-y-auto max-h-52">
+      <div class="space-y-1.5 overflow-y-auto max-h-44 sm:max-h-48">
         <div
           v-for="(s, i) in stats"
           :key="s.tag"

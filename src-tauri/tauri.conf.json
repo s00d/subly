@@ -21,7 +21,24 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://www.google.com https://icons.duckduckgo.com https://icon.horse; connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com https://www.googleapis.com https://www.dropbox.com https://api.dropbox.com https://api.dropboxapi.com https://content.dropboxapi.com https://login.microsoftonline.com https://graph.microsoft.com https://api.frankfurter.dev https://api.apilayer.com https://openexchangerates.org https://api.currencyapi.com https://v6.exchangerate-api.com https://api.telegram.org; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none';"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": [
+          "subly"
+        ]
+      },
+      "mobile": [
+        {
+          "scheme": [
+            "subly"
+          ],
+          "appLink": false
+        }
+      ]
     }
   },
   "bundle": {
@@ -34,6 +51,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "windows": {}
+    "windows": {},
+    "macOS": {
+      "entitlements": "entitlements/macos.plist",
+      "files": {
+        "embedded.provisionprofile": "profiles/Subly_DeveloperID_iCloud_macOS.provisionprofile"
+      }
+    }
   }
 }

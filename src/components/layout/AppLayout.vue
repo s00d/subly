@@ -12,11 +12,10 @@ useScrollLock(sidebarOpen);
 
 const layoutTv = tv({
   slots: {
-    root: "flex h-screen overflow-hidden",
+    root: "flex h-[100dvh] overflow-hidden",
     sidebar: "hidden md:flex",
     content: "flex-1 flex flex-col overflow-hidden min-w-0",
-    main: "flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-surface-secondary pb-20 md:pb-6",
-    tabBar: "md:hidden",
+    main: "flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-surface-secondary",
   },
 });
 
@@ -43,11 +42,11 @@ const slots = layoutTv();
 
     <div :class="slots.content()">
       <AppHeader @toggle-sidebar="sidebarOpen = !sidebarOpen" />
-      <main :class="slots.main()">
+      <main :class="[slots.main(), 'app-main-safe']">
         <slot />
       </main>
     </div>
-    <MobileTabBar :class="slots.tabBar()" />
+    <MobileTabBar />
   </div>
 </template>
 
@@ -70,5 +69,15 @@ const slots = layoutTv();
 .sidebar-slide-enter-from,
 .sidebar-slide-leave-to {
   transform: translateX(-100%);
+}
+
+.app-main-safe {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 768px) {
+  .app-main-safe {
+    padding-bottom: 1.5rem;
+  }
 }
 </style>

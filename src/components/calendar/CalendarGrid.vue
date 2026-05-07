@@ -47,7 +47,7 @@ const weekDays = () => [t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat
           compact ? 'min-h-[42px] sm:min-h-[64px] p-0.5 sm:p-1' : 'min-h-[48px] sm:min-h-[80px] p-0.5 sm:p-1.5',
           {
             'bg-surface-hover/50': cell.isEmpty,
-            'bg-blue-50/50 dark:bg-blue-900/10': cell.isToday,
+            'bg-primary-light/40': cell.isToday,
             'cursor-pointer hover:bg-surface-hover': !cell.isEmpty && (cell.subs.length > 0 || (cell.expenses && cell.expenses.length > 0)),
           },
         ]"
@@ -61,20 +61,20 @@ const weekDays = () => [t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat
           <!-- Mobile: just show dot indicators -->
           <div class="sm:hidden flex gap-0.5 flex-wrap">
             <div v-for="sub in cell.subs.slice(0, 3)" :key="sub.id" class="w-1.5 h-1.5 rounded-full bg-primary" />
-            <div v-for="exp in (cell.expenses || []).slice(0, 3)" :key="exp.id" class="w-1.5 h-1.5 rounded-full bg-orange-400" />
+            <div v-for="exp in (cell.expenses || []).slice(0, 3)" :key="exp.id" class="w-1.5 h-1.5 rounded-full bg-text-muted" />
             <div v-if="cell.subs.length + (cell.expenses?.length || 0) > 6" class="text-[8px] text-text-muted leading-none">+{{ cell.subs.length + (cell.expenses?.length || 0) - 6 }}</div>
           </div>
           <!-- Desktop: show names + amounts -->
           <div class="hidden sm:block">
             <div v-for="sub in cell.subs.slice(0, 2)" :key="sub.id"
-              class="flex items-center gap-0.5 text-[10px] leading-tight px-1 py-0.5 rounded bg-blue-600 text-white dark:bg-blue-500 font-medium mb-0.5">
+              class="flex items-center gap-0.5 text-[10px] leading-tight px-1 py-0.5 rounded bg-primary text-white font-medium mb-0.5">
               <span class="truncate">{{ sub.name }}</span>
               <span class="ml-auto shrink-0 opacity-80">{{ fmt(sub.price, sub.currencyId) }}</span>
             </div>
             <div v-for="exp in (cell.expenses || []).slice(0, 2)" :key="exp.id"
-              class="flex items-center gap-0.5 text-[10px] leading-tight px-1 py-0.5 rounded border border-border bg-surface text-text-primary font-medium mb-0.5">
+              class="flex items-center gap-0.5 text-[10px] leading-tight px-1 py-0.5 rounded bg-surface-secondary border border-border text-text-primary font-medium mb-0.5">
               <span class="truncate">{{ exp.name }}</span>
-              <span class="ml-auto shrink-0 text-amber-500">{{ fmt(exp.amount, exp.currencyId) }}</span>
+              <span class="ml-auto shrink-0 opacity-80">{{ fmt(exp.amount, exp.currencyId) }}</span>
             </div>
             <div v-if="cell.subs.length + (cell.expenses?.length || 0) > 4" class="text-[10px] text-text-muted">
               +{{ cell.subs.length + (cell.expenses?.length || 0) - 4 }}

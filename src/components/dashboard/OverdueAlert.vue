@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Subscription } from "@/schemas/appData";
-import { AlertTriangle } from "lucide-vue-next";
+import { AlertTriangle } from "@lucide/vue";
 import { useI18n } from "vue-i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 
@@ -14,7 +14,7 @@ const { fmtDateShort: formatDate } = useLocaleFormat();
 </script>
 
 <template>
-  <div v-if="subscriptions.length > 0" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-3 sm:p-5">
+  <div v-if="subscriptions.length > 0" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-2.5 sm:p-4">
     <div class="flex items-center gap-2 mb-2 sm:mb-3">
       <AlertTriangle :size="18" class="text-red-500 shrink-0" />
       <h2 class="text-sm sm:text-lg font-semibold text-red-700 dark:text-red-300">{{ t('overdue_renewals') }}</h2>

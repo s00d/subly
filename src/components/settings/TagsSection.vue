@@ -1,77 +1,98 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useCatalogStore } from "@/stores/catalog";
-import { useSubscriptionsStore } from "@/stores/subscriptions";
-import { useExpensesStore } from "@/stores/expenses";
+import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
+import { upsertTag, deleteTag as deleteTagApi, maxSortOrder } from "@/services/catalogClient";
+import type { Tag } from "@/schemas/appData";
 import AppInput from "@/components/ui/AppInput.vue";
 import Toast from "@/components/ui/Toast.vue";
-import { Trash2, Plus, ChevronUp, ChevronDown, Star, Search, Hash } from "lucide-vue-next";
+import { Trash2, Plus, ChevronUp, ChevronDown, Star, Search, Hash } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
+import { ui } from "@/lib/tv";
 
-const catalogStore = useCatalogStore();
-const subsStore = useSubscriptionsStore();
-const expsStore = useExpensesStore();
+const props = defineProps<{
+  lookupData: {
+    tags: Tag[];
+    tagUsage: Record<string, number>;
+  } | null;
+}>();
 const { t } = useI18n();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
+const tags = ref<Tag[]>([]);
+const tagUsage = ref<Record<string, number>>({});
+watch(
+  () => props.lookupData,
+  (lookup) => {
+    tags.value = lookup?.tags ?? [];
+    tagUsage.value = lookup?.tagUsage ?? {};
+  },
+  { immediate: true, deep: true },
+);
 
 const tagSearch = ref("");
 const isSearching = computed(() => tagSearch.value.length > 0);
-
-/** Sorted: favorites first, then by order */
 const sortedTags = computed(() =>
-  [...catalogStore.tags].sort((a, b) => {
+  [...tags.value].sort((a, b) => {
     if (a.favorite && !b.favorite) return -1;
     if (!a.favorite && b.favorite) return 1;
     return a.sortOrder - b.sortOrder;
   })
 );
-
 const filteredTags = computed(() => {
   if (!tagSearch.value) return sortedTags.value;
   const q = tagSearch.value.toLowerCase();
   return sortedTags.value.filter((tag) => tag.name.toLowerCase().includes(q));
 });
 
-const isUsedTag = (name: string) =>
-  subsStore.subscriptions.some((s) => s.tags?.includes(name)) ||
-  expsStore.items.some((e) => e.tags?.includes(name));
-
+const isUsedTag = (name: string) => (tagUsage.value[name] ?? 0) > 0;
 const isDefaultItem = (tag: { i18nKey?: string }) => !!tag.i18nKey;
 
-function addTag() {
-  catalogStore.addTag("Tag");
+async function updateTag(id: string, updates: Partial<Tag>) {
+  const tag = tags.value.find((t) => t.id === id);
+  if (!tag) return;
+  const next = { ...tag, ...updates };
+  await upsertTag(next);
+  Object.assign(tag, next);
 }
-
-function saveTagName(id: string, name: string) {
-  catalogStore.updateTag(id, { name });
+async function reorderTags(ids: string[]) {
+  for (let i = 0; i < ids.length; i += 1) {
+    const tag = tags.value.find((t) => t.id === ids[i]);
+    if (!tag) continue;
+    const next = { ...tag, sortOrder: i };
+    await upsertTag(next);
+    Object.assign(tag, next);
+  }
 }
-
-function removeTag(id: string) {
-  catalogStore.deleteTag(id);
+async function addTag() {
+  const order = await maxSortOrder("tags");
+  const tag: Tag = { id: crypto.randomUUID(), name: "Tag", favorite: false, sortOrder: order + 1, i18nKey: "" };
+  await upsertTag(tag);
+  tags.value.push(tag);
+}
+function saveTagName(id: string, name: string) { void updateTag(id, { name }); }
+async function removeTag(id: string) {
+  await deleteTagApi(id);
+  tags.value = tags.value.filter((t) => t.id !== id);
   toast(t("success"));
 }
-
 function toggleFavorite(id: string) {
-  catalogStore.toggleTagFavorite(id);
+  const tag = tags.value.find((t) => t.id === id);
+  if (!tag) return;
+  void updateTag(id, { favorite: !tag.favorite });
 }
-
-// Reorder
 function moveUp(id: string) {
   const ids = sortedTags.value.map((t) => t.id);
   const idx = ids.indexOf(id);
   if (idx <= 0) return;
   [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
-  catalogStore.reorderTags(ids);
+  void reorderTags(ids);
 }
-
 function moveDown(id: string) {
   const ids = sortedTags.value.map((t) => t.id);
   const idx = ids.indexOf(id);
   if (idx < 0 || idx >= ids.length - 1) return;
   [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
-  catalogStore.reorderTags(ids);
+  void reorderTags(ids);
 }
 </script>
 
@@ -80,7 +101,7 @@ function moveDown(id: string) {
     <div class="flex items-center justify-between gap-2 mb-3">
       <div class="flex items-center gap-2 shrink-0">
         <Hash :size="16" class="text-primary" />
-        <h2 class="text-base sm:text-lg font-semibold text-text-primary">{{ t('manage_tags') }}</h2>
+        <h2 :class="ui.sectionTitle()">{{ t('manage_tags') }}</h2>
       </div>
       <div class="relative w-32 sm:w-44">
         <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -120,7 +141,7 @@ function moveDown(id: string) {
 
         <!-- Usage count -->
         <span class="text-[10px] text-text-muted shrink-0">
-          {{ subsStore.subscriptions.filter((s) => s.tags?.includes(tag.name)).length }}
+          {{ tagUsage[tag.name] ?? 0 }}
         </span>
 
         <!-- Delete -->

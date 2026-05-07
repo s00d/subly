@@ -15,18 +15,33 @@
     "core:window:allow-set-focus",
     "core:tray:default",
     "core:menu:default",
+    "core:event:default",
     "opener:default",
+    "deep-link:default",
     "clipboard-manager:default",
     "clipboard-manager:allow-write-text",
     "dialog:default",
     "notification:default",
-    "notification:allow-notify",
-    "notification:allow-request-permission",
-    "notification:allow-is-permission-granted",
-    "notifications:default",
     "os:default",
-    "sql:default",
-    "sql:allow-execute",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.frankfurter.app/*" },
+        { "url": "https://accounts.google.com/*" },
+        { "url": "https://oauth2.googleapis.com/*" },
+        { "url": "https://www.googleapis.com/*" },
+        { "url": "https://www.dropbox.com/*" },
+        { "url": "https://api.dropboxapi.com/*" },
+        { "url": "https://content.dropboxapi.com/*" },
+        { "url": "https://login.microsoftonline.com/*" },
+        { "url": "https://graph.microsoft.com/*" },
+        { "url": "https://api.telegram.org/*" },
+        { "url": "https://icons.duckduckgo.com/*" },
+        { "url": "https://icon.horse/*" },
+        { "url": "https://www.google.com/s2/*" },
+        { "url": "https://*/*" }
+      ]
+    },
     "fs:default",
     {
       "identifier": "fs:allow-write-text-file",
@@ -43,6 +58,54 @@
     {
       "identifier": "fs:allow-read-file",
       "allow": [{ "path": "**" }]
+    },
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [{ "path": "/Users/*/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
+    },
+    {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [{ "path": "/Users/*/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [{ "path": "/Users/*/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [{ "path": "/Users/*/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
+    },
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [{ "path": "**/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
+    },
+    {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [{ "path": "**/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [{ "path": "**/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [{ "path": "**/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
+    },
+    {
+      "identifier": "fs:allow-read-text-file",
+      "allow": [{ "path": "/private/var/mobile/Containers/Data/Application/*/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
+    },
+    {
+      "identifier": "fs:allow-write-text-file",
+      "allow": [{ "path": "/private/var/mobile/Containers/Data/Application/*/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
+    },
+    {
+      "identifier": "fs:allow-read-file",
+      "allow": [{ "path": "/private/var/mobile/Containers/Data/Application/*/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [{ "path": "/private/var/mobile/Containers/Data/Application/*/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
     }
   ]
 }

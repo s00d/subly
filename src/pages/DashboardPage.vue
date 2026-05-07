@@ -1,22 +1,25 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useRouter } from "vue-router";
-import { useSubscriptionsStore } from "@/stores/subscriptions";
-import { useExpensesStore } from "@/stores/expenses";
-import { useSettingsStore } from "@/stores/settings";
-import { useCatalogStore } from "@/stores/catalog";
 import { useI18n } from "vue-i18n";
 import { useHeaderActions } from "@/composables/useHeaderActions";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
-import { getPricePerMonth } from "@/services/calculations";
-import { getMonthlySpendingHistory, getForecast, getMonthComparison, getLifetimeCosts, getCategoryAverages } from "@/services/analytics";
-import { dbGetExpensesSince, dbGetExpenseAggregations, dbLoadOverdueSubscriptions, dbLoadUpcomingSubscriptions } from "@/services/database";
-import type { Expense } from "@/schemas/appData";
-import { Doughnut } from "vue-chartjs";
-import { Chart as ChartJS, ArcElement, Tooltip as ChartTooltip, Legend } from "chart.js";
-import { Wallet, ArrowRight, Settings2, Eye, EyeOff, ChevronUp, ChevronDown } from "lucide-vue-next";
+import {
+  type DashboardSummaryDto,
+  type DashboardChartsDto,
+  type DashboardForecastDto,
+  type DashboardTrendsDto,
+} from "@/services/dashboardClient";
+import { storeToRefs } from "pinia";
+import { useAppMetaStore } from "@/stores/appMetaStore";
+import { useDashboardStore } from "@/stores/dashboardStore";
+import VChart from "vue-echarts";
+import type { EChartsCoreOption } from "echarts/core";
+import { Wallet, ArrowRight, Settings2, Eye, EyeOff, ChevronUp, ChevronDown } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
+import { ui, typo, statValue } from "@/lib/tv";
 
 import OverdueAlert from "@/components/dashboard/OverdueAlert.vue";
 import UpcomingPayments from "@/components/dashboard/UpcomingPayments.vue";
@@ -33,33 +36,35 @@ import DayOfWeekWidget from "@/components/dashboard/DayOfWeekWidget.vue";
 import MonthCompareWidget from "@/components/dashboard/MonthCompareWidget.vue";
 import TagExpensesWidget from "@/components/dashboard/TagExpensesWidget.vue";
 
-ChartJS.register(ArcElement, ChartTooltip, Legend);
-
 const router = useRouter();
-const subsStore = useSubscriptionsStore();
-const expsStore = useExpensesStore();
-const settingsStore = useSettingsStore();
-const catalogStore = useCatalogStore();
 const { t } = useI18n();
-const { fmt, toMainCurrency } = useCurrencyFormat();
+const { fmt } = useCurrencyFormat();
 const { fmtPercent } = useLocaleFormat();
+const metaStore = useAppMetaStore();
+const dashboardStore = useDashboardStore();
+const { settings, categories, currencies } = storeToRefs(metaStore);
 
 function goToSubscriptions() { router.push("/subscriptions"); }
 
-const now = ref(Date.now());
-let nowInterval: ReturnType<typeof setInterval> | null = null;
 
 const { clearActions } = useHeaderActions();
-onMounted(() => {
+onMounted(async () => {
   clearActions();
-  loadDashboardSubscriptions();
-  nowInterval = setInterval(() => { now.value = Date.now(); }, 60_000);
-});
-onUnmounted(() => {
-  if (nowInterval) clearInterval(nowInterval);
+  unlistenData = await listen("app:data-changed", () => {
+    chartsRemountKey.value += 1;
+  });
+  await metaStore.ensureLoaded();
+  await loadDashboardSubscriptions();
 });
 
-const hasSubscriptions = computed(() => subsStore.subscriptions.length > 0);
+onUnmounted(() => {
+  void unlistenData?.();
+});
+
+const hasSubscriptions = ref(false);
+/** Remount pie charts on global data changes to avoid ECharts instance leaks / stale canvas. */
+const chartsRemountKey = ref(0);
+let unlistenData: UnlistenFn | undefined;
 
 // ---- Widget configuration ----
 interface WidgetDef { id: string; labelKey: string }
@@ -88,7 +93,7 @@ const showWidgetConfig = ref(false);
 
 // Widget order + visibility from settings, with fallback to all visible
 const widgetConfig = computed(() => {
-  const saved = settingsStore.settings.dashboardWidgets;
+  const saved = settings.value?.dashboardWidgets ?? [];
   if (!saved || saved.length === 0) {
     return ALL_WIDGETS.map((w) => ({ id: w.id, visible: true }));
   }
@@ -118,7 +123,10 @@ function toggleWidgetVisibility(id: string) {
   const updated = widgetConfig.value.map((w) =>
     w.id === id ? { ...w, visible: !w.visible } : w,
   );
-  settingsStore.updateSettings({ dashboardWidgets: updated });
+  if (!settings.value) return;
+  const next = { ...settings.value, dashboardWidgets: updated };
+  settings.value = next;
+  void metaStore.updateSettings(next);
 }
 
 function moveWidget(id: string, direction: -1 | 1) {
@@ -128,160 +136,125 @@ function moveWidget(id: string, direction: -1 | 1) {
   const newIdx = idx + direction;
   if (newIdx < 0 || newIdx >= arr.length) return;
   [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
-  settingsStore.updateSettings({ dashboardWidgets: arr });
+  if (!settings.value) return;
+  const next = { ...settings.value, dashboardWidgets: arr };
+  settings.value = next;
+  void metaStore.updateSettings(next);
 }
 
-// ---- Data computations (loaded from SQL) ----
-const overdueSubscriptions = ref<import("@/schemas/appData").Subscription[]>([]);
-const upcomingSubscriptions = ref<import("@/schemas/appData").Subscription[]>([]);
-
+// ---- Data computations (loaded from backend DTOs) ----
+const summary = computed<DashboardSummaryDto | null>(() => dashboardStore.summary);
+const charts = computed<DashboardChartsDto | null>(() => dashboardStore.charts);
+const forecastDto = computed<DashboardForecastDto | null>(() => dashboardStore.forecast);
+const trends = computed<DashboardTrendsDto | null>(() => dashboardStore.trends);
+const overdueSubscriptions = computed(() => summary.value?.overdueSubscriptions ?? []);
+const upcomingSubscriptions = computed(() => summary.value?.upcomingSubscriptions ?? []);
 async function loadDashboardSubscriptions() {
-  const [overdue, upcoming] = await Promise.all([
-    dbLoadOverdueSubscriptions(),
-    dbLoadUpcomingSubscriptions(30, 5),
-  ]);
-  overdueSubscriptions.value = overdue;
-  upcomingSubscriptions.value = upcoming;
+  await dashboardStore.loadPage(true);
+  const summaryRes = dashboardStore.summary;
+  hasSubscriptions.value = summaryRes?.hasSubscriptions ?? false;
 }
 
-const activeSubs = computed(() => subsStore.activeSubscriptions);
-const inactiveSubs = computed(() => subsStore.inactiveSubscriptions);
+const activeCount = computed(() => summary.value?.activeCount ?? 0);
+const inactiveCount = computed(() => summary.value?.inactiveCount ?? 0);
+const totalMonthly = computed(() => summary.value?.totalMonthly ?? 0);
+const totalYearly = computed(() => summary.value?.totalYearly ?? 0);
+const avgMonthly = computed(() => summary.value?.avgMonthly ?? 0);
+const mostExpensive = computed(() => summary.value?.mostExpensive ?? null);
+const amountDueThisMonth = computed(() => summary.value?.amountDueThisMonth ?? 0);
+const budget = computed(() => summary.value?.budget ?? 0);
 
-const totalMonthly = computed(() =>
-  activeSubs.value.reduce((sum, s) => sum + getPricePerMonth(s.cycle, s.frequency, toMainCurrency(s.price, s.currencyId)), 0)
-);
-const totalYearly = computed(() => totalMonthly.value * 12);
-const avgMonthly = computed(() => activeSubs.value.length > 0 ? totalMonthly.value / activeSubs.value.length : 0);
-
-const mostExpensive = computed(() => {
-  if (activeSubs.value.length === 0) return null;
-  let max = { name: "", price: 0 };
-  for (const s of activeSubs.value) {
-    const monthly = getPricePerMonth(s.cycle, s.frequency, toMainCurrency(s.price, s.currencyId));
-    if (monthly > max.price) max = { name: s.name, price: monthly };
-  }
-  return max;
-});
-
-const amountDueThisMonth = computed(() => {
-  void now.value;
-  const today = new Date();
-  const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  return activeSubs.value.reduce((sum, s) => {
-    const next = new Date(s.nextPayment);
-    return (next >= today && next <= endOfMonth) ? sum + toMainCurrency(s.price, s.currencyId) : sum;
-  }, 0);
-});
-
-const budget = computed(() => settingsStore.settings.budget);
-
-const monthlyExpensesTotal = ref(0);
-const analyticsExpenses = ref<Expense[]>([]);
-
-async function refreshExpenseAnalytics() {
-  const d = new Date();
-  const monthPrefix = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  const yearPrefix = String(d.getFullYear());
-  const agg = await dbGetExpenseAggregations(monthPrefix, yearPrefix);
-  monthlyExpensesTotal.value = agg.monthTotal;
-
-  const sinceDate = new Date(d.getFullYear(), d.getMonth() - 12, 1).toISOString().split("T")[0];
-  analyticsExpenses.value = await dbGetExpensesSince(sinceDate);
-}
-
-onMounted(async () => {
-  await refreshExpenseAnalytics();
-});
-
-watch(
-  () => subsStore.subscriptions,
-  () => {
-    loadDashboardSubscriptions();
-  },
-  { deep: true },
-);
-
-watch(
-  [() => expsStore.totalCount, () => expsStore.currentPage, () => expsStore.filter],
-  () => {
-    refreshExpenseAnalytics();
-  },
-  { deep: true },
-);
-
-const totalSpending = computed(() => totalMonthly.value + monthlyExpensesTotal.value);
-const budgetUsed = computed(() => budget.value > 0 ? Math.min(100, (totalSpending.value / budget.value) * 100) : null);
-const budgetLeft = computed(() => budget.value > 0 ? Math.max(0, budget.value - totalSpending.value) : null);
-const overBudget = computed(() => budget.value > 0 && totalSpending.value > budget.value ? totalSpending.value - budget.value : null);
-
-const totalSavingsMonthly = computed(() =>
-  inactiveSubs.value.reduce((sum, s) => sum + getPricePerMonth(s.cycle, s.frequency, toMainCurrency(s.price, s.currencyId)), 0)
-);
+const budgetUsed = computed(() => summary.value?.budgetUsed ?? null);
+const budgetLeft = computed(() => summary.value?.budgetLeft ?? null);
+const overBudget = computed(() => summary.value?.overBudget ?? null);
+const totalSavingsMonthly = computed(() => summary.value?.totalSavingsMonthly ?? 0);
 
 // Charts
 const chartColors = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#f97316", "#14b8a6", "#6366f1"];
-const chartOptions = { responsive: true, plugins: { legend: { position: "bottom" as const } } };
 
-function buildCostMap(keyFn: (s: typeof activeSubs.value[0]) => { id: string; name: string }) {
-  const map: Record<string, { name: string; cost: number }> = {};
-  for (const s of activeSubs.value) {
-    const { id, name } = keyFn(s);
-    if (!map[id]) map[id] = { name, cost: 0 };
-    map[id].cost += getPricePerMonth(s.cycle, s.frequency, toMainCurrency(s.price, s.currencyId));
-  }
-  return Object.values(map).filter((x) => x.cost > 0);
-}
+const categoryCosts = computed(() => charts.value?.categoryCosts ?? []);
+const pmCounts = computed(() => charts.value?.pmCounts ?? []);
+const memberCosts = computed(() => charts.value?.memberCosts ?? []);
 
-const categoryCosts = computed(() => buildCostMap((s) => {
-  const cat = catalogStore.categories.find((c) => c.id === s.categoryId);
-  return { id: s.categoryId, name: cat?.name || "Other" };
-}));
-
-const pmCounts = computed(() => {
-  const map: Record<string, { name: string; count: number }> = {};
-  for (const s of activeSubs.value) {
-    const pm = catalogStore.paymentMethods.find((p) => p.id === s.paymentMethodId);
-    if (!map[s.paymentMethodId]) map[s.paymentMethodId] = { name: pm?.name || "Other", count: 0 };
-    map[s.paymentMethodId].count++;
-  }
-  return Object.values(map).filter((x) => x.count > 0);
-});
-
-const memberCosts = computed(() => buildCostMap((s) => {
-  const m = catalogStore.household.find((h) => h.id === s.payerUserId);
-  return { id: s.payerUserId, name: m?.name || "Other" };
-}));
-
-function toChartData(items: { name: string; cost?: number; count?: number }[]) {
+function splitPieOption(items: { name: string; cost?: number; count?: number }[]): EChartsCoreOption {
   return {
-    labels: items.map((c) => c.name),
-    datasets: [{ data: items.map((c) => Math.round((c.cost ?? c.count ?? 0) * 100) / 100), backgroundColor: chartColors.slice(0, items.length) }],
+    animationDuration: 420,
+    tooltip: {
+      trigger: "item",
+      formatter: (params: unknown) => {
+        const p = params as { name?: string; value?: number; percent?: number };
+        return `${p.name ?? ""}<br/>${p.value ?? ""} (${(p.percent ?? 0).toFixed(1)}%)`;
+      },
+    },
+    legend: {
+      bottom: 4,
+      left: "center",
+      type: "scroll",
+      textStyle: { fontSize: 11 },
+      itemGap: 10,
+    },
+    series: [
+      {
+        type: "pie",
+        radius: ["36%", "58%"],
+        center: ["50%", "44%"],
+        avoidLabelOverlap: true,
+        itemStyle: {
+          borderRadius: 6,
+          borderWidth: 2,
+          borderColor: "var(--color-surface, rgba(255,255,255,0.96))",
+        },
+        label: { show: false },
+        emphasis: {
+          scale: true,
+          itemStyle: { shadowBlur: 14, shadowColor: "rgba(0,0,0,0.14)" },
+        },
+        data: items.map((c, i) => ({
+          name: c.name,
+          value: Math.round((c.cost ?? c.count ?? 0) * 100) / 100,
+          itemStyle: { color: chartColors[i % chartColors.length] },
+        })),
+      },
+    ],
   };
 }
 
-const categoryChartData = computed(() => toChartData(categoryCosts.value));
-const pmChartData = computed(() => toChartData(pmCounts.value.map((p) => ({ name: p.name, cost: p.count }))));
-const memberChartData = computed(() => toChartData(memberCosts.value));
+const categoryChartOption = computed(() => splitPieOption(categoryCosts.value));
+const pmChartOption = computed(() => splitPieOption(pmCounts.value.map((p) => ({ name: p.name, cost: p.count }))));
+const memberChartOption = computed(() => splitPieOption(memberCosts.value));
 
 const hasCharts = computed(() => categoryCosts.value.length > 1 || pmCounts.value.length > 1 || memberCosts.value.length > 1);
 
 // Analytics
-const spendingHistory = computed(() => getMonthlySpendingHistory(subsStore.subscriptions, toMainCurrency, 12, analyticsExpenses.value));
-const forecast = computed(() => getForecast(subsStore.subscriptions, toMainCurrency));
-const monthComparison = computed(() => getMonthComparison(subsStore.subscriptions, toMainCurrency));
-const lifetimeCosts = computed(() => getLifetimeCosts(subsStore.subscriptions, toMainCurrency));
-const categoryAverages = computed(() => getCategoryAverages(subsStore.subscriptions, catalogStore.categories, toMainCurrency, analyticsExpenses.value));
-const hasAnalytics = computed(() => activeSubs.value.length > 0);
+const spendingHistory = computed(() => trends.value?.spendingHistory ?? []);
+const forecast = computed(() => forecastDto.value?.forecast ?? null);
+const monthComparison = computed(() => forecastDto.value?.monthComparison ?? null);
+const lifetimeCosts = computed(() => trends.value?.lifetimeCosts ?? []);
+const categoryAverages = computed(() => trends.value?.categoryAverages ?? []);
+const expenseAggregation = computed(
+  () =>
+    summary.value?.expenseAggregation ?? {
+      monthTotal: 0,
+      yearTotal: 0,
+      recentExpenses: [],
+    },
+);
+const topExpenses = computed(() => trends.value?.topExpenses ?? []);
+const avgExpenseStats = computed(() => trends.value?.avgExpenseStats ?? null);
+const dayOfWeekStats = computed(() => trends.value?.dayOfWeekStats ?? []);
+const monthComparisonData = computed(() => trends.value?.monthComparisonData ?? null);
+const tagExpenseStats = computed(() => trends.value?.tagExpenseStats ?? []);
+const hasAnalytics = computed(() => activeCount.value > 0);
 </script>
 
 <template>
-  <div class="space-y-4 sm:space-y-6 max-w-5xl mx-auto">
+  <div class="space-y-3 sm:space-y-4 max-w-5xl mx-auto">
     <!-- Empty state -->
     <div v-if="!hasSubscriptions" class="text-center py-16">
       <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-primary-light flex items-center justify-center">
         <Wallet :size="36" class="text-primary" />
       </div>
-      <h2 class="text-xl font-bold text-text-primary mb-2">{{ t('welcome_to_subly') }}</h2>
+      <h2 :class="[typo.screenTitle(), 'mb-2']">{{ t('welcome_to_subly') }}</h2>
       <p class="text-sm text-text-muted mb-6 max-w-md mx-auto">{{ t('get_started_info') }}</p>
       <button @click="goToSubscriptions" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-primary text-white font-medium hover:bg-primary-hover shadow-sm">
         <ArrowRight :size="18" /> {{ t('go_to_subscriptions') }}
@@ -359,14 +332,14 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
 
         <!-- stats -->
         <StatsCards v-if="w.id === 'stats' && w.visible"
-          :activeCount="activeSubs.length" :totalMonthly="totalMonthly" :totalYearly="totalYearly"
+          :activeCount="activeCount" :totalMonthly="totalMonthly" :totalYearly="totalYearly"
           :amountDue="amountDueThisMonth" :avgMonthly="avgMonthly" :mostExpensive="mostExpensive"
           :budgetUsed="budgetUsed" :totalSavings="totalSavingsMonthly" :fmt="fmt"
         />
 
         <!-- budget -->
-        <div v-if="w.id === 'budget' && w.visible && budget > 0" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-          <h2 class="text-sm sm:text-lg font-semibold text-text-primary mb-3 sm:mb-4">{{ t('your_budget') }}</h2>
+        <div v-if="w.id === 'budget' && w.visible && budget > 0" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
+          <h2 :class="[ui.sectionTitle(), 'mb-2.5 sm:mb-3']">{{ t('your_budget') }}</h2>
           <div class="space-y-3">
             <div class="w-full bg-surface-hover rounded-full h-2.5 sm:h-3">
               <div class="h-full rounded-full transition-all duration-500" :class="(budgetUsed || 0) > 100 ? 'bg-red-500' : 'bg-primary'" :style="{ width: Math.min(budgetUsed || 0, 100) + '%' }" />
@@ -381,12 +354,12 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
         </div>
 
         <!-- savings -->
-        <div v-if="w.id === 'savings' && w.visible && inactiveSubs.length > 0" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-          <h2 class="text-sm sm:text-lg font-semibold text-text-primary mb-2 sm:mb-3">{{ t('your_savings') }}</h2>
+        <div v-if="w.id === 'savings' && w.visible && inactiveCount > 0" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
+          <h2 :class="[ui.sectionTitle(), 'mb-2 sm:mb-3']">{{ t('your_savings') }}</h2>
           <div class="grid grid-cols-3 gap-2 sm:gap-4">
-            <div><p class="text-[10px] sm:text-sm text-text-muted">{{ t('inactive_subscriptions') }}</p><p class="text-lg sm:text-xl font-bold text-text-primary">{{ inactiveSubs.length }}</p></div>
-            <div><p class="text-[10px] sm:text-sm text-text-muted">{{ t('monthly_savings') }}</p><p class="text-lg sm:text-xl font-bold text-green-600">{{ fmt(totalSavingsMonthly) }}</p></div>
-            <div><p class="text-[10px] sm:text-sm text-text-muted">{{ t('yearly_savings') }}</p><p class="text-lg sm:text-xl font-bold text-green-600">{{ fmt(totalSavingsMonthly * 12) }}</p></div>
+            <div><p :class="typo.statLabel()">{{ t('inactive_subscriptions') }}</p><p :class="statValue()">{{ inactiveCount }}</p></div>
+            <div><p :class="typo.statLabel()">{{ t('monthly_savings') }}</p><p :class="statValue({ tone: 'green' })">{{ fmt(totalSavingsMonthly) }}</p></div>
+            <div><p :class="typo.statLabel()">{{ t('yearly_savings') }}</p><p :class="statValue({ tone: 'green' })">{{ fmt(totalSavingsMonthly * 12) }}</p></div>
           </div>
         </div>
 
@@ -394,50 +367,64 @@ const hasAnalytics = computed(() => activeSubs.value.length > 0);
         <SpendingTrend v-if="w.id === 'trend' && w.visible && hasAnalytics" :data="spendingHistory" :fmt="fmt" />
 
         <!-- forecast -->
-        <ForecastCard v-if="w.id === 'forecast' && w.visible && hasAnalytics" :forecast="forecast" :comparison="monthComparison" :fmt="fmt" />
+        <ForecastCard v-if="w.id === 'forecast' && w.visible && hasAnalytics && forecast && monthComparison" :forecast="forecast" :comparison="monthComparison" :fmt="fmt" />
 
         <!-- lifetime -->
         <LifetimeCosts v-if="w.id === 'lifetime' && w.visible && lifetimeCosts.length > 0" :costs="lifetimeCosts" :fmt="fmt" />
 
         <!-- category_avg -->
-        <CategoryAverages v-if="w.id === 'category_avg' && w.visible && categoryAverages.length > 0" :averages="categoryAverages" :fmt="fmt" />
+        <CategoryAverages v-if="w.id === 'category_avg' && w.visible && categoryAverages.length > 0" :averages="categoryAverages" :fmt="fmt" :categories="categories" />
 
         <!-- expenses -->
-        <ExpenseSummary v-if="w.id === 'expenses' && w.visible" />
+        <ExpenseSummary
+          v-if="w.id === 'expenses' && w.visible"
+          :categories="categories"
+          :currencies="currencies"
+          :mainCurrencyId="settings?.mainCurrencyId || 'cur-2'"
+          :agg="expenseAggregation"
+        />
 
         <!-- top expenses -->
-        <TopExpensesWidget v-if="w.id === 'top_expenses' && w.visible" />
+        <TopExpensesWidget
+          v-if="w.id === 'top_expenses' && w.visible"
+          :categories="categories"
+          :items="topExpenses"
+        />
 
         <!-- avg check -->
-        <AvgCheckWidget v-if="w.id === 'avg_check' && w.visible" />
+        <AvgCheckWidget v-if="w.id === 'avg_check' && w.visible" :stats="avgExpenseStats" />
 
         <!-- day of week -->
-        <DayOfWeekWidget v-if="w.id === 'day_of_week' && w.visible" />
+        <DayOfWeekWidget v-if="w.id === 'day_of_week' && w.visible" :raw-stats="dayOfWeekStats" />
 
         <!-- month compare -->
-        <MonthCompareWidget v-if="w.id === 'month_compare' && w.visible" />
+        <MonthCompareWidget v-if="w.id === 'month_compare' && w.visible" :data="monthComparisonData" />
 
         <!-- tag expenses -->
-        <TagExpensesWidget v-if="w.id === 'tag_expenses' && w.visible" />
+        <TagExpensesWidget v-if="w.id === 'tag_expenses' && w.visible" :stats="tagExpenseStats" />
 
         <!-- rate history -->
-        <RateHistoryWidget v-if="w.id === 'rate_history' && w.visible" />
+        <RateHistoryWidget v-if="w.id === 'rate_history' && w.visible" :settings="settings" :currencies="currencies" />
 
         <!-- charts -->
-        <div v-if="w.id === 'charts' && w.visible && hasCharts" class="space-y-3 sm:space-y-4">
+        <div
+          v-if="w.id === 'charts' && w.visible && hasCharts"
+          :key="`charts-${chartsRemountKey}`"
+          class="space-y-3 sm:space-y-4"
+        >
           <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('split_views') }}</h2>
-          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
-            <div v-if="categoryCosts.length > 1" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-              <h3 class="text-xs sm:text-sm font-semibold text-text-primary mb-3 sm:mb-4">{{ t('category_split') }}</h3>
-              <Doughnut :data="categoryChartData" :options="chartOptions" />
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
+            <div v-if="categoryCosts.length > 1" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
+              <h3 class="text-xs sm:text-sm font-semibold text-text-primary mb-2.5 sm:mb-3">{{ t('category_split') }}</h3>
+              <VChart class="h-52 w-full min-h-52" :option="categoryChartOption" autoresize />
             </div>
-            <div v-if="pmCounts.length > 1" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-              <h3 class="text-xs sm:text-sm font-semibold text-text-primary mb-3 sm:mb-4">{{ t('payment_method_split') }}</h3>
-              <Doughnut :data="pmChartData" :options="chartOptions" />
+            <div v-if="pmCounts.length > 1" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
+              <h3 class="text-xs sm:text-sm font-semibold text-text-primary mb-2.5 sm:mb-3">{{ t('payment_method_split') }}</h3>
+              <VChart class="h-52 w-full min-h-52" :option="pmChartOption" autoresize />
             </div>
-            <div v-if="memberCosts.length > 1" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-              <h3 class="text-xs sm:text-sm font-semibold text-text-primary mb-3 sm:mb-4">{{ t('household_split') }}</h3>
-              <Doughnut :data="memberChartData" :options="chartOptions" />
+            <div v-if="memberCosts.length > 1" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
+              <h3 class="text-xs sm:text-sm font-semibold text-text-primary mb-2.5 sm:mb-3">{{ t('household_split') }}</h3>
+              <VChart class="h-52 w-full min-h-52" :option="memberChartOption" autoresize />
             </div>
           </div>
         </div>

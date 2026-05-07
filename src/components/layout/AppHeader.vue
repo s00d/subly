@@ -3,9 +3,9 @@ import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
 import { useHeaderActions } from "@/composables/useHeaderActions";
-import { tv } from "@/lib/tv";
+import { tv, typo, iconSize } from "@/lib/tv";
 import Tooltip from "@/components/ui/Tooltip.vue";
-import { Menu } from "lucide-vue-next";
+import { Menu } from "@lucide/vue";
 
 const emit = defineEmits<{
   toggleSidebar: [];
@@ -29,11 +29,11 @@ const pageTitle = computed(() => {
 
 const headerTv = tv({
   slots: {
-    root: "h-14 sm:h-16 bg-surface border-b border-border flex items-center px-3 sm:px-6 shrink-0 gap-2",
-    burgerBtn: "md:hidden p-1.5 -ml-1 rounded-lg text-text-secondary hover:bg-surface-hover transition-colors shrink-0",
-    title: "text-base sm:text-xl font-semibold text-text-primary truncate",
-    actionsWrap: "flex items-center gap-2 ml-auto",
-    actionBtn: "w-8 h-8 rounded-lg flex items-center justify-center shadow-sm transition-colors shrink-0",
+    root: "min-h-14 sm:min-h-16 bg-surface border-b border-border flex items-center px-3 sm:px-6 shrink-0 gap-1.5 sm:gap-2",
+    burgerBtn: "md:hidden w-8 h-8 p-0 -ml-0.5 rounded-lg text-text-secondary hover:bg-surface-hover transition-colors shrink-0 inline-flex items-center justify-center",
+    title: typo.pageTitle(),
+    actionsWrap: "flex items-center gap-1.5 sm:gap-2 ml-auto",
+    actionBtn: "w-8 h-8 sm:w-9 sm:h-9 rounded-lg inline-flex items-center justify-center shadow-sm transition-colors shrink-0",
   },
 });
 
@@ -59,20 +59,27 @@ function getActionBtnClass(style?: "primary" | "neutral" | "accent" | "success" 
 </script>
 
 <template>
-  <header :class="slots.root()">
-    <button :class="slots.burgerBtn()" @click="emit('toggleSidebar')">
-      <Menu :size="22" />
+  <header :class="[slots.root(), 'app-header-safe']">
+    <button data-compact :class="slots.burgerBtn()" @click="emit('toggleSidebar')">
+      <Menu :size="iconSize.nav" />
     </button>
     <h1 :class="slots.title()">{{ pageTitle }}</h1>
     <div :class="slots.actionsWrap()">
       <Tooltip v-for="action in actions" :key="action.id" :text="action.title" position="bottom">
         <button
+          data-compact
           @click="action.onClick"
           :class="[slots.actionBtn(), getActionBtnClass(action.style)]"
         >
-          <component :is="action.icon" :size="18" />
+          <component :is="action.icon" :size="iconSize.md" />
         </button>
       </Tooltip>
     </div>
   </header>
 </template>
+
+<style scoped>
+.app-header-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+</style>

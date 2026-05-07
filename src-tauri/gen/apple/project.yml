@@ -36,6 +36,8 @@ targets:
         buildPhase: resources
         type: folder
       - path: LaunchScreen.storyboard
+      - path: PrivacyInfo.xcprivacy
+        buildPhase: resources
     info:
       path: subly_iOS/Info.plist
       properties:
@@ -61,6 +63,8 @@ targets:
         RUST_LOG: info
     settings:
       base:
+        # Tauri ios xcode-script may merge entitlements during build; Xcode otherwise errors.
+        CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION: YES
         ENABLE_BITCODE: false
         ARCHS: [arm64]
         VALID_ARCHS: arm64 

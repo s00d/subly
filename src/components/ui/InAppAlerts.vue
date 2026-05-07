@@ -3,8 +3,8 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useClipboard } from "@/composables/useClipboard";
-import type { InAppAlert } from "@/services/notifications";
-import { Bell, AlertTriangle, Clock, X, Copy } from "lucide-vue-next";
+import type { InAppAlert } from "@/services/notificationsClient";
+import { Bell, AlertTriangle, Clock, X, Copy } from "@lucide/vue";
 import { tv } from "@/lib/tv";
 
 defineProps<{
@@ -44,7 +44,7 @@ async function copyAlert(alert: InAppAlert) {
   if (copied) {
     toast(t("copied_to_clipboard"));
   } else {
-    toast(t("error"), "error");
+    toast(t("clipboard_copy_failed"), "error");
   }
 }
 

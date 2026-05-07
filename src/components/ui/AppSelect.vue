@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, computed, onMounted, onUnmounted, nextTick } from "vue";
-import { ChevronDown, Check, Search } from "lucide-vue-next";
-import { tv } from "@/lib/tv";
+import { ChevronDown, Check, Search } from "@lucide/vue";
+import { tv, ui } from "@/lib/tv";
 
 export interface SelectOption {
   value: string | number;
@@ -111,28 +111,23 @@ onUnmounted(() => {
 const selectTv = tv({
   slots: {
     root: "relative w-full",
-    labelEl: "block text-xs font-medium text-text-secondary mb-1.5",
+    labelEl: ui.fieldLabel(),
     trigger: [
-      "w-full flex items-center gap-2 rounded-lg border",
-      "bg-surface text-left transition-shadow",
-      "disabled:opacity-50 disabled:cursor-not-allowed",
+      ui.field(),
+      "flex items-center gap-2 text-left",
     ],
     triggerText: "flex-1 truncate",
     chevron: "shrink-0 text-text-muted transition-transform",
-    panel: [
-      "fixed z-[200] bg-surface border border-border",
-      "rounded-xl shadow-xl overflow-hidden",
-    ],
+    panel: ["fixed z-[200] bg-surface border border-border rounded-xl shadow-xl overflow-hidden"],
     searchWrap: "p-2 border-b border-border",
     searchInput: [
-      "w-full pl-8 pr-3 py-1.5 rounded-md border border-border",
-      "bg-surface-secondary text-xs text-text-primary",
-      "placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-primary",
+      "w-full pl-8 pr-3 py-1.5 rounded-md border border-border bg-surface text-xs text-text-primary",
+      "placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
     ],
     list: "max-h-56 overflow-y-auto py-1",
     emptyEl: "px-3 py-2 text-xs text-text-muted text-center",
     optionEl: "w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors disabled:opacity-40",
-    errorEl: "mt-1 text-xs text-red-500",
+    errorEl: ui.fieldError(),
   },
   variants: {
     size: {
@@ -140,9 +135,9 @@ const selectTv = tv({
       md: { trigger: "px-3 py-2 text-sm" },
     },
     status: {
-      error: { trigger: "border-red-500 ring-2 ring-red-500" },
-      open: { trigger: "border-primary ring-2 ring-primary" },
-      normal: { trigger: "border-border hover:border-text-muted" },
+      error: { trigger: "border-red-500 ring-2 ring-red-500/20" },
+      open: { trigger: "border-primary ring-2 ring-primary/20" },
+      normal: {},
     },
     chevronOpen: {
       true: { chevron: "rotate-180" },
@@ -153,7 +148,7 @@ const selectTv = tv({
     },
     optionActive: {
       true: { optionEl: "bg-primary-light text-primary font-medium" },
-      false: { optionEl: "text-text-secondary hover:bg-surface-hover" },
+      false: { optionEl: "text-text-secondary hover:bg-surface dark:hover:bg-white/6" },
     },
   },
   defaultVariants: { size: "md", status: "normal" },
@@ -191,12 +186,20 @@ const slots = computed(() =>
     </button>
 
     <Teleport to="body">
-      <div
-        v-if="isOpen"
-        ref="dropdownRef"
-        :class="slots.panel()"
-        :style="{ top: pos.top + 'px', left: pos.left + 'px', width: pos.width + 'px' }"
+      <Transition
+        enter-active-class="transition ease-out duration-150"
+        enter-from-class="opacity-0 scale-95 origin-top"
+        enter-to-class="opacity-100 scale-100 origin-top"
+        leave-active-class="transition ease-in duration-100"
+        leave-from-class="opacity-100 scale-100 origin-top"
+        leave-to-class="opacity-0 scale-95 origin-top"
       >
+        <div
+          v-if="isOpen"
+          ref="dropdownRef"
+          :class="slots.panel()"
+          :style="{ top: pos.top + 'px', left: pos.left + 'px', width: pos.width + 'px' }"
+        >
         <div v-if="searchable" :class="slots.searchWrap()">
           <div class="relative">
             <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
@@ -227,7 +230,8 @@ const slots = computed(() =>
             <Check v-if="String(opt.value) === String(modelValue)" :size="14" class="shrink-0 text-primary" />
           </button>
         </div>
-      </div>
+        </div>
+      </Transition>
     </Teleport>
     <p v-if="error" :class="slots.errorEl()">{{ error }}</p>
   </div>

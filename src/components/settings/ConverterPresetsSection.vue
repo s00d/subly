@@ -1,34 +1,52 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useSettingsStore } from "@/stores/settings";
+import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
+import type { Settings } from "@/schemas/appData";
+import { useAppMetaStore } from "@/stores/appMetaStore";
 import Toast from "@/components/ui/Toast.vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
-import { Trash2, Plus, ChevronUp, ChevronDown, Zap } from "lucide-vue-next";
+import { Trash2, Plus, ChevronUp, ChevronDown, Zap } from "@lucide/vue";
+import { ui } from "@/lib/tv";
 
-const settingsStore = useSettingsStore();
+const props = defineProps<{ lookupSettings: Settings | null }>();
 const { t } = useI18n();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
+const metaStore = useAppMetaStore();
+const settings = ref<Settings | null>(null);
 
 const newValue = ref("");
+watch(
+  () => props.lookupSettings,
+  (value) => {
+    settings.value = value;
+  },
+  { immediate: true, deep: true },
+);
 
 const presets = computed(() =>
-  [...(settingsStore.settings.converterPresets ?? [])].sort((a, b) => a - b),
+  [...(settings.value?.converterPresets ?? [])].sort((a, b) => a - b),
 );
+
+async function updateSettings(updates: Partial<Settings>) {
+  if (!settings.value) return;
+  const next = { ...settings.value, ...updates };
+  settings.value = next;
+  await metaStore.updateSettings(next);
+}
 
 function addPreset() {
   const raw = newValue.value.replace(/[^\d.]/g, "");
   const val = parseFloat(raw);
   if (isNaN(val) || val <= 0) return;
 
-  const current = settingsStore.settings.converterPresets ?? [];
+  const current = settings.value?.converterPresets ?? [];
   if (current.includes(val)) {
     toast(t("preset_exists"), "error");
     return;
   }
 
-  settingsStore.updateSettings({
+  updateSettings({
     converterPresets: [...current, val].sort((a, b) => a - b),
   });
   newValue.value = "";
@@ -36,8 +54,8 @@ function addPreset() {
 }
 
 function removePreset(val: number) {
-  const current = settingsStore.settings.converterPresets ?? [];
-  settingsStore.updateSettings({
+  const current = settings.value?.converterPresets ?? [];
+  updateSettings({
     converterPresets: current.filter((v) => v !== val),
   });
 }
@@ -47,7 +65,7 @@ function moveUp(val: number) {
   const idx = arr.indexOf(val);
   if (idx <= 0) return;
   [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
-  settingsStore.updateSettings({ converterPresets: arr });
+  updateSettings({ converterPresets: arr });
 }
 
 function moveDown(val: number) {
@@ -55,7 +73,7 @@ function moveDown(val: number) {
   const idx = arr.indexOf(val);
   if (idx < 0 || idx >= arr.length - 1) return;
   [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
-  settingsStore.updateSettings({ converterPresets: arr });
+  updateSettings({ converterPresets: arr });
 }
 
 function fmtNum(n: number): string {
@@ -68,7 +86,7 @@ function fmtNum(n: number): string {
     <div class="flex items-center justify-between gap-2 mb-1">
       <div class="flex items-center gap-2 shrink-0">
         <Zap :size="16" class="text-primary" />
-        <h2 class="text-base sm:text-lg font-semibold text-text-primary">{{ t('converter_presets') }}</h2>
+        <h2 :class="ui.sectionTitle()">{{ t('converter_presets') }}</h2>
       </div>
     </div>
     <p class="text-xs text-text-muted mb-3">{{ t('converter_presets_desc') }}</p>

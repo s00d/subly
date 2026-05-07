@@ -1,57 +1,61 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useSubscriptionsStore } from "@/stores/subscriptions";
-import { useSettingsStore } from "@/stores/settings";
-import { useCatalogStore } from "@/stores/catalog";
+import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
-import { formatCurrency } from "@/services/calculations";
 import type { PaymentRecord, Currency } from "@/schemas/appData";
-import { History, Plus, Trash2, ChevronDown, ChevronUp, Receipt, RefreshCw } from "lucide-vue-next";
+import { insertPaymentRecord, deletePaymentRecord } from "@/services/subscriptionsClient";
+import { History, Plus, Trash2, ChevronDown, ChevronUp, Receipt, RefreshCw } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import AppDatePicker from "@/components/ui/AppDatePicker.vue";
+import AppInput from "@/components/ui/AppInput.vue";
 
 const props = defineProps<{
   subscriptionId: string;
   currencyId: string;
   price: number;
   history: PaymentRecord[];
+  lookupData: {
+    currencies: Currency[];
+    mainCurrencyId: string;
+    targetCurrencyIds: string[];
+  };
 }>();
 
 const emit = defineEmits<{
   recordPayment: [id: string];
 }>();
 
-const subsStore = useSubscriptionsStore();
-const settingsStore = useSettingsStore();
-const catalogStore = useCatalogStore();
 const { t } = useI18n();
-const { fmtDateMedium } = useLocaleFormat();
+const { fmtDateMedium, fmtCurrency } = useLocaleFormat();
+const currencies = ref<Currency[]>([]);
+const mainCurrencyId = ref("cur-2");
+const targetIds = ref<string[]>([]);
 
 const expanded = ref(false);
 const showAddForm = ref(false);
+const localHistory = ref<PaymentRecord[]>([]);
 
 // Add form
 const addDate = ref(new Date().toISOString().split("T")[0]);
 const addAmount = ref(props.price);
 const addNote = ref("");
+watch(() => props.history, (value) => { localHistory.value = [...value]; }, { immediate: true });
 
 function fmt(amount: number, curId: string): string {
-  const c = catalogStore.currencies.find((cur) => cur.id === curId);
-  return formatCurrency(amount, c?.code || "USD", c?.symbol);
+  const c = currencies.value.find((cur) => cur.id === curId);
+  return fmtCurrency(amount, c?.code || "USD");
 }
 
 function fmtCur(amount: number, currency: Currency): string {
-  return formatCurrency(amount, currency.code, currency.symbol);
+  return fmtCurrency(amount, currency.code);
 }
 
 const targetCurrencies = computed(() => {
-  const mainId = settingsStore.settings.mainCurrencyId;
-  const targets = settingsStore.settings.currencyUpdateTargets ?? [];
-  const ids = new Set(targets);
+  const ids = new Set(targetIds.value);
+  const mainId = mainCurrencyId.value;
   if (mainId) ids.add(mainId);
   return [...ids]
-    .map((id) => catalogStore.currencies.find((c) => c.id === id))
+    .map((id) => currencies.value.find((c) => c.id === id))
     .filter((c): c is Currency => !!c && c.rate > 0);
 });
 
@@ -60,53 +64,65 @@ function getConvertTargets(curId: string) {
 }
 
 function convertAmount(amount: number, fromCurId: string, toCurrency: Currency): number {
-  const fromCur = catalogStore.currencies.find((c) => c.id === fromCurId);
+  const fromCur = currencies.value.find((c) => c.id === fromCurId);
   if (!fromCur || fromCur.rate <= 0) return 0;
   const inBase = amount / fromCur.rate;
   return inBase * toCurrency.rate;
 }
 
 const visibleRecords = computed(() =>
-  expanded.value ? props.history : props.history.slice(0, 5),
+  expanded.value ? localHistory.value : localHistory.value.slice(0, 5),
 );
 
 const totalPaid = computed(() =>
-  props.history.reduce((sum, r) => sum + r.amount, 0),
+  localHistory.value.reduce((sum, r) => sum + r.amount, 0),
 );
 
-function addRecord() {
+async function addRecord() {
   if (!addDate.value) return;
-  subsStore.addPaymentRecord(props.subscriptionId, {
+  const record: PaymentRecord = {
     id: crypto.randomUUID(),
     date: addDate.value,
     amount: addAmount.value || props.price,
     currencyId: props.currencyId,
     note: addNote.value,
-  });
+  };
+  await insertPaymentRecord(props.subscriptionId, record);
+  localHistory.value = [record, ...localHistory.value];
   showAddForm.value = false;
   addDate.value = new Date().toISOString().split("T")[0];
   addAmount.value = props.price;
   addNote.value = "";
 }
 
-function deleteRecord(recordId: string) {
-  subsStore.deletePaymentRecord(props.subscriptionId, recordId);
+async function deleteRecord(recordId: string) {
+  await deletePaymentRecord(recordId);
+  localHistory.value = localHistory.value.filter((item) => item.id !== recordId);
 }
 
 const formatDate = fmtDateMedium;
+watch(
+  () => props.lookupData,
+  (lookup) => {
+    currencies.value = lookup.currencies;
+    mainCurrencyId.value = lookup.mainCurrencyId;
+    targetIds.value = lookup.targetCurrencyIds ?? [];
+  },
+  { immediate: true, deep: true },
+);
 </script>
 
 <template>
-  <div class="bg-surface-secondary rounded-lg overflow-hidden">
+  <div class="rounded-lg border border-border bg-surface-secondary overflow-hidden divide-y divide-border">
     <!-- Header -->
     <div class="flex items-center justify-between px-3 py-2.5">
       <div class="flex items-center gap-1.5">
         <History :size="13" class="text-text-muted" />
         <span class="text-[10px] uppercase tracking-wide font-medium text-text-muted">{{ t('payment_history') }}</span>
-        <span v-if="history.length > 0" class="text-[10px] text-text-muted ml-1">({{ history.length }})</span>
+        <span v-if="localHistory.length > 0" class="text-[10px] text-text-muted ml-1">({{ localHistory.length }})</span>
       </div>
       <div class="flex items-center gap-1">
-        <div v-if="history.length > 0" class="text-right mr-1">
+        <div v-if="localHistory.length > 0" class="text-right mr-1">
           <span class="text-[10px] font-medium text-primary">
             {{ t('total') }}: {{ fmt(totalPaid, currencyId) }}
           </span>
@@ -146,41 +162,44 @@ const formatDate = fmtDateMedium;
       leave-from-class="opacity-100"
       leave-to-class="opacity-0"
     >
-      <div v-if="showAddForm" class="px-3 pb-3 space-y-2 border-b border-border">
+      <div v-if="showAddForm" class="px-3 pb-3 space-y-2">
         <div class="flex gap-2">
           <div class="flex-1">
             <AppDatePicker v-model="addDate" />
           </div>
-          <input
-            v-model.number="addAmount"
+          <AppInput
+            :modelValue="addAmount"
+            @update:modelValue="(v) => addAmount = Number(v)"
             type="number"
             step="0.01"
             min="0"
             :placeholder="String(price)"
-            class="w-24 px-2 py-1 rounded border border-border bg-surface text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            size="sm"
+            class="w-24"
           />
         </div>
         <div class="flex gap-2">
-          <input
-            v-model="addNote"
-            type="text"
+          <AppInput
+            :modelValue="addNote"
+            @update:modelValue="(v) => addNote = String(v)"
             :placeholder="t('note_optional')"
-            class="flex-1 px-2 py-1 rounded border border-border bg-surface text-xs text-text-primary placeholder-text-muted focus:outline-none focus:ring-1 focus:ring-primary"
+            size="sm"
+            class="flex-1"
           />
           <button
             @click="addRecord"
-            class="px-3 py-1 rounded bg-primary text-white text-xs font-medium hover:bg-primary-hover transition-colors"
+            class="px-3 py-1 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary-hover transition-colors"
           >{{ t('add') }}</button>
         </div>
       </div>
     </Transition>
 
     <!-- Records list -->
-    <div v-if="history.length > 0" class="divide-y divide-border">
+    <div v-if="localHistory.length > 0">
       <div
         v-for="record in visibleRecords"
         :key="record.id"
-        class="flex items-center gap-2.5 px-3 py-2 group hover:bg-surface-hover transition-colors"
+        class="flex items-center gap-2.5 px-3 py-2.5 group hover:bg-surface dark:hover:bg-white/6 transition-colors"
       >
         <Receipt :size="12" class="text-text-muted shrink-0" />
         <span class="text-xs text-text-muted whitespace-nowrap">{{ formatDate(record.date) }}</span>
@@ -214,12 +233,12 @@ const formatDate = fmtDateMedium;
 
     <!-- Show more -->
     <button
-      v-if="history.length > 5"
+      v-if="localHistory.length > 5"
       @click="expanded = !expanded"
       class="w-full flex items-center justify-center gap-1 py-1.5 text-[10px] text-primary hover:bg-surface-hover transition-colors"
     >
       <component :is="expanded ? ChevronUp : ChevronDown" :size="12" />
-      {{ expanded ? t('show_less') : t('show_all') }} ({{ history.length }})
+      {{ expanded ? t('show_less') : t('show_all') }} ({{ localHistory.length }})
     </button>
   </div>
 </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { Check } from "lucide-vue-next";
+import { Check } from "@lucide/vue";
 import { tv } from "@/lib/tv";
 
 const props = defineProps<{

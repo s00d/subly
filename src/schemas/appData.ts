@@ -1,462 +1,380 @@
-import { z } from "zod";
+import { importJsonPayloadSchema } from "@/schemas/zod/importEnvelope";
 
-// =============================================
-// Zod-схемы — единый источник истины для типов
-// =============================================
+export type CycleType = 1 | 2 | 3 | 4;
 
-// ---- Cycle type ----
-export const CycleTypeSchema = z.union([
-  z.literal(1),
-  z.literal(2),
-  z.literal(3),
-  z.literal(4),
-]);
+/** Те же поля, что в `SubscriptionInputDto.credentials`; хранятся в secure storage, не в снапшоте данных. */
+export interface SubscriptionCredentials {
+  login: string;
+  password: string;
+  totpSecret: string;
+}
 
-// ---- Payment record (history entry) ----
-export const PaymentRecordSchema = z.object({
-  id: z.string(),
-  date: z.string(),            // ISO date YYYY-MM-DD when payment was made
-  amount: z.number(),          // actual amount paid
-  currencyId: z.string(),
-  note: z.string().default(""),
-});
+export interface PaymentRecord {
+  id: string;
+  date: string;
+  amount: number;
+  currencyId: string;
+  note: string;
+}
 
-// ---- Subscription ----
-export const SubscriptionSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  logo: z.string().default(""),
-  price: z.number().default(0),
-  currencyId: z.string(),
-  nextPayment: z.string(), // ISO date YYYY-MM-DD
-  startDate: z.string(),
-  cycle: CycleTypeSchema.default(3),
-  frequency: z.number().int().min(1).default(1),
-  notes: z.string().default(""),
-  paymentMethodId: z.string().default(""),
-  payerUserId: z.string().default(""),
-  categoryId: z.string().default("cat-1"),
-  notify: z.boolean().default(true),
-  notifyDaysBefore: z.number().default(1),
-  lastNotifiedDate: z.string().default(""),   // ISO date of last sent notification (for recurring)
-  inactive: z.boolean().default(false),
-  autoRenew: z.boolean().default(true),
-  url: z.string().default(""),
-  cancellationDate: z.nullable(z.string()).default(null),
-  replacementSubscriptionId: z.nullable(z.string()).default(null),
-  createdAt: z.string().default(""),
-  tags: z.array(z.string()).default([]),
-  favorite: z.boolean().default(false),
-  paymentHistory: z.array(PaymentRecordSchema).default([]),
-});
+export interface Subscription {
+  id: string;
+  name: string;
+  logo: string;
+  price: number;
+  currencyId: string;
+  nextPayment: string;
+  startDate: string;
+  cycle: CycleType;
+  frequency: number;
+  notes: string;
+  paymentMethodId: string;
+  payerUserId: string;
+  categoryId: string;
+  notify: boolean;
+  notifyDaysBefore: number;
+  lastNotifiedDate: string;
+  inactive: boolean;
+  autoRenew: boolean;
+  url: string;
+  cancellationDate: string | null;
+  replacementSubscriptionId: string | null;
+  createdAt: string;
+  tags: string[];
+  favorite: boolean;
+  paymentHistory: PaymentRecord[];
+  /** Приходит из list/upsert IPC; не часть импорта JSON-бэкапа. */
+  credentials?: SubscriptionCredentials | null;
+}
 
-// ---- Expense (one-time / irregular spending) ----
-export const ExpenseSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  amount: z.number().default(0),
-  currencyId: z.string(),
-  date: z.string(),  // ISO date YYYY-MM-DD
-  categoryId: z.string().default("cat-1"),
-  paymentMethodId: z.string().default(""),
-  payerUserId: z.string().default(""),
-  tags: z.array(z.string()).default([]),
-  notes: z.string().default(""),
-  url: z.string().default(""),
-  createdAt: z.string().default(""),
-  subscriptionId: z.string().default(""),
-  paymentRecordId: z.string().default(""),
-});
+/** Row from list/detail IPC (`SubscriptionListItemDto`): base subscription plus computed list fields. */
+export interface SubscriptionListItem extends Subscription {
+  monthlyPrice: number;
+  daysLeft: number;
+  overdue: boolean;
+}
 
-// ---- Category ----
-export const CategorySchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  icon: z.string().default(""),
-  sortOrder: z.number().int().default(0),
-  i18nKey: z.string().default(""),
-});
+export interface Expense {
+  id: string;
+  name: string;
+  amount: number;
+  currencyId: string;
+  createdAt: string;
+  categoryId: string;
+  paymentMethodId: string;
+  payerUserId: string;
+  tags: string[];
+  notes: string;
+  url: string;
+  /** Empty string when not linked to a subscription payment. */
+  subscriptionId: string;
+  /** Empty string when not from a subscription payment record. */
+  paymentRecordId: string;
+  /** Milliseconds (`ExpenseDoc.updated_at`), present when returned from backend. */
+  updatedAt?: number;
+}
 
-// ---- Currency ----
-export const CurrencySchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  symbol: z.string(),
-  code: z.string(),
-  rate: z.number().default(1),
-  sortOrder: z.number().int().default(0),
-  i18nKey: z.string().default(""),
-});
+/** `YYYY-MM-DD` for date pickers / formatters (UTC calendar date derived from `createdAt`). */
+export function expenseToIsoDate(e: Pick<Expense, "createdAt">): string {
+  const s = String(e.createdAt ?? "").trim();
+  if (s.length >= 10 && /^\d{4}-\d{2}-\d{2}/.test(s)) {
+    return s.slice(0, 10);
+  }
+  const t = Date.parse(s);
+  if (Number.isFinite(t)) {
+    const d = new Date(t);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
+  }
+  return "2000-01-01";
+}
 
-// ---- Household member ----
-export const HouseholdMemberSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  email: z.string().default(""),
-  sortOrder: z.number().int().default(0),
-});
+function expenseCreatedAtFromRaw(r: Record<string, unknown>): string {
+  const ca = String(r.createdAt ?? "").trim();
+  if (ca) return ca;
+  const y = r.dateYear;
+  const m = r.dateMonth;
+  const d = r.dateDay;
+  if (typeof y === "number" && typeof m === "number" && typeof d === "number" && Number.isFinite(y) && Number.isFinite(m) && Number.isFinite(d)) {
+    const pad = (n: number) => String(Math.trunc(n)).padStart(2, "0");
+    return `${Math.trunc(y)}-${pad(m)}-${pad(d)}T12:00:00.000Z`;
+  }
+  const legacy = String(r.date ?? "").trim();
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(legacy);
+  if (match) {
+    return `${match[1]}-${match[2]}-${match[3]}T12:00:00.000Z`;
+  }
+  return "2000-01-01T12:00:00.000Z";
+}
 
-// ---- Payment method ----
-export const PaymentMethodSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  icon: z.string().default("💳"),
-  enabled: z.boolean().default(true),
-  sortOrder: z.number().int().default(0),
-  i18nKey: z.string().default(""),
-});
+export interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  sortOrder: number;
+  i18nKey: string;
+}
 
-// ---- Tag ----
-export const TagSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  favorite: z.boolean().default(true),
-  sortOrder: z.number().int().default(0),
-  i18nKey: z.string().default(""),
-});
+export interface Currency {
+  id: string;
+  name: string;
+  symbol: string;
+  code: string;
+  rate: number;
+  sortOrder: number;
+  i18nKey: string;
+}
 
-// ---- Custom colors ----
-export const CustomColorsSchema = z.object({
-  main: z.string().default(""),
-  accent: z.string().default(""),
-  hover: z.string().default(""),
-});
+export interface HouseholdMember {
+  id: string;
+  name: string;
+  email: string;
+  sortOrder: number;
+}
 
-// ---- Settings ----
-export const SettingsSchema = z.object({
-  darkTheme: z.union([z.literal(0), z.literal(1), z.literal(2)]).default(2),
-  colorTheme: z.string().default("blue"),
-  monthlyPrice: z.boolean().default(false),
-  convertCurrency: z.boolean().default(false),
-  hideDisabled: z.boolean().default(false),
-  disabledToBottom: z.boolean().default(true),
-  showOriginalPrice: z.boolean().default(false),
-  showSubscriptionProgress: z.boolean().default(true),
-  language: z.string().default("en"),
-  mainCurrencyId: z.string().default("cur-2"),
-  defaultCategoryId: z.string().default("cat-1"),
-  defaultPaymentMethodId: z.string().default("pm-1"),
-  budget: z.number().default(0),
-  notifyDaysBefore: z.number().default(1),
-  notificationTitle: z.string().default("Subly — Payment Reminder"),
-  notificationBodyDueToday: z.string().default('Payment for "{name}" is due today!'),
-  notificationBodyDueSoon: z.string().default('Payment for "{name}" is due in {days} day(s).'),
-  notificationOverdueTitle: z.string().default("Subly — Overdue Payment"),
-  notificationOverdueBody: z.string().default('"{name}" is overdue by {days} day(s). Please renew manually.'),
-  notificationSchedule: z.enum(["any", "morning", "evening", "custom"]).default("any"),
-  notificationCustomHour: z.number().int().min(0).max(23).default(9),
-  recurringNotifications: z.boolean().default(true),
-  notificationSound: z.boolean().default(true),
-  currencyAutoUpdate: z.boolean().default(false),
-  currencyUpdateTargets: z.array(z.string()).default([]),       // currency IDs to auto-update
-  lastCurrencyUpdate: z.string().default(""),                   // ISO date of last rate fetch
-  // Dashboard widgets config: array of { id, visible }; order = array order
-  dashboardWidgets: z.array(z.object({
-    id: z.string(),
-    visible: z.boolean().default(true),
-  })).default([]),
-  // Subscription list view
-  subscriptionViewMode: z.enum(["default", "compact", "expanded"]).default("default"),
-  subscriptionGroupBy: z.enum(["none", "category", "payment_method"]).default("none"),
-  // Expense list view
-  expenseViewMode: z.enum(["default", "compact", "expanded"]).default("default"),
-  // Currency rates/converter view
-  currencyViewMode: z.enum(["default", "compact", "expanded"]).default("default"),
-  // Calendar view
-  calendarViewMode: z.enum(["default", "compact", "expanded"]).default("default"),
-  // Converter presets
-  converterPresets: z.array(z.number()).default([100, 500, 1000, 5000]),
-  // Rate history
-  rateHistoryEnabled: z.boolean().default(true),
-  rateHistoryDays: z.number().min(7).max(365).default(90),
-  customColors: CustomColorsSchema.default({ main: "", accent: "", hover: "" }),
-});
+export interface PaymentMethod {
+  id: string;
+  name: string;
+  icon: string;
+  enabled: boolean;
+  sortOrder: number;
+  i18nKey: string;
+}
 
-// ---- Notification settings ----
-export const NotificationSettingsSchema = z.object({
-  enabled: z.boolean().default(true),
-  daysBefore: z.number().default(1),
-});
+export interface Tag {
+  id: string;
+  name: string;
+  favorite: boolean;
+  sortOrder: number;
+  i18nKey: string;
+}
 
-// ---- Stats data ----
-const StatsEntrySchema = z.object({
-  label: z.string(),
-  value: z.number(),
-});
-
-export const StatsDataSchema = z.object({
-  activeSubscriptions: z.number().default(0),
-  inactiveSubscriptions: z.number().default(0),
-  totalCostPerMonth: z.number().default(0),
-  totalCostPerYear: z.number().default(0),
-  averageSubscriptionCost: z.number().default(0),
-  mostExpensive: z.nullable(
-    z.object({ name: z.string(), price: z.number(), logo: z.string() }),
-  ).default(null),
-  amountDueThisMonth: z.number().default(0),
-  totalSavingsPerMonth: z.number().default(0),
-  budget: z.number().default(0),
-  budgetUsed: z.nullable(z.number()).default(null),
-  budgetLeft: z.nullable(z.number()).default(null),
-  overBudgetAmount: z.nullable(z.number()).default(null),
-  categoryCosts: z.array(StatsEntrySchema).default([]),
-  memberCosts: z.array(StatsEntrySchema).default([]),
-  paymentMethodCounts: z.array(StatsEntrySchema).default([]),
-});
-
-// ---- Calendar day ----
-export const CalendarDaySchema = z.object({
-  day: z.number(),
-  isToday: z.boolean(),
-  isEmpty: z.boolean(),
-  subscriptions: z.array(
-    z.object({
-      id: z.string(),
-      name: z.string(),
-      price: z.number(),
-      currencyId: z.string(),
-    }),
-  ).default([]),
-});
-
-// ---- Root AppData ----
-export const AppDataSchema = z.object({
-  subscriptions: z.array(SubscriptionSchema).default([]),
-  expenses: z.array(ExpenseSchema).default([]),
-  categories: z.array(CategorySchema).default([]),
-  currencies: z.array(CurrencySchema).default([]),
-  household: z.array(HouseholdMemberSchema).default([]),
-  paymentMethods: z.array(PaymentMethodSchema).default([]),
-  tags: z.array(TagSchema).default([]),
-  settings: SettingsSchema.default({
-    darkTheme: 2,
-    colorTheme: "blue",
-    monthlyPrice: false,
-    convertCurrency: false,
-    hideDisabled: false,
-    disabledToBottom: true,
-    showOriginalPrice: false,
-    showSubscriptionProgress: true,
-    language: "en",
-    mainCurrencyId: "cur-2",
-    defaultCategoryId: "cat-1",
-    defaultPaymentMethodId: "pm-1",
-    budget: 0,
-    notifyDaysBefore: 1,
-    notificationTitle: "Subly — Payment Reminder",
-    notificationBodyDueToday: 'Payment for "{name}" is due today!',
-    notificationBodyDueSoon: 'Payment for "{name}" is due in {days} day(s).',
-    notificationOverdueTitle: "Subly — Overdue Payment",
-    notificationOverdueBody: '"{name}" is overdue by {days} day(s). Please renew manually.',
-    notificationSchedule: "any",
-    notificationCustomHour: 9,
-    recurringNotifications: true,
-    notificationSound: true,
-    currencyAutoUpdate: false,
-    currencyUpdateTargets: [],
-    lastCurrencyUpdate: "",
-    dashboardWidgets: [],
-    subscriptionViewMode: "default",
-    subscriptionGroupBy: "none",
-    expenseViewMode: "default",
-    currencyViewMode: "default",
-    calendarViewMode: "default",
-    converterPresets: [100, 500, 1000, 5000],
-    rateHistoryEnabled: true,
-    rateHistoryDays: 90,
-    customColors: { main: "", accent: "", hover: "" },
-  }),
-  ratesApiKey: z.string().default(""),
-  ratesProvider: z.string().default("frankfurter"),
-  fixerApiKey: z.string().default(""),
-  fixerProvider: z.number().default(0),
-  telegramBotToken: z.string().default(""),
-  telegramChatId: z.string().default(""),
-  telegramEnabled: z.boolean().default(false),
-  initialized: z.boolean().default(true),
-});
-
-// =============================================
-// Inferred TypeScript types
-// =============================================
-export type CycleType = z.infer<typeof CycleTypeSchema>;
-export type PaymentRecord = z.infer<typeof PaymentRecordSchema>;
-export type Subscription = z.infer<typeof SubscriptionSchema>;
-export type Expense = z.infer<typeof ExpenseSchema>;
-export type Category = z.infer<typeof CategorySchema>;
-export type Currency = z.infer<typeof CurrencySchema>;
-export type HouseholdMember = z.infer<typeof HouseholdMemberSchema>;
-export type PaymentMethod = z.infer<typeof PaymentMethodSchema>;
-export type Tag = z.infer<typeof TagSchema>;
-export type CustomColors = z.infer<typeof CustomColorsSchema>;
-export type Settings = z.infer<typeof SettingsSchema>;
-export type NotificationSettings = z.infer<typeof NotificationSettingsSchema>;
-export type StatsData = z.infer<typeof StatsDataSchema>;
-export type CalendarDay = z.infer<typeof CalendarDaySchema>;
-export type AppData = z.infer<typeof AppDataSchema>;
-
-// =============================================
-// Validation helpers
-// =============================================
+export interface CustomColors {
+  main: string;
+  accent: string;
+  hover: string;
+}
 
 /**
- * Parse a single subscription (fill defaults for missing fields).
+ * Full UI preferences stored in app config (`config_get` / `config_set` key `"settings"`).
+ * Not the same as the compact `SettingsDoc` embedded in the Redb data snapshot — see Rust `SettingsDoc`.
  */
+export interface Settings {
+  darkTheme: 0 | 1 | 2;
+  colorTheme: string;
+  monthlyPrice: boolean;
+  convertCurrency: boolean;
+  hideDisabled: boolean;
+  disabledToBottom: boolean;
+  showOriginalPrice: boolean;
+  showSubscriptionProgress: boolean;
+  language: string;
+  mainCurrencyId: string;
+  defaultCategoryId: string;
+  defaultPaymentMethodId: string;
+  budget: number;
+  notifyDaysBefore: number;
+  notificationTitle: string;
+  notificationBodyDueToday: string;
+  notificationBodyDueSoon: string;
+  notificationOverdueTitle: string;
+  notificationOverdueBody: string;
+  notificationSchedule: "any" | "morning" | "evening" | "custom";
+  notificationCustomHour: number;
+  recurringNotifications: boolean;
+  notificationSound: boolean;
+  currencyAutoUpdate: boolean;
+  currencyUpdateTargets: string[];
+  lastCurrencyUpdate: string;
+  dashboardWidgets: Array<{ id: string; visible: boolean }>;
+  subscriptionViewMode: "default" | "compact" | "expanded";
+  subscriptionGroupBy: "none" | "category" | "payment_method";
+  expenseViewMode: "default" | "compact" | "expanded";
+  currencyViewMode: "default" | "compact" | "expanded";
+  calendarViewMode: "default" | "compact" | "expanded";
+  converterPresets: number[];
+  rateHistoryEnabled: boolean;
+  rateHistoryDays: number;
+  customColors: CustomColors;
+}
+
+/** Alias: settings JSON from config store (same shape as `Settings`). */
+export type ConfigSettings = Settings;
+
+export interface NotificationSettings {
+  enabled: boolean;
+  daysBefore: number;
+}
+
+export interface StatsData {
+  activeSubscriptions: number;
+  inactiveSubscriptions: number;
+  totalCostPerMonth: number;
+  totalCostPerYear: number;
+  averageSubscriptionCost: number;
+  mostExpensive: { name: string; price: number; logo: string } | null;
+  amountDueThisMonth: number;
+  totalSavingsPerMonth: number;
+  budget: number;
+  budgetUsed: number | null;
+  budgetLeft: number | null;
+  overBudgetAmount: number | null;
+  categoryCosts: Array<{ label: string; value: number }>;
+  memberCosts: Array<{ label: string; value: number }>;
+  paymentMethodCounts: Array<{ label: string; value: number }>;
+}
+
+export interface CalendarDay {
+  day: number;
+  isToday: boolean;
+  isEmpty: boolean;
+  subscriptions: Array<{ id: string; name: string; price: number; currencyId: string }>;
+}
+
+export interface AppData {
+  subscriptions: Subscription[];
+  expenses: Expense[];
+  categories: Category[];
+  currencies: Currency[];
+  household: HouseholdMember[];
+  paymentMethods: PaymentMethod[];
+  tags: Tag[];
+  settings: Settings;
+  ratesApiKey: string;
+  ratesProvider: string;
+  fixerApiKey: string;
+  fixerProvider: number;
+  telegramBotToken: string;
+  telegramChatId: string;
+  telegramProxyUrl: string;
+  telegramEnabled: boolean;
+  initialized: boolean;
+}
+
+function asString(v: unknown, fallback = ""): string {
+  return typeof v === "string" ? v : fallback;
+}
+function asNumber(v: unknown, fallback = 0): number {
+  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+}
+function asBool(v: unknown, fallback = false): boolean {
+  return typeof v === "boolean" ? v : fallback;
+}
+function asArray<T>(v: unknown, map: (item: unknown, index: number) => T): T[] {
+  if (!Array.isArray(v)) return [];
+  return v.map(map);
+}
+
+function parseSubscriptionCredentials(raw: unknown): SubscriptionCredentials | undefined {
+  if (raw == null || typeof raw !== "object") return undefined;
+  const c = raw as Record<string, unknown>;
+  const login = asString(c.login);
+  const password = asString(c.password);
+  const totpSecret = asString(c.totpSecret);
+  if (!login.trim() && !password && !totpSecret.trim()) return undefined;
+  return { login, password, totpSecret };
+}
+
 export function parseSubscription(raw: unknown): Subscription {
-  return SubscriptionSchema.parse(raw);
-}
-
-/**
- * Parse a single tag.
- */
-export function parseTag(raw: unknown): Tag {
-  return TagSchema.parse(raw);
-}
-
-/**
- * Parse a single expense.
- */
-export function parseExpense(raw: unknown): Expense {
-  return ExpenseSchema.parse(raw);
-}
-
-/**
- * Parse a single category.
- */
-export function parseCategory(raw: unknown): Category {
-  return CategorySchema.parse(raw);
-}
-
-/**
- * Parse a single currency.
- */
-export function parseCurrency(raw: unknown): Currency {
-  return CurrencySchema.parse(raw);
-}
-
-/**
- * Parse a single household member.
- */
-export function parseHouseholdMember(raw: unknown): HouseholdMember {
-  return HouseholdMemberSchema.parse(raw);
-}
-
-/**
- * Parse a single payment method.
- */
-export function parsePaymentMethod(raw: unknown): PaymentMethod {
-  return PaymentMethodSchema.parse(raw);
-}
-
-/**
- * Parse settings object.
- */
-export function parseSettings(raw: unknown): Settings {
-  return SettingsSchema.parse(raw);
-}
-
-/**
- * Validate and sanitize full AppData from storage.
- * Returns clean data with all missing fields filled with defaults.
- * If data is completely invalid, returns null.
- */
-export function validateAppData(raw: unknown): AppData | null {
-  const result = AppDataSchema.safeParse(raw);
-  if (result.success) {
-    return result.data;
-  }
-  console.warn("AppData validation failed, attempting partial recovery:", result.error.issues);
-
-  // Try to recover: parse what we can with defaults for the rest
-  if (raw && typeof raw === "object") {
-    const obj = raw as Record<string, unknown>;
-    try {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const credentials = parseSubscriptionCredentials(r.credentials);
+  return {
+    id: asString(r.id),
+    name: asString(r.name),
+    logo: asString(r.logo),
+    price: asNumber(r.price, 0),
+    currencyId: asString(r.currencyId),
+    nextPayment: asString(r.nextPayment),
+    startDate: asString(r.startDate),
+    cycle: ([1, 2, 3, 4].includes(Number(r.cycle)) ? Number(r.cycle) : 3) as CycleType,
+    frequency: Math.max(1, Math.trunc(asNumber(r.frequency, 1))),
+    notes: asString(r.notes),
+    paymentMethodId: asString(r.paymentMethodId),
+    payerUserId: asString(r.payerUserId),
+    categoryId: asString(r.categoryId, "cat-1"),
+    notify: asBool(r.notify, true),
+    notifyDaysBefore: asNumber(r.notifyDaysBefore, 1),
+    lastNotifiedDate: asString(r.lastNotifiedDate),
+    inactive: asBool(r.inactive, false),
+    autoRenew: asBool(r.autoRenew, true),
+    url: asString(r.url),
+    cancellationDate: r.cancellationDate == null ? null : asString(r.cancellationDate),
+    replacementSubscriptionId: r.replacementSubscriptionId == null ? null : asString(r.replacementSubscriptionId),
+    createdAt: asString(r.createdAt),
+    tags: asArray<string>(r.tags, (item) => asString(item)).filter(Boolean),
+    favorite: asBool(r.favorite, false),
+    paymentHistory: asArray<PaymentRecord>(r.paymentHistory, (item) => {
+      const p = (item ?? {}) as Record<string, unknown>;
       return {
-        subscriptions: safeParseArray(obj.subscriptions, SubscriptionSchema, []),
-        expenses: safeParseArray(obj.expenses, ExpenseSchema, []),
-        categories: safeParseArray(obj.categories, CategorySchema, []),
-        currencies: safeParseArray(obj.currencies, CurrencySchema, []),
-        household: safeParseArray(obj.household, HouseholdMemberSchema, []),
-        paymentMethods: safeParseArray(obj.paymentMethods, PaymentMethodSchema, []),
-        tags: migrateTags(obj.tags),
-        settings: safeParseObj(obj.settings, SettingsSchema),
-        ratesApiKey: typeof obj.ratesApiKey === "string" ? obj.ratesApiKey : (typeof obj.fixerApiKey === "string" ? obj.fixerApiKey : ""),
-        ratesProvider: typeof obj.ratesProvider === "string" ? obj.ratesProvider : migrateFixerProvider(obj.fixerProvider),
-        fixerApiKey: typeof obj.fixerApiKey === "string" ? obj.fixerApiKey : "",
-        fixerProvider: typeof obj.fixerProvider === "number" ? obj.fixerProvider : 0,
-        telegramBotToken: typeof obj.telegramBotToken === "string" ? obj.telegramBotToken : "",
-        telegramChatId: typeof obj.telegramChatId === "string" ? obj.telegramChatId : "",
-        telegramEnabled: typeof obj.telegramEnabled === "boolean" ? obj.telegramEnabled : false,
-        initialized: true,
+        id: asString(p.id),
+        date: asString(p.date),
+        amount: asNumber(p.amount),
+        currencyId: asString(p.currencyId),
+        note: asString(p.note),
       };
-    } catch (e) {
-      console.warn("Partial recovery failed:", e);
-    }
-  }
-  return null;
+    }),
+    ...(credentials ? { credentials } : {}),
+  };
+}
+
+/** Строка списка подписок из `list_subscriptions_page`. */
+export function parseSubscriptionListItem(raw: unknown): SubscriptionListItem {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const base = parseSubscription(raw);
+  return {
+    ...base,
+    monthlyPrice: asNumber(r.monthlyPrice, 0),
+    daysLeft: asNumber(r.daysLeft, 0),
+    overdue: asBool(r.overdue, false),
+  };
+}
+
+export function parseExpense(raw: unknown): Expense {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const createdAt = expenseCreatedAtFromRaw(r);
+  const updatedRaw = r.updatedAt;
+  const updatedAt =
+    typeof updatedRaw === "number" && Number.isFinite(updatedRaw)
+      ? updatedRaw
+      : typeof updatedRaw === "string" && updatedRaw.trim() !== "" && Number.isFinite(Number(updatedRaw))
+        ? Number(updatedRaw)
+        : undefined;
+  return {
+    id: asString(r.id),
+    name: asString(r.name),
+    amount: asNumber(r.amount),
+    currencyId: asString(r.currencyId),
+    categoryId: asString(r.categoryId, "cat-1"),
+    paymentMethodId: asString(r.paymentMethodId),
+    payerUserId: asString(r.payerUserId),
+    tags: asArray<string>(r.tags, (item) => asString(item)).filter(Boolean),
+    notes: asString(r.notes),
+    url: asString(r.url),
+    createdAt,
+    subscriptionId: asString(r.subscriptionId),
+    paymentRecordId: asString(r.paymentRecordId),
+    ...(updatedAt !== undefined ? { updatedAt } : {}),
+  };
 }
 
 /**
- * Validate imported JSON data. Returns validated data or null if unrecoverable.
+ * Payload for `subscriptions_upsert` / loose imports: camelCase like Rust `SubscriptionInputDto`;
+ * extra JSON fields are ignored by serde on the backend.
+ * Uses a loose object type so form numeric fields (e.g. `cycle`) stay compatible with IPC JSON.
+ */
+export type SubscriptionUpsertPayload = Record<string, unknown>;
+
+/**
+ * Payload for `expenses_upsert`: camelCase like Rust `ExpenseInputDto`; extra keys ignored server-side.
+ */
+export type ExpenseUpsertPayload = Partial<Expense> & Record<string, unknown>;
+
+/**
+ * Structural checks aligned with Rust `validate_import_payload` (required catalogs, main currency, currency codes).
+ * Does not fully deserialize rows — backend still applies `parse_import_payload_json` + validation on import.
  */
 export function validateImportData(raw: unknown): AppData | null {
-  if (!raw || typeof raw !== "object") return null;
-  const obj = raw as Record<string, unknown>;
-  // Must have at least subscriptions to be a valid import
-  if (!Array.isArray(obj.subscriptions)) return null;
-  return validateAppData(raw);
-}
-
-// ---- Internal helpers ----
-
-function safeParseArray<T>(
-  raw: unknown,
-  schema: z.ZodType<T>,
-  fallback: T[],
-): T[] {
-  if (!Array.isArray(raw)) return fallback;
-  const result: T[] = [];
-  for (const item of raw) {
-    const parsed = schema.safeParse(item);
-    if (parsed.success) {
-      result.push(parsed.data);
-    } else {
-      console.warn("Skipping invalid array item:", parsed.error.issues);
-    }
-  }
-  return result.length > 0 ? result : fallback;
-}
-
-function safeParseObj<T>(
-  raw: unknown,
-  schema: z.ZodType<T>,
-): T {
-  const result = schema.safeParse(raw ?? {});
-  if (result.success) return result.data;
-  // Return default by parsing empty object
-  return schema.parse({});
-}
-
-/** Migrate old numeric fixerProvider to string RatesProviderType */
-function migrateFixerProvider(raw: unknown): string {
-  if (raw === 1) return "apilayer";
-  if (raw === 0) return "fixer";
-  return "frankfurter";
-}
-
-/** Migrate tags from old string[] format to new Tag[] format */
-function migrateTags(raw: unknown): Tag[] {
-  if (!Array.isArray(raw)) return [];
-  const result: Tag[] = [];
-  for (let i = 0; i < raw.length; i++) {
-    const item = raw[i];
-    if (typeof item === "string") {
-      // Old format: plain string => convert to Tag object
-      result.push(TagSchema.parse({ id: `tag-migrated-${i}`, name: item, order: i, favorite: true }));
-    } else {
-      const parsed = TagSchema.safeParse(item);
-      if (parsed.success) result.push(parsed.data);
-    }
-  }
-  return result;
+  const parsed = importJsonPayloadSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  return raw as AppData;
 }

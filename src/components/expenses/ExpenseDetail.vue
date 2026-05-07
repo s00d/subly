@@ -1,20 +1,25 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { useCatalogStore } from "@/stores/catalog";
-import { useSettingsStore } from "@/stores/settings";
+import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
-import { formatCurrency } from "@/services/calculations";
-import type { Expense, Currency } from "@/schemas/appData";
+import type { Expense, Currency, Category, PaymentMethod, HouseholdMember, Settings } from "@/schemas/appData";
+import { expenseToIsoDate } from "@/schemas/appData";
 import Modal from "@/components/ui/Modal.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
-import { Pencil, Trash2, Calendar, CreditCard, Tag, User, FileText, Hash, Wallet, Link2, ExternalLink, Link } from "lucide-vue-next";
+import { Pencil, Trash2, Calendar, CreditCard, Tag, User, FileText, Hash, Wallet, Link2, ExternalLink, Link } from "@lucide/vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 
 const props = defineProps<{
   show: boolean;
   expense: Expense | null;
+  lookupData: {
+    categories: Category[];
+    paymentMethods: PaymentMethod[];
+    household: HouseholdMember[];
+    currencies: Currency[];
+    settings: Settings;
+  };
 }>();
 
 const emit = defineEmits<{
@@ -24,47 +29,50 @@ const emit = defineEmits<{
   openUrl: [url: string];
 }>();
 
-const catalogStore = useCatalogStore();
-const settingsStore = useSettingsStore();
+const categories = ref<Category[]>([]);
+const paymentMethods = ref<PaymentMethod[]>([]);
+const household = ref<HouseholdMember[]>([]);
+const currencies = ref<Currency[]>([]);
+const settings = ref<Settings | null>(null);
 const { t } = useI18n();
-const { fmtDateFull } = useLocaleFormat();
+const { fmtDateFull, fmtCurrency } = useLocaleFormat();
 
 const exp = computed(() => props.expense);
 
 function fmt(price: number, currencyId: string): string {
-  const c = catalogStore.currencies.find((cur) => cur.id === currencyId);
-  return formatCurrency(price, c?.code || "USD", c?.symbol);
+  const c = currencies.value.find((cur) => cur.id === currencyId);
+  return fmtCurrency(price, c?.code || "USD");
 }
 
 function fmtCur(amount: number, currency: Currency): string {
-  return formatCurrency(amount, currency.code, currency.symbol);
+  return fmtCurrency(amount, currency.code);
 }
 
 const categoryName = computed(() =>
-  exp.value ? (catalogStore.categories.find((c) => c.id === exp.value!.categoryId)?.name || "") : ""
+  exp.value ? (categories.value.find((c) => c.id === exp.value!.categoryId)?.name || "") : ""
 );
 const categoryIcon = computed(() =>
-  exp.value ? (catalogStore.categories.find((c) => c.id === exp.value!.categoryId)?.icon || "") : ""
+  exp.value ? (categories.value.find((c) => c.id === exp.value!.categoryId)?.icon || "") : ""
 );
 const paymentMethod = computed(() =>
-  exp.value ? catalogStore.paymentMethods.find((p) => p.id === exp.value!.paymentMethodId) : null
+  exp.value ? paymentMethods.value.find((p) => p.id === exp.value!.paymentMethodId) : null
 );
 const payerName = computed(() =>
-  exp.value ? (catalogStore.household.find((h) => h.id === exp.value!.payerUserId)?.name || "") : ""
+  exp.value ? (household.value.find((h) => h.id === exp.value!.payerUserId)?.name || "") : ""
 );
 
 const targetCurrencies = computed(() => {
-  const mainId = settingsStore.settings.mainCurrencyId;
-  const targets = settingsStore.settings.currencyUpdateTargets ?? [];
+  const mainId = settings.value?.mainCurrencyId;
+  const targets = settings.value?.currencyUpdateTargets ?? [];
   const ids = new Set(targets);
   if (mainId) ids.add(mainId);
   return [...ids]
-    .map((id) => catalogStore.currencies.find((c) => c.id === id))
+    .map((id) => currencies.value.find((c) => c.id === id))
     .filter((c): c is Currency => !!c && c.rate > 0);
 });
 
 function convertAmount(amount: number, fromCurId: string, toCurrency: Currency): number {
-  const fromCur = catalogStore.currencies.find((c) => c.id === fromCurId);
+  const fromCur = currencies.value.find((c) => c.id === fromCurId);
   if (!fromCur || fromCur.rate <= 0) return 0;
   return (amount / fromCur.rate) * toCurrency.rate;
 }
@@ -88,6 +96,17 @@ async function handleOpenUrl(url: string) {
   const fullUrl = url.startsWith("http") ? url : `https://${url}`;
   try { await openUrl(fullUrl); } catch (e) { console.error("Failed to open URL:", e); }
 }
+watch(
+  () => props.lookupData,
+  (lookup) => {
+    categories.value = lookup.categories;
+    paymentMethods.value = lookup.paymentMethods;
+    household.value = lookup.household;
+    currencies.value = lookup.currencies;
+    settings.value = lookup.settings;
+  },
+  { immediate: true, deep: true },
+);
 </script>
 
 <template>
@@ -101,7 +120,7 @@ async function handleOpenUrl(url: string) {
         </div>
         <div class="flex-1 min-w-0">
           <h3 class="text-base font-semibold text-text-primary truncate">{{ exp.name }}</h3>
-          <p class="text-xs text-text-muted">{{ fmtDateFull(exp.date) }}</p>
+          <p class="text-xs text-text-muted">{{ fmtDateFull(expenseToIsoDate(exp)) }}</p>
         </div>
         <div class="text-right shrink-0">
           <p class="text-lg font-bold text-text-primary">{{ fmt(exp.amount, exp.currencyId) }}</p>
@@ -131,7 +150,7 @@ async function handleOpenUrl(url: string) {
             <Calendar :size="13" class="text-text-muted" />
             <span class="text-[10px] uppercase tracking-wide font-medium text-text-muted">{{ t('expense_date') }}</span>
           </div>
-          <p class="text-sm font-medium text-text-primary">{{ fmtDateFull(exp.date) }}</p>
+          <p class="text-sm font-medium text-text-primary">{{ fmtDateFull(expenseToIsoDate(exp)) }}</p>
         </div>
 
         <!-- Category -->

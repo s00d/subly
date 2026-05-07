@@ -1,29 +1,47 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useCatalogStore } from "@/stores/catalog";
-import { useSettingsStore } from "@/stores/settings";
-import { useSubscriptionsStore } from "@/stores/subscriptions";
+import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
+import { upsertCategory, deleteCategory as deleteCategoryApi, maxSortOrder } from "@/services/catalogClient";
+import type { Category, Settings } from "@/schemas/appData";
+import { useAppMetaStore } from "@/stores/appMetaStore";
 import AppInput from "@/components/ui/AppInput.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import IconPickerModal from "@/components/ui/IconPickerModal.vue";
-import { Trash2, Plus, ChevronUp, ChevronDown, Star, Search, ImageIcon } from "lucide-vue-next";
+import { Trash2, Plus, ChevronUp, ChevronDown, Star, Search, ImageIcon } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
+import { ui } from "@/lib/tv";
 
-const catalogStore = useCatalogStore();
-const settingsStore = useSettingsStore();
-const subsStore = useSubscriptionsStore();
+const props = defineProps<{
+  lookupData: {
+    categories: Category[];
+    settings: Settings;
+    categoryUsage: Record<string, number>;
+  } | null;
+}>();
 const { t } = useI18n();
 const { toast } = useToast();
+const metaStore = useAppMetaStore();
+const categories = ref<Category[]>([]);
+const settings = ref<Settings | null>(null);
+const categoryUsage = ref<Record<string, number>>({});
+watch(
+  () => props.lookupData,
+  (lookup) => {
+    categories.value = lookup?.categories ?? [];
+    settings.value = lookup?.settings ?? null;
+    categoryUsage.value = lookup?.categoryUsage ?? {};
+  },
+  { immediate: true, deep: true },
+);
 
 const catSearch = ref("");
 const isCatSearching = computed(() => catSearch.value.length > 0);
 
 /** Sorted: default category first, then by order */
 const sortedCategories = computed(() => {
-  const defId = settingsStore.settings.defaultCategoryId;
-  return [...catalogStore.categories].sort((a, b) => {
+  const defId = settings.value?.defaultCategoryId;
+  return [...categories.value].sort((a, b) => {
     // "No category" always first
     if (a.id === "cat-1" && b.id !== "cat-1") return -1;
     if (b.id === "cat-1" && a.id !== "cat-1") return 1;
@@ -40,7 +58,7 @@ const filteredCategories = computed(() => {
   return sortedCategories.value.filter((c) => c.name.toLowerCase().includes(q));
 });
 
-const isUsedCategory = (id: string) => subsStore.subscriptions.some((s) => s.categoryId === id);
+const isUsedCategory = (id: string) => (categoryUsage.value[id] ?? 0) > 0;
 const isDefaultItem = (c: { i18nKey?: string }) => !!c.i18nKey;
 
 // Icon picker
@@ -49,7 +67,7 @@ const iconPickerCatId = ref<string | null>(null);
 const iconPickerValue = ref("");
 
 function openIconPicker(catId: string) {
-  const cat = catalogStore.categories.find((c) => c.id === catId);
+  const cat = categories.value.find((c) => c.id === catId);
   iconPickerCatId.value = catId;
   iconPickerValue.value = cat?.icon || "";
   showIconPicker.value = true;
@@ -57,9 +75,9 @@ function openIconPicker(catId: string) {
 
 function onIconSelected(icon: string) {
   if (iconPickerCatId.value) {
-    const cat = catalogStore.categories.find((c) => c.id === iconPickerCatId.value);
+    const cat = categories.value.find((c) => c.id === iconPickerCatId.value);
     if (cat) {
-      catalogStore.updateCategory(cat.id, cat.name, icon);
+      updateCategory(cat.id, cat.name, icon);
       toast(t("success"));
     }
   }
@@ -67,38 +85,70 @@ function onIconSelected(icon: string) {
   iconPickerCatId.value = null;
 }
 
-function addCat() { catalogStore.addCategory("Category"); }
-function saveCat(id: string, name: string) { catalogStore.updateCategory(id, name); toast(t("success")); }
-function removeCat(id: string) {
-  if (!catalogStore.deleteCategory(id)) toast(t("error"), "error");
-  else toast(t("success"));
+async function addCat() {
+  const order = await maxSortOrder("categories");
+  const cat: Category = { id: crypto.randomUUID(), name: "Category", icon: "", sortOrder: order + 1, i18nKey: "" };
+  await upsertCategory(cat);
+  categories.value.push(cat);
+}
+async function updateCategory(id: string, name: string, icon?: string) {
+  const cat = categories.value.find((c) => c.id === id);
+  if (!cat) return;
+  const next = { ...cat, name, icon: icon ?? cat.icon };
+  await upsertCategory(next);
+  Object.assign(cat, next);
+}
+async function saveCat(id: string, name: string) { await updateCategory(id, name); toast(t("success")); }
+async function removeCat(id: string) {
+  if (isUsedCategory(id) || id === "cat-1") {
+    toast(t("category_cannot_delete"), "error");
+    return;
+  }
+  await deleteCategoryApi(id);
+  categories.value = categories.value.filter((c) => c.id !== id);
+  toast(t("success"));
 }
 
-function moveCatUp(id: string) {
+async function moveCatUp(id: string) {
   const ids = sortedCategories.value.map((c) => c.id);
   const idx = ids.indexOf(id);
   if (idx <= 0) return;
   [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
-  catalogStore.reorderCategories(ids);
+  await reorderCategories(ids);
 }
 
-function moveCatDown(id: string) {
+async function moveCatDown(id: string) {
   const ids = sortedCategories.value.map((c) => c.id);
   const idx = ids.indexOf(id);
   if (idx < 0 || idx >= ids.length - 1) return;
   [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
-  catalogStore.reorderCategories(ids);
+  await reorderCategories(ids);
 }
 
 function getCatIcon(id: string): string {
-  return catalogStore.categories.find((c) => c.id === id)?.icon || "";
+  return categories.value.find((c) => c.id === id)?.icon || "";
+}
+async function reorderCategories(ids: string[]) {
+  for (let i = 0; i < ids.length; i += 1) {
+    const cat = categories.value.find((c) => c.id === ids[i]);
+    if (!cat) continue;
+    const next = { ...cat, sortOrder: i };
+    await upsertCategory(next);
+    Object.assign(cat, next);
+  }
+}
+async function setDefaultCategory(id: string) {
+  if (!settings.value) return;
+  const next = { ...settings.value, defaultCategoryId: id };
+  settings.value = next;
+  await metaStore.updateSettings(next);
 }
 </script>
 
 <template>
   <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
     <div class="flex items-center justify-between gap-2 mb-3">
-      <h2 class="text-base sm:text-lg font-semibold text-text-primary shrink-0">{{ t('categories') }}</h2>
+      <h2 :class="[ui.sectionTitle(), 'shrink-0']">{{ t('categories') }}</h2>
       <div class="relative w-32 sm:w-44">
         <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
         <input v-model="catSearch" type="text" :placeholder="t('search')" class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow" />
@@ -109,7 +159,7 @@ function getCatIcon(id: string): string {
         v-for="(c, idx) in filteredCategories"
         :key="c.id"
         class="flex gap-2 items-center rounded-lg px-2 py-1"
-        :class="c.id === settingsStore.settings.defaultCategoryId ? 'bg-primary-light/50' : ''"
+        :class="c.id === settings?.defaultCategoryId ? 'bg-primary-light/50' : ''"
       >
         <!-- Move buttons (not for cat-1 "No category") -->
         <div v-if="!isCatSearching && c.id !== 'cat-1'" class="flex flex-row sm:flex-col shrink-0">
@@ -120,8 +170,8 @@ function getCatIcon(id: string): string {
 
         <!-- Primary star -->
         <Tooltip :text="t('set_as_primary')">
-          <button @click="settingsStore.updateSettings({ defaultCategoryId: c.id })" class="p-1 rounded-lg transition-colors shrink-0" :class="c.id === settingsStore.settings.defaultCategoryId ? 'text-yellow-500' : 'text-text-muted hover:text-yellow-500'">
-            <Star :size="14" :fill="c.id === settingsStore.settings.defaultCategoryId ? 'currentColor' : 'none'" />
+          <button @click="setDefaultCategory(c.id)" class="p-1 rounded-lg transition-colors shrink-0" :class="c.id === settings?.defaultCategoryId ? 'text-yellow-500' : 'text-text-muted hover:text-yellow-500'">
+            <Star :size="14" :fill="c.id === settings?.defaultCategoryId ? 'currentColor' : 'none'" />
           </button>
         </Tooltip>
 

@@ -1,0 +1,62 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Frontend typecheck
+        run: pnpm exec vue-tsc --noEmit
+
+      - name: Rust cargo check
+        run: cargo check --manifest-path src-tauri/Cargo.toml
+
+      - name: Run backend test suite
+        run: |
+          set -o pipefail
+          pnpm test:backend 2>&1 | tee backend-tests.log
+
+      - name: Run restart smoke suite
+        run: |
+          set -o pipefail
+          pnpm test:restart-smoke 2>&1 | tee restart-smoke.log
+
+      - name: Run known-risk suite (allowed to fail)
+        run: |
+          set -o pipefail
+          pnpm test:known-risks 2>&1 | tee known-risks.log || true
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: restart-stability-test-logs
+          path: |
+            backend-tests.log
+            restart-smoke.log
+            known-risks.log

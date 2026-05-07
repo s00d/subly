@@ -1,16 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
-import { useSubscriptionsStore } from "@/stores/subscriptions";
-import { useExpensesStore } from "@/stores/expenses";
-import { useSettingsStore } from "@/stores/settings";
-import { useCatalogStore } from "@/stores/catalog";
 import { useI18n } from "vue-i18n";
 import { useHeaderActions } from "@/composables/useHeaderActions";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useToast } from "@/composables/useToast";
 import { useScrollLock } from "@/composables/useScrollLock";
-import { getPaymentDatesInMonth, convertPrice } from "@/services/calculations";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import CalendarHeader from "@/components/calendar/CalendarHeader.vue";
 import CalendarGrid from "@/components/calendar/CalendarGrid.vue";
@@ -22,20 +17,33 @@ import SubscriptionForm from "@/components/subscriptions/SubscriptionForm.vue";
 import ExpenseDetail from "@/components/expenses/ExpenseDetail.vue";
 import ExpenseForm from "@/components/expenses/ExpenseForm.vue";
 import Toast from "@/components/ui/Toast.vue";
-import type { Subscription, Expense } from "@/schemas/appData";
-import { dbGetExpensesForMonth } from "@/services/database";
-import { AlertTriangle, LayoutList, LayoutGrid, Rows3, CreditCard, Wallet } from "lucide-vue-next";
+import { type Subscription, type Expense, type Settings, type Category, type PaymentMethod, type Currency, type HouseholdMember, type Tag } from "@/schemas/appData";
+import { deleteExpense } from "@/services/expensesClient";
+import { storeToRefs } from "pinia";
+import { AlertTriangle, LayoutList, LayoutGrid, Rows3, CreditCard, Wallet } from "@lucide/vue";
+import { useAppMetaStore } from "@/stores/appMetaStore";
+import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
+import { useCalendarStore } from "@/stores/calendarStore";
+import { ui } from "@/lib/tv";
+import { formatErrorForToast } from "@/utils/formatError";
 
-const subsStore = useSubscriptionsStore();
-const expsStore = useExpensesStore();
-const settingsStore = useSettingsStore();
-const catalogStore = useCatalogStore();
 const { t } = useI18n();
 const { setActions, clearActions } = useHeaderActions();
-const { fmt: fmtMain, getCurrencyRate } = useCurrencyFormat();
+const { fmt: fmtMain, toMainCurrency } = useCurrencyFormat();
 const { fmtMonthYear, fmtDateMedium } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 const pageLogPrefix = "[CalendarPage]";
+const metaStore = useAppMetaStore();
+const subscriptionsStore = useSubscriptionsStore();
+const calendarStore = useCalendarStore();
+const metaRefs = storeToRefs(metaStore);
+const settings = computed(() => metaRefs.settings.value);
+const categories = computed(() => metaRefs.categories.value ?? []);
+const paymentMethods = computed(() => metaRefs.paymentMethods.value ?? []);
+const currencies = computed(() => metaRefs.currencies.value ?? []);
+const household = computed(() => metaRefs.household.value ?? []);
+const tags = computed(() => metaRefs.tags.value ?? []);
+const subscriptions = computed(() => subscriptionsStore.items);
 
 function logPageError(scope: string, error: unknown, extra?: Record<string, unknown>) {
   console.error(`${pageLogPrefix} ${scope}`, {
@@ -45,7 +53,10 @@ function logPageError(scope: string, error: unknown, extra?: Record<string, unkn
 }
 
 onMounted(() => {
-  updateHeaderActions();
+  loadInitial().then(() => {
+    updateHeaderActions();
+    loadMonthExpenses();
+  });
 });
 onUnmounted(() => {
   clearActions();
@@ -70,7 +81,7 @@ const currentMonthLabel = computed(() => {
   }
   return fmtMonthYear(new Date(currentYear.value, currentMonth.value, 1));
 });
-const viewMode = computed(() => settingsStore.settings.calendarViewMode || "default");
+const viewMode = computed(() => settings.value?.calendarViewMode || "default");
 const isCompactView = computed(() => viewMode.value === "compact");
 
 const isCurrentMonth = computed(() =>
@@ -85,9 +96,6 @@ function prevMonth() {
   if (isCompactView.value) {
     const weeks = monthWeeks.value;
     if (weeks.length === 0) return;
-    if (currentMonth.value === now.getMonth() && currentYear.value === now.getFullYear() && compactWeekIndex.value <= currentWeekMonthIndex.value) {
-      return;
-    }
     if (compactWeekIndex.value > 0) {
       compactWeekIndex.value -= 1;
       return;
@@ -102,18 +110,11 @@ function prevMonth() {
     return;
   }
 
-  if (isCurrentMonth.value) return;
   if (currentMonth.value === 0) {
     currentMonth.value = 11;
     currentYear.value--;
   } else {
     currentMonth.value--;
-  }
-  const cur = new Date(now.getFullYear(), now.getMonth(), 1);
-  const sel = new Date(currentYear.value, currentMonth.value, 1);
-  if (sel < cur) {
-    currentMonth.value = now.getMonth();
-    currentYear.value = now.getFullYear();
   }
 }
 
@@ -148,7 +149,7 @@ function resetMonth() {
 }
 
 function setViewMode(mode: "default" | "compact" | "expanded") {
-  settingsStore.updateSettings({ calendarViewMode: mode });
+  updateSettings({ calendarViewMode: mode });
 }
 
 function updateHeaderActions() {
@@ -165,19 +166,23 @@ function updateHeaderActions() {
 watch(viewMode, updateHeaderActions);
 
 // --- Grid ---
-const monthExpenses = ref<Expense[]>([]);
+const monthExpenses = computed(() => calendarStore.monthExpenses);
+const subscriptionPaymentDaysById = computed(() => calendarStore.paymentDaysBySubId);
 
 async function loadMonthExpenses() {
-  const monthStr = `${currentYear.value}-${String(currentMonth.value + 1).padStart(2, "0")}`;
   try {
-    monthExpenses.value = await dbGetExpensesForMonth(monthStr);
+    await calendarStore.loadMonth(currentYear.value, currentMonth.value + 1);
   } catch (e) {
-    logPageError("loadMonthExpenses failed", e, { month: monthStr });
+    logPageError("loadMonthExpenses failed", e, { year: currentYear.value, month: currentMonth.value + 1 });
   }
 }
 
-watch([currentYear, currentMonth], loadMonthExpenses);
-onMounted(() => loadMonthExpenses());
+watch([currentYear, currentMonth], () => {
+  loadMonthExpenses();
+});
+onMounted(() => {
+  // initialized in global onMounted after app data is loaded
+});
 
 const calendarGrid = computed<CalendarCell[]>(() => {
   const year = currentYear.value;
@@ -190,11 +195,11 @@ const calendarGrid = computed<CalendarCell[]>(() => {
   const todayMonth = today.getMonth();
   const todayYear = today.getFullYear();
 
-  const activeSubs = subsStore.subscriptions.filter((s) => !s.inactive);
+  const activeSubs = subscriptions.value.filter((s) => !s.inactive);
   const subsByDay: Record<number, CalendarCell["subs"]> = {};
 
   for (const sub of activeSubs) {
-    const days = getPaymentDatesInMonth(sub, year, month);
+    const days = subscriptionPaymentDaysById.value[sub.id] || [];
     for (const d of days) {
       if (!subsByDay[d]) subsByDay[d] = [];
       subsByDay[d].push({ id: sub.id, name: sub.name, price: sub.price, currencyId: sub.currencyId, logo: sub.logo });
@@ -203,10 +208,10 @@ const calendarGrid = computed<CalendarCell[]>(() => {
 
   const expByDay: Record<number, { id: string; name: string; amount: number; currencyId: string; icon?: string }[]> = {};
   for (const exp of monthExpenses.value) {
-    const d = parseInt(exp.date.split("-")[2], 10);
+    const d = parseInt(String(exp.createdAt).slice(8, 10), 10) || 0;
     if (!expByDay[d]) expByDay[d] = [];
-    const categoryIcon = catalogStore.categories.find((c) => c.id === exp.categoryId)?.icon || "";
-    const paymentIcon = catalogStore.paymentMethods.find((p) => p.id === exp.paymentMethodId)?.icon || "";
+    const categoryIcon = categories.value.find((c) => c.id === exp.categoryId)?.icon || "";
+    const paymentIcon = paymentMethods.value.find((p) => p.id === exp.paymentMethodId)?.icon || "";
     expByDay[d].push({ id: exp.id, name: exp.name, amount: exp.amount, currencyId: exp.currencyId, icon: categoryIcon || paymentIcon });
   }
 
@@ -271,7 +276,7 @@ const monthStats = computed(() => {
   for (const cell of calendarGrid.value) {
     if (cell.isEmpty) continue;
     for (const sub of cell.subs) {
-      const converted = convertPrice(sub.price, getCurrencyRate(sub.currencyId));
+      const converted = toMainCurrency(sub.price, sub.currencyId);
       totalCost += converted;
       count++;
       const cellDate = new Date(currentYear.value, currentMonth.value, cell.day);
@@ -280,7 +285,7 @@ const monthStats = computed(() => {
       }
     }
     for (const exp of (cell.expenses || [])) {
-      const converted = convertPrice(exp.amount, getCurrencyRate(exp.currencyId));
+      const converted = toMainCurrency(exp.amount, exp.currencyId);
       totalCost += converted;
       count++;
     }
@@ -300,6 +305,49 @@ const dayModalTitle = computed(() => {
   if (!selectedDay.value) return "";
   return fmtDateMedium(new Date(currentYear.value, currentMonth.value, selectedDay.value.day).toISOString());
 });
+const subscriptionLookupData = computed(() => {
+  if (!settings.value) return null;
+  return {
+    categories: categories.value,
+    paymentMethods: paymentMethods.value,
+    household: household.value,
+    currencies: currencies.value,
+    settings: settings.value,
+  };
+});
+const subscriptionFormLookupData = computed(() => {
+  if (!settings.value) return null;
+  return {
+    settings: settings.value,
+    currencies: currencies.value,
+    paymentMethods: paymentMethods.value,
+    household: household.value,
+    categories: categories.value,
+    tags: tags.value,
+  };
+});
+const expenseLookupData = computed(() => {
+  if (!settings.value) return null;
+  return {
+    categories: categories.value,
+    paymentMethods: paymentMethods.value,
+    household: household.value,
+    currencies: currencies.value,
+    settings: settings.value,
+  };
+});
+const expenseFormLookupData = computed(() => {
+  if (!settings.value) return null;
+  return {
+    settings: settings.value,
+    currencies: currencies.value,
+    paymentMethods: paymentMethods.value,
+    household: household.value,
+    categories: categories.value,
+    tags: tags.value,
+    expensesCount: monthExpenses.value.length,
+  };
+});
 const expandedDays = computed(() => calendarGrid.value.filter(
   (cell) => !cell.isEmpty && (cell.subs.length > 0 || (cell.expenses?.length || 0) > 0),
 ));
@@ -313,7 +361,7 @@ const detailSub = ref<Subscription | null>(null);
 const showDetail = ref(false);
 
 function openSubDetail(subId: string) {
-  const sub = subsStore.subscriptions.find((s) => s.id === subId);
+  const sub = subscriptions.value.find((s) => s.id === subId);
   if (sub) {
     selectedDay.value = null;
     detailSub.value = sub;
@@ -338,14 +386,18 @@ function handleEdit(sub: Subscription) {
 
 function handleClone(id: string) {
   closeDetail();
-  subsStore.cloneSubscription(id);
-  toast(t("subscription_added"));
+  subscriptionsStore.cloneById(id).then(async () => {
+    await loadMonthExpenses();
+    toast(t("subscription_added"));
+  });
 }
 
 function handleRenew(id: string) {
   closeDetail();
-  subsStore.renewSubscription(id);
-  toast(t("payment_recorded"));
+  subscriptionsStore.recordPayment(id).then(async () => {
+    await loadMonthExpenses();
+    toast(t("payment_recorded"));
+  });
 }
 
 // --- Delete ---
@@ -356,12 +408,19 @@ function handleDelete(id: string) {
   deleteConfirmId.value = id;
 }
 
-function confirmDelete() {
-  if (deleteConfirmId.value) {
-    subsStore.deleteSubscription(deleteConfirmId.value);
-    toast(t("subscription_deleted"));
+async function confirmDelete() {
+  try {
+    if (deleteConfirmId.value) {
+      await subscriptionsStore.deleteById(deleteConfirmId.value);
+      await loadMonthExpenses();
+      toast(t("subscription_deleted"));
+    }
+  } catch (e) {
+    logPageError("confirmDelete failed", e, { subscriptionId: deleteConfirmId.value });
+    toast(formatErrorForToast(e, t), "error");
+  } finally {
+    deleteConfirmId.value = null;
   }
-  deleteConfirmId.value = null;
 }
 
 function cancelDelete() {
@@ -372,6 +431,7 @@ function handleOpenUrl(url: string) {
   const fullUrl = url.startsWith("http") ? url : `https://${url}`;
   openUrl(fullUrl).catch((e) => {
     logPageError("handleOpenUrl failed", e, { url: fullUrl });
+    toast(formatErrorForToast(e, t), "error");
   });
 }
 
@@ -413,7 +473,7 @@ async function onExpSaved() {
     await loadMonthExpenses();
   } catch (e) {
     logPageError("onExpSaved failed", e);
-    toast(t("error"), "error");
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 
@@ -430,13 +490,13 @@ function handleExpDelete(id: string) {
 async function confirmExpDelete() {
   try {
     if (deleteExpConfirmId.value) {
-      await expsStore.deleteExpense(deleteExpConfirmId.value);
+      await deleteExpense(deleteExpConfirmId.value);
       toast(t("expense_deleted"));
       await loadMonthExpenses();
     }
   } catch (e) {
     logPageError("confirmExpDelete failed", e, { expenseId: deleteExpConfirmId.value });
-    toast(t("error"), "error");
+    toast(formatErrorForToast(e, t), "error");
   } finally {
     deleteExpConfirmId.value = null;
   }
@@ -450,7 +510,29 @@ async function handleExpOpenUrl(url: string) {
   const fullUrl = url.startsWith("http") ? url : `https://${url}`;
   openUrl(fullUrl).catch((e) => {
     logPageError("handleExpOpenUrl failed", e, { url: fullUrl });
+    toast(formatErrorForToast(e, t), "error");
   });
+}
+
+async function updateSettings(updates: Partial<Settings>) {
+  if (!settings.value) return;
+  await metaStore.updateSettings({ ...settings.value, ...updates });
+}
+
+async function loadInitial() {
+  await metaStore.ensureLoaded();
+  await subscriptionsStore.loadBrief();
+}
+
+async function onDetailToggleFavorite(id: string) {
+  await subscriptionsStore.toggleFavorite(id);
+  detailSub.value = subscriptions.value.find((s) => s.id === id) || null;
+}
+
+async function onDetailRecordPayment(id: string) {
+  await subscriptionsStore.recordPayment(id);
+  await loadMonthExpenses();
+  detailSub.value = subscriptions.value.find((s) => s.id === id) || null;
 }
 </script>
 
@@ -496,13 +578,13 @@ async function handleExpOpenUrl(url: string) {
             v-for="exp in cell.expenses"
             :key="exp.id"
             @click.stop="openExpDetail(exp.id)"
-            class="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg border border-border bg-surface text-text-primary text-xs font-medium hover:bg-surface-hover transition-colors"
+            class="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-medium hover:bg-amber-600 transition-colors"
           >
             <span class="inline-flex items-center gap-1.5 min-w-0">
-              <Wallet :size="12" class="shrink-0 text-amber-500" />
+              <Wallet :size="12" class="shrink-0" />
               <span class="truncate">{{ exp.name }}</span>
             </span>
-            <span class="shrink-0 text-amber-500">{{ fmtMain(exp.amount, exp.currencyId) }}</span>
+            <span class="shrink-0 opacity-90">{{ fmtMain(exp.amount, exp.currencyId) }}</span>
           </button>
         </div>
       </div>
@@ -544,11 +626,11 @@ async function handleExpOpenUrl(url: string) {
           <div
             v-for="exp in (cell.expenses || []).slice(0, 2)"
             :key="`compact-exp-${exp.id}`"
-            class="flex items-center gap-1.5 px-2 py-1 rounded border border-border bg-surface text-text-primary text-[11px] font-medium"
+            class="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-500 text-white text-[11px] font-medium"
           >
-            <Wallet :size="11" class="shrink-0 text-amber-500" />
+            <Wallet :size="11" class="shrink-0" />
             <span class="truncate">{{ exp.name }}</span>
-            <span class="ml-auto shrink-0 text-amber-500">{{ fmtMain(exp.amount, exp.currencyId) }}</span>
+            <span class="ml-auto shrink-0 opacity-90">{{ fmtMain(exp.amount, exp.currencyId) }}</span>
           </div>
           <div v-if="cell.subs.length + (cell.expenses?.length || 0) > 4" class="text-[10px] text-text-muted pl-1">
             +{{ cell.subs.length + (cell.expenses?.length || 0) - 4 }}
@@ -582,44 +664,41 @@ async function handleExpOpenUrl(url: string) {
 
     <!-- Subscription detail -->
     <SubscriptionDetail
+      v-if="subscriptionLookupData"
       :show="showDetail"
       :subscription="detailSub"
+      :lookupData="subscriptionLookupData"
       @close="closeDetail"
       @edit="handleEdit"
       @clone="handleClone"
       @renew="handleRenew"
       @delete="handleDelete"
       @openUrl="handleOpenUrl"
-      @toggleFavorite="(id: string) => { subsStore.toggleFavorite(id); if (detailSub && detailSub.id === id) detailSub = { ...subsStore.subscriptions.find((s) => s.id === id)! }; }"
-      @recordPayment="(id: string) => { subsStore.recordPayment(id); if (detailSub && detailSub.id === id) detailSub = { ...subsStore.subscriptions.find((s) => s.id === id)! }; }"
+      @toggleFavorite="onDetailToggleFavorite"
+      @recordPayment="onDetailRecordPayment"
     />
 
     <!-- Edit / Add form -->
     <SubscriptionForm
+      v-if="subscriptionFormLookupData"
       :show="showForm"
       :edit-subscription="editingSub"
+      :lookupData="subscriptionFormLookupData"
       @close="showForm = false"
       @saved="onSaved"
     />
 
     <!-- Delete confirmation modal -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="app-modal">
         <div v-if="deleteConfirmId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div class="absolute inset-0 bg-black/50" @click="cancelDelete" />
-          <div class="relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
+          <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="cancelDelete" />
+          <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
             <div class="flex items-center gap-3 mb-3 sm:mb-4">
               <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                 <AlertTriangle :size="18" class="text-red-500" />
               </div>
-              <h3 class="text-base sm:text-lg font-semibold text-text-primary">{{ t('delete') }}</h3>
+              <h3 :class="ui.sectionTitle()">{{ t('delete') }}</h3>
             </div>
             <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('confirm_delete_subscription') }}</p>
             <div class="flex justify-end gap-2 sm:gap-3">
@@ -633,8 +712,10 @@ async function handleExpOpenUrl(url: string) {
 
     <!-- Expense detail -->
     <ExpenseDetail
+      v-if="expenseLookupData"
       :show="showExpDetail"
       :expense="detailExp"
+      :lookupData="expenseLookupData"
       @close="closeExpDetail"
       @edit="handleExpEdit"
       @delete="handleExpDelete"
@@ -643,30 +724,25 @@ async function handleExpOpenUrl(url: string) {
 
     <!-- Expense edit form -->
     <ExpenseForm
+      v-if="expenseFormLookupData"
       :show="showExpForm"
       :editExpense="editingExp"
+      :lookupData="expenseFormLookupData"
       @close="showExpForm = false"
       @saved="onExpSaved"
     />
 
     <!-- Expense delete confirmation -->
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="app-modal">
         <div v-if="deleteExpConfirmId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div class="absolute inset-0 bg-black/50" @click="cancelExpDelete" />
-          <div class="relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
+          <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="cancelExpDelete" />
+          <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
             <div class="flex items-center gap-3 mb-3 sm:mb-4">
               <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                 <AlertTriangle :size="18" class="text-red-500" />
               </div>
-              <h3 class="text-base sm:text-lg font-semibold text-text-primary">{{ t('delete') }}</h3>
+              <h3 :class="ui.sectionTitle()">{{ t('delete') }}</h3>
             </div>
             <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('confirm_delete_expense') }}</p>
             <div class="flex justify-end gap-2 sm:gap-3">

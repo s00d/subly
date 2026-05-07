@@ -255,6 +255,27 @@ A GitHub Actions workflow is configured in `.github/workflows/build.yml` for aut
 
 Releases are created automatically when a `v*` tag is pushed.
 
+### Restart Stability Test Suite
+
+The project includes restart-focused persistence diagnostics:
+
+```bash
+# Core backend suite (must-pass)
+pnpm test:backend
+
+# Restart smoke scenarios (must-pass)
+pnpm test:restart-smoke
+
+# Known architectural risks (expected to fail until fixed)
+pnpm test:known-risks
+```
+
+Artifacts and non-blocking known-risk logs are collected in `.github/workflows/tests.yml`.
+
+See:
+- `docs/restart-risk-matrix.md`
+- `docs/restart-smoke-scenarios.md`
+
 ---
 
 ## License

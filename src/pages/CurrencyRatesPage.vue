@@ -1,28 +1,29 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { useSettingsStore } from "@/stores/settings";
-import { useCatalogStore } from "@/stores/catalog";
 import { useToast } from "@/composables/useToast";
 import { useClipboard } from "@/composables/useClipboard";
 import { useHeaderActions } from "@/composables/useHeaderActions";
-import { updateCurrencyRates } from "@/services/rates";
-import type { RatesProviderType } from "@/services/rates";
+import { getCurrencyFlags, ratesRunBackendUpdate } from "@/services/ratesClient";
+import { storeToRefs } from "pinia";
+import type { Settings } from "@/schemas/appData";
+import { useAppMetaStore } from "@/stores/appMetaStore";
 import Toast from "@/components/ui/Toast.vue";
+import { typo } from "@/lib/tv";
 import Tooltip from "@/components/ui/Tooltip.vue";
+import { formatErrorForToast } from "@/utils/formatError";
 import AppSlider from "@/components/ui/AppSlider.vue";
 import ExpenseForm from "@/components/expenses/ExpenseForm.vue";
 import {
-  RefreshCw, ClipboardCopy, ArrowRightLeft, TrendingUp,
+  RefreshCw, Copy, ArrowRightLeft, TrendingUp,
   Search, Star, Check, Plus, RotateCcw, ChevronUp, ChevronDown, ArrowUpDown, LayoutList, LayoutGrid, Rows3, Hash, Type, CircleDollarSign, CheckSquare, Square,
-} from "lucide-vue-next";
-import { useConverterStore } from "@/stores/converter";
-import { currencyFlag } from "@/services/currencyFlags";
+} from "@lucide/vue";
 
 const { t } = useI18n();
-const settingsStore = useSettingsStore();
-const catalogStore = useCatalogStore();
-const converterStore = useConverterStore();
+const metaStore = useAppMetaStore();
+const { settings, currencies, paymentMethods, household, categories, tags } = storeToRefs(metaStore);
+const converterBaseAmount = ref(1);
+const converterOrder = ref<string[]>([]);
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 const { copyToClipboard } = useClipboard();
 const { setActions, clearActions } = useHeaderActions();
@@ -37,6 +38,7 @@ onUnmounted(() => {
 const searchQuery = ref("");
 const isUpdating = ref(false);
 const copiedId = ref<string | null>(null);
+const currencyFlags = ref<Record<string, string>>({});
 
 type RateSortKey = "code" | "name" | "rate" | "enabled";
 const rateSortBy = ref<RateSortKey>("enabled");
@@ -56,11 +58,16 @@ function getSortIcon(key: RateSortKey) {
 
 const showExpenseForm = ref(false);
 const expensePrefill = ref<{ amount: number; currencyId: string; name: string } | null>(null);
-const viewMode = computed(() => settingsStore.settings.currencyViewMode || "default");
+const viewMode = computed(() => settings.value?.currencyViewMode || "default");
 const isCompactView = computed(() => viewMode.value === "compact");
 
+async function updateSettings(updates: Partial<Settings>) {
+  if (!settings.value) return;
+  await metaStore.updateSettings({ ...settings.value, ...updates });
+}
+
 function setViewMode(mode: "default" | "compact" | "expanded") {
-  settingsStore.updateSettings({ currencyViewMode: mode });
+  updateSettings({ currencyViewMode: mode });
 }
 
 function updateHeaderActions() {
@@ -78,17 +85,40 @@ function updateHeaderActions() {
 watch(viewMode, updateHeaderActions);
 watch(isUpdating, updateHeaderActions);
 
+async function refreshCurrencyFlags() {
+  const codes = [...new Set(currencies.value.map((c) => c.code).filter(Boolean))];
+  currencyFlags.value = codes.length ? await getCurrencyFlags(codes) : {};
+}
+
+function flagFor(code: string): string {
+  return currencyFlags.value[code.toUpperCase()] || "";
+}
+
 const baseAmount = computed({
-  get: () => converterStore.baseAmount,
-  set: (v: number) => { converterStore.baseAmount = v; },
+  get: () => converterBaseAmount.value,
+  set: (v: number) => { converterBaseAmount.value = v; },
 });
 const editingId = ref<string | null>(null);
 
-const mainCurrency = computed(() => catalogStore.mainCurrency);
-const otherCurrencies = computed(() =>
-  catalogStore.currencies.filter((c) => c.id !== settingsStore.settings.mainCurrencyId),
+const mainCurrency = computed(() =>
+  currencies.value.find((c) => c.id === settings.value?.mainCurrencyId) ?? null,
 );
-const selectedTargetIds = computed(() => settingsStore.settings.currencyUpdateTargets);
+const otherCurrencies = computed(() =>
+  currencies.value.filter((c) => c.id !== settings.value?.mainCurrencyId),
+);
+const selectedTargetIds = computed(() => settings.value?.currencyUpdateTargets ?? []);
+const expenseFormLookupData = computed(() => {
+  if (!settings.value) return null;
+  return {
+    settings: settings.value,
+    currencies: currencies.value,
+    paymentMethods: paymentMethods.value,
+    household: household.value,
+    categories: categories.value,
+    tags: tags.value,
+    expensesCount: 0,
+  };
+});
 
 interface ConverterCurrency {
   id: string;
@@ -103,25 +133,25 @@ const allConverterIds = computed(() => {
   const base = mainCurrency.value;
   if (!base) return [];
   return [base.id, ...selectedTargetIds.value.filter((id) => {
-    const c = catalogStore.currencies.find((cur) => cur.id === id);
+    const c = currencies.value.find((cur) => cur.id === id);
     return c && c.rate > 0;
   })];
 });
 
 watch(allConverterIds, (ids) => {
-  const current = converterStore.order;
+  const current = converterOrder.value;
   if (current.length === 0 || ids.length !== current.length || !ids.every((id) => current.includes(id))) {
-    converterStore.setOrder(ids);
+    converterOrder.value = [...ids];
   }
 }, { immediate: true });
 
 const converterCurrencies = computed<ConverterCurrency[]>(() => {
   const base = mainCurrency.value;
   if (!base) return [];
-  const ordered = converterStore.order.length ? converterStore.order : allConverterIds.value;
+  const ordered = converterOrder.value.length ? converterOrder.value : allConverterIds.value;
   return ordered
     .map((id) => {
-      const c = catalogStore.currencies.find((cur) => cur.id === id);
+      const c = currencies.value.find((cur) => cur.id === id);
       if (!c) return null;
       return {
         id: c.id, code: c.code, name: c.name, symbol: c.symbol,
@@ -130,6 +160,28 @@ const converterCurrencies = computed<ConverterCurrency[]>(() => {
     })
     .filter((x): x is ConverterCurrency => x !== null);
 });
+
+function moveConverterUp(id: string) {
+  const idx = converterOrder.value.indexOf(id);
+  if (idx > 0) {
+    const arr = [...converterOrder.value];
+    [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
+    converterOrder.value = arr;
+  }
+}
+
+function moveConverterDown(id: string) {
+  const idx = converterOrder.value.indexOf(id);
+  if (idx >= 0 && idx < converterOrder.value.length - 1) {
+    const arr = [...converterOrder.value];
+    [arr[idx], arr[idx + 1]] = [arr[idx + 1], arr[idx]];
+    converterOrder.value = arr;
+  }
+}
+
+function resetConverter() {
+  converterBaseAmount.value = 1;
+}
 
 function getRawValue(cur: ConverterCurrency): number {
   return cur.isBase ? baseAmount.value : baseAmount.value * cur.rate;
@@ -222,29 +274,29 @@ const allRates = computed(() => {
   });
 });
 
-const lastUpdate = computed(() => settingsStore.settings.lastCurrencyUpdate || t("never"));
+const lastUpdate = computed(() => settings.value?.lastCurrencyUpdate || t("never"));
 
 function toggleTarget(id: string) {
   const current = [...selectedTargetIds.value];
   const idx = current.indexOf(id);
   if (idx >= 0) current.splice(idx, 1);
   else current.push(id);
-  settingsStore.updateSettings({ currencyUpdateTargets: current });
+  updateSettings({ currencyUpdateTargets: current });
 }
 
 function selectAllTargets() {
   const ids = otherCurrencies.value.map((c) => c.id);
-  settingsStore.updateSettings({ currencyUpdateTargets: ids });
+  updateSettings({ currencyUpdateTargets: ids });
 }
 
 function deselectAllTargets() {
-  settingsStore.updateSettings({ currencyUpdateTargets: [] });
+  updateSettings({ currencyUpdateTargets: [] });
 }
 
 async function copyRow(text: string, id: string) {
   const copied = await copyToClipboard(text);
   if (!copied) {
-    toast(t("error"), "error");
+    toast(t("clipboard_copy_failed"), "error");
     return;
   }
   copiedId.value = id;
@@ -253,28 +305,15 @@ async function copyRow(text: string, id: string) {
 }
 
 async function handleUpdate() {
-  const providerType = settingsStore.ratesProvider as RatesProviderType;
-  const apiKey = settingsStore.ratesApiKey;
-  if (!apiKey && providerType !== "frankfurter") {
-    toast(t("rates_key_required"), "error");
-    return;
-  }
   isUpdating.value = true;
   try {
-    const result = await updateCurrencyRates(
-      providerType, apiKey, catalogStore.currencies,
-      settingsStore.settings.mainCurrencyId, [],
-      {
-        historyEnabled: settingsStore.settings.rateHistoryEnabled,
-        historyDays: settingsStore.settings.rateHistoryDays,
-      },
-    );
+    const result = await ratesRunBackendUpdate();
     if (result.error) toast(result.error, "error");
-    else if (result.updated > 0) {
-      settingsStore.updateSettings({ lastCurrencyUpdate: new Date().toISOString().split("T")[0] });
-      toast(t("rates_updated").replace("{count}", String(result.updated)));
-    } else toast(t("no_rates_updated"));
-  } catch (e) { toast(String(e), "error"); }
+    else if (result.updated > 0) toast(t("rates_updated").replace("{count}", String(result.updated)));
+    else toast(t("no_rates_updated"));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  }
   finally {
     isUpdating.value = false;
   }
@@ -286,18 +325,29 @@ function fmtNum(n: number): string {
 
 async function copyAllConversion() {
   const lines = converterCurrencies.value.map((cur) => {
-    const flag = currencyFlag(cur.code);
+    const flag = flagFor(cur.code);
     const val = fmtNum(getRawValue(cur));
     return `${flag ? flag + " " : ""}${cur.code}: ${val} ${cur.symbol}`;
   });
   const text = lines.join("\n");
   const copied = await copyToClipboard(text);
   if (!copied) {
-    toast(t("error"), "error");
+    toast(t("clipboard_copy_failed"), "error");
     return;
   }
   toast(t("copied_to_clipboard"));
 }
+
+onMounted(async () => {
+  await metaStore.ensureLoaded();
+  await refreshCurrencyFlags();
+});
+watch(
+  () => currencies.value.map((c) => c.code).join(","),
+  () => {
+    refreshCurrencyFlags();
+  },
+);
 </script>
 
 <template>
@@ -306,13 +356,18 @@ async function copyAllConversion() {
     <!-- Header -->
     <div class="flex items-center justify-between gap-3">
       <div class="min-w-0">
-        <h1 class="text-xl font-bold text-text-primary">{{ t('exchange_rates') }}</h1>
+        <h1 :class="typo.screenTitle()">{{ t('exchange_rates') }}</h1>
         <p class="text-xs text-text-muted mt-0.5">{{ t('last_update') }}: {{ lastUpdate }}</p>
       </div>
     </div>
 
     <!-- Converter empty state -->
-    <div v-if="converterCurrencies.length <= 1" class="bg-surface rounded-xl border border-dashed border-border p-5 text-center">
+    <div v-if="currencies.length === 0" class="bg-surface rounded-xl border border-dashed border-border p-5 text-center">
+      <ArrowRightLeft :size="28" class="mx-auto mb-2 text-text-muted opacity-40" />
+      <p class="text-sm font-semibold text-text-secondary mb-1">{{ t('no_data_yet') }}</p>
+      <p class="text-xs text-text-muted">{{ t('exchange_rates_desc') }}</p>
+    </div>
+    <div v-else-if="converterCurrencies.length <= 1" class="bg-surface rounded-xl border border-dashed border-border p-5 text-center">
       <ArrowRightLeft :size="28" class="mx-auto mb-2 text-text-muted opacity-40" />
       <p class="text-sm font-semibold text-text-secondary mb-1">{{ t('converter_empty') }}</p>
       <p class="text-xs text-text-muted">{{ t('converter_empty_hint') }}</p>
@@ -333,15 +388,15 @@ async function copyAllConversion() {
           <Tooltip :text="t('copy')">
             <button
               @click="copyAllConversion"
-              class="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary-light transition-colors"
+              class="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-surface-secondary transition-colors"
             >
-              <ClipboardCopy :size="14" />
+              <Copy :size="14" />
             </button>
           </Tooltip>
           <Tooltip :text="t('reset')">
             <button
-              @click="converterStore.reset()"
-              class="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-primary-light transition-colors"
+              @click="resetConverter()"
+              class="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-surface-secondary transition-colors"
             >
               <RotateCcw :size="14" />
             </button>
@@ -352,14 +407,14 @@ async function copyAllConversion() {
       <!-- Quick presets -->
       <div class="flex flex-wrap gap-1.5" :class="isCompactView ? 'mb-2' : 'mb-3'">
         <button
-          v-for="preset in settingsStore.settings.converterPresets"
+          v-for="preset in (settings?.converterPresets || [])"
           :key="preset"
           @click="baseAmount = preset"
           :class="[
             'px-3 py-1 text-xs font-semibold rounded-lg border transition-colors',
             baseAmount === preset
               ? 'bg-primary text-white border-primary'
-              : 'bg-surface-secondary text-text-secondary border-border hover:border-primary hover:text-primary',
+              : 'bg-surface-secondary text-text-secondary border-border hover:bg-surface hover:border-text-muted',
           ]"
         >
           {{ fmtNum(preset) }}
@@ -370,26 +425,26 @@ async function copyAllConversion() {
         <div
           v-for="(cur, idx) in converterCurrencies"
           :key="cur.id"
-          class="rounded-xl border border-border bg-surface-secondary/40 p-3"
+          class="rounded-xl border border-border bg-surface-secondary p-3"
         >
           <div class="flex items-start justify-between gap-2 mb-2">
             <div class="min-w-0">
               <div class="text-sm font-bold text-text-primary leading-tight">
-                <span v-if="currencyFlag(cur.code)" class="mr-0.5">{{ currencyFlag(cur.code) }}</span>{{ cur.code }}
+                <span v-if="flagFor(cur.code)" class="mr-0.5">{{ flagFor(cur.code) }}</span>{{ cur.code }}
               </div>
               <div class="text-xs text-text-muted truncate">{{ cur.name }}</div>
             </div>
             <div class="flex items-center gap-0.5 shrink-0">
               <Tooltip :text="t('move_up')">
                 <button
-                  @click="converterStore.moveUp(cur.id)"
+                  @click="moveConverterUp(cur.id)"
                   :disabled="idx === 0"
                   class="p-1 rounded text-text-muted hover:text-primary disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                 ><ChevronUp :size="14" /></button>
               </Tooltip>
               <Tooltip :text="t('move_down')">
                 <button
-                  @click="converterStore.moveDown(cur.id)"
+                  @click="moveConverterDown(cur.id)"
                   :disabled="idx === converterCurrencies.length - 1"
                   class="p-1 rounded text-text-muted hover:text-primary disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                 ><ChevronDown :size="14" /></button>
@@ -440,9 +495,9 @@ async function copyAllConversion() {
                 class="p-1.5 rounded-lg transition-all"
                 :class="copiedId === `conv-${cur.id}`
                   ? 'text-green-500'
-                  : 'text-text-muted hover:text-primary hover:bg-primary-light'"
+                  : 'text-text-muted hover:text-primary hover:bg-surface'"
               >
-                <component :is="copiedId === `conv-${cur.id}` ? Check : ClipboardCopy" :size="14" />
+                <component :is="copiedId === `conv-${cur.id}` ? Check : Copy" :size="14" />
               </button>
             </Tooltip>
           </div>
@@ -458,14 +513,14 @@ async function copyAllConversion() {
           <div v-if="!isCompactView" class="flex flex-row sm:flex-col shrink-0">
             <Tooltip :text="t('move_up')">
               <button
-                @click="converterStore.moveUp(cur.id)"
+                @click="moveConverterUp(cur.id)"
                 :disabled="idx === 0"
                 class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
               ><ChevronUp :size="14" /></button>
             </Tooltip>
             <Tooltip :text="t('move_down')">
               <button
-                @click="converterStore.moveDown(cur.id)"
+                @click="moveConverterDown(cur.id)"
                 :disabled="idx === converterCurrencies.length - 1"
                 class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
               ><ChevronDown :size="14" /></button>
@@ -473,7 +528,7 @@ async function copyAllConversion() {
           </div>
           <div class="shrink-0" :class="isCompactView ? 'w-14 sm:w-16' : 'w-14 sm:w-20'">
             <span class="text-sm font-bold text-text-primary block leading-tight">
-              <span v-if="currencyFlag(cur.code)" class="mr-0.5">{{ currencyFlag(cur.code) }}</span>{{ cur.code }}
+              <span v-if="flagFor(cur.code)" class="mr-0.5">{{ flagFor(cur.code) }}</span>{{ cur.code }}
             </span>
             <span class="text-[10px] text-text-muted leading-tight truncate block max-w-14 sm:max-w-none">{{ cur.name }}</span>
           </div>
@@ -521,9 +576,9 @@ async function copyAllConversion() {
                 class="p-1 rounded-lg sm:p-1.5 transition-all"
                 :class="copiedId === `conv-${cur.id}`
                   ? 'text-green-500'
-                  : 'text-text-muted hover:text-primary hover:bg-primary-light'"
+                  : 'text-text-muted hover:text-primary hover:bg-surface'"
               >
-                <component :is="copiedId === `conv-${cur.id}` ? Check : ClipboardCopy" :size="14" />
+                <component :is="copiedId === `conv-${cur.id}` ? Check : Copy" :size="14" />
               </button>
             </Tooltip>
           </div>
@@ -548,7 +603,7 @@ async function copyAllConversion() {
           <button
             @click="selectAllTargets"
             :disabled="selectedTargetIds.length === otherCurrencies.length"
-            class="px-2 py-0.5 text-[11px] rounded border border-border text-text-secondary hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            class="px-2 py-0.5 text-[11px] rounded border border-border text-text-secondary hover:bg-surface hover:border-text-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             :title="t('select_all')"
           >
             <CheckSquare :size="13" class="sm:hidden" />
@@ -557,7 +612,7 @@ async function copyAllConversion() {
           <button
             @click="deselectAllTargets"
             :disabled="selectedTargetIds.length === 0"
-            class="px-2 py-0.5 text-[11px] rounded border border-border text-text-secondary hover:border-primary hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            class="px-2 py-0.5 text-[11px] rounded border border-border text-text-secondary hover:bg-surface hover:border-text-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             :title="t('deselect_all')"
           >
             <Square :size="13" class="sm:hidden" />
@@ -591,7 +646,7 @@ async function copyAllConversion() {
               'px-1.5 sm:px-2 py-1 text-[10px] sm:text-[11px] rounded border transition-colors inline-flex items-center justify-center gap-1',
               rateSortBy === opt.key
                 ? 'bg-primary text-white border-primary'
-                : 'bg-surface-secondary text-text-secondary border-border hover:border-primary hover:text-primary',
+                : 'bg-surface-secondary text-text-secondary border-border hover:bg-surface hover:border-text-muted',
             ]"
           >
             <component :is="getSortIcon(opt.key)" :size="12" class="sm:hidden" />
@@ -605,12 +660,12 @@ async function copyAllConversion() {
         <div
           v-for="rate in allRates"
           :key="rate.id"
-          class="rounded-xl border border-border bg-surface-secondary/40 p-3"
+          class="rounded-xl border border-border bg-surface-secondary p-3"
         >
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
               <div class="text-sm font-bold text-text-primary">
-                <span v-if="currencyFlag(rate.code)" class="mr-0.5">{{ currencyFlag(rate.code) }}</span>{{ rate.code }}
+                <span v-if="flagFor(rate.code)" class="mr-0.5">{{ flagFor(rate.code) }}</span>{{ rate.code }}
               </div>
               <div class="text-xs text-text-muted truncate">{{ rate.name }}</div>
             </div>
@@ -641,7 +696,7 @@ async function copyAllConversion() {
                   ? 'text-green-500'
                   : 'text-text-muted hover:text-primary'"
               >
-                <component :is="copiedId === `rate-${rate.id}` ? Check : ClipboardCopy" :size="13" />
+                <component :is="copiedId === `rate-${rate.id}` ? Check : Copy" :size="13" />
               </button>
             </Tooltip>
           </div>
@@ -668,7 +723,7 @@ async function copyAllConversion() {
             </button>
           </Tooltip>
           <span class="text-sm font-bold text-text-primary w-14 sm:w-16 shrink-0">
-            <span v-if="currencyFlag(rate.code)" class="mr-0.5">{{ currencyFlag(rate.code) }}</span>{{ rate.code }}
+            <span v-if="flagFor(rate.code)" class="mr-0.5">{{ flagFor(rate.code) }}</span>{{ rate.code }}
           </span>
           <span class="text-xs sm:text-sm text-text-muted flex-1 min-w-0 truncate">{{ rate.name }}</span>
           <span class="text-xs sm:text-sm font-mono font-semibold text-text-primary tabular-nums">{{ rate.rateFormatted }}</span>
@@ -681,7 +736,7 @@ async function copyAllConversion() {
                 ? 'text-green-500'
                 : 'text-text-muted hover:text-primary'"
             >
-              <component :is="copiedId === `rate-${rate.id}` ? Check : ClipboardCopy" :size="13" />
+              <component :is="copiedId === `rate-${rate.id}` ? Check : Copy" :size="13" />
             </button>
           </Tooltip>
         </div>
@@ -692,8 +747,10 @@ async function copyAllConversion() {
     </div>
 
     <ExpenseForm
+      v-if="expenseFormLookupData"
       :show="showExpenseForm"
       :prefill="expensePrefill"
+      :lookupData="expenseFormLookupData"
       @close="showExpenseForm = false"
       @saved="showExpenseForm = false"
     />

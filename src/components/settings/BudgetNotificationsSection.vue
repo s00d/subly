@@ -1,56 +1,130 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useSettingsStore } from "@/stores/settings";
+import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
+import type { Settings } from "@/schemas/appData";
+import { useAppMetaStore } from "@/stores/appMetaStore";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppToggle from "@/components/ui/AppToggle.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
+import { platform } from "@tauri-apps/plugin-os";
 import { enable as enableAutostart, disable as disableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
-import { sendTestNotification } from "@/services/notifications";
-import { playNotificationSound } from "@/services/sound";
-import { Bell, Volume2 } from "lucide-vue-next";
+import { notificationsEvent } from "@/services/notificationsClient";
+import { Bell, Volume2 } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
+import { ui } from "@/lib/tv";
+import { formatErrorForToast } from "@/utils/formatError";
+import {
+  NOTIFICATION_TAGS_TOOLTIP,
+  NOTIFICATION_TEMPLATE_DEFAULTS,
+} from "@/constants/notificationTemplateDefaults";
 
-const settingsStore = useSettingsStore();
+const props = defineProps<{ lookupSettings: Settings | null }>();
 const { t } = useI18n();
 const { toast } = useToast();
+const metaStore = useAppMetaStore();
+const settings = ref<Settings | null>(null);
 
 // --- Budget ---
-const budgetInput = ref(settingsStore.settings.budget);
-function saveBudget() {
-  settingsStore.updateSettings({ budget: budgetInput.value });
-  toast(t("success"));
-}
+const budgetInput = ref(0);
 
 // --- Notify days ---
-const notifyDaysBefore = ref(settingsStore.settings.notifyDaysBefore);
-function saveNotifyDays() {
-  settingsStore.updateSettings({ notifyDaysBefore: notifyDaysBefore.value });
+const notifyDaysBefore = ref(1);
+
+// --- Recurring notifications ---
+const recurringNotifications = ref(true);
+
+// --- Notification sound ---
+const notificationSound = ref(true);
+
+// --- Notification schedule ---
+const notifSchedule = ref("any");
+const notifCustomHour = ref(9);
+
+// --- Notification templates ---
+const notifTitle = ref("");
+const notifBodyToday = ref("");
+const notifBodySoon = ref("");
+const notifOverdueTitle = ref("");
+const notifOverdueBody = ref("");
+
+function templateFieldOrDefault(stored: string, fallback: string): string {
+  return stored.trim().length > 0 ? stored : fallback;
+}
+
+watch(
+  () => props.lookupSettings,
+  (s) => {
+    if (!s) return;
+    settings.value = s;
+    budgetInput.value = s.budget;
+    notifyDaysBefore.value = s.notifyDaysBefore;
+    recurringNotifications.value = s.recurringNotifications !== false;
+    notificationSound.value = s.notificationSound !== false;
+    notifSchedule.value = s.notificationSchedule || "any";
+    notifCustomHour.value = s.notificationCustomHour ?? 9;
+    notifTitle.value = templateFieldOrDefault(
+      s.notificationTitle,
+      NOTIFICATION_TEMPLATE_DEFAULTS.notificationTitle,
+    );
+    notifBodyToday.value = templateFieldOrDefault(
+      s.notificationBodyDueToday,
+      NOTIFICATION_TEMPLATE_DEFAULTS.notificationBodyDueToday,
+    );
+    notifBodySoon.value = templateFieldOrDefault(
+      s.notificationBodyDueSoon,
+      NOTIFICATION_TEMPLATE_DEFAULTS.notificationBodyDueSoon,
+    );
+    notifOverdueTitle.value = templateFieldOrDefault(
+      s.notificationOverdueTitle,
+      NOTIFICATION_TEMPLATE_DEFAULTS.notificationOverdueTitle,
+    );
+    notifOverdueBody.value = templateFieldOrDefault(
+      s.notificationOverdueBody,
+      NOTIFICATION_TEMPLATE_DEFAULTS.notificationOverdueBody,
+    );
+  },
+  { immediate: true, deep: true },
+);
+
+async function updateSettings(updates: Partial<Settings>) {
+  if (!settings.value) return;
+  const next = { ...settings.value, ...updates };
+  settings.value = next;
+  await metaStore.updateSettings(next);
+}
+
+function saveBudget() {
+  updateSettings({ budget: budgetInput.value });
   toast(t("success"));
 }
 
-// --- Recurring notifications ---
-const recurringNotifications = ref(settingsStore.settings.recurringNotifications !== false);
+function saveNotifyDays() {
+  updateSettings({ notifyDaysBefore: notifyDaysBefore.value });
+  toast(t("success"));
+}
+
 function toggleRecurring() {
   recurringNotifications.value = !recurringNotifications.value;
-  settingsStore.updateSettings({ recurringNotifications: recurringNotifications.value });
+  updateSettings({ recurringNotifications: recurringNotifications.value });
 }
 
-// --- Notification sound ---
-const notificationSound = ref(settingsStore.settings.notificationSound !== false);
 function toggleNotificationSound() {
   notificationSound.value = !notificationSound.value;
-  settingsStore.updateSettings({ notificationSound: notificationSound.value });
+  updateSettings({ notificationSound: notificationSound.value });
 }
-function handleTestSound() {
-  playNotificationSound();
+async function handleTestSound() {
+  try {
+    await notificationsEvent("dispatch", {
+      showSystem: false,
+      playSound: true,
+      forceSound: true,
+    });
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  }
 }
-
-// --- Notification schedule ---
-const notifSchedule = ref(settingsStore.settings.notificationSchedule || "any");
-const notifCustomHour = ref(settingsStore.settings.notificationCustomHour ?? 9);
 
 const scheduleOptions = computed<SelectOption[]>(() => [
   { value: "any", label: t("schedule_any") },
@@ -60,22 +134,15 @@ const scheduleOptions = computed<SelectOption[]>(() => [
 ]);
 
 function saveSchedule() {
-  settingsStore.updateSettings({
+  updateSettings({
     notificationSchedule: notifSchedule.value as "any" | "morning" | "evening" | "custom",
     notificationCustomHour: notifCustomHour.value,
   });
   toast(t("success"));
 }
 
-// --- Notification templates ---
-const notifTitle = ref(settingsStore.settings.notificationTitle);
-const notifBodyToday = ref(settingsStore.settings.notificationBodyDueToday);
-const notifBodySoon = ref(settingsStore.settings.notificationBodyDueSoon);
-const notifOverdueTitle = ref(settingsStore.settings.notificationOverdueTitle);
-const notifOverdueBody = ref(settingsStore.settings.notificationOverdueBody);
-
 function saveNotifTemplates() {
-  settingsStore.updateSettings({
+  updateSettings({
     notificationTitle: notifTitle.value,
     notificationBodyDueToday: notifBodyToday.value,
     notificationBodyDueSoon: notifBodySoon.value,
@@ -90,12 +157,14 @@ const testingSending = ref(false);
 async function handleTestNotification() {
   testingSending.value = true;
   try {
-    const result = await sendTestNotification();
-    // Play sound if enabled
-    if (settingsStore.settings.notificationSound !== false) {
-      playNotificationSound();
-    }
-    if (result.system) {
+    const result = await notificationsEvent<{ system: boolean; sound: boolean; telegram: boolean }>("dispatch", {
+      title: "Subly - Test Notification",
+      body: "Notifications are working correctly!",
+      showSystem: true,
+      playSound: true,
+      forceSound: false,
+    });
+    if (result.data.system) {
       toast(t("test_notification_sent"));
     } else {
       toast(t("test_notification_sent_inapp"));
@@ -107,20 +176,40 @@ async function handleTestNotification() {
   }
 }
 
-// --- Autostart ---
+// --- Autostart (Rust registers tauri-plugin-autostart only on desktop; iOS/Android → plugin missing) ---
+function desktopAutostartAvailable(): boolean {
+  try {
+    const p = platform();
+    return p !== "ios" && p !== "android";
+  } catch {
+    return false;
+  }
+}
+const autostartSupported = desktopAutostartAvailable();
 const autostartEnabled = ref(false);
 async function loadAutostartStatus() {
-  try { autostartEnabled.value = await isAutostartEnabled(); }
-  catch (e) { console.warn("Autostart check failed:", e); }
+  if (!autostartSupported) return;
+  try {
+    autostartEnabled.value = await isAutostartEnabled();
+  } catch (e) {
+    console.error("Autostart check failed:", e);
+    toast(formatErrorForToast(e, t), "error");
+  }
 }
 async function toggleAutostart() {
+  if (!autostartSupported) return;
   try {
-    if (autostartEnabled.value) { await disableAutostart(); autostartEnabled.value = false; }
-    else { await enableAutostart(); autostartEnabled.value = true; }
+    if (autostartEnabled.value) {
+      await disableAutostart();
+      autostartEnabled.value = false;
+    } else {
+      await enableAutostart();
+      autostartEnabled.value = true;
+    }
     toast(t("success"));
   } catch (e) {
     console.error("Autostart toggle failed:", e);
-    toast(t("error"), "error");
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 loadAutostartStatus();
@@ -128,7 +217,7 @@ loadAutostartStatus();
 
 <template>
   <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-    <h2 class="text-base sm:text-lg font-semibold text-text-primary mb-3 sm:mb-4">{{ t('budget_and_notifications') }}</h2>
+    <h2 :class="[ui.sectionTitle(), 'mb-3 sm:mb-4']">{{ t('budget_and_notifications') }}</h2>
 
     <!-- Monthly budget -->
     <div class="flex gap-2 sm:gap-3 items-end mb-2">
@@ -192,13 +281,44 @@ loadAutostartStatus();
     <!-- Notification templates -->
     <div class="pt-4 border-t border-border mb-4">
       <h3 class="text-sm font-semibold text-text-primary mb-2">{{ t('notification_templates') }}</h3>
-      <p class="text-xs text-text-muted mb-3">{{ t('notification_templates_info') }}</p>
+      <p class="text-xs text-text-muted mb-2">{{ t('notification_templates_info') }}</p>
+      <p class="text-xs text-text-muted mb-3">{{ t('notification_templates_scheduled_hint') }}</p>
       <div class="space-y-3">
-        <AppInput v-model="notifTitle" :label="t('notification_title_template')" size="sm" />
-        <AppInput v-model="notifBodyToday" :label="t('notification_body_due_today')" size="sm" />
-        <AppInput v-model="notifBodySoon" :label="t('notification_body_due_soon')" size="sm" />
-        <AppInput v-model="notifOverdueTitle" :label="t('notification_overdue_title')" size="sm" />
-        <AppInput v-model="notifOverdueBody" :label="t('notification_overdue_body')" size="sm" />
+        <AppInput
+          v-model="notifTitle"
+          :label="t('notification_title_template')"
+          :placeholder="NOTIFICATION_TEMPLATE_DEFAULTS.notificationTitle"
+          :tooltip="NOTIFICATION_TAGS_TOOLTIP"
+          size="sm"
+        />
+        <AppInput
+          v-model="notifBodyToday"
+          :label="t('notification_body_due_today')"
+          :placeholder="NOTIFICATION_TEMPLATE_DEFAULTS.notificationBodyDueToday"
+          :tooltip="NOTIFICATION_TAGS_TOOLTIP"
+          size="sm"
+        />
+        <AppInput
+          v-model="notifBodySoon"
+          :label="t('notification_body_due_soon')"
+          :placeholder="NOTIFICATION_TEMPLATE_DEFAULTS.notificationBodyDueSoon"
+          :tooltip="NOTIFICATION_TAGS_TOOLTIP"
+          size="sm"
+        />
+        <AppInput
+          v-model="notifOverdueTitle"
+          :label="t('notification_overdue_title')"
+          :placeholder="NOTIFICATION_TEMPLATE_DEFAULTS.notificationOverdueTitle"
+          :tooltip="NOTIFICATION_TAGS_TOOLTIP"
+          size="sm"
+        />
+        <AppInput
+          v-model="notifOverdueBody"
+          :label="t('notification_overdue_body')"
+          :placeholder="NOTIFICATION_TEMPLATE_DEFAULTS.notificationOverdueBody"
+          :tooltip="NOTIFICATION_TAGS_TOOLTIP"
+          size="sm"
+        />
         <div class="flex gap-2">
           <button @click="saveNotifTemplates" class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors">{{ t('save') }}</button>
           <button
@@ -213,8 +333,8 @@ loadAutostartStatus();
       </div>
     </div>
 
-    <!-- Autostart -->
-    <div class="pt-4 border-t border-border">
+    <!-- Autostart (desktop only; plugin not loaded on mobile) -->
+    <div v-if="autostartSupported" class="pt-4 border-t border-border">
       <AppToggle :modelValue="autostartEnabled" @update:modelValue="toggleAutostart" :label="t('autostart')" :description="t('autostart_info')" />
     </div>
   </section>

@@ -1,13 +1,9 @@
 <script setup lang="ts">
-import { ref, watch, computed, reactive } from "vue";
-import { useExpensesStore } from "@/stores/expenses";
-import { useSettingsStore } from "@/stores/settings";
-import { useCatalogStore } from "@/stores/catalog";
+import { ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
-import type { Expense } from "@/schemas/appData";
-import { ExpenseSchema } from "@/schemas/appData";
-import { mapZodErrors, type ZodFieldMeta } from "@/composables/useZodErrors";
+import type { Expense, Settings, Currency, PaymentMethod, HouseholdMember, Category, Tag } from "@/schemas/appData";
+import { expenseToIsoDate } from "@/schemas/appData";
 import { useClipboard } from "@/composables/useClipboard";
 import Modal from "@/components/ui/Modal.vue";
 import AppInput from "@/components/ui/AppInput.vue";
@@ -16,13 +12,26 @@ import AppTextarea from "@/components/ui/AppTextarea.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import TagInput from "@/components/ui/TagInput.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
-import { Globe, Loader2 } from "lucide-vue-next";
-import { resolveFaviconFromInputUrl } from "@/services/logoAssets";
+import { Globe, Loader2 } from "@lucide/vue";
+import { resolveFaviconFromInputUrl } from "@/services/logoClient";
+import { upsertExpense } from "@/services/expensesClient";
+import { expenseFormFieldsSchema, coerceExpenseFormForValidation } from "@/schemas/zod/expenseForm";
+import { useZodLiveForm } from "@/composables/useZodLiveForm";
+import type { ZodFieldMeta } from "@/composables/useZodErrors";
 
 const props = defineProps<{
   show: boolean;
   editExpense?: Expense | null;
   prefill?: { amount?: number; currencyId?: string; name?: string } | null;
+  lookupData: {
+    settings: Settings;
+    currencies: Currency[];
+    paymentMethods: PaymentMethod[];
+    household: HouseholdMember[];
+    categories: Category[];
+    tags: Tag[];
+    expensesCount: number;
+  };
 }>();
 
 const emit = defineEmits<{
@@ -30,38 +39,73 @@ const emit = defineEmits<{
   saved: [];
 }>();
 
-const expsStore = useExpensesStore();
-const settingsStore = useSettingsStore();
-const catalogStore = useCatalogStore();
+const settings = ref<Settings | null>(null);
+const currencies = ref<Currency[]>([]);
+const paymentMethods = ref<PaymentMethod[]>([]);
+const household = ref<HouseholdMember[]>([]);
+const categories = ref<Category[]>([]);
+const tags = ref<Tag[]>([]);
+const expensesCount = ref(0);
 const { t } = useI18n();
 const { toast } = useToast();
 const { copyToClipboard } = useClipboard();
 
-const form = ref<Partial<Expense>>({});
-const errors = reactive<Record<string, string>>({});
-const iconPreview = ref("");
-const isResolvingIcon = ref(false);
+/** UI-only `date` is `YYYY-MM-DD` for AppDatePicker; persisted moment is `createdAt` (RFC3339). */
+type ExpenseFormModel = Partial<Expense> & { date?: string };
 
-const fieldMeta: ZodFieldMeta = {
+const form = ref<ExpenseFormModel>({});
+
+const expenseFieldMeta: ZodFieldMeta = {
   name: "string",
   amount: "number",
   currencyId: "string",
   date: "date",
 };
 
+function buildExpenseValidationInput(): Record<string, unknown> {
+  return coerceExpenseFormForValidation(form.value as Record<string, unknown>);
+}
+
+const {
+  errors: expenseErrors,
+  markDirty: markExpenseFieldDirty,
+  clearDirty: clearExpenseZodDirty,
+  validateStrict: validateExpenseStrict,
+  watchSource: watchExpenseZod,
+} = useZodLiveForm({
+  getValues: buildExpenseValidationInput,
+  schema: expenseFormFieldsSchema,
+  fieldMeta: expenseFieldMeta,
+  t,
+  guardEmptyRequiredStrings: true,
+  guardedStringFields: ["name"],
+});
+
+watchExpenseZod(form);
+
+const iconPreview = ref("");
+const isResolvingIcon = ref(false);
+
 function nextExpenseNumber(): number {
-  return expsStore.totalCount + 1;
+  return expensesCount.value + 1;
+}
+
+function localYmd(d = new Date()): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 function resetForm() {
   form.value = {
     name: `${t("expenses")} #${nextExpenseNumber()}`,
     amount: 0,
-    currencyId: settingsStore.settings.mainCurrencyId,
-    date: new Date().toISOString().split("T")[0],
-    categoryId: settingsStore.settings.defaultCategoryId || "cat-1",
-    paymentMethodId: settingsStore.settings.defaultPaymentMethodId || catalogStore.enabledPaymentMethods[0]?.id || "",
-    payerUserId: catalogStore.household[0]?.id || "",
+    currencyId: settings.value?.mainCurrencyId || "cur-2",
+    date: localYmd(),
+    categoryId: settings.value?.defaultCategoryId || "cat-1",
+    paymentMethodId: settings.value?.defaultPaymentMethodId || paymentMethods.value.find((p) => p.enabled)?.id || "",
+    payerUserId: household.value[0]?.id || "",
     tags: [],
     notes: "",
     url: "",
@@ -70,8 +114,10 @@ function resetForm() {
 
 watch(() => props.show, (val) => {
   if (val) {
+    loadLookupData();
+    clearExpenseZodDirty();
     if (props.editExpense) {
-      form.value = { ...props.editExpense };
+      form.value = { ...props.editExpense, date: expenseToIsoDate(props.editExpense) };
       iconPreview.value = "";
     } else {
       resetForm();
@@ -87,28 +133,24 @@ watch(() => props.show, (val) => {
 const isEditing = computed(() => !!props.editExpense);
 
 const currencyOptions = computed<SelectOption[]>(() =>
-  catalogStore.currencies.map((c) => ({ label: `${c.symbol} ${c.name} (${c.code})`, value: c.id }))
+  currencies.value.map((c) => ({ label: `${c.symbol} ${c.name} (${c.code})`, value: c.id }))
 );
 
 const categoryOptions = computed<SelectOption[]>(() =>
-  catalogStore.sortedCategories.map((c) => ({ label: c.name, value: c.id, icon: c.icon || undefined }))
+  [...categories.value].sort((a, b) => a.sortOrder - b.sortOrder).map((c) => ({ label: c.name, value: c.id, icon: c.icon || undefined }))
 );
 
 const paymentOptions = computed<SelectOption[]>(() => {
   const opts: SelectOption[] = [{ label: t("none"), value: "" }];
-  catalogStore.enabledPaymentMethods.forEach((p) =>
+  paymentMethods.value.filter((p) => p.enabled).forEach((p) =>
     opts.push({ label: p.name, value: p.id, icon: p.icon })
   );
   return opts;
 });
 
 const payerOptions = computed<SelectOption[]>(() =>
-  catalogStore.household.map((h) => ({ label: h.name, value: h.id }))
+  household.value.map((h) => ({ label: h.name, value: h.id }))
 );
-
-function clearErrors() {
-  Object.keys(errors).forEach((k) => delete errors[k]);
-}
 
 async function applyDomainIcon() {
   if (isResolvingIcon.value) return;
@@ -127,33 +169,46 @@ async function applyDomainIcon() {
   }
 }
 
-function handleSave() {
-  clearErrors();
+async function handleSave() {
+  if (!validateExpenseStrict()) {
+    toast(t("fill_required_fields"), "error");
+    return;
+  }
 
   const base = isEditing.value && props.editExpense
     ? { ...props.editExpense, ...form.value }
     : { ...form.value, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
 
+  const iso = String(form.value.date ?? "").trim();
+
   // Coerce numeric fields — HTML inputs always return strings
-  const raw = {
-    ...base,
-    amount: Number(base.amount) || 0,
+  const rawAmount = Number(base.amount) || 0;
+
+  const prev = String(base.createdAt ?? "").trim();
+  const prevDay = prev.length >= 10 ? prev.slice(0, 10) : "";
+  const createdAt =
+    isEditing.value && prevDay === iso
+      ? prev
+      : new Date(`${iso}T12:00:00.000Z`).toISOString();
+
+  const payload: Record<string, unknown> = {
+    id: base.id,
+    name: String(base.name).trim(),
+    amount: rawAmount,
+    currencyId: String(base.currencyId),
+    categoryId: String(base.categoryId ?? ""),
+    paymentMethodId: String(base.paymentMethodId ?? ""),
+    payerUserId: String(base.payerUserId ?? ""),
+    tags: base.tags ?? [],
+    notes: String(base.notes ?? ""),
+    url: String(base.url ?? ""),
+    createdAt,
+    subscriptionId: String(base.subscriptionId ?? ""),
+    paymentRecordId: String(base.paymentRecordId ?? ""),
   };
 
-  const result = ExpenseSchema.safeParse(raw);
-
-  if (!result.success) {
-    mapZodErrors(result.error.issues, errors, fieldMeta, t);
-    toast(t("fill_required_fields"), "error");
-    return;
-  }
-
   try {
-    if (isEditing.value && props.editExpense) {
-      expsStore.updateExpense(result.data);
-    } else {
-      expsStore.addExpense(result.data);
-    }
+    await upsertExpense(payload);
     toast(t("success"));
     emit("saved");
     emit("close");
@@ -161,6 +216,16 @@ function handleSave() {
     console.error("Expense save failed:", e);
     toast(t("save_error"), "error");
   }
+}
+
+function loadLookupData() {
+  settings.value = props.lookupData.settings;
+  currencies.value = props.lookupData.currencies;
+  paymentMethods.value = props.lookupData.paymentMethods;
+  household.value = props.lookupData.household;
+  categories.value = props.lookupData.categories;
+  tags.value = props.lookupData.tags;
+  expensesCount.value = props.lookupData.expensesCount;
 }
 </script>
 
@@ -171,9 +236,9 @@ function handleSave() {
       <AppInput
         :label="t('expense_name')"
         :modelValue="form.name || ''"
-        @update:modelValue="(v) => form.name = String(v)"
+        @update:modelValue="(v) => { form.name = String(v); markExpenseFieldDirty('name'); }"
         :placeholder="t('expense_name')"
-        :error="errors.name"
+        :error="expenseErrors.name"
         required
       />
 
@@ -187,7 +252,7 @@ function handleSave() {
             type="number"
             step="0.01"
             min="0"
-            :error="errors.amount"
+            :error="expenseErrors.amount"
             required
           />
         </div>
@@ -197,7 +262,7 @@ function handleSave() {
             :options="currencyOptions"
             :modelValue="form.currencyId || ''"
             @update:modelValue="(v) => (form.currencyId = String(v))"
-            :error="errors.currencyId"
+            :error="expenseErrors.currencyId"
           />
         </div>
       </div>
@@ -207,7 +272,7 @@ function handleSave() {
         :label="t('expense_date')"
         :modelValue="form.date || ''"
         @update:modelValue="(v) => form.date = v"
-        :error="errors.date"
+        :error="expenseErrors.date"
       />
 
       <!-- Category + Payment Method -->
@@ -232,7 +297,7 @@ function handleSave() {
 
       <!-- Payer (if more than 1 household member) -->
       <AppSelect
-        v-if="catalogStore.household.length > 1"
+        v-if="household.length > 1"
         :label="t('paid_by')"
         :options="payerOptions"
         :modelValue="form.payerUserId || ''"
@@ -270,6 +335,7 @@ function handleSave() {
       <TagInput
         :label="t('tags')"
         :modelValue="form.tags || []"
+        :availableTags="tags"
         @update:modelValue="(v) => (form.tags = v)"
       />
 

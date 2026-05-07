@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
-import { logoAssets, type LogoAsset } from "@/services/logoAssets";
+import { getLogoAssets, type LogoAsset } from "@/services/logoClient";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
-import { X, Search, Upload } from "lucide-vue-next";
+import { X, Search, Upload } from "@lucide/vue";
 import { tv } from "@/lib/tv";
 import { useScrollLock } from "@/composables/useScrollLock";
 
@@ -21,13 +21,14 @@ const emit = defineEmits<{
 const { t } = useI18n();
 const search = ref("");
 const fileInput = ref<HTMLInputElement | null>(null);
+const logoAssets = ref<LogoAsset[]>([]);
 
 const filterGroup = computed(() => props.group || "all");
 
 const filteredAssets = computed(() => {
   let items: LogoAsset[] = filterGroup.value === "all"
-    ? logoAssets
-    : logoAssets.filter((a) => a.group === filterGroup.value);
+    ? logoAssets.value
+    : logoAssets.value.filter((a) => a.group === filterGroup.value);
 
   if (search.value) {
     const q = search.value.toLowerCase();
@@ -190,7 +191,7 @@ const pickerTv = tv({
       "relative bg-surface w-full max-w-md overflow-hidden",
       "rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[85vh] sm:max-h-none",
     ],
-    header: "flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-border",
+    header: "flex items-center justify-between px-4 sm:px-5 py-2.5 sm:py-3 border-b border-border",
     headerTitle: "text-sm sm:text-base font-semibold text-text-primary",
     closeBtn: "p-1 rounded-lg hover:bg-surface-hover text-text-muted",
     searchRow: "px-4 sm:px-5 pt-3 sm:pt-4 pb-2 flex gap-2",
@@ -206,11 +207,11 @@ const pickerTv = tv({
       "hover:border-primary hover:text-primary transition-colors shrink-0",
     ],
     currentWrap: "px-5 pb-2",
-    currentInner: "flex items-center gap-2 p-2 rounded-lg bg-primary-light border border-primary/20",
+    currentInner: "flex items-center gap-2 p-2 rounded-lg bg-surface-secondary border border-border",
     gridWrap: "px-4 sm:px-5 pb-4 max-h-[50vh] overflow-y-auto",
     sectionLabel: "text-[10px] uppercase tracking-wider text-text-muted font-medium mb-2",
     grid: "grid grid-cols-8 gap-1.5",
-    iconBtn: "w-10 h-10 rounded-lg border flex items-center justify-center text-lg hover:bg-surface-hover transition-colors",
+    iconBtn: "w-10 h-10 rounded-lg border flex items-center justify-center text-lg transition-colors hover:bg-surface dark:hover:bg-white/6",
     emptyText: "text-center py-8 text-sm text-text-muted",
   },
   variants: {
@@ -223,21 +224,18 @@ const pickerTv = tv({
 
 const slots = pickerTv();
 useScrollLock(computed(() => props.show));
+
+onMounted(async () => {
+  logoAssets.value = await getLogoAssets();
+});
 </script>
 
 <template>
   <Teleport to="body">
-    <Transition
-      enter-active-class="transition ease-out duration-200"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition ease-in duration-150"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
+    <Transition name="app-modal">
       <div v-if="show" :class="slots.overlay()">
-        <div :class="slots.backdrop()" @click="onBackdropClick" />
-        <div :class="slots.panel()">
+        <div :class="[slots.backdrop(), 'app-modal-backdrop']" @click="onBackdropClick" />
+        <div :class="[slots.panel(), 'app-modal-panel']">
           <div :class="slots.header()">
             <h3 :class="slots.headerTitle()">{{ t('choose_icon') }}</h3>
             <button @click="emit('close')" :class="slots.closeBtn()">

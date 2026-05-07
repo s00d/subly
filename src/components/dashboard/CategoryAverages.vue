@@ -1,26 +1,28 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { useCatalogStore } from "@/stores/catalog";
-import type { CategoryAverage } from "@/services/analytics";
+import type { CategoryAverage } from "@/services/dashboardClient";
+import type { Category } from "@/schemas/appData";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
-import { Tag } from "lucide-vue-next";
+import { Tag } from "@lucide/vue";
 
-defineProps<{
+const props = defineProps<{
   averages: CategoryAverage[];
   fmt: (n: number) => string;
+  categories?: Category[];
 }>();
 
-const catalogStore = useCatalogStore();
+const categories = computed<Category[]>(() => props.categories ?? []);
 const { t } = useI18n();
 
 function getCatIcon(id: string): string {
-  return catalogStore.categories.find((c) => c.id === id)?.icon || "";
+  return categories.value.find((c) => c.id === id)?.icon || "";
 }
 </script>
 
 <template>
-  <div class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-    <div class="flex items-center gap-2 mb-3 sm:mb-4">
+  <div class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
+    <div class="flex items-center gap-2 mb-2.5 sm:mb-3">
       <Tag :size="14" class="text-primary shrink-0" />
       <h3 class="text-xs sm:text-sm font-semibold text-text-primary">{{ t('category_averages') }}</h3>
     </div>

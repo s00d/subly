@@ -1,138 +1,174 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from "vue";
-import { useSettingsStore } from "@/stores/settings";
-import { useCatalogStore } from "@/stores/catalog";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppToggle from "@/components/ui/AppToggle.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import Toast from "@/components/ui/Toast.vue";
-import { getRatesProviders, updateCurrencyRates } from "@/services/rates";
-import type { RatesProviderType, RatesProviderMeta } from "@/services/rates";
-import { RefreshCw, Check, CheckSquare, Square, ChevronDown, ExternalLink, ArrowRightLeft } from "lucide-vue-next";
-import { tv } from "@/lib/tv";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { ratesGetProviders, ratesRunBackendUpdate } from "@/services/ratesClient";
+import type { RatesProviderType, RatesProviderMeta } from "@/services/ratesClient";
+import { getConfigValue, setConfigValue } from "@/services/configClient";
+import { getSecureValue, setSecureValue } from "@/services/secureStorageClient";
+import type { Currency, Settings } from "@/schemas/appData";
+import { useAppMetaStore } from "@/stores/appMetaStore";
+import { RefreshCw, Check, CheckSquare, Square, ChevronDown, ArrowRightLeft, Search } from "@lucide/vue";
+import { tv, ui } from "@/lib/tv";
+import { formatErrorForToast } from "@/utils/formatError";
 
-const settingsStore = useSettingsStore();
-const catalogStore = useCatalogStore();
+const props = defineProps<{
+  lookupData: {
+    settings: Settings;
+    currencies: Currency[];
+  } | null;
+}>();
 const { t } = useI18n();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
+const metaStore = useAppMetaStore();
+const settings = ref<Settings | null>(null);
+const currencies = ref<Currency[]>([]);
 
-const providers = getRatesProviders();
-const selectedProvider = ref<RatesProviderType>(settingsStore.ratesProvider as RatesProviderType || "frankfurter");
-const apiKey = ref(settingsStore.ratesApiKey);
+const providers = ref<RatesProviderMeta[]>([]);
+const selectedProvider = ref<RatesProviderType>("frankfurter");
+const apiKey = ref("");
 const expandedProvider = ref<RatesProviderType | null>(null);
 const showChangeProvider = ref(false);
+const targetSearch = ref("");
 
-onMounted(() => {
-  selectedProvider.value = (settingsStore.ratesProvider as RatesProviderType) || "frankfurter";
-  apiKey.value = settingsStore.ratesApiKey;
+async function updateSettings(updates: Partial<Settings>) {
+  if (!settings.value) return;
+  const next = { ...settings.value, ...updates };
+  settings.value = next;
+  await metaStore.updateSettings(next);
+}
+
+onMounted(async () => {
+  settings.value = props.lookupData?.settings ?? null;
+  currencies.value = props.lookupData?.currencies ?? [];
+  selectedProvider.value = ((await getConfigValue<string>("ratesProvider")) || "frankfurter") as RatesProviderType;
+  apiKey.value = (await getSecureValue("ratesApiKey")) || "";
+  ratesGetProviders()
+    .then((items) => { providers.value = items; })
+    .catch((e) => {
+      providers.value = [];
+      console.error("[ExchangeRatesSection] ratesGetProviders failed", e);
+      toast(formatErrorForToast(e, t), "error");
+    });
 });
 
 const activeProvider = computed<RatesProviderMeta | undefined>(() =>
-  providers.find((p) => p.type === selectedProvider.value),
+  providers.value.find((p) => p.type === selectedProvider.value),
 );
 
-function selectProvider(type: RatesProviderType) {
-  if (type === selectedProvider.value && !providers.find((p) => p.type === type)?.requiresKey) return;
+async function selectProvider(type: RatesProviderType) {
+  if (type === selectedProvider.value && !providers.value.find((p) => p.type === type)?.requiresKey) return;
 
-  const provider = providers.find((p) => p.type === type);
+  const provider = providers.value.find((p) => p.type === type);
   if (!provider) return;
 
   if (!provider.requiresKey) {
-    selectedProvider.value = type;
-    apiKey.value = "";
-    settingsStore.setRatesConfig("", type);
-    toast(t("success"));
-    expandedProvider.value = null;
-    showChangeProvider.value = false;
+    try {
+      selectedProvider.value = type;
+      await setConfigValue("ratesProvider", type);
+      toast(t("success"));
+      expandedProvider.value = null;
+      showChangeProvider.value = false;
+    } catch (e) {
+      toast(formatErrorForToast(e, t), "error");
+    }
     return;
   }
 
   expandedProvider.value = expandedProvider.value === type ? null : type;
 }
 
-function saveProviderConfig(type: RatesProviderType) {
-  selectedProvider.value = type;
-  settingsStore.setRatesConfig(apiKey.value, type);
-  expandedProvider.value = null;
-  showChangeProvider.value = false;
-  toast(t("success"));
+async function saveProviderConfig(type: RatesProviderType) {
+  try {
+    selectedProvider.value = type;
+    await setSecureValue("ratesApiKey", apiKey.value);
+    await setConfigValue("ratesProvider", type);
+    expandedProvider.value = null;
+    showChangeProvider.value = false;
+    toast(t("success"));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  }
 }
 
 const otherProviders = computed(() =>
-  providers.filter((p) => p.type !== selectedProvider.value),
+  providers.value.filter((p) => p.type !== selectedProvider.value),
 );
 
-const autoUpdate = ref(settingsStore.settings.currencyAutoUpdate);
-const updateTargets = ref<string[]>([...settingsStore.settings.currencyUpdateTargets]);
+const autoUpdate = computed(() => Boolean(settings.value?.currencyAutoUpdate));
+const updateTargets = computed(() => settings.value?.currencyUpdateTargets ?? []);
 
 const targetCurrencyOptions = computed<SelectOption[]>(() =>
-  catalogStore.currencies
-    .filter((c) => c.id !== settingsStore.settings.mainCurrencyId)
+  currencies.value
+    .filter((c) => c.id !== settings.value?.mainCurrencyId)
     .map((c) => ({ value: c.id, label: `${c.name} (${c.code})` })),
 );
 
+const filteredTargetCurrencyOptions = computed<SelectOption[]>(() => {
+  const q = targetSearch.value.trim().toLowerCase();
+  if (!q) return targetCurrencyOptions.value;
+  return targetCurrencyOptions.value.filter((opt) => opt.label.toLowerCase().includes(q));
+});
+
 function toggleAutoUpdate() {
-  autoUpdate.value = !autoUpdate.value;
-  settingsStore.updateSettings({ currencyAutoUpdate: autoUpdate.value });
+  updateSettings({ currencyAutoUpdate: !autoUpdate.value });
 }
 
 function toggleTarget(curId: string) {
-  const idx = updateTargets.value.indexOf(curId);
+  const current = [...updateTargets.value];
+  const idx = current.indexOf(curId);
   if (idx >= 0) {
-    updateTargets.value.splice(idx, 1);
+    current.splice(idx, 1);
   } else {
-    updateTargets.value.push(curId);
+    current.push(curId);
   }
-  settingsStore.updateSettings({ currencyUpdateTargets: [...updateTargets.value] });
+  updateSettings({ currencyUpdateTargets: current });
 }
 
 function selectAllTargets() {
-  updateTargets.value = targetCurrencyOptions.value.map((o) => String(o.value));
-  settingsStore.updateSettings({ currencyUpdateTargets: [...updateTargets.value] });
+  updateSettings({ currencyUpdateTargets: targetCurrencyOptions.value.map((o) => String(o.value)) });
 }
 
 function deselectAllTargets() {
-  updateTargets.value = [];
-  settingsStore.updateSettings({ currencyUpdateTargets: [] });
+  updateSettings({ currencyUpdateTargets: [] });
 }
 
-const lastUpdate = computed(() => settingsStore.settings.lastCurrencyUpdate || t("never"));
+const lastUpdate = computed(() => settings.value?.lastCurrencyUpdate || t("never"));
 
 const isUpdating = ref(false);
 
 async function manualUpdate() {
-  const provider = activeProvider.value;
-  if (!provider) return;
-  if (provider.requiresKey && !apiKey.value) {
-    toast(t("rates_key_required"), "error");
-    return;
-  }
   isUpdating.value = true;
   try {
-    const result = await updateCurrencyRates(
-      selectedProvider.value,
-      apiKey.value,
-      catalogStore.currencies,
-      settingsStore.settings.mainCurrencyId,
-      updateTargets.value,
-      {
-        historyEnabled: settingsStore.settings.rateHistoryEnabled,
-        historyDays: settingsStore.settings.rateHistoryDays,
-      },
-    );
+    console.log("[ExchangeRatesSection] manualUpdate start", {
+      provider: selectedProvider.value,
+      activeProvider: activeProvider.value?.type,
+      mainCurrencyId: settings.value?.mainCurrencyId,
+      targetCount: settings.value?.currencyUpdateTargets?.length ?? 0,
+    });
+    const result = await ratesRunBackendUpdate();
+    console.log("[ExchangeRatesSection] manualUpdate backend result", result);
+    await metaStore.refresh();
+    settings.value = metaStore.settings;
+    currencies.value = metaStore.currencies;
+    console.log("[ExchangeRatesSection] manualUpdate post-refresh", {
+      lastCurrencyUpdate: settings.value?.lastCurrencyUpdate,
+      currencyCount: currencies.value.length,
+    });
     if (result.error) {
       toast(result.error, "error");
     } else if (result.updated > 0) {
-      settingsStore.updateSettings({ lastCurrencyUpdate: new Date().toISOString().split("T")[0] });
       toast(t("rates_updated").replace("{count}", String(result.updated)));
     } else {
-      toast(t("no_rates_updated"));
+      toast(t("no_rates_updated"), "error");
     }
   } catch (e) {
-    toast(String(e), "error");
+    console.error("[ExchangeRatesSection] manualUpdate failed", e);
+    toast(formatErrorForToast(e, t), "error");
   } finally {
     isUpdating.value = false;
   }
@@ -142,7 +178,7 @@ const sectionTv = tv({
   slots: {
     root: "bg-surface rounded-xl border border-border p-4 sm:p-5",
     header: "flex items-center gap-2 mb-1",
-    title: "text-base sm:text-lg font-semibold text-text-primary",
+    title: ui.sectionTitle(),
     desc: "text-xs sm:text-sm text-text-muted mb-4",
     providerCard: "rounded-xl border overflow-hidden transition-all cursor-pointer select-none",
     providerRow: "flex items-center gap-3 p-3",
@@ -190,12 +226,6 @@ const s = sectionTv();
           </div>
           <p class="text-[10px] text-text-muted">{{ activeProvider.freeTierNote }}</p>
         </div>
-        <button
-          @click.stop="openUrl(activeProvider.url)"
-          class="p-1.5 rounded-md text-text-muted hover:text-primary transition-colors shrink-0"
-        >
-          <ExternalLink :size="13" />
-        </button>
       </div>
       <!-- Change provider button -->
       <div class="flex items-center gap-2 mt-2 pt-2 border-t border-border">
@@ -231,12 +261,6 @@ const s = sectionTv();
               <p :class="s.providerName()">{{ provider.name }}</p>
               <p :class="s.providerNote()">{{ provider.freeTierNote }}</p>
             </div>
-            <button
-              @click.stop="openUrl(provider.url)"
-              class="p-1.5 rounded-md text-text-muted hover:text-primary transition-colors"
-            >
-              <ExternalLink :size="13" />
-            </button>
             <ChevronDown
               v-if="provider.requiresKey"
               :size="16"
@@ -265,9 +289,6 @@ const s = sectionTv();
                     <button @click.stop="saveProviderConfig(provider.type)" :disabled="!apiKey" :class="s.saveBtn()">
                       {{ t('sync_connect') }}
                     </button>
-                    <button @click.stop="openUrl(provider.url)" :class="s.linkBtn()">
-                      {{ t('rates_get_key') }} <ExternalLink :size="10" />
-                    </button>
                   </div>
                 </div>
               </div>
@@ -276,6 +297,30 @@ const s = sectionTv();
         </div>
       </div>
     </Transition>
+
+    <!-- Active provider credentials -->
+    <div
+      v-if="activeProvider"
+      class="rounded-xl border border-border bg-surface p-3 mb-3"
+    >
+      <p class="text-xs font-medium text-text-primary mb-2">
+        {{ t('api_key') }} — {{ activeProvider.name }}
+      </p>
+      <div class="flex flex-col sm:flex-row gap-2">
+        <input
+          v-model="apiKey"
+          type="password"
+          :class="[s.credInput(), 'flex-1']"
+          :placeholder="t('api_key')"
+        />
+        <button
+          @click="saveProviderConfig(activeProvider.type)"
+          :class="s.saveBtn()"
+        >
+          {{ t('save') }}
+        </button>
+      </div>
+    </div>
 
     <!-- Target currencies -->
     <div :class="s.divider()">
@@ -291,9 +336,18 @@ const s = sectionTv();
         </div>
       </div>
       <p class="text-[10px] text-text-muted mb-2">{{ t('target_currencies_info') }}</p>
+      <div class="relative mb-2">
+        <Search :size="13" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+        <input
+          v-model="targetSearch"
+          type="text"
+          :placeholder="t('search')"
+          class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
+        />
+      </div>
       <div class="flex flex-wrap gap-1.5 max-h-32 overflow-auto">
         <button
-          v-for="opt in targetCurrencyOptions"
+          v-for="opt in filteredTargetCurrencyOptions"
           :key="String(opt.value)"
           @click="toggleTarget(String(opt.value))"
           class="px-2 py-1 rounded-md text-[11px] font-medium border transition-colors"

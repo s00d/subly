@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { watch } from "vue";
 import { useClipboard } from "@/composables/useClipboard";
-import { CheckCircle, XCircle, Info, AlertTriangle, X, Copy } from "lucide-vue-next";
+import { CheckCircle, XCircle, Info, AlertTriangle, X, Copy } from "@lucide/vue";
 import { tv } from "@/lib/tv";
 
 const props = defineProps<{

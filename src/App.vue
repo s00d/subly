@@ -1,38 +1,84 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, watch, computed } from "vue";
+import { onMounted, onUnmounted, watch, ref } from "vue";
 import { useRouter } from "vue-router";
-import { useAppStore } from "@/stores/appStore";
-import { useSubscriptionsStore } from "@/stores/subscriptions";
-import { useSettingsStore } from "@/stores/settings";
-import { useCatalogStore } from "@/stores/catalog";
-import { checkAndNotify } from "@/services/notifications";
-import { shouldUpdateRates, updateCurrencyRates } from "@/services/rates";
-import type { RatesProviderType } from "@/services/rates";
-import { setupPushNotifications, startPushNotificationListener } from "@/services/pushNotifications";
-import { initSync, setSyncCallbacks, syncStatus, pullRemote, dismissPendingUpdate, flushSyncBeforeExit } from "@/services/sync";
+import {
+  notificationsEvent,
+  type InAppAlert,
+} from "@/services/notificationsClient";
+import {
+  initSync,
+  syncStatus,
+  pullRemote,
+  dismissPendingUpdate,
+  flushSyncBeforeExit,
+  finishOAuth,
+  checkRemote,
+} from "@/services/syncClient";
+import { setLanguage } from "@/i18n";
+import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { useAlerts } from "@/composables/useAlerts";
-import { setupTray, setTraySubscriptionClickHandler } from "@/services/tray";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { listen } from "@tauri-apps/api/event";
+import { getCurrent as getCurrentDeepLinks, onOpenUrl } from "@tauri-apps/plugin-deep-link";
+import { useDashboardStore } from "@/stores/dashboardStore";
+import { useExpensesStore } from "@/stores/expensesStore";
+import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
+import { useCalendarStore } from "@/stores/calendarStore";
+import { useAppMetaStore } from "@/stores/appMetaStore";
+import { useCatalogsUsageStore } from "@/stores/catalogsUsageStore";
+import { useNowStore } from "@/stores/nowStore";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import InAppAlerts from "@/components/ui/InAppAlerts.vue";
+import { formatErrorForToast } from "@/utils/formatError";
 
 const router = useRouter();
-const appStore = useAppStore();
-const subsStore = useSubscriptionsStore();
-const settingsStore = useSettingsStore();
-const catalogStore = useCatalogStore();
+const isLoading = ref(true);
 const { alerts, setAlerts, dismiss, dismissAll } = useAlerts();
 const { t } = useI18n();
 const { toast } = useToast();
+let audioCtx: AudioContext | null = null;
+
+function playNotificationSoundFrontend() {
+  try {
+    const Ctx = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Ctx) return;
+    if (!audioCtx) audioCtx = new Ctx();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = 880;
+    gain.gain.value = 0.06;
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    const now = audioCtx.currentTime;
+    osc.start(now);
+    osc.stop(now + 0.16);
+  } catch (e) {
+    console.warn("Notification sound playback failed:", e);
+  }
+}
 
 async function handlePullRemote() {
-  const ok = await pullRemote();
-  if (ok) {
+  const result = await pullRemote();
+  if (result.ok) {
+    await metaStore.refresh();
+    await Promise.all([
+      dashboardStore.loadPage(true),
+      subscriptionsStore.loadBrief(subscriptionsStore.currentFilter),
+      expensesStore.loadPage(expensesStore.page, expensesStore.currentFilter),
+      expensesStore.refreshSummary(expensesStore.currentFilter),
+      calendarStore.reloadCurrentMonth(),
+      catalogsUsageStore.refreshIfLoaded(),
+    ]);
     toast(t("sync_pull_success"));
-  } else if (syncStatus.error) {
-    toast(syncStatus.error, "error");
+  } else {
+    const msg =
+      (result.messageKey && t(result.messageKey)) ||
+      syncStatus.error ||
+      t("sync_operation_failed");
+    toast(msg, "error");
   }
 }
 
@@ -40,23 +86,43 @@ function handleDismissSync() {
   dismissPendingUpdate();
 }
 
-async function initTray() {
-  try {
-    await setupTray(
-      subsStore.subscriptions,
-      settingsStore.settings,
-      catalogStore.currencies,
-    );
-  } catch (e) {
-    console.warn("Tray setup failed:", e);
-  }
-}
-
 let notificationInterval: ReturnType<typeof setInterval> | null = null;
 let unlistenCloseRequested: (() => void) | null = null;
 let closingWithSync = false;
 let mediaQueryList: MediaQueryList | null = null;
 let mediaQueryListener: ((e: MediaQueryListEvent) => void) | null = null;
+let unlistenDeepLinks: (() => void) | null = null;
+let unlistenLocalNotifications: (() => void) | null = null;
+let unlistenSingleInstanceDeepLink: (() => void) | null = null;
+let unlistenDataChanged: (() => void) | null = null;
+let wakeHandler: (() => void) | null = null;
+let visibilityHandler: (() => void) | null = null;
+let refreshDataTimer: ReturnType<typeof setTimeout> | null = null;
+const dashboardStore = useDashboardStore();
+const expensesStore = useExpensesStore();
+const subscriptionsStore = useSubscriptionsStore();
+const calendarStore = useCalendarStore();
+const metaStore = useAppMetaStore();
+const catalogsUsageStore = useCatalogsUsageStore();
+const nowStore = useNowStore();
+const { settings } = storeToRefs(metaStore);
+
+interface DataChangedEventPayload {
+  entity?: string;
+  action?: string;
+}
+
+function scheduleStoresRefresh() {
+  if (refreshDataTimer) clearTimeout(refreshDataTimer);
+  refreshDataTimer = setTimeout(() => {
+    void dashboardStore.loadPage(true);
+    void subscriptionsStore.loadBrief(subscriptionsStore.currentFilter);
+    void expensesStore.loadPage(expensesStore.page, expensesStore.currentFilter);
+    void expensesStore.refreshSummary(expensesStore.currentFilter);
+    void calendarStore.reloadCurrentMonth();
+    void catalogsUsageStore.refreshIfLoaded();
+  }, 120);
+}
 
 function logUnhandledRejection(event: PromiseRejectionEvent) {
   console.error("[Global] Unhandled promise rejection", {
@@ -76,101 +142,109 @@ function logWindowError(event: ErrorEvent) {
 
 async function runNotificationCheck() {
   try {
-    const result = await checkAndNotify({
-      subscriptions: subsStore.subscriptions,
-      settings: settingsStore.settings,
-      telegram: {
-        botToken: settingsStore.telegramBotToken,
-        chatId: settingsStore.telegramChatId,
-        enabled: settingsStore.telegramEnabled,
-      },
-      currencies: catalogStore.currencies,
-      onNotified: (subId, date) => subsStore.markNotified(subId, date),
-    });
-    if (result.alerts.length > 0) {
-      setAlerts(result.alerts);
+    const result = await notificationsEvent<{ sentCount: number; alerts: InAppAlert[] }>("run_check");
+    const data = result.data;
+    if (data.alerts.length > 0) {
+      setAlerts(data.alerts);
     }
   } catch (e) {
-    console.warn("Notification check failed:", e);
+    console.error("Notification check failed:", e);
   }
 }
 
-async function runCurrencyUpdate() {
+function parseOAuthUrl(url: string): { code: string; provider: "gdrive" | "dropbox" | "onedrive" | undefined } | null {
   try {
-    const s = settingsStore.settings;
-    if (!s.currencyAutoUpdate) return;
-    const providerType = settingsStore.ratesProvider as RatesProviderType;
-    const apiKey = settingsStore.ratesApiKey;
-    if (!apiKey && providerType !== "frankfurter") return;
-    if (!shouldUpdateRates(s.lastCurrencyUpdate)) return;
+    const parsed = new URL(url);
+    const code = parsed.searchParams.get("code");
+    if (!code) return null;
+    const state = parsed.searchParams.get("state");
+    const provider = state === "gdrive" || state === "dropbox" || state === "onedrive" ? state : undefined;
+    return { code, provider };
+  } catch {
+    return null;
+  }
+}
 
-    const result = await updateCurrencyRates(
-      providerType,
-      apiKey,
-      catalogStore.currencies,
-      s.mainCurrencyId,
-      s.currencyUpdateTargets,
-      {
-        historyEnabled: s.rateHistoryEnabled,
-        historyDays: s.rateHistoryDays,
-      },
-    );
-
-    if (result.updated > 0) {
-      settingsStore.updateSettings({ lastCurrencyUpdate: new Date().toISOString().split("T")[0] });
-      console.log(`Currency rates updated: ${result.updated} currencies`);
+async function handleOAuthUrls(urls: string[]) {
+  for (const url of urls) {
+    if (!url.startsWith("subly://oauth/callback")) continue;
+    const parsed = parseOAuthUrl(url);
+    if (!parsed) continue;
+    const ok = await finishOAuth(parsed.code, parsed.provider);
+    if (ok) {
+      toast(t("sync_connected"));
+    } else {
+      toast(t("sync_oauth_failed"), "error");
     }
-    if (result.error) {
-      console.warn("Currency update error:", result.error);
-    }
-  } catch (e) {
-    console.warn("Currency auto-update failed:", e);
   }
 }
 
 onMounted(async () => {
-  await appStore.init();
+  isLoading.value = true;
+  nowStore.ensureStarted();
+  await metaStore.ensureLoaded();
+  if (!settings.value) {
+    isLoading.value = false;
+    return;
+  }
+  await setLanguage(settings.value.language);
   applyTheme();
   applyColorTheme();
+  isLoading.value = false;
 
   await runNotificationCheck();
-  await runCurrencyUpdate();
 
   notificationInterval = setInterval(() => {
     runNotificationCheck();
-    runCurrencyUpdate();
   }, 30 * 60 * 1000);
 
-  setTraySubscriptionClickHandler((subId: string) => {
-    router.push({ path: "/subscriptions", query: { sub: subId } });
+  unlistenLocalNotifications = await listen<{ title: string; body: string }>("notifications:local", (event) => {
+    const payload = event.payload;
+    if (!payload?.body) return;
+    playNotificationSoundFrontend();
+    toast(`${payload.title}: ${payload.body}`);
   });
 
-  await initTray();
+  unlistenDataChanged = await listen<DataChangedEventPayload>("app:data-changed", (event) => {
+    const payload = event.payload;
+    if (payload?.entity === "appData" || payload?.entity === "settings") {
+      void metaStore.refresh();
+    }
+    scheduleStoresRefresh();
+  });
 
   try {
-    const pushResult = await setupPushNotifications();
-    if (pushResult.registered && pushResult.token) {
-      console.log("Push notifications registered, token:", pushResult.token);
+    await initSync();
+    const startUrls = await getCurrentDeepLinks();
+    if (startUrls && startUrls.length > 0) {
+      await handleOAuthUrls(startUrls);
     }
-    await startPushNotificationListener((event) => {
-      console.log("Push notification event:", event.type, event.payload);
-      if (event.type === "FOREGROUND_DELIVERY" || event.type === "BACKGROUND_TAP") {
-        runNotificationCheck();
+    unlistenDeepLinks = await onOpenUrl(handleOAuthUrls);
+    unlistenSingleInstanceDeepLink = await listen<string[]>("deep-link:single-instance", (event) => {
+      if (event.payload?.length) {
+        void handleOAuthUrls(event.payload);
       }
     });
   } catch (e) {
-    console.warn("Push notification init skipped:", e);
+    const message = formatErrorForToast(e, t);
+    syncStatus.error = message;
+    console.error("Sync init failed:", e);
+    toast(message, "error");
   }
 
-  try {
-    setSyncCallbacks(
-      (data) => appStore.importData(data),
-      () => appStore.getExportData(),
-    );
-    await initSync();
-  } catch (e) {
-    console.warn("Sync init skipped:", e);
-  }
+  wakeHandler = () => {
+    runNotificationCheck();
+    checkRemote().catch((e) => {
+      const message = e instanceof Error ? e.message : String(e);
+      syncStatus.error = message;
+      console.error("Sync checkRemote failed:", e);
+    });
+  };
+  visibilityHandler = () => {
+    if (!document.hidden) wakeHandler?.();
+  };
+  window.addEventListener("focus", wakeHandler);
+  document.addEventListener("visibilitychange", visibilityHandler);
 
   document.addEventListener("keydown", handleKeyDown);
   window.addEventListener("unhandledrejection", logUnhandledRejection);
@@ -199,13 +273,14 @@ onUnmounted(() => {
   if (mediaQueryList && mediaQueryListener) {
     mediaQueryList.removeEventListener("change", mediaQueryListener);
   }
+  if (unlistenDeepLinks) unlistenDeepLinks();
+  if (unlistenSingleInstanceDeepLink) unlistenSingleInstanceDeepLink();
+  if (unlistenLocalNotifications) unlistenLocalNotifications();
+  if (unlistenDataChanged) unlistenDataChanged();
+  if (refreshDataTimer) clearTimeout(refreshDataTimer);
+  if (wakeHandler) window.removeEventListener("focus", wakeHandler);
+  if (visibilityHandler) document.removeEventListener("visibilitychange", visibilityHandler);
 });
-
-watch(
-  () => subsStore.subscriptions,
-  () => initTray(),
-  { deep: true },
-);
 
 function handleKeyDown(e: KeyboardEvent) {
   const isMod = e.metaKey || e.ctrlKey;
@@ -220,7 +295,8 @@ function handleKeyDown(e: KeyboardEvent) {
 }
 
 function applyTheme() {
-  const dt = settingsStore.settings.darkTheme;
+  const dt = settings.value?.darkTheme;
+  if (dt === undefined) return;
   if (dt === 1) {
     document.documentElement.classList.add("dark");
   } else if (dt === 0) {
@@ -232,27 +308,27 @@ function applyTheme() {
 }
 
 function applyColorTheme() {
-  const theme = settingsStore.settings.colorTheme;
+  const theme = settings.value?.colorTheme || "blue";
   document.body.className = document.body.className.replace(/theme-\w+/g, "").trim();
   if (theme !== "blue") {
     document.body.classList.add(`theme-${theme}`);
   }
 }
 
-watch(() => settingsStore.settings.darkTheme, applyTheme);
-watch(() => settingsStore.settings.colorTheme, applyColorTheme);
+watch(() => settings.value?.darkTheme, applyTheme);
+watch(() => settings.value?.colorTheme, applyColorTheme);
 
 if (typeof window !== "undefined") {
   mediaQueryList = window.matchMedia("(prefers-color-scheme: dark)");
   mediaQueryListener = () => {
-    if (settingsStore.settings.darkTheme === 2) applyTheme();
+    if (settings.value?.darkTheme === 2) applyTheme();
   };
   mediaQueryList.addEventListener("change", mediaQueryListener);
 }
 </script>
 
 <template>
-  <div v-if="appStore.isLoading" class="h-screen flex items-center justify-center bg-surface-secondary">
+  <div v-if="isLoading" class="h-screen flex items-center justify-center bg-surface-secondary">
     <div class="text-center">
       <div class="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-3">
         <span class="text-white font-bold text-xl">W</span>

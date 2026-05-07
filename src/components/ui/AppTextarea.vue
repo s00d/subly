@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { tv } from "@/lib/tv";
+import { computed } from "vue";
+import { tv, ui } from "@/lib/tv";
 
-defineProps<{
+const props = defineProps<{
   modelValue: string;
   placeholder?: string;
   disabled?: boolean;
   rows?: number;
   label?: string;
+  error?: string;
+  class?: string;
 }>();
 
 const emit = defineEmits<{
@@ -20,23 +23,37 @@ function onInput(e: Event) {
 const textareaTv = tv({
   slots: {
     root: "w-full",
-    labelEl: "block text-xs font-medium text-text-secondary mb-1.5",
+    labelEl: ui.fieldLabel(),
     textareaEl: [
-      "w-full px-3 py-2 rounded-lg border border-border",
-      "bg-surface text-text-primary text-sm",
-      "placeholder-text-muted resize-none",
-      "hover:border-text-muted",
-      "focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent",
-      "disabled:opacity-50 transition-shadow",
+      ui.field(),
+      "px-3 py-2 text-sm resize-none",
     ],
+    errorEl: ui.fieldError(),
   },
+  variants: {
+    status: {
+      error: {
+        textareaEl: "border-red-500 hover:border-red-500 focus:ring-red-500/20 focus:border-red-500",
+      },
+      normal: {},
+    },
+    disabled: {
+      true: { textareaEl: "bg-surface-secondary" },
+    },
+  },
+  defaultVariants: { status: "normal" },
 });
 
-const slots = textareaTv();
+const slots = computed(() =>
+  textareaTv({
+    status: props.error ? "error" : "normal",
+    disabled: props.disabled || undefined,
+  }),
+);
 </script>
 
 <template>
-  <div :class="slots.root()">
+  <div :class="slots.root({ class: props.class })">
     <label v-if="label" :class="slots.labelEl()">{{ label }}</label>
     <textarea
       :value="modelValue"
@@ -46,5 +63,6 @@ const slots = textareaTv();
       @input="onInput"
       :class="slots.textareaEl()"
     />
+    <p v-if="error" :class="slots.errorEl()">{{ error }}</p>
   </div>
 </template>

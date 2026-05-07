@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { tv } from "@/lib/tv";
+import { tv, iconSize } from "@/lib/tv";
 import { version } from "../../../package.json";
 import {
   LayoutDashboard,
@@ -11,7 +11,7 @@ import {
   Calendar,
   Settings,
   ArrowRightLeft,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 
 const props = withDefaults(defineProps<{
   mobile?: boolean;
@@ -48,7 +48,7 @@ const sidebarTv = tv({
     root: "w-56 shrink-0 bg-surface border-r border-border flex flex-col h-full",
     logoWrap: "h-16 flex items-center px-5 border-b border-border",
     logoIcon: "w-8 h-8 rounded-lg bg-primary flex items-center justify-center",
-    logoText: "font-semibold text-lg text-text-primary",
+    logoText: "font-semibold text-sm text-text-primary tracking-tight",
     nav: "flex-1 p-3 space-y-1",
     navItem: "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
     footer: "p-4 border-t border-border",
@@ -85,7 +85,7 @@ const slots = sidebarTv();
           :class="sidebarTv({ active: isActive(item.name) }).navItem()"
           class="w-full text-left"
         >
-          <component :is="item.icon" :size="20" />
+          <component :is="item.icon" :size="iconSize.nav" />
           <span>{{ item.label }}</span>
         </button>
       </template>
@@ -96,7 +96,7 @@ const slots = sidebarTv();
           :to="item.path"
           :class="sidebarTv({ active: isActive(item.name) }).navItem()"
         >
-          <component :is="item.icon" :size="20" />
+          <component :is="item.icon" :size="iconSize.nav" />
           <span>{{ item.label }}</span>
         </router-link>
       </template>

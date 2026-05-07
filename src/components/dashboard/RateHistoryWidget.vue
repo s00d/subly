@@ -1,62 +1,71 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
-import { useSettingsStore } from "@/stores/settings";
-import { useCatalogStore } from "@/stores/catalog";
 import { useI18n } from "vue-i18n";
-import { dbGetRateHistoryBatch } from "@/services/database";
-import type { RateHistoryPoint } from "@/services/database";
-import { currencyFlag } from "@/services/currencyFlags";
-import { TrendingUp } from "lucide-vue-next";
+import { getRateHistoryWidget, type RateHistoryPoint } from "@/services/dashboardClient";
+import { getCurrencyFlags } from "@/services/ratesClient";
+import type { Settings, Currency } from "@/schemas/appData";
+import { TrendingUp } from "@lucide/vue";
 import { useRouter } from "vue-router";
-import { Line } from "vue-chartjs";
-import {
-  Chart as ChartJS,
-  LineElement,
-  PointElement,
-  LinearScale,
-  CategoryScale,
-  Tooltip as ChartTooltip,
-  Legend,
-  Filler,
-} from "chart.js";
-
-ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, ChartTooltip, Legend, Filler);
+import VChart from "vue-echarts";
+import type { EChartsCoreOption } from "echarts/core";
 
 const LINE_COLORS = [
   "#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6",
   "#06b6d4", "#ec4899", "#f97316", "#14b8a6", "#6366f1",
   "#a855f7", "#84cc16", "#e11d48", "#0ea5e9", "#d946ef",
 ];
+const props = defineProps<{
+  settings?: Settings | null;
+  currencies?: Currency[];
+}>();
 
-const settingsStore = useSettingsStore();
-const catalogStore = useCatalogStore();
+const settings = ref<Settings | null>(null);
+const allCurrencies = ref<Currency[]>([]);
 const { t } = useI18n();
 const router = useRouter();
 
 const history = ref<Record<string, RateHistoryPoint[]>>({});
+const currencyFlags = ref<Record<string, string>>({});
 
-const targetIds = computed(() => settingsStore.settings.currencyUpdateTargets);
-const mainCurrency = computed(() => catalogStore.mainCurrency);
+const targetIds = computed(() => settings.value?.currencyUpdateTargets ?? []);
+const mainCurrency = computed(() =>
+  allCurrencies.value.find((c) => c.id === settings.value?.mainCurrencyId) ?? null,
+);
 
 const currencies = computed(() =>
   targetIds.value
-    .map((id) => catalogStore.currencies.find((c) => c.id === id))
+    .map((id) => allCurrencies.value.find((c) => c.id === id))
     .filter((c): c is NonNullable<typeof c> => !!c && c.rate > 0),
 );
 
 const hasHistory = computed(() => Object.values(history.value).some((h) => h.length >= 1));
 
 async function loadHistory() {
-  if (!settingsStore.settings.rateHistoryEnabled || targetIds.value.length === 0) return;
-  history.value = await dbGetRateHistoryBatch(targetIds.value, settingsStore.settings.rateHistoryDays);
+  if (!settings.value?.rateHistoryEnabled || targetIds.value.length === 0) return;
+  history.value = await getRateHistoryWidget(targetIds.value, settings.value.rateHistoryDays);
 }
 
-onMounted(loadHistory);
+async function loadFlags() {
+  const codes = [...new Set(currencies.value.map((c) => c.code).filter(Boolean))];
+  currencyFlags.value = codes.length ? await getCurrencyFlags(codes) : {};
+}
+
+function flagFor(code: string): string {
+  return currencyFlags.value[code.toUpperCase()] || "";
+}
+
+onMounted(async () => {
+  settings.value = props.settings ?? null;
+  allCurrencies.value = props.currencies ?? [];
+  await loadHistory();
+  await loadFlags();
+});
 
 watch(
-  [targetIds, () => settingsStore.settings.rateHistoryEnabled, () => settingsStore.settings.rateHistoryDays],
+  [targetIds, () => settings.value?.rateHistoryEnabled, () => settings.value?.rateHistoryDays],
   () => {
     loadHistory();
+    loadFlags();
   },
   { deep: true },
 );
@@ -98,7 +107,6 @@ function pctChange(data: number[]): string {
   return `${sign}${pct.toFixed(2)}%`;
 }
 
-// Line chart data
 const allDates = computed(() => {
   const dateSet = new Set<string>();
   for (const points of Object.values(history.value)) {
@@ -107,81 +115,91 @@ const allDates = computed(() => {
   return [...dateSet].sort();
 });
 
-const chartData = computed(() => {
+const rateLineSeriesCount = computed(
+  () => currencies.value.filter((cur) => (history.value[cur.id] ?? []).length >= 1).length,
+);
+
+const rateChartOption = computed((): EChartsCoreOption => {
   const labels = allDates.value.map((d) => {
     const parts = d.split("-");
     return `${parts[2]}.${parts[1]}`;
   });
 
-  const datasets = currencies.value
+  const series = currencies.value
     .filter((cur) => (history.value[cur.id] ?? []).length >= 1)
     .map((cur, i) => {
       const points = history.value[cur.id] ?? [];
       const rateMap = new Map(points.map((p) => [p.recordedAt, p.rate]));
       const data = allDates.value.map((d) => rateMap.get(d) ?? null);
       const color = LINE_COLORS[i % LINE_COLORS.length];
-      const flag = currencyFlag(cur.code);
+      const flag = flagFor(cur.code);
       return {
-        label: `${flag ? flag + " " : ""}${cur.code}`,
+        name: `${flag ? flag + " " : ""}${cur.code}`,
+        type: "line" as const,
+        smooth: 0.35,
+        connectNulls: true,
+        showSymbol: allDates.value.length <= 30,
+        symbolSize: allDates.value.length > 30 ? 0 : 6,
+        lineStyle: { width: 2.5, color },
+        itemStyle: { color },
         data,
-        borderColor: color,
-        backgroundColor: color + "20",
-        fill: false,
-        tension: 0.3,
-        pointRadius: allDates.value.length > 30 ? 0 : 3,
-        pointHoverRadius: 5,
-        borderWidth: 2,
-        spanGaps: true,
       };
     });
 
-  return { labels, datasets };
-});
-
-const chartOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  interaction: {
-    mode: "index" as const,
-    intersect: false,
-  },
-  plugins: {
-    legend: {
-      position: "bottom" as const,
-      labels: {
-        usePointStyle: true,
-        pointStyle: "line" as const,
-        padding: 12,
-        font: { size: 11 },
-      },
-    },
+  return {
+    animationDuration: 480,
+    color: LINE_COLORS,
     tooltip: {
-      callbacks: {
-        label: (ctx: { dataset: { label?: string }; parsed: { y: number | null } }) => {
-          const val = ctx.parsed.y;
-          if (val === null) return "";
-          return `${ctx.dataset.label}: ${val.toFixed(4)}`;
-        },
+      trigger: "axis",
+      axisPointer: { type: "line" },
+      formatter: (params: unknown) => {
+        const arr = Array.isArray(params) ? params : [params];
+        if (arr.length === 0) return "";
+        const first = arr[0] as { axisValue?: string };
+        const lines = arr
+          .map((raw: unknown) => {
+            const x = raw as { seriesName?: string; value?: number | null };
+            if (x.value === null || x.value === undefined) return "";
+            return `${x.seriesName}: ${Number(x.value).toFixed(4)}`;
+          })
+          .filter(Boolean);
+        return lines.length ? `${first.axisValue ?? ""}<br/>${lines.join("<br/>")}` : "";
       },
     },
-  },
-  scales: {
-    x: {
-      grid: { display: false },
-      ticks: { font: { size: 10 }, maxRotation: 45 },
+    legend: {
+      bottom: 0,
+      type: "scroll",
+      textStyle: { fontSize: 11 },
+      itemGap: 12,
     },
-    y: {
-      grid: { color: "rgba(128,128,128,0.1)" },
-      ticks: { font: { size: 10 } },
+    grid: {
+      left: 10,
+      right: 12,
+      top: 20,
+      bottom: series.length > 3 ? 56 : 48,
+      containLabel: true,
     },
-  },
-}));
+    xAxis: {
+      type: "category",
+      boundaryGap: false,
+      data: labels,
+      axisLine: { lineStyle: { color: "rgba(128,128,128,0.2)" } },
+      axisLabel: { fontSize: 10, rotate: labels.length > 14 ? 36 : 0 },
+    },
+    yAxis: {
+      type: "value",
+      splitLine: { lineStyle: { color: "rgba(128,128,128,0.1)" } },
+      axisLabel: { fontSize: 10 },
+    },
+    series,
+  };
+});
 </script>
 
 <template>
   <div
-    v-if="settingsStore.settings.rateHistoryEnabled && currencies.length > 0 && hasHistory"
-    class="bg-surface rounded-xl border border-border p-3 sm:p-5"
+    v-if="settings?.rateHistoryEnabled && currencies.length > 0 && hasHistory"
+    class="bg-surface rounded-xl border border-border p-2.5 sm:p-4"
   >
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-2">
@@ -195,14 +213,14 @@ const chartOptions = computed(() => ({
     </div>
 
     <!-- Mini cards -->
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 mb-4">
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-3">
       <div
         v-for="cur in currencies"
         :key="cur.id"
         class="rounded-lg border border-border p-2.5 sm:p-3 bg-surface-secondary"
       >
         <div class="flex items-center gap-1.5 mb-1.5">
-          <span v-if="currencyFlag(cur.code)" class="text-sm">{{ currencyFlag(cur.code) }}</span>
+          <span v-if="flagFor(cur.code)" class="text-sm">{{ flagFor(cur.code) }}</span>
           <span class="text-xs font-bold text-text-primary">{{ cur.code }}</span>
           <span
             v-if="pctChange((history[cur.id] ?? []).map(p => p.rate))"
@@ -241,8 +259,8 @@ const chartOptions = computed(() => ({
     </div>
 
     <!-- Line chart -->
-    <div v-if="hasHistory && chartData.datasets.length > 0" class="h-64 sm:h-80">
-      <Line :data="chartData" :options="chartOptions" />
+    <div v-if="hasHistory && rateLineSeriesCount > 0" class="h-56 sm:h-72 min-h-[14rem]">
+      <VChart class="h-full w-full" :option="rateChartOption" autoresize />
     </div>
   </div>
 </template>

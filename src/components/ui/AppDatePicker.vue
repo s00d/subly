@@ -7,8 +7,8 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-} from "lucide-vue-next";
-import { tv } from "@/lib/tv";
+} from "@lucide/vue";
+import { tv, ui } from "@/lib/tv";
 
 const props = defineProps<{
   modelValue: string;
@@ -208,30 +208,29 @@ onUnmounted(() => {
 const datePickerTv = tv({
   slots: {
     root: "relative w-full",
-    labelEl: "block text-xs font-medium text-text-secondary mb-1.5",
+    labelEl: ui.fieldLabel(),
     trigger: [
-      "w-full flex items-center gap-2.5 px-3 py-2 rounded-lg border",
-      "bg-surface text-sm text-left transition-shadow cursor-pointer",
-      "disabled:opacity-50 disabled:cursor-not-allowed",
+      ui.field(),
+      "flex items-center gap-2.5 px-3 py-2 text-sm text-left cursor-pointer",
     ],
     popover: "fixed z-[200] w-72 bg-surface border border-border rounded-xl shadow-xl overflow-hidden flex flex-col",
     header: "flex items-center justify-between px-3 py-2 border-b border-border bg-surface-secondary",
-    navBtn: "p-1.5 rounded hover:bg-border text-text-secondary transition-colors",
-    viewToggleBtn: "text-sm font-semibold hover:bg-border px-2 py-1 rounded transition-colors text-text-primary",
+    navBtn: "p-1.5 rounded hover:bg-surface text-text-secondary transition-colors",
+    viewToggleBtn: "text-sm font-semibold hover:bg-surface px-2 py-1 rounded transition-colors text-text-primary",
     gridDays: "grid grid-cols-7 gap-1 p-3",
     gridMonthsYears: "grid grid-cols-3 gap-2 p-3",
     weekday: "text-center text-[10px] font-semibold text-text-muted uppercase mb-1",
     cellBtn: "h-8 rounded-lg text-sm flex items-center justify-center transition-colors",
     bigCellBtn: "py-3 rounded-lg text-sm font-medium transition-colors",
     quickActions: "flex items-center gap-2 p-3 border-t border-border bg-surface-secondary",
-    quickBtn: "flex-1 py-1.5 text-xs font-medium rounded-md border border-border bg-surface hover:bg-surface-hover hover:text-primary transition-colors text-text-secondary",
-    errorEl: "mt-1 text-xs text-red-500",
+    quickBtn: "flex-1 py-1.5 text-xs font-medium rounded-md border border-border bg-surface hover:bg-surface-hover transition-colors text-text-secondary",
+    errorEl: ui.fieldError(),
   },
   variants: {
     status: {
       error: { trigger: "border-red-500 ring-2 ring-red-500/20" },
       open: { trigger: "border-primary ring-2 ring-primary/20" },
-      normal: { trigger: "border-border hover:border-text-muted" },
+      normal: {},
     },
     cellState: {
       selected: { cellBtn: "bg-primary text-white font-bold shadow-md", bigCellBtn: "bg-primary text-white font-bold shadow-md" },

@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { logoAssets } from "@/services/logoAssets";
+import { ref, computed, onMounted } from "vue";
+import { getLogoAssets, type LogoAsset } from "@/services/logoClient";
 import { useI18n } from "vue-i18n";
-import { X, Upload, Image as ImageIcon, Search, Link as LinkIcon } from "lucide-vue-next";
+import { X, Upload, Image as ImageIcon, Search, Link as LinkIcon } from "@lucide/vue";
 import { tv } from "@/lib/tv";
 import { useToast } from "@/composables/useToast";
 import { useScrollLock } from "@/composables/useScrollLock";
@@ -21,11 +21,12 @@ const showPicker = ref(false);
 const searchQuery = ref("");
 const activeTab = ref<"gallery" | "upload" | "url">("gallery");
 const logoUrl = ref("");
+const logoAssets = ref<LogoAsset[]>([]);
 const MAX_ICON_DIMENSION = 128;
 const MAX_ICON_DATA_URL_BYTES = 200 * 1024;
 
 const filteredAssets = computed(() => {
-  let assets = logoAssets;
+  let assets = logoAssets.value;
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase();
     assets = assets.filter((a) => a.name.toLowerCase().includes(q));
@@ -134,7 +135,7 @@ const pickerTv = tv({
     previewBtn: [
       "w-12 h-12 rounded-xl border-2 border-dashed border-border",
       "flex items-center justify-center cursor-pointer",
-      "hover:border-primary hover:bg-primary-light",
+      "hover:border-primary hover:bg-surface-secondary",
       "transition-all overflow-hidden shrink-0",
     ],
     clearBtn: [
@@ -147,7 +148,7 @@ const pickerTv = tv({
       "relative bg-surface w-full overflow-hidden",
       "rounded-t-2xl sm:rounded-2xl shadow-2xl max-h-[85vh] sm:max-h-none sm:max-w-lg",
     ],
-    header: "flex items-center justify-between px-4 sm:px-5 py-3 sm:py-4 border-b border-border",
+    header: "flex items-center justify-between px-4 sm:px-5 py-2.5 sm:py-3 border-b border-border",
     headerTitle: "text-sm sm:text-base font-semibold text-text-primary",
     closeBtn: "p-1 rounded-lg hover:bg-surface-hover text-text-muted",
     tabBar: "flex border-b border-border",
@@ -163,12 +164,12 @@ const pickerTv = tv({
     uploadZone: [
       "flex flex-col items-center justify-center w-full h-40 rounded-xl",
       "border-2 border-dashed border-border cursor-pointer",
-      "hover:border-primary hover:bg-primary-light transition-colors",
+      "hover:border-primary hover:bg-surface-secondary transition-colors",
     ],
     urlInput: [
       "w-full px-3 py-2 rounded-lg border border-border",
       "bg-surface-secondary text-sm text-text-primary",
-      "placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary",
+      "placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary",
     ],
     actionBtn: [
       "px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium",
@@ -181,14 +182,18 @@ const pickerTv = tv({
       false: { tab: "text-text-muted hover:text-text-secondary" },
     },
     assetSelected: {
-      true: { assetBtn: "border-primary bg-primary-light ring-2 ring-primary" },
-      false: { assetBtn: "border-border hover:border-text-muted bg-surface-secondary" },
+      true: { assetBtn: "border-primary bg-primary-light ring-2 ring-primary/20" },
+      false: { assetBtn: "border-border bg-surface-secondary hover:bg-surface dark:hover:bg-white/6" },
     },
   },
 });
 
 const slots = pickerTv();
 useScrollLock(showPicker);
+
+onMounted(async () => {
+  logoAssets.value = await getLogoAssets();
+});
 </script>
 
 <template>
@@ -204,17 +209,10 @@ useScrollLock(showPicker);
     </div>
 
     <Teleport to="body">
-      <Transition
-        enter-active-class="transition ease-out duration-200"
-        enter-from-class="opacity-0"
-        enter-to-class="opacity-100"
-        leave-active-class="transition ease-in duration-150"
-        leave-from-class="opacity-100"
-        leave-to-class="opacity-0"
-      >
+      <Transition name="app-modal">
         <div v-if="showPicker" :class="slots.overlay()">
-          <div :class="slots.backdrop()" @click="showPicker = false" />
-          <div :class="slots.panel()">
+          <div :class="[slots.backdrop(), 'app-modal-backdrop']" @click="showPicker = false" />
+          <div :class="[slots.panel(), 'app-modal-panel']">
             <div :class="slots.header()">
               <h3 :class="slots.headerTitle()">{{ t('upload_logo') }}</h3>
               <button @click="showPicker = false" :class="slots.closeBtn()">

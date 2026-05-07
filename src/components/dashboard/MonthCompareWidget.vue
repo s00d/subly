@@ -1,34 +1,59 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from "vue";
+import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
-import { useExpensesStore } from "@/stores/expenses";
-import { dbGetExpenseMonthComparison, type MonthComparisonData } from "@/services/database";
-import { ArrowUpRight, ArrowDownRight, Equal } from "lucide-vue-next";
+import type { MonthComparisonStyle } from "@/services/dashboardClient";
+import { ArrowUpRight, ArrowDownRight, Equal } from "@lucide/vue";
 
 const { t } = useI18n();
 const { fmt } = useCurrencyFormat();
-const expsStore = useExpensesStore();
+const props = defineProps<{
+  data?: {
+    currentTotal: number;
+    currentCount: number;
+    previousTotal: number;
+    previousCount: number;
+    usedFullMonthFallback?: boolean;
+    comparisonStyle?: MonthComparisonStyle;
+    currentMonthLabel?: string;
+    previousMonthLabel?: string;
+  } | null;
+}>();
 
-const data = ref<MonthComparisonData | null>(null);
+const data = computed(() => props.data ?? null);
 
-async function loadComparison() {
-  const now = new Date();
-  const curPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const prevPrefix = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
-  data.value = await dbGetExpenseMonthComparison(curPrefix, prevPrefix);
+/** Human-readable month from `YYYY-MM` (backend labels). */
+function captionFromYm(ym: string | undefined): string {
+  if (!ym || ym.length < 7) return "";
+  const y = Number(ym.slice(0, 4));
+  const m = Number(ym.slice(5, 7));
+  if (!Number.isFinite(y) || !Number.isFinite(m)) return ym;
+  return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
 }
 
-onMounted(loadComparison);
+const comparisonHintKey = computed(() => {
+  const s = data.value?.comparisonStyle;
+  if (s === "completedPair") return "month_comparison_completed_pair_hint";
+  if (s === "fullMonths") return "month_comparison_full_month_hint";
+  return "month_comparison_mtd_hint";
+});
 
-watch(
-  [() => expsStore.totalCount, () => expsStore.currentPage, () => expsStore.filter],
-  () => {
-    loadComparison();
-  },
-  { deep: true },
-);
+const newerMonthCaption = computed(() => {
+  const d = data.value;
+  const fromApi = captionFromYm(d?.currentMonthLabel);
+  if (fromApi) return fromApi;
+  const now = new Date();
+  return now.toLocaleString(undefined, { month: "long", year: "numeric" });
+});
+
+const olderMonthCaption = computed(() => {
+  const d = data.value;
+  const fromApi = captionFromYm(d?.previousMonthLabel);
+  if (fromApi) return fromApi;
+  const x = new Date();
+  x.setMonth(x.getMonth() - 1);
+  return x.toLocaleString(undefined, { month: "long", year: "numeric" });
+});
 
 const diff = computed(() => {
   if (!data.value) return 0;
@@ -45,16 +70,11 @@ const barMax = computed(() => {
   return Math.max(data.value.currentTotal, data.value.previousTotal, 1);
 });
 
-function monthName(offset: number): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + offset);
-  return d.toLocaleString(undefined, { month: "long" });
-}
 </script>
 
 <template>
-  <div v-if="data && (data.currentTotal > 0 || data.previousTotal > 0)" class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-    <div class="flex items-center gap-2 mb-3">
+  <div v-if="data && (data.currentTotal > 0 || data.previousTotal > 0)" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
+    <div class="flex items-center gap-2 mb-2.5">
       <component
         :is="diff > 0 ? ArrowUpRight : diff < 0 ? ArrowDownRight : Equal"
         :size="16"
@@ -62,12 +82,15 @@ function monthName(offset: number): string {
       />
       <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_month_compare') }}</h2>
     </div>
+    <p class="text-[10px] text-text-muted mb-2.5 leading-snug">
+      {{ t(comparisonHintKey) }}
+    </p>
 
-    <div class="space-y-3">
-      <!-- Current month -->
+    <div class="space-y-2.5">
+      <!-- Newer / current side of comparison -->
       <div>
         <div class="flex items-center justify-between mb-1">
-          <span class="text-xs text-text-primary font-medium capitalize">{{ monthName(0) }}</span>
+          <span class="text-xs text-text-primary font-medium capitalize">{{ newerMonthCaption }}</span>
           <span class="text-sm font-bold text-text-primary tabular-nums">{{ fmt(data.currentTotal) }}</span>
         </div>
         <div class="w-full h-3 bg-surface-hover rounded-full overflow-hidden">
@@ -79,10 +102,10 @@ function monthName(offset: number): string {
         <span class="text-[10px] text-text-muted">{{ data.currentCount }} {{ t('records') }}</span>
       </div>
 
-      <!-- Previous month -->
+      <!-- Older / previous side of comparison -->
       <div>
         <div class="flex items-center justify-between mb-1">
-          <span class="text-xs text-text-muted font-medium capitalize">{{ monthName(-1) }}</span>
+          <span class="text-xs text-text-muted font-medium capitalize">{{ olderMonthCaption }}</span>
           <span class="text-sm font-bold text-text-muted tabular-nums">{{ fmt(data.previousTotal) }}</span>
         </div>
         <div class="w-full h-3 bg-surface-hover rounded-full overflow-hidden">

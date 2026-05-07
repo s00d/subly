@@ -1,36 +1,39 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useCatalogStore } from "@/stores/catalog";
+import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
-import { X, Plus } from "lucide-vue-next";
+import { X, Plus } from "@lucide/vue";
 import { tv } from "@/lib/tv";
+import { upsertTag, maxSortOrder } from "@/services/catalogClient";
+import type { Tag } from "@/schemas/appData";
 
 const props = withDefaults(defineProps<{
   modelValue?: string[];
   label?: string;
+  availableTags?: Tag[];
 }>(), {
   modelValue: () => [],
+  availableTags: () => [],
 });
 
 const emit = defineEmits<{
   "update:modelValue": [value: string[]];
 }>();
 
-const catalogStore = useCatalogStore();
 const { t } = useI18n();
+const tags = ref<Tag[]>([]);
 
 const inputValue = ref("");
 const showSuggestions = ref(false);
 const safeModelValue = computed(() => (Array.isArray(props.modelValue) ? props.modelValue : []));
 
 const quickTags = computed(() =>
-  catalogStore.favoriteTags
+  tags.value.filter((tag) => tag.favorite)
     .filter((tag) => !safeModelValue.value.includes(tag.name))
     .map((tag) => tag.name),
 );
 
 const suggestions = computed(() => {
-  const allTags = catalogStore.tags;
+  const allTags = tags.value;
   if (!inputValue.value.trim()) {
     return allTags
       .filter((tag) => !safeModelValue.value.includes(tag.name))
@@ -42,11 +45,16 @@ const suggestions = computed(() => {
     .map((tag) => tag.name);
 });
 
-function addTag(tagName: string) {
+async function addTag(tagName: string) {
   const n = tagName.trim();
   if (!n || safeModelValue.value.includes(n)) return;
   emit("update:modelValue", [...safeModelValue.value, n]);
-  if (!catalogStore.tags.some((t) => t.name === n)) catalogStore.addTag(n);
+  if (!tags.value.some((t) => t.name === n)) {
+    const order = await maxSortOrder("tags");
+    const tag: Tag = { id: crypto.randomUUID(), name: n, favorite: true, sortOrder: order + 1, i18nKey: "" };
+    await upsertTag(tag);
+    tags.value.push(tag);
+  }
   inputValue.value = "";
   showSuggestions.value = false;
 }
@@ -108,6 +116,13 @@ const tagInputTv = tv({
 });
 
 const slots = tagInputTv();
+watch(
+  () => props.availableTags,
+  (value) => {
+    tags.value = value;
+  },
+  { immediate: true, deep: true },
+);
 </script>
 
 <template>

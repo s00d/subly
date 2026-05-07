@@ -23,3 +23,5 @@ dist-ssr
 *.sln
 *.sw?
 restore.sql
+.pnpm-store
+src-tauri/profiles/

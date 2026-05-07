@@ -1,225 +1,127 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { useAppStore } from "@/stores/appStore";
-import { useSubscriptionsStore } from "@/stores/subscriptions";
-import { useExpensesStore } from "@/stores/expenses";
-import { useCatalogStore } from "@/stores/catalog";
-import { useSettingsStore } from "@/stores/settings";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
-import { exportAsSubly, exportAsJson, exportAsCsv, exportExpensesCsv, importFromSubly, importFromJson, importFromCsv } from "@/services/export";
-import { resetAppData, executeSqlFile, loadAllData, dbLoadExpenses } from "@/services/database";
-import { open } from "@tauri-apps/plugin-dialog";
-import { readTextFile } from "@tauri-apps/plugin-fs";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { appDataDir, join } from "@tauri-apps/api/path";
-import { Download, Upload, RotateCcw, Archive, FileSpreadsheet, Database, FolderOpen } from "lucide-vue-next";
+import {
+  exportAsSubly,
+  importFromSublyBytes,
+  getExportPathPresets,
+} from "@/services/exportClient";
+import { resetAppData } from "@/services/appDataClient";
+import { Archive, RotateCcw } from "@lucide/vue";
+import { ui } from "@/lib/tv";
+import { formatErrorForToast } from "@/utils/formatError";
 
-const appStore = useAppStore();
-const subsStore = useSubscriptionsStore();
-const expsStore = useExpensesStore();
-const catalogStore = useCatalogStore();
-const settingsStore = useSettingsStore();
 const { t } = useI18n();
 const { toast } = useToast();
 
 const isExporting = ref(false);
 const showResetConfirm = ref(false);
+const sublyInput = ref<HTMLInputElement | null>(null);
 
-// --- .subly archive ---
+function isSublyArchive(file: File): boolean {
+  return file.name.toLowerCase().endsWith(".subly");
+}
+
+async function resolveExportPathSubly(): Promise<string | null> {
+  const presets = await getExportPathPresets();
+  const selected = presets.downloads ?? presets.documents;
+  if (!selected) {
+    toast(t("export_path_unavailable"), "error");
+    return null;
+  }
+  return selected.sublyBackup;
+}
+
+function toastImportStatus(code?: string | null, fallbackError = false) {
+  switch (code) {
+    case "cancelled":
+      toast(t("cancel"));
+      break;
+    case "invalid_archive":
+      toast(t("import_error"), "error");
+      break;
+    default:
+      if (fallbackError) toast(t("import_error"), "error");
+  }
+}
+
 async function handleExportSubly() {
   isExporting.value = true;
   try {
-    const ok = await exportAsSubly(appStore.getExportData());
-    if (ok) toast(t("export_success"));
+    const path = await resolveExportPathSubly();
+    if (!path) return;
+    const res = await exportAsSubly(path);
+    if (res.ok) toast(t("export_success"));
   } catch (e) {
     console.error(e);
-    toast(t("error"), "error");
-  } finally { isExporting.value = false; }
-}
-
-async function handleImportSubly() {
-  try {
-    const data = await importFromSubly();
-    if (data) { appStore.importData(data); toast(t("import_success")); }
-    else { toast(t("import_error"), "error"); }
-  } catch (e) {
-    console.error(e);
-    toast(t("import_error"), "error");
-  }
-}
-
-// --- Legacy JSON ---
-async function handleExportJson() {
-  isExporting.value = true;
-  try {
-    const ok = await exportAsJson(appStore.getExportData());
-    if (ok) toast(t("export_success"));
-  } catch (e) {
-    console.error(e);
-    toast(t("error"), "error");
-  } finally { isExporting.value = false; }
-}
-
-async function handleExportCsv() {
-  isExporting.value = true;
-  try {
-    const ok = await exportAsCsv(subsStore.subscriptions, catalogStore.categories, catalogStore.currencies, catalogStore.paymentMethods, catalogStore.household);
-    if (ok) toast(t("export_success"));
-  } catch (e) {
-    console.error(e);
-    toast(t("error"), "error");
-  } finally { isExporting.value = false; }
-}
-
-async function handleExportExpensesCsv() {
-  isExporting.value = true;
-  try {
-    const allExps = await dbLoadExpenses({}, 999999, 0);
-    const ok = await exportExpensesCsv(allExps.items, catalogStore.categories, catalogStore.currencies, catalogStore.paymentMethods, catalogStore.household);
-    if (ok) toast(t("export_success"));
-  } catch (e) {
-    console.error(e);
-    toast(t("error"), "error");
-  } finally { isExporting.value = false; }
-}
-
-async function handleImportJson() {
-  try {
-    const data = await importFromJson();
-    if (data) { appStore.importData(data); toast(t("import_success")); }
-    else { toast(t("import_error"), "error"); }
-  } catch (e) {
-    console.error(e);
-    toast(t("import_error"), "error");
-  }
-}
-
-async function handleImportCsv() {
-  try {
-    const subs = await importFromCsv({
-      categories: catalogStore.categories,
-      currencies: catalogStore.currencies,
-      paymentMethods: catalogStore.paymentMethods,
-      household: catalogStore.household,
-      defaultCategoryId: settingsStore.settings.defaultCategoryId || "cat-1",
-      defaultCurrencyId: settingsStore.settings.mainCurrencyId,
-      defaultPaymentMethodId: settingsStore.settings.defaultPaymentMethodId || catalogStore.paymentMethods[0]?.id || "",
-      defaultPayerUserId: catalogStore.household[0]?.id || "",
-    });
-    if (subs === null) {
-      toast(t("import_error"), "error");
-      return;
-    }
-    if (subs.length === 0) {
-      toast("CSV file is empty");
-      return;
-    }
-    if (subs.length > 0) {
-      for (const sub of subs) {
-        await subsStore.addSubscription(sub);
-      }
-      toast(t("csv_import_success").replace("{count}", String(subs.length)));
-    }
-  } catch (e) {
-    console.error(e);
-    toast(t("import_error"), "error");
-  }
-}
-
-// --- SQL import ---
-const isImportingSql = ref(false);
-
-async function handleImportSql() {
-  try {
-    const selected = await open({
-      multiple: false,
-      filters: [{ name: "SQL", extensions: ["sql"] }],
-    });
-    if (!selected) return;
-
-    isImportingSql.value = true;
-    const sql = await readTextFile(selected as string);
-    const { statementsRun } = await executeSqlFile(sql);
-
-    const freshData = await loadAllData();
-    if (freshData) {
-      appStore.importData(freshData);
-    }
-
-    toast(t("sql_import_success").replace("{count}", String(statementsRun)));
-  } catch (e) {
-    console.error(e);
-    toast(t("sql_import_error"), "error");
+    toast(formatErrorForToast(e, t), "error");
   } finally {
-    isImportingSql.value = false;
+    isExporting.value = false;
   }
 }
 
-// --- Open DB folder ---
-async function handleOpenDbFolder() {
+async function handleImportSublyFile(file: File) {
   try {
-    const dataDir = await appDataDir();
-    const dbPath = await join(dataDir, "subly.db");
-    await revealItemInDir(dbPath);
+    const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
+    const res = await importFromSublyBytes(bytes);
+    if (!res.ok) {
+      toastImportStatus(res.message, true);
+      return;
+    }
+    toast(t("import_success"));
   } catch (e) {
     console.error(e);
-    toast(t("error"), "error");
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 
-// --- Reset ---
+function triggerImportSubly() {
+  sublyInput.value?.click();
+}
+
+async function onPickSubly(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (!file) return;
+  if (!isSublyArchive(file)) {
+    toast(t("import_error"), "error");
+    input.value = "";
+    return;
+  }
+  await handleImportSublyFile(file);
+  input.value = "";
+}
+
 async function handleResetData() {
   try {
-    const defaultData = await resetAppData();
-    appStore.importData(defaultData);
+    await resetAppData();
     showResetConfirm.value = false;
     toast(t("reset_success"));
   } catch (e) {
     console.error(e);
-    toast(t("error"), "error");
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 </script>
 
 <template>
   <section class="bg-surface rounded-xl border border-border p-4 sm:p-5">
-    <h2 class="text-base sm:text-lg font-semibold text-text-primary mb-2">{{ t('data_management') }}</h2>
+    <h2 :class="[ui.sectionTitle(), 'mb-2']">{{ t('data_management') }}</h2>
     <p class="text-xs sm:text-sm text-text-muted mb-4">{{ t('export_import_info') }}</p>
 
-    <!-- Primary: .subly archive -->
-    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 mb-4">
-      <button @click="handleExportSubly" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg bg-primary text-white text-xs sm:text-sm font-medium hover:bg-primary-hover disabled:opacity-50">
-        <Archive :size="14" /> {{ t('export_subly') }}
-      </button>
-      <button @click="handleImportSubly" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-primary text-primary text-xs sm:text-sm font-medium hover:bg-primary-light">
-        <Archive :size="14" /> {{ t('import_subly') }}
-      </button>
-    </div>
-
-    <!-- Secondary: JSON / CSV -->
-    <div class="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:gap-3 mb-6">
-      <button @click="handleExportJson" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover disabled:opacity-50">
-        <Download :size="14" /> {{ t('export_as_json') }}
-      </button>
-      <button @click="handleExportCsv" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover disabled:opacity-50">
-        <Download :size="14" /> {{ t('export_as_csv') }}
-      </button>
-      <button @click="handleExportExpensesCsv" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover disabled:opacity-50">
-        <FileSpreadsheet :size="14" /> {{ t('expenses') }} CSV
-      </button>
-      <button @click="handleImportJson" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover">
-        <Upload :size="14" /> {{ t('import_from_json') }}
-      </button>
-      <button @click="handleImportCsv" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover">
-        <FileSpreadsheet :size="14" /> {{ t('import_from_csv') }}
-      </button>
-      <button @click="handleImportSql" :disabled="isImportingSql" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover disabled:opacity-50">
-        <Database :size="14" /> {{ t('import_from_sql') }}
-      </button>
-      <button @click="handleOpenDbFolder" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover">
-        <FolderOpen :size="14" /> {{ t('open_db_folder') }}
-      </button>
+    <div class="space-y-3 mb-6">
+      <div class="rounded-lg border border-border p-3">
+        <h3 :class="[ui.sectionTitle(), 'mb-2']">.subly</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button @click="handleExportSubly" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover disabled:opacity-50">
+            <Archive :size="14" /> {{ t('export_subly') }}
+          </button>
+          <button @click="triggerImportSubly" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-primary text-primary text-xs sm:text-sm font-medium hover:bg-primary-light">
+            <Archive :size="14" /> {{ t('import_subly') }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <div class="pt-4 border-t border-border">
@@ -237,4 +139,5 @@ async function handleResetData() {
       </div>
     </div>
   </section>
+  <input ref="sublyInput" type="file" accept=".subly" class="hidden" @change="onPickSubly" />
 </template>

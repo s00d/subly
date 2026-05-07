@@ -1,20 +1,31 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { useCatalogStore } from "@/stores/catalog";
-import { useSettingsStore } from "@/stores/settings";
+import { computed, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
-import { getPricePerMonth, getDaysUntilPayment, getBillingCycleText, formatCurrency, isOverdue } from "@/services/calculations";
-import type { Subscription, Currency } from "@/schemas/appData";
+import type { Subscription, SubscriptionCredentials, SubscriptionListItem, Currency, Category, PaymentMethod, HouseholdMember, Settings } from "@/schemas/appData";
 import Modal from "@/components/ui/Modal.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import PaymentHistory from "@/components/subscriptions/PaymentHistory.vue";
-import { Pencil, Copy, RefreshCw, ExternalLink, Trash2, Calendar, CreditCard, Tag, User, Bell, BellOff, Link, FileText, Clock, AlertTriangle, Power, Star, Hash, CircleDollarSign } from "lucide-vue-next";
+import { Pencil, Copy, RefreshCw, Trash2, Calendar, CreditCard, Tag, User, Bell, BellOff, Link, FileText, Clock, AlertTriangle, Power, Star, Hash, CircleDollarSign, KeyRound } from "@lucide/vue";
+import {
+  subscriptionTotpCurrent,
+  type SubscriptionTotpCurrentDto,
+} from "@/services/subscriptionCredentialsClient";
+import { useClipboard } from "@/composables/useClipboard";
+import { useToast } from "@/composables/useToast";
+import { ui, statValue } from "@/lib/tv";
 
 const props = defineProps<{
   show: boolean;
   subscription: Subscription | null;
+  lookupData: {
+    categories: Category[];
+    paymentMethods: PaymentMethod[];
+    household: HouseholdMember[];
+    currencies: Currency[];
+    settings: Settings;
+  };
 }>();
 
 const emit = defineEmits<{
@@ -28,34 +39,109 @@ const emit = defineEmits<{
   recordPayment: [id: string];
 }>();
 
-const catalogStore = useCatalogStore();
-const settingsStore = useSettingsStore();
+const categories = ref<Category[]>([]);
+const paymentMethods = ref<PaymentMethod[]>([]);
+const household = ref<HouseholdMember[]>([]);
+const currencies = ref<Currency[]>([]);
+const settings = ref<Settings | null>(null);
 const { t } = useI18n();
-const { fmtDateFull, fmtDateMedium } = useLocaleFormat();
+const { fmtDateFull, fmtDateMedium, fmtCurrency } = useLocaleFormat();
+const { copyToClipboard } = useClipboard();
+const { toast } = useToast();
 
-const sub = computed(() => props.subscription);
+const totpCurrent = ref<SubscriptionTotpCurrentDto | null>(null);
+let otpPollTimer: ReturnType<typeof setInterval> | null = null;
+
+const sub = computed(() => props.subscription as SubscriptionListItem | null);
+
+/** Учётные данные приходят в объекте подписки из списка (secure storage на бэкенде). */
+const creds = computed<SubscriptionCredentials | null>(() => sub.value?.credentials ?? null);
+
+const hasSavedCredentials = computed(() => {
+  const c = creds.value;
+  if (!c) return false;
+  return Boolean(c.login?.trim() || c.password || c.totpSecret?.trim());
+});
+
+const otpSecondsLeft = computed(() => {
+  if (!totpCurrent.value) return 0;
+  const ms = totpCurrent.value.validUntilMs - Date.now();
+  return Math.max(0, Math.ceil(ms / 1000));
+});
+
+function clearOtpPoll() {
+  if (otpPollTimer) {
+    clearInterval(otpPollTimer);
+    otpPollTimer = null;
+  }
+}
+
+async function refreshTotpOnly() {
+  if (!sub.value) return;
+  try {
+    totpCurrent.value = await subscriptionTotpCurrent(sub.value.id);
+  } catch {
+    totpCurrent.value = null;
+  }
+}
+
+async function copyLoginField() {
+  const v = creds.value?.login?.trim() ?? "";
+  if (!v) return;
+  if (await copyToClipboard(v)) toast(t("copied_to_clipboard"));
+  else toast(t("clipboard_copy_failed"), "error");
+}
+
+async function copyPasswordField() {
+  const v = creds.value?.password ?? "";
+  if (!v) return;
+  if (await copyToClipboard(v)) toast(t("copied_to_clipboard"));
+  else toast(t("clipboard_copy_failed"), "error");
+}
+
+async function copyOtpField() {
+  const v = totpCurrent.value?.code ?? "";
+  if (!v) return;
+  if (await copyToClipboard(v)) toast(t("copied_to_clipboard"));
+  else toast(t("clipboard_copy_failed"), "error");
+}
+
+watch(
+  () => ({
+    open: props.show,
+    totpSecret: sub.value?.credentials?.totpSecret ?? "",
+  }),
+  () => {
+    clearOtpPoll();
+    totpCurrent.value = null;
+    if (!props.show || !sub.value?.credentials?.totpSecret?.trim()) return;
+    void refreshTotpOnly();
+    otpPollTimer = setInterval(() => void refreshTotpOnly(), 2500);
+  },
+  { immediate: true },
+);
 
 function fmt(price: number, currencyId: string): string {
-  const c = catalogStore.currencies.find((cur) => cur.id === currencyId);
-  return formatCurrency(price, c?.code || "USD", c?.symbol);
+  const c = currencies.value.find((cur) => cur.id === currencyId);
+  return fmtCurrency(price, c?.code || "USD");
 }
 
 function fmtCur(amount: number, currency: Currency): string {
-  return formatCurrency(amount, currency.code, currency.symbol);
+  return fmtCurrency(amount, currency.code);
 }
 
 const targetCurrencies = computed(() => {
-  const mainId = settingsStore.settings.mainCurrencyId;
-  const targets = settingsStore.settings.currencyUpdateTargets ?? [];
+  const mainId = settings.value?.mainCurrencyId;
+  const targets = settings.value?.currencyUpdateTargets ?? [];
   const ids = new Set(targets);
   if (mainId) ids.add(mainId);
   return [...ids]
-    .map((id) => catalogStore.currencies.find((c) => c.id === id))
+    .map((id) => currencies.value.find((c) => c.id === id))
     .filter((c): c is Currency => !!c && c.rate > 0);
 });
 
 function convertAmount(amount: number, fromCurId: string, toCurrency: Currency): number {
-  const fromCur = catalogStore.currencies.find((c) => c.id === fromCurId);
+  const fromCur = currencies.value.find((c) => c.id === fromCurId);
   if (!fromCur || fromCur.rate <= 0) return 0;
   return (amount / fromCur.rate) * toCurrency.rate;
 }
@@ -81,35 +167,58 @@ const convertedMonthly = computed(() => {
 });
 
 const categoryName = computed(() =>
-  sub.value ? (catalogStore.categories.find((c) => c.id === sub.value!.categoryId)?.name || "") : ""
+  sub.value ? (categories.value.find((c) => c.id === sub.value!.categoryId)?.name || "") : ""
 );
 
 const categoryIcon = computed(() =>
-  sub.value ? (catalogStore.categories.find((c) => c.id === sub.value!.categoryId)?.icon || "") : ""
+  sub.value ? (categories.value.find((c) => c.id === sub.value!.categoryId)?.icon || "") : ""
 );
 
 const paymentMethod = computed(() =>
-  sub.value ? catalogStore.paymentMethods.find((p) => p.id === sub.value!.paymentMethodId) : null
+  sub.value ? paymentMethods.value.find((p) => p.id === sub.value!.paymentMethodId) : null
 );
 
 const payerName = computed(() =>
-  sub.value ? (catalogStore.household.find((h) => h.id === sub.value!.payerUserId)?.name || "") : ""
+  sub.value ? (household.value.find((h) => h.id === sub.value!.payerUserId)?.name || "") : ""
 );
 
 const monthlyPrice = computed(() =>
-  sub.value ? getPricePerMonth(sub.value.cycle, sub.value.frequency, sub.value.price) : 0
+  sub.value ? Number(sub.value.monthlyPrice ?? 0) : 0
 );
 
 const daysLeft = computed(() =>
-  sub.value ? getDaysUntilPayment(sub.value.nextPayment) : 0
+  sub.value ? Number(sub.value.daysLeft ?? 0) : 0
 );
 
 const overdue = computed(() =>
-  sub.value ? isOverdue(sub.value) : false
+  sub.value ? Boolean(sub.value.overdue) : false
 );
 
 const formatDate = fmtDateFull;
 const formatDateShort = fmtDateMedium;
+
+function billingCycleText(cycle: number, frequency: number): string {
+  switch (cycle) {
+    case 1: return frequency === 1 ? t("daily") : `${frequency} ${t("days")}`;
+    case 2: return frequency === 1 ? t("weekly") : `${frequency} ${t("weeks")}`;
+    case 3: return frequency === 1 ? t("monthly") : `${frequency} ${t("months")}`;
+    case 4: return frequency === 1 ? t("yearly") : `${frequency} ${t("years")}`;
+    default: return "";
+  }
+}
+watch(
+  () => props.lookupData,
+  (lookup) => {
+    categories.value = lookup.categories;
+    paymentMethods.value = lookup.paymentMethods;
+    household.value = lookup.household;
+    currencies.value = lookup.currencies;
+    settings.value = lookup.settings;
+  },
+  { immediate: true, deep: true },
+);
+
+onUnmounted(() => clearOtpPoll());
 </script>
 
 <template>
@@ -122,14 +231,14 @@ const formatDateShort = fmtDateMedium;
           <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
         </div>
         <div class="flex-1 min-w-0">
-          <h3 class="text-base sm:text-lg font-semibold text-text-primary truncate">{{ sub.name }}</h3>
+          <h3 :class="[ui.sectionTitle(), 'truncate']">{{ sub.name }}</h3>
           <p class="text-[10px] sm:text-xs text-text-muted">
-            {{ getBillingCycleText(sub.cycle, sub.frequency, t) }}
+            {{ billingCycleText(sub.cycle, sub.frequency) }}
             <span v-if="!sub.autoRenew" class="ml-1 text-orange-500">({{ t('manual_renewal') }})</span>
           </p>
         </div>
         <div class="text-right shrink-0">
-          <p class="text-lg sm:text-xl font-bold text-text-primary">{{ fmt(sub.price, sub.currencyId) }}</p>
+          <p :class="statValue()">{{ fmt(sub.price, sub.currencyId) }}</p>
           <p v-if="sub.cycle !== 3 || sub.frequency !== 1" class="text-[10px] sm:text-xs text-text-muted">
             ≈ {{ fmt(monthlyPrice, sub.currencyId) }}/{{ t('monthly').toLowerCase() }}
           </p>
@@ -191,6 +300,64 @@ const formatDateShort = fmtDateMedium;
           :key="tag"
           class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-surface-secondary text-text-secondary border border-border"
         >{{ tag }}</span>
+      </div>
+
+      <!-- Saved credentials -->
+      <div
+        v-if="sub"
+        class="rounded-xl border border-border p-3 bg-surface-secondary/80 space-y-3"
+      >
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <KeyRound :size="15" class="text-primary shrink-0" />
+            <span class="text-xs font-semibold text-text-primary uppercase tracking-wide">{{ t("credentials_section") }}</span>
+          </div>
+          <button
+            type="button"
+            class="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover"
+            @click="emit('edit', sub)"
+          >
+            <Pencil :size="12" />
+            {{ t("edit_credentials") }}
+          </button>
+        </div>
+        <template v-if="hasSavedCredentials">
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-if="creds?.login?.trim()"
+              type="button"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover"
+              @click="copyLoginField"
+            >
+              <Copy :size="12" /> {{ t("copy_login") }}
+            </button>
+            <button
+              v-if="creds?.password"
+              type="button"
+              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover"
+              @click="copyPasswordField"
+            >
+              <Copy :size="12" /> {{ t("copy_password") }}
+            </button>
+          </div>
+          <p v-if="creds?.login?.trim()" class="text-sm text-text-primary font-mono truncate">{{ creds.login }}</p>
+          <p v-if="creds?.password" class="text-sm font-mono tracking-widest text-text-secondary">
+            ••••••••
+          </p>
+          <div v-if="creds?.totpSecret?.trim() && totpCurrent" class="rounded-lg border border-border p-2 bg-surface">
+            <p class="text-[10px] text-text-muted mb-1">{{ t("current_otp") }}</p>
+            <p class="font-mono text-lg tracking-widest text-center">{{ totpCurrent.code }}</p>
+            <p class="text-[11px] text-center text-text-muted mt-1">{{ t("otp_expires_in", { s: otpSecondsLeft }) }}</p>
+            <button
+              type="button"
+              class="mt-2 w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-surface-hover text-xs font-medium"
+              @click="copyOtpField"
+            >
+              <Copy :size="12" /> {{ t("copy_otp") }}
+            </button>
+          </div>
+        </template>
+        <p v-else class="text-xs text-text-muted">{{ t("credentials_none_hint") }}</p>
       </div>
 
       <!-- Info grid -->
@@ -282,6 +449,11 @@ const formatDateShort = fmtDateMedium;
         :currencyId="sub.currencyId"
         :price="sub.price"
         :history="sub.paymentHistory || []"
+        :lookupData="{
+          currencies,
+          mainCurrencyId: settings?.mainCurrencyId || 'cur-2',
+          targetCurrencyIds: settings?.currencyUpdateTargets || [],
+        }"
         @recordPayment="(id: string) => emit('recordPayment', id)"
       />
 

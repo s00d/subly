@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isImageIcon } from "@/services/logoAssets";
+import { isImageIcon } from "@/services/logoClient";
 
 defineProps<{
   icon: string;
