@@ -1,0 +1,21 @@
+src-tauri/tauri.conf.json
+  s_760a8176b5063e::t_38b2519ad718a1 57-58,61
+src-tauri/Info.plist
+  s_760a8176b5063e::t_933ee235cdacfe 1-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "74e57ece9e9247e6468d0829fd6531b2dc9f8392",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
