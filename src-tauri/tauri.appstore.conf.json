@@ -1,0 +1,11 @@
+{
+  "bundle": {
+    "category": "Utility",
+    "macOS": {
+      "entitlements": "entitlements/macos.appstore.plist",
+      "files": {
+        "embedded.provisionprofile": "profiles/Subly_MAS.provisionprofile"
+      }
+    }
+  }
+}

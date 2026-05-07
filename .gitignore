@@ -25,3 +25,4 @@ dist-ssr
 restore.sql
 .pnpm-store
 src-tauri/profiles/
+APPSTORE_PUBLISH_RU.md
