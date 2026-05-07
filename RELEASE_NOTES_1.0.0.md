@@ -6,6 +6,9 @@
 Go to **Settings → Data Management**, export a `.subly` file, install the new version, and **if anything is broken, restore from that file**.  
 This update completely replaces the old sync/storage stack; the backup is your safety net.
 
+**If you skipped backup/restore:**  
+You can temporarily return to the previous app version, export your `.subly` backup there, then update to 1.0.0 again and restore from that backup.
+
 ### What actually changed (short)
 
 - **Cloud sync is new**
