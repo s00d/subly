@@ -1,0 +1,21 @@
+src-tauri/gen/apple/project.yml
+  s_760a8176b5063e::t_2b2ca87d2ff849 45
+src-tauri/gen/apple/subly_iOS/Info.plist
+  s_760a8176b5063e::t_b894626e41015c 23-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "ae73c4397cc3ffa7064e1da5c7c87a8e38fc672d",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
