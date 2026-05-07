@@ -4,7 +4,7 @@
     "macOS": {
       "entitlements": "entitlements/macos.appstore.plist",
       "files": {
-        "embedded.provisionprofile": "profiles/Subly_MAS.provisionprofile"
+        "embedded.provisionprofile": "profiles/Subly_MAS_macOS_Profile.provisionprofile"
       }
     }
   }
