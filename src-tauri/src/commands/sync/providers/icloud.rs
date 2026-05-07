@@ -1,25 +1,10 @@
-use super::super::{decode_sync_payload, encode_sync_payload, SyncConfig, SyncPayload, SYNC_FILENAME, SYNC_ICLOUD_FOLDER};
+use super::super::{SyncConfig, SyncPayload};
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+use super::super::{decode_sync_payload, encode_sync_payload, SYNC_FILENAME, SYNC_ICLOUD_FOLDER};
 use std::path::PathBuf;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 use super::icloud_native;
-
-/// iOS: только ubiquity-контейнер (`Documents/<SYNC_ICLOUD_FOLDER>/`).
-#[cfg(target_os = "ios")]
-pub(crate) fn icloud_subly_sync_dir() -> Option<PathBuf> {
-    icloud_native::ubiquity_sync_subdir(SYNC_ICLOUD_FOLDER)
-}
-
-/// macOS: тот же app ubiquity container, что и на iOS (`iCloud.com.s00d.subly/Documents/Subly-v1`).
-#[cfg(target_os = "macos")]
-pub(crate) fn icloud_subly_sync_dir() -> Option<PathBuf> {
-    icloud_native::ubiquity_sync_subdir(SYNC_ICLOUD_FOLDER)
-}
-
-#[cfg(not(any(target_os = "macos", target_os = "ios")))]
-pub(crate) fn icloud_subly_sync_dir() -> Option<PathBuf> {
-    None
-}
 
 pub fn descriptor() -> super::ProviderInfo {
     super::ProviderInfo {
@@ -28,6 +13,16 @@ pub fn descriptor() -> super::ProviderInfo {
         icon: "icloud".to_string(),
         fields: vec![],
     }
+}
+
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub(crate) fn icloud_subly_sync_dir() -> Option<PathBuf> {
+    icloud_native::ubiquity_sync_subdir(SYNC_ICLOUD_FOLDER)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+pub(crate) fn icloud_subly_sync_dir() -> Option<PathBuf> {
+    None
 }
 
 #[cfg(target_os = "macos")]
@@ -71,7 +66,7 @@ fn debug_dir_entries(path: &std::path::Path) -> String {
 pub async fn download(_app: &tauri::AppHandle, _cfg: &SyncConfig) -> Result<Option<SyncPayload>, String> {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
-        let Some(dir) = icloud_subly_sync_dir() else {
+        let Some(dir) = icloud_native::ubiquity_sync_subdir(SYNC_ICLOUD_FOLDER) else {
             #[cfg(target_os = "ios")]
             {
                 return Err("iCloud ubiquity container is unavailable on iOS (check iCloud account, entitlements, and Cloud Documents capability)".to_string());
@@ -138,18 +133,18 @@ pub async fn download(_app: &tauri::AppHandle, _cfg: &SyncConfig) -> Result<Opti
     }
 }
 
-pub async fn upload(_app: &tauri::AppHandle, _cfg: &SyncConfig, payload: &SyncPayload) -> Result<(), String> {
+pub async fn upload(_app: &tauri::AppHandle, _cfg: &SyncConfig, _payload: &SyncPayload) -> Result<(), String> {
     #[cfg(any(target_os = "macos", target_os = "ios"))]
     {
         #[cfg(target_os = "macos")]
-        let dir = icloud_subly_sync_dir().ok_or_else(|| {
+        let dir = icloud_native::ubiquity_sync_subdir(SYNC_ICLOUD_FOLDER).ok_or_else(|| {
             "iCloud app container folder not available on macOS (check iCloud account, code signing, and Cloud Documents entitlement)".to_string()
         })?;
         #[cfg(target_os = "ios")]
-        let dir = icloud_subly_sync_dir().ok_or_else(|| {
+        let dir = icloud_native::ubiquity_sync_subdir(SYNC_ICLOUD_FOLDER).ok_or_else(|| {
             "iCloud Drive folder not available (enable iCloud Drive on this device)".to_string()
         })?;
-        let raw = encode_sync_payload(payload)?;
+        let raw = encode_sync_payload(_payload)?;
         let path = dir.join(SYNC_FILENAME);
         #[cfg(target_os = "ios")]
         {

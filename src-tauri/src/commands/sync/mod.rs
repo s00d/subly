@@ -9,10 +9,17 @@ mod wire;
 use serde::de::DeserializeOwned;
 pub use types::{SyncProviderType, SyncStatusDto};
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 pub(crate) use config::{
     clear_oauth_tokens, load_oauth_tokens, load_sync_config, save_oauth_tokens, save_sync_config,
     set_dropbox_app_secret, set_webdav_password, token_key, webdav_password, KR_SYNC_DROPBOX_APP_SECRET,
     KR_SYNC_WEBDAV_PASSWORD, MAX_SYNC_PAYLOAD_BYTES, OAUTH_REDIRECT_URI, SYNC_FILENAME, SYNC_ICLOUD_FOLDER,
+};
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+pub(crate) use config::{
+    clear_oauth_tokens, load_oauth_tokens, load_sync_config, save_oauth_tokens, save_sync_config,
+    set_dropbox_app_secret, set_webdav_password, token_key, webdav_password, KR_SYNC_DROPBOX_APP_SECRET,
+    KR_SYNC_WEBDAV_PASSWORD, MAX_SYNC_PAYLOAD_BYTES, OAUTH_REDIRECT_URI, SYNC_FILENAME,
 };
 pub(crate) use wire::{decode_sync_payload, encode_sync_payload};
 pub(crate) use oauth::{exchange_oauth_code, provider_access_token};

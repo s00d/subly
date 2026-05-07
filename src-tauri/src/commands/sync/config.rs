@@ -8,7 +8,8 @@ pub const ONEDRIVE_TOKEN_KEY: &str = "onedrive_tokens";
 pub(crate) const KR_SYNC_DROPBOX_APP_SECRET: &str = "subly.sync.dropbox_app_secret";
 pub(crate) const KR_SYNC_WEBDAV_PASSWORD: &str = "subly.sync.webdav_password";
 
-/// Подпапка внутри ubiquity `Documents/` (iOS/macOS) или legacy `…/CloudDocs/<эта>/` на macOS.
+/// Подпапка внутри ubiquity `Documents/` (iOS/macOS).
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 pub const SYNC_ICLOUD_FOLDER: &str = "Subly-v1";
 /// Имя файла синка (все провайдеры). Dropbox по-прежнему: `/Apps/Subly/<файл>`.
 pub const SYNC_FILENAME: &str = "subly-sync-v2.sublysync";
