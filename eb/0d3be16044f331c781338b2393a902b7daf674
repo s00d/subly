@@ -1,0 +1,19 @@
+.github/workflows/appstore-macos.yml
+  s_760a8176b5063e::t_f2d25cc166fe49 74-77,93-101,104-106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "eb0d3be16044f331c781338b2393a902b7daf674",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
