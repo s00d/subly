@@ -1,0 +1,21 @@
+CHANGELOG.md
+  s_760a8176b5063e::t_bfecc1a5f11bcc 1-122
+RELEASE_NOTES_1.0.0.md
+  s_760a8176b5063e::t_29472c00410f3a 9-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "300156379be828b7ccf48291d0aa9e2a89ea5278",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
