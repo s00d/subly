@@ -80,7 +80,7 @@ jobs:
       - name: Build macOS app bundle (MAS config)
         env:
           APPLE_SIGNING_IDENTITY: ${{ env.MAS_APP_SIGNING_IDENTITY }}
-        run: pnpm tauri build -- --bundles app --target universal-apple-darwin --config src-tauri/tauri.appstore.conf.json
+        run: pnpm tauri build --bundles app --target universal-apple-darwin --config src-tauri/tauri.appstore.conf.json
 
       - name: Build signed PKG
         run: |
