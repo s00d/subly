@@ -43,8 +43,8 @@ jobs:
 
       - name: Write App Store Connect API key
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/src-tauri/private_keys"
-          KEY_PATH="$GITHUB_WORKSPACE/src-tauri/private_keys/AuthKey_${APPLE_API_KEY}.p8"
+          mkdir -p "$HOME/private_keys"
+          KEY_PATH="$HOME/private_keys/AuthKey_${APPLE_API_KEY}.p8"
           echo "$SUBLY_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
           echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
