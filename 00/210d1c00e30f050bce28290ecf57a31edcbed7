@@ -1,0 +1,25 @@
+src-tauri/src/commands/sync/config.rs
+  s_760a8176b5063e::t_4194b06048014a 11-12
+src-tauri/src/commands/sync/mod.rs
+  s_760a8176b5063e::t_48971195577218 18-23
+  s_760a8176b5063e::t_918b88b5e413ad 12
+src-tauri/src/commands/sync/providers/icloud.rs
+  s_760a8176b5063e::t_ab3a9121febb51 1-3,69,136,140,144,147
+  s_760a8176b5063e::t_5878c5242a1e94 18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "00210d1c00e30f050bce28290ecf57a31edcbed7",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
