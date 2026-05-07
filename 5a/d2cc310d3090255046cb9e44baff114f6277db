@@ -1,0 +1,14 @@
+.github/workflows/appstore-ios.yml
+  h_ee6cac30a1b83a 15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "5ad2cc310d3090255046cb9e44baff114f6277db",
+  "prompts": {},
+  "humans": {
+    "h_ee6cac30a1b83a": {
+      "author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
