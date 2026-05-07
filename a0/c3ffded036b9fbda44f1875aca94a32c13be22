@@ -1,0 +1,25 @@
+src-tauri/tauri.conf.json
+  s_760a8176b5063e::t_72eec4c02e2db2 56-57
+src-tauri/gen/apple/project.yml
+  s_760a8176b5063e::t_1634b80d76300f 5
+src-tauri/gen/apple/Podfile
+  s_760a8176b5063e::t_01c4fd6977bf4b 4
+src-tauri/gen/apple/subly.xcodeproj/project.pbxproj
+  s_760a8176b5063e::t_85994971b2180e 455,517
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "a0c3ffded036b9fbda44f1875aca94a32c13be22",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
