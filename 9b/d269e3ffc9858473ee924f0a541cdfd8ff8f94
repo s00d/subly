@@ -1,0 +1,33 @@
+app-icon.svg
+  s_760a8176b5063e::t_bdf8eac0111a98 24-26
+  s_760a8176b5063e::t_0dd9b62f20c04c 8-9,12-18,22-23
+  s_760a8176b5063e::t_f0e74a42a789d8 19-20
+  s_760a8176b5063e::t_9a6647f6830f64 10
+.github/workflows/appstore-ios.yml
+  s_760a8176b5063e::t_e76473eca94da2 1-65,67-71
+  s_760a8176b5063e::t_a17c5981cc5503 66
+.github/workflows/appstore-macos.yml
+  s_760a8176b5063e::t_3ef8ae74edca41 96
+  s_760a8176b5063e::t_ef2a9b265aa327 1-95,97-101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "9bd269e3ffc9858473ee924f0a541cdfd8ff8f94",
+  "prompts": {},
+  "humans": {
+    "h_ee6cac30a1b83a": {
+      "author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
