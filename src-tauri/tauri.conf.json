@@ -53,7 +53,8 @@
     ],
     "windows": {},
     "iOS": {
-      "developmentTeam": "R6VC7JTLE8"
+      "developmentTeam": "R6VC7JTLE8",
+      "minimumSystemVersion": "16.0"
     },
     "macOS": {
       "entitlements": "entitlements/macos.plist",
