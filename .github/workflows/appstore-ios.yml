@@ -38,6 +38,16 @@ jobs:
         with:
           targets: aarch64-apple-ios,aarch64-apple-ios-sim
 
+      - name: Check Xcode / iOS SDK requirement
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks
+          if ! xcodebuild -showsdks | grep -q "iphoneos26"; then
+            echo "ERROR: App Store Connect now requires iOS 26 SDK+. This runner does not have iphoneos26."
+            echo "Use a runner with Xcode 26+ (self-hosted or newer GitHub hosted image when available)."
+            exit 1
+          fi
+
       - name: Install frontend dependencies
         run: pnpm install
 
