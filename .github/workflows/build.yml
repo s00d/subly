@@ -101,12 +101,19 @@ jobs:
 
           echo "Available signing identities in CI keychain:"
           security find-identity -v -p codesigning "$KEYCHAIN_PATH" || true
-          if [ -n "$APPLE_SIGNING_IDENTITY" ]; then
-            security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -F "$APPLE_SIGNING_IDENTITY" >/dev/null || {
-              echo "Configured APPLE_SIGNING_IDENTITY was not found in imported certificate keychain.";
-              exit 1;
-            }
+          SELECTED_IDENTITY=""
+          if [ -n "$APPLE_SIGNING_IDENTITY" ] && security find-identity -v -p codesigning "$KEYCHAIN_PATH" | grep -F "$APPLE_SIGNING_IDENTITY" >/dev/null; then
+            SELECTED_IDENTITY="$APPLE_SIGNING_IDENTITY"
+            echo "Using APPLE_SIGNING_IDENTITY from secret."
+          else
+            SELECTED_IDENTITY="$(security find-identity -v -p codesigning "$KEYCHAIN_PATH" | sed -n 's/.*"\(Developer ID Application:.*\)"/\1/p' | head -n1)"
+            if [ -z "$SELECTED_IDENTITY" ]; then
+              echo "No usable Developer ID Application identity found in keychain."
+              exit 1
+            fi
+            echo "Using detected signing identity from keychain."
           fi
+          echo "APPLE_SIGNING_IDENTITY=$SELECTED_IDENTITY" >> "$GITHUB_ENV"
 
       - name: Write App Store Connect API key (macOS)
         if: matrix.platform == 'macos-latest'
@@ -141,7 +148,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
           APPLE_API_KEY_PATH: "AuthKey_33V5B24JP9.p8"
