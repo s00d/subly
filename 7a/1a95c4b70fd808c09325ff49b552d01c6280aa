@@ -1,0 +1,25 @@
+.gitignore
+  s_760a8176b5063e::t_3981e6ceb91b53 27-28
+.github/workflows/build.yml
+  s_760a8176b5063e::t_113acbc4d74db7 84,89-109
+src-tauri/entitlements/macos.appstore.plist
+  s_760a8176b5063e::t_2e5adb51017e3e 1-30
+src-tauri/tauri.appstore.conf.json
+  s_760a8176b5063e::t_e1556c1948919f 1-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "7a1a95c4b70fd808c09325ff49b552d01c6280aa",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
