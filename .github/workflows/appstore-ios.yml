@@ -18,6 +18,9 @@ jobs:
       APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       SUBLY_API_KEY_BASE64: ${{ secrets.SUBLY_API_KEY_BASE64 }}
+      IOS_CERTIFICATE: ${{ secrets.IOS_CERTIFICATE }}
+      IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+      IOS_MOBILE_PROVISION: ${{ secrets.IOS_MOBILE_PROVISION }}
     steps:
       - uses: actions/checkout@v4
 
@@ -44,6 +47,12 @@ jobs:
           KEY_PATH="$GITHUB_WORKSPACE/src-tauri/private_keys/AuthKey_${APPLE_API_KEY}.p8"
           echo "$SUBLY_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
           echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+
+      - name: Validate manual iOS signing secrets
+        run: |
+          test -n "$IOS_CERTIFICATE" || (echo "Missing IOS_CERTIFICATE secret" && exit 1)
+          test -n "$IOS_CERTIFICATE_PASSWORD" || (echo "Missing IOS_CERTIFICATE_PASSWORD secret" && exit 1)
+          test -n "$IOS_MOBILE_PROVISION" || (echo "Missing IOS_MOBILE_PROVISION secret" && exit 1)
 
       - name: Build iOS (App Store Connect export)
         env:
