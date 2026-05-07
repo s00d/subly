@@ -71,11 +71,7 @@ jobs:
       - name: Build macOS app bundle (MAS config)
         env:
           APPLE_SIGNING_IDENTITY: ${{ env.MAS_APP_SIGNING_IDENTITY }}
-          # MAS build: notarization must be disabled (it requires Developer ID cert).
-          APPLE_API_KEY: ""
-          APPLE_API_ISSUER: ""
-          APPLE_API_KEY_PATH: ""
-        run: pnpm tauri build --bundles app --target universal-apple-darwin --config src-tauri/tauri.appstore.conf.json
+        run: env -u APPLE_API_KEY -u APPLE_API_ISSUER -u APPLE_API_KEY_PATH pnpm tauri build --bundles app --target universal-apple-darwin --config src-tauri/tauri.appstore.conf.json
 
       - name: Build signed PKG
         run: |
