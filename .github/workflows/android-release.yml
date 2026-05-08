@@ -50,13 +50,21 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
+      - name: Prepare Tauri CLI shim for Android Gradle task
+        run: |
+          cat > src-tauri/tauri <<'EOF'
+          #!/usr/bin/env node
+          require("../node_modules/@tauri-apps/cli/tauri.js");
+          EOF
+          chmod +x src-tauri/tauri
+
       - name: Build Android APK (unsigned)
         run: pnpm tauri android build --apk
 
       - name: Resolve APK path
         id: apk
         run: |
-          APK_PATH="$(ls src-tauri/gen/android/app/build/outputs/apk/**/*.apk | head -n 1)"
+          APK_PATH="$(ls src-tauri/gen/android/app/build/outputs/apk/*/*.apk | head -n 1)"
           if [ -z "$APK_PATH" ]; then
             echo "No APK found under src-tauri/gen/android/app/build/outputs/apk/"
             exit 1
