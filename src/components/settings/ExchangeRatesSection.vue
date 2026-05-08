@@ -10,6 +10,7 @@ import { ratesGetProviders, ratesRunBackendUpdate } from "@/services/ratesClient
 import type { RatesProviderType, RatesProviderMeta } from "@/services/ratesClient";
 import { getConfigValue, setConfigValue } from "@/services/configClient";
 import { getSecureValue, setSecureValue } from "@/services/secureStorageClient";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import type { Currency, Settings } from "@/schemas/appData";
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import { RefreshCw, Check, CheckSquare, Square, ChevronDown, ArrowRightLeft, Search } from "@lucide/vue";
@@ -102,16 +103,37 @@ const otherProviders = computed(() =>
 const autoUpdate = computed(() => Boolean(settings.value?.currencyAutoUpdate));
 const updateTargets = computed(() => settings.value?.currencyUpdateTargets ?? []);
 
-const targetCurrencyOptions = computed<SelectOption[]>(() =>
-  currencies.value
-    .filter((c) => c.id !== settings.value?.mainCurrencyId)
-    .map((c) => ({ value: c.id, label: `${c.name} (${c.code})` })),
-);
+type TargetCurrencyOption = SelectOption & { searchText: string };
+
+const targetCurrencyOptions = computed<TargetCurrencyOption[]>(() => {
+  const mainId = settings.value?.mainCurrencyId ?? "";
+  const mainCode = currencies.value.find((c) => c.id === mainId)?.code?.trim().toUpperCase() ?? "";
+  const seenCodes = new Set<string>();
+  const out: TargetCurrencyOption[] = [];
+
+  for (const currency of currencies.value) {
+    const id = String(currency.id ?? "").trim();
+    const code = String(currency.code ?? "").trim().toUpperCase();
+    if (!id || !code) continue;
+    if (id === mainId || code === mainCode) continue;
+    if (seenCodes.has(code)) continue;
+    seenCodes.add(code);
+    out.push({
+      value: id,
+      label: `${currency.name} (${code})`,
+      searchText: `${currency.name} ${code} ${currency.symbol || ""} ${id}`.toLowerCase(),
+    });
+  }
+
+  return out;
+});
 
 const filteredTargetCurrencyOptions = computed<SelectOption[]>(() => {
   const q = targetSearch.value.trim().toLowerCase();
   if (!q) return targetCurrencyOptions.value;
-  return targetCurrencyOptions.value.filter((opt) => opt.label.toLowerCase().includes(q));
+  return targetCurrencyOptions.value.filter((opt) =>
+    opt.searchText.includes(q) || opt.label.toLowerCase().includes(q),
+  );
 });
 
 function toggleAutoUpdate() {
@@ -144,6 +166,18 @@ const isUpdating = ref(false);
 async function manualUpdate() {
   isUpdating.value = true;
   try {
+    if (activeProvider.value?.requiresKey) {
+      const key = apiKey.value.trim();
+      if (!key) {
+        toast(t("rates_key_required"), "error");
+        return;
+      }
+      // Keep backend keyring/config in sync before manual update.
+      await setSecureValue("ratesApiKey", key);
+      await setConfigValue("ratesProvider", selectedProvider.value);
+      apiKey.value = key;
+    }
+
     console.log("[ExchangeRatesSection] manualUpdate start", {
       provider: selectedProvider.value,
       activeProvider: activeProvider.value?.type,
@@ -203,6 +237,29 @@ const sectionTv = tv({
 });
 
 const s = sectionTv();
+
+const providerDocs: Record<RatesProviderType, string> = {
+  frankfurter: "https://www.frankfurter.app/",
+  currencyapi: "https://currencyapi.com/",
+  apilayer: "https://apilayer.com/",
+  fixer: "https://fixer.io/",
+  openexchangerates: "https://openexchangerates.org/",
+  exchangerate: "https://www.exchangerate-api.com/",
+};
+
+const currentProviderDocsUrl = computed(() => providerDocs[selectedProvider.value] ?? providerDocs.frankfurter);
+
+function providerDocsUrl(type: RatesProviderType): string {
+  return providerDocs[type] ?? providerDocs.frankfurter;
+}
+
+async function openProviderDocs(type: RatesProviderType) {
+  try {
+    await openUrl(providerDocsUrl(type));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  }
+}
 </script>
 
 <template>
@@ -212,6 +269,16 @@ const s = sectionTv();
       <h2 :class="s.title()">{{ t('exchange_rates') }}</h2>
     </div>
     <p :class="s.desc()">{{ t('exchange_rates_desc') }}</p>
+    <p class="text-[11px] text-text-muted mb-4">
+      {{ t("exchange_rates_links_desc") }}
+      <button
+        type="button"
+        class="text-primary hover:underline"
+        @click="openProviderDocs(selectedProvider)"
+      >
+        {{ activeProvider?.name || selectedProvider }}
+      </button>
+    </p>
 
     <!-- Active provider card -->
     <div v-if="activeProvider" class="rounded-xl border border-primary bg-primary-light p-3 mb-3">
@@ -260,6 +327,14 @@ const s = sectionTv();
             <div class="flex-1 min-w-0">
               <p :class="s.providerName()">{{ provider.name }}</p>
               <p :class="s.providerNote()">{{ provider.freeTierNote }}</p>
+              <button
+                v-if="provider.requiresKey"
+                type="button"
+                class="inline-flex items-center mt-1 text-[10px] text-primary hover:underline"
+                @click.stop="openProviderDocs(provider.type)"
+              >
+                {{ t('open_url') }} (API key)
+              </button>
             </div>
             <ChevronDown
               v-if="provider.requiresKey"
@@ -306,6 +381,14 @@ const s = sectionTv();
       <p class="text-xs font-medium text-text-primary mb-2">
         {{ t('api_key') }} — {{ activeProvider.name }}
       </p>
+      <button
+        v-if="activeProvider.requiresKey"
+        type="button"
+        class="inline-flex items-center mb-2 text-[11px] text-primary hover:underline"
+        @click="openProviderDocs(activeProvider.type)"
+      >
+        {{ t('open_url') }} (API key)
+      </button>
       <div class="flex flex-col sm:flex-row gap-2">
         <input
           v-model="apiKey"

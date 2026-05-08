@@ -100,6 +100,7 @@
   "currencies": "Devises",
   "exchange_rates": "Taux de change",
   "exchange_rates_desc": "Choisissez un fournisseur pour la mise à jour automatique des taux",
+  "exchange_rates_links_desc": "Où obtenir les clés API :",
   "rates_get_key": "Obtenir une clé API",
   "rates_key_required": "Une clé API est requise pour ce fournisseur",
   "active": "Actif",

@@ -100,6 +100,7 @@
   "currencies": "Währungen",
   "exchange_rates": "Wechselkurse",
   "exchange_rates_desc": "Wählen Sie einen Anbieter für automatische Kursaktualisierungen",
+  "exchange_rates_links_desc": "Wo Sie API-Schlüssel erhalten:",
   "rates_get_key": "API-Schlüssel holen",
   "rates_key_required": "Für diesen Anbieter ist ein API-Schlüssel erforderlich",
   "active": "Aktiv",

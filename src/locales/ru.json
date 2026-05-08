@@ -101,6 +101,7 @@
   "currencies": "Валюты",
   "exchange_rates": "Курсы валют",
   "exchange_rates_desc": "Выберите провайдера для автоматического обновления курсов",
+  "exchange_rates_links_desc": "Где получить API-ключи:",
   "rates_get_key": "Получить API ключ",
   "rates_key_required": "Для этого провайдера нужен API ключ",
   "active": "Активен",

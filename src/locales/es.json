@@ -100,6 +100,7 @@
   "currencies": "Monedas",
   "exchange_rates": "Tasas de cambio",
   "exchange_rates_desc": "Elige un proveedor para la actualización automática de tasas",
+  "exchange_rates_links_desc": "Dónde obtener claves API:",
   "rates_get_key": "Obtener clave API",
   "rates_key_required": "Se requiere una clave API para este proveedor",
   "active": "Activo",

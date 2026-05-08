@@ -5,8 +5,9 @@ import { useToast } from "@/composables/useToast";
 import { useClipboard } from "@/composables/useClipboard";
 import { useHeaderActions } from "@/composables/useHeaderActions";
 import { getCurrencyFlags, ratesRunBackendUpdate } from "@/services/ratesClient";
+import { updateCurrencyRates } from "@/services/catalogClient";
 import { storeToRefs } from "pinia";
-import type { Settings } from "@/schemas/appData";
+import type { Currency, Settings } from "@/schemas/appData";
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import Toast from "@/components/ui/Toast.vue";
 import { typo } from "@/lib/tv";
@@ -16,7 +17,7 @@ import AppSlider from "@/components/ui/AppSlider.vue";
 import ExpenseForm from "@/components/expenses/ExpenseForm.vue";
 import {
   RefreshCw, Copy, ArrowRightLeft, TrendingUp,
-  Search, Star, Check, Plus, RotateCcw, ChevronUp, ChevronDown, ArrowUpDown, LayoutList, LayoutGrid, Rows3, Hash, Type, CircleDollarSign, CheckSquare, Square,
+  Search, Star, Check, Plus, RotateCcw, ChevronUp, ChevronDown, ArrowUpDown, LayoutList, LayoutGrid, Rows3, Hash, Type, CircleDollarSign, CheckSquare, Square, Pencil, X,
 } from "@lucide/vue";
 
 const { t } = useI18n();
@@ -38,6 +39,8 @@ onUnmounted(() => {
 const searchQuery = ref("");
 const isUpdating = ref(false);
 const copiedId = ref<string | null>(null);
+const editingRateId = ref<string | null>(null);
+const editingRateValue = ref("");
 const currencyFlags = ref<Record<string, string>>({});
 
 type RateSortKey = "code" | "name" | "rate" | "enabled";
@@ -103,9 +106,26 @@ const editingId = ref<string | null>(null);
 const mainCurrency = computed(() =>
   currencies.value.find((c) => c.id === settings.value?.mainCurrencyId) ?? null,
 );
-const otherCurrencies = computed(() =>
-  currencies.value.filter((c) => c.id !== settings.value?.mainCurrencyId),
-);
+function normalizedCode(code: string | null | undefined): string {
+  return String(code ?? "").trim().toUpperCase();
+}
+
+const otherCurrencies = computed(() => {
+  const mainCode = normalizedCode(mainCurrency.value?.code);
+  const seenCodes = new Set<string>();
+  const out: Currency[] = [];
+
+  for (const c of currencies.value) {
+    if (c.id === settings.value?.mainCurrencyId) continue;
+    const code = normalizedCode(c.code);
+    if (!code) continue;
+    if (mainCode && code === mainCode) continue;
+    if (seenCodes.has(code)) continue;
+    seenCodes.add(code);
+    out.push(c);
+  }
+  return out;
+});
 const selectedTargetIds = computed(() => settings.value?.currencyUpdateTargets ?? []);
 const expenseFormLookupData = computed(() => {
   if (!settings.value) return null;
@@ -132,10 +152,20 @@ interface ConverterCurrency {
 const allConverterIds = computed(() => {
   const base = mainCurrency.value;
   if (!base) return [];
-  return [base.id, ...selectedTargetIds.value.filter((id) => {
+  const baseCode = normalizedCode(base.code);
+  const seenCodes = new Set<string>([baseCode]);
+  const orderedTargets: string[] = [];
+
+  for (const id of selectedTargetIds.value) {
     const c = currencies.value.find((cur) => cur.id === id);
-    return c && c.rate > 0;
-  })];
+    if (!c || c.rate <= 0) continue;
+    const code = normalizedCode(c.code);
+    if (!code || seenCodes.has(code)) continue;
+    seenCodes.add(code);
+    orderedTargets.push(c.id);
+  }
+
+  return [base.id, ...orderedTargets];
 });
 
 watch(allConverterIds, (ids) => {
@@ -316,6 +346,35 @@ async function handleUpdate() {
   }
   finally {
     isUpdating.value = false;
+  }
+}
+
+function startRateEdit(rate: { id: string; rate: number }) {
+  editingRateId.value = rate.id;
+  editingRateValue.value = Number.isFinite(rate.rate) ? String(rate.rate) : "";
+}
+
+function cancelRateEdit() {
+  editingRateId.value = null;
+  editingRateValue.value = "";
+}
+
+async function saveRateEdit(rate: { id: string; code: string }) {
+  const normalized = editingRateValue.value.replace(",", ".").trim();
+  const nextRate = Number(normalized);
+  if (!Number.isFinite(nextRate) || nextRate <= 0) {
+    toast("Rate must be a positive number", "error");
+    return;
+  }
+
+  try {
+    await updateCurrencyRates([{ id: rate.id, rate: nextRate }]);
+    await metaStore.refresh();
+    await refreshCurrencyFlags();
+    toast(`${rate.code} ${t("save").toLowerCase()}`);
+    cancelRateEdit();
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 
@@ -682,12 +741,46 @@ watch(
             </Tooltip>
           </div>
           <div class="mt-2 text-lg font-mono font-semibold text-text-primary tabular-nums">
-            {{ rate.rateFormatted }}
+            <input
+              v-if="editingRateId === rate.id"
+              v-model="editingRateValue"
+              type="text"
+              inputmode="decimal"
+              @keydown.enter.prevent="saveRateEdit(rate)"
+              class="w-full px-2 py-1 rounded-md border border-border bg-surface text-base font-mono text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            <template v-else>{{ rate.rateFormatted }}</template>
           </div>
           <div class="text-xs font-mono text-text-muted tabular-nums mt-0.5">
             1/{{ rate.inverse }}
           </div>
           <div class="flex justify-end mt-2">
+            <Tooltip v-if="editingRateId !== rate.id" :text="t('save')">
+              <button
+                @click="startRateEdit(rate)"
+                class="p-1.5 rounded-lg transition-all shrink-0 text-text-muted hover:text-primary"
+              >
+                <Pencil :size="13" />
+              </button>
+            </Tooltip>
+            <template v-else>
+              <Tooltip :text="t('save')">
+                <button
+                  @click="saveRateEdit(rate)"
+                  class="p-1.5 rounded-lg transition-all shrink-0 text-green-600 hover:text-green-700"
+                >
+                  <Check :size="13" />
+                </button>
+              </Tooltip>
+              <Tooltip :text="t('cancel')">
+                <button
+                  @click="cancelRateEdit"
+                  class="p-1.5 rounded-lg transition-all shrink-0 text-text-muted hover:text-primary"
+                >
+                  <X :size="13" />
+                </button>
+              </Tooltip>
+            </template>
             <Tooltip :text="t('copy')">
               <button
                 @click="copyRow(`1 ${mainCurrency?.code} = ${rate.rateFormatted} ${rate.code}`, `rate-${rate.id}`)"
@@ -726,8 +819,40 @@ watch(
             <span v-if="flagFor(rate.code)" class="mr-0.5">{{ flagFor(rate.code) }}</span>{{ rate.code }}
           </span>
           <span class="text-xs sm:text-sm text-text-muted flex-1 min-w-0 truncate">{{ rate.name }}</span>
-          <span class="text-xs sm:text-sm font-mono font-semibold text-text-primary tabular-nums">{{ rate.rateFormatted }}</span>
+          <input
+            v-if="editingRateId === rate.id"
+            v-model="editingRateValue"
+            type="text"
+            inputmode="decimal"
+            @keydown.enter.prevent="saveRateEdit(rate)"
+            class="w-24 px-2 py-1 rounded-md border border-border bg-surface text-xs sm:text-sm font-mono font-semibold text-text-primary tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <span v-else class="text-xs sm:text-sm font-mono font-semibold text-text-primary tabular-nums">{{ rate.rateFormatted }}</span>
           <span class="text-xs font-mono text-text-muted tabular-nums w-18 text-right hidden sm:block">1/{{ rate.inverse }}</span>
+          <Tooltip :text="editingRateId === rate.id ? t('save') : t('save')">
+            <button
+              v-if="editingRateId !== rate.id"
+              @click="startRateEdit(rate)"
+              class="p-1 rounded-lg transition-all shrink-0 text-text-muted hover:text-primary"
+            >
+              <Pencil :size="13" />
+            </button>
+            <button
+              v-else
+              @click="saveRateEdit(rate)"
+              class="p-1 rounded-lg transition-all shrink-0 text-green-600 hover:text-green-700"
+            >
+              <Check :size="13" />
+            </button>
+          </Tooltip>
+          <Tooltip v-if="editingRateId === rate.id" :text="t('cancel')">
+            <button
+              @click="cancelRateEdit"
+              class="p-1 rounded-lg transition-all shrink-0 text-text-muted hover:text-primary"
+            >
+              <X :size="13" />
+            </button>
+          </Tooltip>
           <Tooltip v-if="!isCompactView" :text="t('copy')">
             <button
               @click="copyRow(`1 ${mainCurrency?.code} = ${rate.rateFormatted} ${rate.code}`, `rate-${rate.id}`)"

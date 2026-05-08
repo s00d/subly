@@ -100,6 +100,7 @@
   "currencies": "العملات",
   "exchange_rates": "أسعار الصرف",
   "exchange_rates_desc": "اختر مزودًا لتحديث الأسعار تلقائيًا",
+  "exchange_rates_links_desc": "أماكن الحصول على مفاتيح API:",
   "rates_get_key": "احصل على مفتاح API",
   "rates_key_required": "مفتاح API مطلوب لهذا المزود",
   "active": "نشط",

@@ -4,5 +4,9 @@
 <dict>
   <key>ITSAppUsesNonExemptEncryption</key>
   <false/>
+  <key>NSCameraUsageDescription</key>
+  <string>Subly uses the camera so you can take a photo for subscription logos.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>Subly uses your photo library so you can pick an image for subscription logos.</string>
 </dict>
 </plist>

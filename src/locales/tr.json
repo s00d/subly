@@ -100,6 +100,7 @@
   "currencies": "Para Birimleri",
   "exchange_rates": "Döviz Kurları",
   "exchange_rates_desc": "Otomatik kur güncelleme sağlayıcısı seçin",
+  "exchange_rates_links_desc": "API anahtarları nereden alınır:",
   "rates_get_key": "API anahtarı al",
   "rates_key_required": "Bu sağlayıcı için API anahtarı gerekli",
   "active": "Etkin",

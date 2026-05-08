@@ -100,6 +100,7 @@
   "currencies": "मुद्राएँ",
   "exchange_rates": "विनिमय दरें",
   "exchange_rates_desc": "स्वचालित दर अपडेट के लिए प्रदाता चुनें",
+  "exchange_rates_links_desc": "API keys कहां से प्राप्त करें:",
   "rates_get_key": "API कुंजी प्राप्त करें",
   "rates_key_required": "इस प्रदाता के लिए API कुंजी आवश्यक है",
   "active": "सक्रिय",

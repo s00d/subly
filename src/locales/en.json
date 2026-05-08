@@ -101,6 +101,7 @@
   "currencies": "Currencies",
   "exchange_rates": "Exchange Rates",
   "exchange_rates_desc": "Choose a provider for automatic currency rate updates",
+  "exchange_rates_links_desc": "Where to get API access keys:",
   "rates_get_key": "Get API key",
   "rates_key_required": "API key is required for this provider",
   "active": "Active",

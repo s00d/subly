@@ -239,7 +239,7 @@ mod price_tests {
     }
 }
 
-fn build_default_ui_settings(data: &AppDataDoc) -> serde_json::Value {
+pub(crate) fn build_default_ui_settings(data: &AppDataDoc) -> serde_json::Value {
     let main_currency_id = data
         .currencies
         .first()

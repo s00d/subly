@@ -100,6 +100,7 @@
   "currencies": "통화",
   "exchange_rates": "환율",
   "exchange_rates_desc": "자동 환율 업데이트 공급자를 선택하세요",
+  "exchange_rates_links_desc": "API 키 발급 사이트:",
   "rates_get_key": "API 키 받기",
   "rates_key_required": "이 공급자에는 API 키가 필요합니다",
   "active": "활성",

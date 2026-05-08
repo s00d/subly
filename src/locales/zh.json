@@ -100,6 +100,7 @@
   "currencies": "货币",
   "exchange_rates": "汇率",
   "exchange_rates_desc": "选择自动更新汇率的提供商",
+  "exchange_rates_links_desc": "获取 API Key 的网站：",
   "rates_get_key": "获取 API 密钥",
   "rates_key_required": "此提供商需要 API 密钥",
   "active": "已激活",

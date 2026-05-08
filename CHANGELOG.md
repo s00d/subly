@@ -5,6 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-05-08
+
+### Fixed
+
+- Fixed iOS crash when tapping **Take Photo** by adding required privacy usage descriptions in `Info.plist` (`NSCameraUsageDescription`, `NSPhotoLibraryUsageDescription`).
+- Fixed full reset flow to recreate default `config:settings` after wipe, preventing app startup from hanging on loading.
+- Fixed exchange rates provider UX:
+  - Added provider docs links in selection flow and wired opening through Tauri opener.
+  - Fixed API key persistence/read flow for providers that require keys.
+- Fixed currency rates UI issues:
+  - Removed duplicated currencies by code in converter/rates lists.
+  - Added manual rate editing in **All Rates**.
+  - Added save-by-Enter while editing a rate.
+
+### Changed
+
+- Bumped app version to `1.0.1`.
+
 ## [1.0.0] - 2026-05-07
 
 ### ⚠️ Upgrade notice
@@ -108,7 +126,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.1] - 2026-02-11
 ## [0.1.0] - 2026-02-11
 
-[1.0.0]: https://github.com/s00d/subly/compare/v0.6.1...HEAD
+[1.0.1]: https://github.com/s00d/subly/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/s00d/subly/compare/v0.6.1...v1.0.0
 [0.6.1]: https://github.com/s00d/subly/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/s00d/subly/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/s00d/subly/compare/v0.5.0...v0.5.1
