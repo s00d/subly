@@ -38,6 +38,12 @@ jobs:
         with:
           targets: aarch64-apple-ios,aarch64-apple-ios-sim
 
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+          shared-key: "appstore-ios"
+
       - name: Check Xcode / iOS SDK requirement
         run: |
           xcodebuild -version

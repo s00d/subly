@@ -1,0 +1,81 @@
+name: Android Release Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  android:
+    name: Build Android APK
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+          shared-key: "android-release"
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Build Android APK (unsigned)
+        run: pnpm tauri android build --apk
+
+      - name: Resolve APK path
+        id: apk
+        run: |
+          APK_PATH="$(ls src-tauri/gen/android/app/build/outputs/apk/**/*.apk | head -n 1)"
+          if [ -z "$APK_PATH" ]; then
+            echo "No APK found under src-tauri/gen/android/app/build/outputs/apk/"
+            exit 1
+          fi
+          APK_NAME="subly-android-${GITHUB_REF_NAME:-manual}.apk"
+          cp "$APK_PATH" "$RUNNER_TEMP/$APK_NAME"
+          echo "apk_path=$RUNNER_TEMP/$APK_NAME" >> "$GITHUB_OUTPUT"
+          echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: ${{ steps.apk.outputs.apk_path }}
+
+      - name: Upload APK to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.apk.outputs.apk_path }}
+          fail_on_unmatched_files: true
+
