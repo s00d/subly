@@ -1,0 +1,28 @@
+.github/workflows/tests.yml
+  s_760a8176b5063e::t_86ff820d7d76f8 30-35
+.github/workflows/appstore-macos.yml
+  s_760a8176b5063e::t_d163655a308933 42-47
+.github/workflows/build.yml
+  s_760a8176b5063e::t_3151e436989c15 48-52
+.github/workflows/android-release.yml
+  s_760a8176b5063e::t_e23e98f03644c7 57,66-67,73,79
+  s_760a8176b5063e::t_f2c0c9d6f5bbe3 1-56,58-65,68-72,74-78,80-81
+.github/workflows/appstore-ios.yml
+  s_760a8176b5063e::t_7336a80da7ff4d 41-46
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "fca15c6c13d019254141426ef74db59bf26f9c0a",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
