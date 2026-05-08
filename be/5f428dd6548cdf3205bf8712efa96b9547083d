@@ -1,0 +1,80 @@
+src/locales/es.json
+  s_760a8176b5063e::t_606ec1c447e312 103
+src-tauri/gen/apple/subly_iOS/Info.plist
+  s_760a8176b5063e::t_88fe98f80bb7d1 18,20
+  s_760a8176b5063e::t_36b9c0b68699e3 25-28
+src/locales/en.json
+  s_760a8176b5063e::t_f7751b69b47425 104
+src-tauri/src/keyring_store.rs
+  s_760a8176b5063e::t_f91bfc2242d1dd 3-5,7-11,17-22,29-34,39,43-48
+src/pages/CurrencyRatesPage.vue
+  s_760a8176b5063e::t_c722ea2c4071e7 749,827
+  s_760a8176b5063e::t_b2547ccc722be5 109-128,155-159,161-168
+  s_760a8176b5063e::t_3494ca6ece7b94 10
+  s_760a8176b5063e::t_79de4cf6186bb2 8,20,42-43,352-380,744-748,750-752,758-783,822-826,828-830,832-855
+src/locales/tr.json
+  s_760a8176b5063e::t_280ebfd1710746 103
+src/locales/ja.json
+  s_760a8176b5063e::t_07e196ca835abf 103
+src/locales/fr.json
+  s_760a8176b5063e::t_f9d4de3f62c8c6 103
+src-tauri/Info.plist
+  s_760a8176b5063e::t_4c46e002a5cf03 7-10
+src-tauri/gen/apple/subly.xcodeproj/project.pbxproj
+  ai_agent 376,403,538,565
+package.json
+  s_760a8176b5063e::t_e2e4bc31cba0d5 4
+src/locales/ko.json
+  s_760a8176b5063e::t_e7049a2538b438 103
+app-icon.svg
+  s_760a8176b5063e::t_44f36d7eea492c 11
+  s_760a8176b5063e::t_5b5d75c6b56500 12-13
+src/locales/ar.json
+  s_760a8176b5063e::t_3d0a559b3e3abb 103
+src/locales/ru.json
+  s_760a8176b5063e::t_2f94438822aeb9 104
+src/locales/pt.json
+  s_760a8176b5063e::t_9729f5da799de3 103
+src/components/settings/ExchangeRatesSection.vue
+  s_760a8176b5063e::t_03d99a05af3d29 109-111,113-120,126-129
+  s_760a8176b5063e::t_3da731520c804c 13,255-262,274-275,277,280,330,332,334,337,384,386,388,391
+  s_760a8176b5063e::t_d70438cd50a04e 169-180
+  s_760a8176b5063e::t_ba99618abb28c7 241-250,272-273,276,279,281
+  s_760a8176b5063e::t_02d7694459eb13 251-254,331,333,335-336,385,387,389-390
+  s_760a8176b5063e::t_850bd4e82c630d 106-108,112,121-125,134-136
+  s_760a8176b5063e::t_3ca6c4959eb584 240,278
+src-tauri/src/lib.rs
+  s_760a8176b5063e::t_d546d593380553 242
+src/locales/zh.json
+  s_760a8176b5063e::t_d2b8b034d956bf 103
+src-tauri/tauri.conf.json
+  s_760a8176b5063e::t_70b39b2133bb30 58,61
+src-tauri/src/commands/app_data.rs
+  s_760a8176b5063e::t_f7b724872eecaa 26-28
+  s_760a8176b5063e::t_010bb1fdb7c7fc 2
+  s_760a8176b5063e::t_29941b2e9a0923 25,37-40,43-61
+src/locales/de.json
+  s_760a8176b5063e::t_4b93026029e417 103
+src/locales/hi.json
+  s_760a8176b5063e::t_f7cd5ebb531466 103
+CHANGELOG.md
+  s_760a8176b5063e::t_3ecc2ffad6a6a2 8-25,129-130
+src/components/dashboard/OverdueAlert.vue
+  s_760a8176b5063e::t_450ac3220576be 17-23,25-33,37,39-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "be5f428dd6548cdf3205bf8712efa96b9547083d",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
