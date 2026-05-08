@@ -54,6 +54,8 @@ jobs:
         run: |
           cat > src-tauri/tauri <<'EOF'
           #!/usr/bin/env node
+          import { createRequire } from "node:module";
+          const require = createRequire(import.meta.url);
           require("../node_modules/@tauri-apps/cli/tauri.js");
           EOF
           chmod +x src-tauri/tauri
