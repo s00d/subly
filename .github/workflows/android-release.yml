@@ -66,7 +66,10 @@ jobs:
       - name: Resolve APK path
         id: apk
         run: |
-          APK_PATH="$(ls src-tauri/gen/android/app/build/outputs/apk/*/*.apk | head -n 1)"
+          APK_PATH="$(ls src-tauri/gen/android/app/build/outputs/apk/**/*.apk 2>/dev/null | head -n 1)"
+          if [ -z "$APK_PATH" ]; then
+            APK_PATH="$(ls src-tauri/gen/android/app/build/outputs/apk/*/*/*.apk 2>/dev/null | head -n 1)"
+          fi
           if [ -z "$APK_PATH" ]; then
             echo "No APK found under src-tauri/gen/android/app/build/outputs/apk/"
             exit 1
