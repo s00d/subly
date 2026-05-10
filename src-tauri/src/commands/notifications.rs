@@ -1,4 +1,4 @@
-use chrono::{Local, NaiveDate, Timelike};
+use chrono::{Local, LocalResult, NaiveDate, TimeZone, Timelike};
 use tauri::State;
 use tauri::Emitter;
 use tauri_plugin_notification::{NotificationExt, Schedule};
@@ -336,7 +336,6 @@ pub(crate) fn notifications_reschedule_with_state(
         }
     }
 
-    let today = Local::now().date_naive();
     let mut scheduled_ids: Vec<i32> = Vec::new();
     for item in &schedule {
         let payment_date = NaiveDate::parse_from_str(&item.next_payment, "%Y-%m-%d").ok();
@@ -361,14 +360,22 @@ pub(crate) fn notifications_reschedule_with_state(
             Ok(v) => v,
             Err(_) => continue,
         };
-        if notify_date < today {
-            continue;
-        }
-        let dt = notify_date
+        let naive = notify_date
             .and_hms_opt(schedule_hour as u32, 0, 0)
             .ok_or("invalid schedule datetime".to_string())?;
-        let ts = dt.and_utc().timestamp();
+        // Interpret wall-clock time in the user's timezone (not UTC). Using `and_utc()` on naive
+        // values caused wrong instants and iOS `pastScheduledTime` when local hour had already passed.
+        let local_dt = match Local.from_local_datetime(&naive) {
+            LocalResult::Single(dt) => dt,
+            LocalResult::Ambiguous(earliest, _) => earliest,
+            LocalResult::None => continue,
+        };
+        let ts = local_dt.timestamp();
         let date = time::OffsetDateTime::from_unix_timestamp(ts).map_err(|e| e.to_string())?;
+        let now = time::OffsetDateTime::now_utc();
+        if date <= now {
+            continue;
+        }
         let _ = app
             .notification()
             .builder()
