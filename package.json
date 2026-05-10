@@ -11,7 +11,8 @@
     "test:backend": "cargo test --manifest-path src-tauri/Cargo.toml --lib",
     "test:restart-smoke": "cargo test --manifest-path src-tauri/Cargo.toml restart_smoke_ --lib",
     "test:known-risks": "cargo test --manifest-path src-tauri/Cargo.toml --lib -- --ignored",
-    "cargo:outdated": "cargo outdated --manifest-path src-tauri/Cargo.toml --workspace --depth 1 -x tauri-plugin-single-instance --verbose"
+    "cargo:outdated": "cargo outdated --manifest-path src-tauri/Cargo.toml --workspace --depth 1 -x tauri-plugin-single-instance --verbose",
+    "bump:version": "node scripts/bump-app-version.mjs"
   },
   "dependencies": {
     "@lucide/vue": "^1.14.0",

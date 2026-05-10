@@ -60,6 +60,8 @@ xcodegen generate
 
 so **`project.pbxproj`** picks up **`MARKETING_VERSION`** / **`CURRENT_PROJECT_VERSION`**.
 
+**Caution:** `xcodegen generate` can rewrite entitlements plist files referenced from **`project.yml`** (e.g. **`src-tauri/entitlements/ios.plist`**, **`SublyWidget.entitlements`**) and leave them as empty `<dict/>`, which drops App Groups / iCloud. The repo script **`pnpm bump:version`** updates **`project.yml`**, Info plists, **`tauri.conf.json`**, and patches **`project.pbxproj`** directly—**it does not run XcodeGen** for that reason. If you edit **`project.yml`** by hand and must regenerate the Xcode project, back up those entitlements files first or restore them from git after `xcodegen generate`.
+
 ---
 
 ## Typical order for a new Store build
