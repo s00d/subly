@@ -93,39 +93,161 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions "$KEYCHAIN_PATH"
           mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
           install_pp() {
-            local label="$1"
+            local slug="$1"
             local b64="$2"
-            echo "$b64" | base64 --decode > /tmp/profile.mobileprovision
-            security cms -D -i /tmp/profile.mobileprovision > /tmp/profile.plist
-            UUID="$(plutil -extract UUID raw /tmp/profile.plist)"
-            TEAM_DOT_APP="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' /tmp/profile.plist 2>/dev/null || echo "?")"
-            cp /tmp/profile.mobileprovision "$HOME/Library/MobileDevice/Provisioning Profiles/${UUID}.mobileprovision"
-            echo "Installed $label profile UUID=$UUID Entitlements.application-identifier=$TEAM_DOT_APP"
+            local env_var_name="$3"
+            echo "$b64" | base64 --decode > "/tmp/subly_${slug}.mobileprovision"
+            security cms -D -i "/tmp/subly_${slug}.mobileprovision" > "/tmp/subly_${slug}.plist"
+            UUID="$(plutil -extract UUID raw "/tmp/subly_${slug}.plist")"
+            NAME="$(plutil -extract Name raw "/tmp/subly_${slug}.plist")"
+            TEAM_DOT_APP="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' "/tmp/subly_${slug}.plist" 2>/dev/null || echo "?")"
+            cp "/tmp/subly_${slug}.mobileprovision" "$HOME/Library/MobileDevice/Provisioning Profiles/${UUID}.mobileprovision"
+            echo "Installed ${slug} UUID=$UUID Name=${NAME} application-identifier=${TEAM_DOT_APP}"
+            echo "${env_var_name}=${NAME}" >> "$GITHUB_ENV"
           }
-          install_pp "main_app" "$IOS_MOBILE_PROVISION"
-          install_pp "widget" "$IOS_WIDGET_MOBILE_PROVISION"
+          install_pp "main" "$IOS_MOBILE_PROVISION" "SUBLY_MAIN_PROFILE_NAME"
+          install_pp "widget" "$IOS_WIDGET_MOBILE_PROVISION" "SUBLY_WIDGET_PROFILE_NAME"
+          echo ""
+          echo "========== SIGNING: identities in keychain =========="
+          security find-identity -v -p codesigning || true
+          echo ""
+          echo "========== SIGNING: provisioning profiles installed (filenames = UUID.mobileprovision) =========="
+          ls -1 "$HOME/Library/MobileDevice/Provisioning Profiles" 2>/dev/null | head -50 || true
+          echo "(total files: $(ls -1 "$HOME/Library/MobileDevice/Provisioning Profiles" 2>/dev/null | wc -l | tr -d ' '))"
 
-      - name: Build iOS (App Store Connect export)
+      # Without provisioningProfiles for BOTH bundle IDs, xcodebuild -exportArchive can re-sign the
+      # widget appex without embedded entitlements → App Store validation 409.
+      - name: Write ExportOptions.plist for App Store export (main app + widget extension)
+        run: |
+          test -n "${SUBLY_MAIN_PROFILE_NAME}" || (echo "SUBLY_MAIN_PROFILE_NAME missing" && exit 1)
+          test -n "${SUBLY_WIDGET_PROFILE_NAME}" || (echo "SUBLY_WIDGET_PROFILE_NAME missing" && exit 1)
+          test -n "${APPLE_TEAM_ID}" || (echo "APPLE_TEAM_ID missing" && exit 1)
+          OUT="src-tauri/gen/apple/ExportOptions.plist"
+          python3 << 'PY'
+          import os
+          import plistlib
+
+          out = os.environ["OUT_PATH"]
+          data = {
+              "method": "app-store-connect",
+              "teamID": os.environ["APPLE_TEAM_ID"],
+              "signingStyle": "manual",
+              "provisioningProfiles": {
+                  "com.s00d.subly": os.environ["SUBLY_MAIN_PROFILE_NAME"],
+                  "com.s00d.subly.widget": os.environ["SUBLY_WIDGET_PROFILE_NAME"],
+              },
+          }
+          with open(out, "wb") as f:
+              plistlib.dump(data, f, fmt=plistlib.FMT_XML)
+          print("Wrote", out)
+          PY
+          plutil -lint "$OUT"
+          echo "--- ExportOptions.plist ---"
+          /usr/libexec/PlistBuddy -c 'Print' "$OUT" || true
+        env:
+          OUT_PATH: src-tauri/gen/apple/ExportOptions.plist
+
+      # Archive only: skipping Tauri’s IPA export avoids it overwriting ExportOptions.plist before export.
+      - name: Build iOS archive (xcarchive)
         env:
           APPLE_DEVELOPMENT_TEAM: ${{ env.APPLE_TEAM_ID }}
-        run: pnpm tauri ios build --export-method app-store-connect
+        run: pnpm tauri ios build --archive-only --ci
 
-      - name: Resolve IPA path
+      - name: Resolve xcarchive path
         run: |
-          IPA_PATH=$(ls src-tauri/gen/apple/build/arm64/*.ipa | sed -n '1p')
-          if [ -z "$IPA_PATH" ]; then
-            echo "No IPA found in src-tauri/gen/apple/build/arm64/"
+          ARCHIVE="$(find src-tauri/gen/apple -name "*.xcarchive" -type d | sort | tail -n 1)"
+          if [ -z "$ARCHIVE" ] || [ ! -d "$ARCHIVE" ]; then
+            echo "ERROR: No .xcarchive under src-tauri/gen/apple"
+            find src-tauri/gen/apple -type d -maxdepth 4 2>/dev/null | head -80 || true
+            exit 1
+          fi
+          echo "XCODE_ARCHIVE_PATH=$ARCHIVE" >> "$GITHUB_ENV"
+          echo "Resolved xcarchive: $ARCHIVE"
+          du -sh "$ARCHIVE" || true
+
+      - name: Diagnostics — widget in xcarchive (before export)
+        run: |
+          set +e
+          A="${XCODE_ARCHIVE_PATH:?missing XCODE_ARCHIVE_PATH}"
+          APP="$A/Products/Applications/Subly.app"
+          W_EXE="$APP/PlugIns/SublyWidgetExtension.appex/SublyWidgetExtension"
+          W_APPEX="$(dirname "$W_EXE")"
+          echo "========== XCODE_ARCHIVE_PATH =========="
+          echo "$A"
+          echo "========== Subly.app exists? =========="
+          ls -la "$APP" 2>&1 | head -5
+          echo "========== Widget executable path =========="
+          echo "$W_EXE"
+          ls -la "$W_EXE" 2>&1
+          echo "========== codesign -dv (widget) =========="
+          codesign -dv --verbose=4 "$W_EXE" 2>&1
+          echo "========== codesign --entitlements (widget) — expect com.apple.security.application-groups =========="
+          codesign -d --entitlements :- "$W_EXE" 2>&1
+          EC=$?
+          if [ "$EC" != 0 ]; then echo "codesign entitlements exit=$EC (empty or failed)"; fi
+          echo "========== embedded.mobileprovision in appex =========="
+          ls -la "$W_APPEX/embedded.mobileprovision" 2>&1
+          if [ -f "$W_APPEX/embedded.mobileprovision" ]; then
+            echo "--- profile application-identifier / Name ---"
+            security cms -D -i "$W_APPEX/embedded.mobileprovision" > /tmp/emb.plist
+            plutil -extract Name raw /tmp/emb.plist 2>/dev/null && echo "(profile Name)"
+            /usr/libexec/PlistBuddy -c 'Print :Entitlements:application-identifier' /tmp/emb.plist 2>/dev/null
+          fi
+
+      - name: Export IPA with ExportOptions.plist (widget + main provisioning profiles)
+        run: |
+          set -euo pipefail
+          ARCHIVE="${XCODE_ARCHIVE_PATH:?}"
+          echo "Using archive: $ARCHIVE"
+          EXPORT_DIR="src-tauri/gen/apple/build/ipa_export"
+          rm -rf "$EXPORT_DIR"
+          mkdir -p "$EXPORT_DIR"
+          echo "========== xcodebuild -exportArchive (full log) =========="
+          set -o pipefail
+          xcodebuild -exportArchive \
+            -archivePath "$ARCHIVE" \
+            -exportPath "$EXPORT_DIR" \
+            -exportOptionsPlist src-tauri/gen/apple/ExportOptions.plist 2>&1 | tee /tmp/export_archive.log
+          IPA_PATH="$(find "$EXPORT_DIR" -maxdepth 4 -name "*.ipa" | head -n 1)"
+          if [ -z "$IPA_PATH" ] || [ ! -f "$IPA_PATH" ]; then
+            echo "Export did not produce an IPA under $EXPORT_DIR"
+            ls -laR "$EXPORT_DIR" || true
+            echo "--- tail export log ---"
+            tail -100 /tmp/export_archive.log || true
             exit 1
           fi
           echo "IPA_PATH=$IPA_PATH" >> "$GITHUB_ENV"
+          echo "Exported IPA: $IPA_PATH"
+          ls -lh "$IPA_PATH"
+
+      - name: Diagnostics — widget entitlements inside exported IPA
+        run: |
+          set +e
+          IPA="${IPA_PATH:?missing IPA_PATH}"
+          echo "========== IPA =========="
+          ls -lh "$IPA"
+          rm -rf /tmp/ipa_ent_check
+          mkdir -p /tmp/ipa_ent_check
+          unzip -q "$IPA" -d /tmp/ipa_ent_check
+          W="/tmp/ipa_ent_check/Payload/Subly.app/PlugIns/SublyWidgetExtension.appex/SublyWidgetExtension"
+          echo "========== Widget path in IPA =========="
+          ls -la "$W" 2>&1
+          echo "========== codesign -dv (IPA widget) =========="
+          codesign -dv --verbose=4 "$W" 2>&1
+          echo "========== codesign --entitlements (IPA widget) — App Store reads this =========="
+          codesign -d --entitlements :- "$W" 2>&1
+          echo "========== spctl / assess (informational) =========="
+          spctl -a -vv -t install "$W" 2>&1 || true
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa
-          path: src-tauri/gen/apple/build/arm64/*.ipa
+          path: src-tauri/gen/apple/build/ipa_export/
 
       - name: Upload IPA to App Store Connect
         if: ${{ inputs.upload_to_appstore }}
         run: |
-          xcrun altool --upload-app --type ios --file "${IPA_PATH}" --apiKey "${APPLE_API_KEY}" --apiIssuer "${APPLE_API_ISSUER}"
+          echo "========== altool upload =========="
+          ls -lh "${IPA_PATH}"
+          xcrun altool --upload-app --type ios --file "${IPA_PATH}" --apiKey "${APPLE_API_KEY}" --apiIssuer "${APPLE_API_ISSUER}" --verbose
