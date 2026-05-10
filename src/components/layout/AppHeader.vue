@@ -29,11 +29,14 @@ const pageTitle = computed(() => {
 
 const headerTv = tv({
   slots: {
-    root: "min-h-14 sm:min-h-16 bg-surface border-b border-border flex items-center px-3 sm:px-6 shrink-0 gap-1.5 sm:gap-2",
-    burgerBtn: "md:hidden w-8 h-8 p-0 -ml-0.5 rounded-lg text-text-secondary hover:bg-surface-hover transition-colors shrink-0 inline-flex items-center justify-center",
-    title: typo.pageTitle(),
-    actionsWrap: "flex items-center gap-1.5 sm:gap-2 ml-auto",
-    actionBtn: "w-8 h-8 sm:w-9 sm:h-9 rounded-lg inline-flex items-center justify-center shadow-sm transition-colors shrink-0",
+    root:
+      "max-md:min-h-[4.75rem] md:min-h-16 bg-surface border-b border-border flex items-center px-3 sm:px-6 shrink-0 gap-1.5 sm:gap-2 max-md:py-2",
+    burgerBtn:
+      "md:hidden w-9 h-9 p-0 -ml-0.5 rounded-lg text-text-secondary hover:bg-surface-hover transition-colors shrink-0 inline-flex items-center justify-center",
+    title: `${typo.pageTitle()} flex-1 min-w-0`,
+    actionsWrap: "flex items-center gap-1 sm:gap-2 ml-auto shrink-0",
+    actionBtn:
+      "w-9 h-9 rounded-lg inline-flex items-center justify-center shadow-sm transition-colors shrink-0",
   },
 });
 
