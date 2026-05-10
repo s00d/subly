@@ -1,0 +1,25 @@
+src-tauri/tauri.conf.json
+  s_760a8176b5063e::t_696ee8b41a6ee9 58,61
+src-tauri/ios-apple/SublyWidget/Info.plist
+  s_760a8176b5063e::t_89f84fbdf04738 22
+.cursor/rules/app-release-versioning.mdc
+  s_760a8176b5063e::t_f29233f111feb0 26
+  s_760a8176b5063e::t_1ff463236abf00 7,9,11-14,16,20,22,24,27,29-32,36,38,40,42,44,46,48-49,53,55,61,65-72,74,78,80
+  s_760a8176b5063e::t_850a24b12243d6 1-6,8,10,15,17-19,21,23,25,28,33-35,37,39,41,43,45,47,50-52,54,56-60,62-64,73,75-77,79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "8a4575f71dd40cdea8a629cdc466f9846c186379",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
