@@ -118,7 +118,9 @@ targets:
         DEVELOPMENT_TEAM: R6VC7JTLE8
         CODE_SIGN_STYLE: Automatic
         APPLICATION_EXTENSION_API_ONLY: YES
-        CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION: YES
+        # YES lets Xcode strip entitlements to match the provisioning profile; if the widget profile
+        # lacks App Groups, the signed appex can end up with no entitlements → App Store 409 validation.
+        CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION: NO
         PRODUCT_BUNDLE_IDENTIFIER: com.s00d.subly.widget
         PRODUCT_NAME: SublyWidgetExtension
         INFOPLIST_FILE: ../../ios-apple/SublyWidget/Info.plist

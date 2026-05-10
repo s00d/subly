@@ -13,7 +13,7 @@
 </p>
 
 <p align="center">
-  <strong>Desktop app for tracking subscriptions and expenses</strong><br>
+  <strong>Subscriptions, everyday expenses, dashboards, and a renewal calendar—local-first with optional cloud sync</strong><br>
   Tauri v2 · Vue 3 · TypeScript · Tailwind CSS v4
 </p>
 
