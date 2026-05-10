@@ -1,0 +1,25 @@
+scripts/bump-app-version.mjs
+  s_760a8176b5063e::t_0e565b56677cbb 1-48,57-145,161-162
+  s_760a8176b5063e::t_7a04a6804abeb5 49-56
+  s_760a8176b5063e::t_f98701b8eb840b 146-160
+package.json
+  s_760a8176b5063e::t_27be2ea5314935 14-15
+.cursor/rules/app-release-versioning.mdc
+  s_760a8176b5063e::t_49bff9592a073f 63-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "4c30d616442751f0dc95cde5876247f313309478",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
