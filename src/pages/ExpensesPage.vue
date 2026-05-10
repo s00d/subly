@@ -4,29 +4,47 @@ import { useI18n } from "vue-i18n";
 import {
   deleteExpense,
   deleteExpensesBatch,
+  insertExpense,
   type ExpenseFilter,
 } from "@/services/expensesClient";
 import { storeToRefs } from "pinia";
 import type { Currency, Expense, Subscription, Category, PaymentMethod, Tag, Settings, HouseholdMember } from "@/schemas/appData";
-import { expenseToIsoDate } from "@/schemas/appData";
+import { expenseToIsoDate, parseExpense } from "@/schemas/appData";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useHeaderActions } from "@/composables/useHeaderActions";
 import { useToast } from "@/composables/useToast";
+import { useClipboard } from "@/composables/useClipboard";
 import { useScrollLock } from "@/composables/useScrollLock";
 import ExpenseForm from "@/components/expenses/ExpenseForm.vue";
 import ExpenseDetail from "@/components/expenses/ExpenseDetail.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import UniversalListRow from "@/components/ui/UniversalListRow.vue";
+import ContextActionMenu, {
+  type ContextMenuRow,
+  type ContextMenuExcludeRect,
+} from "@/components/ui/ContextActionMenu.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import Toast from "@/components/ui/Toast.vue";
 import {
-  Plus, Search, Trash2, CheckSquare, Square,
-  Wallet, AlertTriangle, ChevronLeft, ChevronRight,
-  Rows3, LayoutList, LayoutGrid, Filter,
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  ExternalLink,
+  CopyPlus,
+  ClipboardCopy,
+  CheckSquare,
+  Square,
+  Wallet,
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Rows3,
+  LayoutList,
+  LayoutGrid,
+  Filter,
 } from "@lucide/vue";
-import { Menu } from "@tauri-apps/api/menu";
-import type { MenuItemOptions, PredefinedMenuItemOptions } from "@tauri-apps/api/menu";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { formatErrorForToast } from "@/utils/formatError";
 import { useAppMetaStore } from "@/stores/appMetaStore";
@@ -57,6 +75,7 @@ const { t } = useI18n();
 const { setActions, clearActions } = useHeaderActions();
 const { fmtDateMedium, fmtCurrency } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
+const { copyToClipboard } = useClipboard();
 const pageLogPrefix = "[ExpensesPage]";
 const showFilters = ref(false);
 
@@ -123,6 +142,7 @@ function applyFilters() {
   const filter = buildFilter();
   fetchPage(1, filter).catch((e) => {
     logPageError("fetchPage failed", e, { filter, page: 1 });
+    toast(formatErrorForToast(e, t), "error");
   });
   updateTotal();
 }
@@ -142,6 +162,7 @@ function goPage(p: number) {
   if (p < 1 || p > totalPages.value) return;
   fetchPage(p).catch((e) => {
     logPageError("goPage failed", e, { page: p });
+    toast(formatErrorForToast(e, t), "error");
   });
 }
 
@@ -151,6 +172,7 @@ async function updateTotal() {
     await expensesStore.refreshSummary(buildFilter());
   } catch (e) {
     logPageError("updateTotal failed", e, { filter: buildFilter() });
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 
@@ -376,28 +398,115 @@ async function handleOpenUrl(url: string) {
   }
 }
 
+async function handleDuplicateExpense(exp: Expense) {
+  showDetail.value = false;
+  detailExpId.value = null;
+  const { updatedAt: _omitUpdated, ...rest } = exp;
+  const cloned = parseExpense({
+    ...rest,
+    id: crypto.randomUUID(),
+    name: `${exp.name} (copy)`,
+    createdAt: new Date().toISOString(),
+    subscriptionId: "",
+    paymentRecordId: "",
+  });
+  try {
+    await insertExpense(cloned);
+    toast(t("expense_added"));
+    await fetchPage(currentPage.value, activeFilter.value);
+    await updateTotal();
+  } catch (e) {
+    logPageError("handleDuplicateExpense failed", e, { id: exp.id });
+    toast(formatErrorForToast(e, t), "error");
+  }
+}
+
+async function handleCopyExpenseName(exp: Expense) {
+  const copied = await copyToClipboard(exp.name);
+  if (copied) toast(t("copied_to_clipboard"));
+  else toast(t("clipboard_copy_failed"), "error");
+}
+
 function onDetailOpenUrl(url: string) { handleOpenUrl(url); }
 
-async function showContextMenu(exp: Expense, event: MouseEvent) {
+const contextMenuOpen = ref(false);
+const contextMenuX = ref(0);
+const contextMenuY = ref(0);
+const contextMenuRows = ref<ContextMenuRow[]>([]);
+const contextMenuExcludeRect = ref<ContextMenuExcludeRect | null>(null);
+
+watch(contextMenuOpen, (open) => {
+  if (!open) contextMenuExcludeRect.value = null;
+});
+
+function showContextMenu(exp: Expense, event: MouseEvent, anchorRect?: DOMRect | null) {
   if (selectionMode.value) return;
 
-  const items: (MenuItemOptions | PredefinedMenuItemOptions)[] = [
-    { id: "edit", text: t("edit_expense"), action: () => openEdit(exp) },
+  const vx = event.clientX || window.innerWidth / 2;
+  const vy = event.clientY || window.innerHeight / 3;
+  contextMenuX.value = vx;
+  contextMenuY.value = vy;
+  contextMenuExcludeRect.value =
+    anchorRect != null
+      ? {
+          left: anchorRect.left,
+          top: anchorRect.top,
+          right: anchorRect.right,
+          bottom: anchorRect.bottom,
+        }
+      : null;
+
+  const rows: ContextMenuRow[] = [
+    {
+      kind: "button",
+      label: t("edit_expense"),
+      icon: Pencil,
+      run: () => {
+        openEdit(exp);
+      },
+    },
+    {
+      kind: "button",
+      label: t("clone"),
+      icon: CopyPlus,
+      run: () => {
+        void handleDuplicateExpense(exp);
+      },
+    },
   ];
   if (exp.url) {
-    items.push({ id: "url", text: t("url"), action: () => handleOpenUrl(exp.url) });
+    rows.push({
+      kind: "button",
+      label: t("url"),
+      icon: ExternalLink,
+      run: () => {
+        handleOpenUrl(exp.url);
+      },
+    });
   }
-  items.push(
-    { item: "Separator" },
-    { id: "delete", text: t("delete"), action: () => requestDelete(exp.id) },
+  rows.push(
+    {
+      kind: "button",
+      label: t("copy"),
+      icon: ClipboardCopy,
+      run: () => {
+        void handleCopyExpenseName(exp);
+      },
+    },
+    { kind: "separator" },
+    {
+      kind: "button",
+      label: t("delete"),
+      danger: true,
+      icon: Trash2,
+      run: () => {
+        requestDelete(exp.id);
+      },
+    },
   );
 
-  try {
-    const menu = await Menu.new({ items });
-    await menu.popup();
-  } catch (e) {
-    logPageError("showContextMenu failed", e, { expenseId: exp.id });
-  }
+  contextMenuRows.value = rows;
+  contextMenuOpen.value = true;
 }
 
 async function loadInitial() {
@@ -499,7 +608,7 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
         <UniversalListRow
           :mode="viewMode as 'compact' | 'default' | 'expanded'"
           @click="selectionMode ? toggleSelect(exp.id) : openDetail(exp)"
-          @contextmenu="showContextMenu(exp, $event)"
+          @contextmenu="(e, rect) => showContextMenu(exp, e, rect)"
         >
           <template #selection>
             <div
@@ -667,6 +776,14 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
         </div>
       </Transition>
     </Teleport>
+
+    <ContextActionMenu
+      v-model:open="contextMenuOpen"
+      :x="contextMenuX"
+      :y="contextMenuY"
+      :rows="contextMenuRows"
+      :exclude-rect="contextMenuExcludeRect"
+    />
 
     <Toast :show="showToast" :message="toastMsg" :type="toastType" @close="closeToast" />
   </div>

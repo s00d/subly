@@ -20,11 +20,35 @@ import AppSelect from "@/components/ui/AppSelect.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import UniversalListRow from "@/components/ui/UniversalListRow.vue";
-import { Plus, Search, Pencil, Trash2, Copy, RefreshCw, ExternalLink, CreditCard, AlertTriangle, Star, CheckSquare, Square, Hash, CircleDollarSign, LayoutList, LayoutGrid, Rows3, FolderOpen, Filter } from "@lucide/vue";
+import ContextActionMenu, {
+  type ContextMenuRow,
+  type ContextMenuExcludeRect,
+} from "@/components/ui/ContextActionMenu.vue";
+import {
+  Plus,
+  Search,
+  Pencil,
+  Trash2,
+  RefreshCw,
+  ExternalLink,
+  CreditCard,
+  AlertTriangle,
+  Star,
+  StarOff,
+  CopyPlus,
+  ClipboardCopy,
+  CheckSquare,
+  Square,
+  Hash,
+  CircleDollarSign,
+  LayoutList,
+  LayoutGrid,
+  Rows3,
+  FolderOpen,
+  Filter,
+} from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Menu } from "@tauri-apps/api/menu";
-import type { MenuItemOptions, PredefinedMenuItemOptions } from "@tauri-apps/api/menu";
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
 import { useNowStore } from "@/stores/nowStore";
@@ -251,37 +275,112 @@ async function confirmBatchCategory() {
   fetchFilteredSubs();
 }
 
-// Native context menu
-async function showContextMenu(sub: Subscription, event: MouseEvent) {
+const contextMenuOpen = ref(false);
+const contextMenuX = ref(0);
+const contextMenuY = ref(0);
+const contextMenuRows = ref<ContextMenuRow[]>([]);
+const contextMenuExcludeRect = ref<ContextMenuExcludeRect | null>(null);
+
+watch(contextMenuOpen, (open) => {
+  if (!open) contextMenuExcludeRect.value = null;
+});
+
+function showContextMenu(sub: Subscription, event: MouseEvent, anchorRect?: DOMRect | null) {
   if (selectionMode.value) return;
 
-  const items: (MenuItemOptions | PredefinedMenuItemOptions)[] = [
-    { id: "favorite", text: sub.favorite ? t("remove_from_favorites") : t("add_to_favorites"), action: async () => { await handleToggleFavorite(sub.id); } },
+  const vx = event.clientX || window.innerWidth / 2;
+  const vy = event.clientY || window.innerHeight / 3;
+  contextMenuX.value = vx;
+  contextMenuY.value = vy;
+  contextMenuExcludeRect.value =
+    anchorRect != null
+      ? {
+          left: anchorRect.left,
+          top: anchorRect.top,
+          right: anchorRect.right,
+          bottom: anchorRect.bottom,
+        }
+      : null;
+
+  const rows: ContextMenuRow[] = [
+    {
+      kind: "button",
+      label: sub.favorite ? t("remove_from_favorites") : t("add_to_favorites"),
+      icon: sub.favorite ? StarOff : Star,
+      run: async () => {
+        await handleToggleFavorite(sub.id);
+      },
+    },
   ];
   if (!sub.inactive) {
-    items.push({ id: "record_payment", text: t("record_payment"), action: () => handleRecordPayment(sub.id) });
+    rows.push({
+      kind: "button",
+      label: t("record_payment"),
+      icon: CreditCard,
+      run: () => {
+        handleRecordPayment(sub.id);
+      },
+    });
   }
-  items.push(
-    { id: "edit", text: t("edit_subscription"), action: () => openEdit(sub) },
-    { id: "clone", text: t("clone"), action: () => handleClone(sub.id) },
-    { id: "renew", text: t("renew"), action: () => handleRenew(sub.id) },
+  rows.push(
+    {
+      kind: "button",
+      label: t("edit_subscription"),
+      icon: Pencil,
+      run: () => {
+        openEdit(sub);
+      },
+    },
+    {
+      kind: "button",
+      label: t("clone"),
+      icon: CopyPlus,
+      run: () => {
+        handleClone(sub.id);
+      },
+    },
+    {
+      kind: "button",
+      label: t("renew"),
+      icon: RefreshCw,
+      run: () => {
+        handleRenew(sub.id);
+      },
+    },
   );
   if (sub.url) {
-    items.push({ id: "url", text: t("url"), action: () => handleOpenUrl(sub.url) });
+    rows.push({
+      kind: "button",
+      label: t("url"),
+      icon: ExternalLink,
+      run: () => {
+        handleOpenUrl(sub.url);
+      },
+    });
   }
-  items.push(
-    { id: "copy", text: t("copy"), action: () => handleCopyName(sub) },
-    { item: "Separator" },
-    { id: "delete", text: t("delete"), action: () => requestDelete(sub.id) },
+  rows.push(
+    {
+      kind: "button",
+      label: t("copy"),
+      icon: ClipboardCopy,
+      run: () => {
+        handleCopyName(sub);
+      },
+    },
+    { kind: "separator" },
+    {
+      kind: "button",
+      label: t("delete"),
+      danger: true,
+      icon: Trash2,
+      run: () => {
+        requestDelete(sub.id);
+      },
+    },
   );
 
-  try {
-    const menu = await Menu.new({ items });
-    await menu.popup();
-  } catch (e) {
-    console.error("[SubscriptionsPage] context menu failed", e);
-    toast(formatErrorForToast(e, t), "error");
-  }
+  contextMenuRows.value = rows;
+  contextMenuOpen.value = true;
 }
 
 // Filtered subscriptions from backend DTO query
@@ -663,7 +762,7 @@ async function loadInitial() {
             <UniversalListRow
               :mode="viewMode as 'compact' | 'default' | 'expanded'"
               @click="selectionMode ? toggleSelected(sub.id) : openDetail(sub)"
-              @contextmenu="showContextMenu(sub, $event)"
+              @contextmenu="(e, rect) => showContextMenu(sub, e, rect)"
             >
               <template #selection>
                 <div
@@ -920,6 +1019,14 @@ async function loadInitial() {
         </div>
       </Transition>
     </Teleport>
+
+    <ContextActionMenu
+      v-model:open="contextMenuOpen"
+      :x="contextMenuX"
+      :y="contextMenuY"
+      :rows="contextMenuRows"
+      :exclude-rect="contextMenuExcludeRect"
+    />
 
     <Toast :show="showToast" :message="toastMsg" :type="toastType" @close="closeToast" />
   </div>
