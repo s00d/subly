@@ -1,0 +1,20 @@
+src-tauri/src/commands/notifications.rs
+  s_760a8176b5063e::t_898c830302c3ad 1
+  s_760a8176b5063e::t_b4d785ac46d51b 363,366-373,375-378
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "3435108100eab7c3e86afaf498d3ae76f66dd95f",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
