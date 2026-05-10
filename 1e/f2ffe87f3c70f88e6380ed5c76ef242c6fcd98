@@ -1,0 +1,30 @@
+package.json
+  s_760a8176b5063e::t_3afd8bb9dac783 4
+src-tauri/gen/apple/subly.xcodeproj/project.pbxproj
+  s_760a8176b5063e::t_ecd9bce7579d72 569,780
+  s_760a8176b5063e::t_34ead1dc04922a 559,770
+src-tauri/gen/apple/project.yml
+  s_760a8176b5063e::t_33fb39e4cb0a9d 61-62
+  s_760a8176b5063e::t_1a4ef23c8bd41c 125-126
+src-tauri/gen/apple/subly_iOS/Info.plist
+  s_760a8176b5063e::t_890baaffbf8d74 18,20
+CHANGELOG.md
+  s_760a8176b5063e::t_17d680a31fc057 135-136
+  s_760a8176b5063e::t_1bd21d84b25a33 8-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "1ef2ffe87f3c70f88e6380ed5c76ef242c6fcd98",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
