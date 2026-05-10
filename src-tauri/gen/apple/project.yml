@@ -58,8 +58,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: 0.1.4
-        CFBundleVersion: "0.1.4"
+        CFBundleShortVersionString: 1.0.2
+        CFBundleVersion: "10003"
     # Must match src-tauri/entitlements/ios.plist (App Groups + iCloud). Empty gen/subly_iOS*.entitlements breaks widget + sync.
     entitlements:
       path: ../../entitlements/ios.plist
@@ -122,8 +122,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.s00d.subly.widget
         PRODUCT_NAME: SublyWidgetExtension
         INFOPLIST_FILE: ../../ios-apple/SublyWidget/Info.plist
-        MARKETING_VERSION: 0.1.4
-        CURRENT_PROJECT_VERSION: "10002"
+        MARKETING_VERSION: 1.0.2
+        CURRENT_PROJECT_VERSION: "10003"
         TARGETED_DEVICE_FAMILY: "1,2"
         IPHONEOS_DEPLOYMENT_TARGET: 16.0
         SWIFT_VERSION: "5.0"
