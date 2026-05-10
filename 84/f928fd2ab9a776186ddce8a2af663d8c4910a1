@@ -1,0 +1,30 @@
+README.md
+  s_760a8176b5063e::t_f74ccba346e68b 16
+src-tauri/gen/apple/project.yml
+  s_760a8176b5063e::t_ae4057a8c5d056 121-123
+src-tauri/gen/apple/subly.xcodeproj/project.pbxproj
+  s_760a8176b5063e::t_af7d99e8588a77 767
+  s_760a8176b5063e::t_3d658443638dec 556
+store-assets/APP_STORE_LISTING_EN.md
+  s_760a8176b5063e::t_dc541ba4457a95 14,16-20
+  s_760a8176b5063e::t_71cbc661e791ac 3,7,9,11,13,15,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77,79,81,83
+  s_760a8176b5063e::t_b75a04de0f2550 1-2,4,6,8,10,12,22,24,26,28,30,34,36,38,40,42,44,46,48,50,52,54,56,58,60,62,64,66,68,70,72,74,76,78,80,82,84
+  s_760a8176b5063e::t_54622a6a50913c 32
+  s_760a8176b5063e::t_8c0f11d600c215 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "84f928fd2ab9a776186ddce8a2af663d8c4910a1",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
