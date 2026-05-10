@@ -1,0 +1,80 @@
+---
+description: Bump Subly app marketing version (semver) and build number (CFBundleVersion) for iOS, macOS MAS, widget; avoid stale macOS uploads.
+alwaysApply: false
+globs: package.json,src-tauri/tauri.conf.json,src-tauri/gen/apple/**,src-tauri/ios-apple/**/Info.plist
+---
+
+# Subly: release versions (what to change on each update)
+
+## Two different numbers
+
+| | Where it lives | Example |
+|---|----------------|---------|
+| **Marketing / semver** (user-facing `1.0.x`) | **`package.json`** → `version` first. Tauri reads **`"version": "../package.json"`** in `src-tauri/tauri.conf.json`. | `1.0.2` |
+| **Build** (strictly monotonic ↑ for every App Store Connect upload) | **`CFBundleVersion`** / Apple **`CURRENT_PROJECT_VERSION`** / Tauri **`bundleVersion`**. Must be **greater** than the last uploaded build. | `10003`, then `10004` … |
+
+Validation *“CFBundleVersion must be higher than previously uploaded”* almost always means: **build was not bumped** or **macOS still has the old value in `tauri.conf.json`**.
+
+---
+
+## Full file checklist (verify on every release)
+
+### Required
+
+1. **`package.json`** — **`version`** (app semver). Source of truth for the frontend and Tauri.
+
+2. **`src-tauri/tauri.conf.json`** → **`bundle.iOS.bundleVersion`** and **`bundle.macOS.bundleVersion`** — **both** should match the target build and be **the same** if you ship iOS + Mac under one release policy.  
+   **Critical for macOS `.pkg` / MAS:** this is where **`CFBundleVersion`** in the Mac bundle comes from; editing only `gen/apple/...` without this is **not enough**.
+
+3. **`src-tauri/gen/apple/project.yml`** — for the app target:
+   - **`CFBundleShortVersionString`** = semver (same as `package.json`),
+   - **`CFBundleVersion`** = build (string, e.g. `"10003"`).
+   For **SublyWidgetExtension**:
+   - **`MARKETING_VERSION`** = semver,
+   - **`CURRENT_PROJECT_VERSION`** = build.
+
+4. **`src-tauri/gen/apple/subly_iOS/Info.plist`** — **`CFBundleShortVersionString`**, **`CFBundleVersion`** (often mirrors `project.yml`; after YAML edits regenerate the project or sync by hand).
+
+5. **`src-tauri/ios-apple/SublyWidget/Info.plist`** — **`CFBundleVersion`** is a **literal string** (not only `$(MARKETING_VERSION)`). Must match the widget build in Xcode / `project.yml`.
+
+6. **`src-tauri/gen/apple/subly.xcodeproj/project.pbxproj`** — **`MARKETING_VERSION`**, **`CURRENT_PROJECT_VERSION`** per target (usually aligned with the widget). Prefer **regenerating** from YAML (below) over hand-editing plists only.
+
+### Documentation (optional)
+
+7. **`CHANGELOG.md`** — release section and compare links.
+
+### Do not confuse with the app version
+
+- **`src-tauri/Cargo.toml`** → `version = "0.0.0"` is the **Rust crate** version—**do not** bump it as the app marketing version.
+- **`Cargo.lock`** — **dependency** versions, unrelated to the app release.
+
+---
+
+## After editing `project.yml`
+
+From **`src-tauri/gen/apple`** run:
+
+```bash
+xcodegen generate
+```
+
+so **`project.pbxproj`** picks up **`MARKETING_VERSION`** / **`CURRENT_PROJECT_VERSION`**.
+
+---
+
+## Typical order for a new Store build
+
+1. Pick **semver** (`1.0.3`) and **new build** (`10004`), strictly **>** the last build already in Connect (iOS vs Mac history may differ—use the **highest uploaded build** for **that** product).
+2. Update **`package.json`**.
+3. Update **`tauri.conf.json`** — **iOS + macOS** `bundleVersion`.
+4. Update **`project.yml`** (semver + build for app and widget).
+5. Run **`xcodegen generate`** when needed.
+6. Keep **`subly_iOS/Info.plist`** and **`ios-apple/SublyWidget/Info.plist`** in sync with the same semver/build.
+7. **`CHANGELOG.md`**.
+8. Rebuild **`pnpm tauri build`** / CI and upload to Connect.
+
+---
+
+## Common mistake (mac MAS)
+
+The Mac build takes **`bundle.macOS.bundleVersion`** from **`tauri.conf.json`**. If you only bump **`gen/apple/subly_iOS/Info.plist`**, Mac stays on the old build → **409 Validation failed** on `altool --upload-app`.
