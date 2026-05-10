@@ -1,0 +1,24 @@
+src/components/layout/MobileTabBar.vue
+  s_760a8176b5063e::t_1bd04e9d2866a0 47
+  s_760a8176b5063e::t_8e3cf8485c50bd 32-33
+  s_760a8176b5063e::t_67c49273c4ff65 52
+  s_760a8176b5063e::t_6e6781cea8a657 5
+src/composables/useMobileTabBarViewport.ts
+  s_760a8176b5063e::t_f9f17e943f72af 1-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "6cf21a0bef037db3d706e037db9add96a240bbc3",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
