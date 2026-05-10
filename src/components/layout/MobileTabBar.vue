@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
+import { useMobileTabBarViewport } from "@/composables/useMobileTabBarViewport";
 import { tv, iconSize } from "@/lib/tv";
 import {
   LayoutDashboard,
@@ -28,7 +29,8 @@ function isActive(name: string): boolean {
 
 const tabBarTv = tv({
   slots: {
-    root: "fixed bottom-0 left-0 right-0 z-40 bg-surface border-t border-border md:hidden",
+    root:
+      "fixed left-0 right-0 z-40 bg-surface border-t border-border md:hidden pb-[env(safe-area-inset-bottom,0px)] will-change-[bottom]",
     inner: "flex items-center justify-around h-14",
     tab: "flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors",
     tabLabel: "text-[10px] font-medium leading-tight",
@@ -42,11 +44,12 @@ const tabBarTv = tv({
 });
 
 const slots = tabBarTv();
+const { bottomPx } = useMobileTabBarViewport();
 </script>
 
 <template>
   <Teleport to="body">
-    <nav :class="slots.root()">
+    <nav :class="slots.root()" :style="{ bottom: `${bottomPx}px` }">
       <div :class="slots.inner()">
         <router-link
           v-for="item in navItems"
