@@ -1,0 +1,44 @@
+src/components/expenses/ExpenseDetail.vue
+  s_760a8176b5063e::t_11cf3043d7c167 40
+  s_760a8176b5063e::t_5c97225040fdf4 100-105
+  s_760a8176b5063e::t_db85ab3b795b1d 12-13
+src/components/settings/TelegramSection.vue
+  s_760a8176b5063e::t_cb9cac461695a1 12
+  s_760a8176b5063e::t_162d35c68bd675 64-65
+src/components/subscriptions/SubscriptionForm.vue
+  s_760a8176b5063e::t_ef14f4c54631ab 249-250
+  s_760a8176b5063e::t_5dead378bdf0b2 5
+  s_760a8176b5063e::t_358a5dcdc0cb84 234
+  s_760a8176b5063e::t_63fe06cbff99ca 195-196
+  s_760a8176b5063e::t_fe7a4b73a429e8 271-272
+src/components/expenses/ExpenseForm.vue
+  s_760a8176b5063e::t_287b01ef5846b4 168-169
+  s_760a8176b5063e::t_6ce4f1f02ab9a9 220
+  s_760a8176b5063e::t_adefb8540a6dac 5
+src/components/settings/BudgetNotificationsSection.vue
+  s_760a8176b5063e::t_ae92c4a7097ce8 172-173
+src/App.vue
+  s_760a8176b5063e::t_a6044d4b68cff3 177
+  s_760a8176b5063e::t_cfb6ff0b700ef7 238
+src/components/ui/LogoPicker.vue
+  s_760a8176b5063e::t_08989f72407bfe 8
+  s_760a8176b5063e::t_914fe77d2ab551 116-117
+src/pages/CalendarPage.vue
+  s_760a8176b5063e::t_a8438fa8d76931 177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "21662ed9fae4384fa8a28467783aafdc951d950e",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
