@@ -187,7 +187,6 @@ onMounted(async () => {
     isLoading.value = false;
     return;
   }
-  await setLanguage(settings.value.language);
   applyTheme();
   applyColorTheme();
   isLoading.value = false;
@@ -315,6 +314,13 @@ function applyColorTheme() {
   }
 }
 
+watch(
+  () => settings.value?.language,
+  async (lang) => {
+    if (!lang) return;
+    await setLanguage(lang);
+  },
+);
 watch(() => settings.value?.darkTheme, applyTheme);
 watch(() => settings.value?.colorTheme, applyColorTheme);
 
