@@ -40,6 +40,8 @@ fn emit_subscriptions_changed(app: &tauri::AppHandle, action: &str) {
             "action": action
         }),
     );
+    #[cfg(target_os = "ios")]
+    crate::widget_snapshot::export_ios_widget_snapshot_from_app(app);
 }
 
 fn subscription_row_from_input(mut input: SubscriptionInputDto) -> Result<SubscriptionDoc, String> {
@@ -517,6 +519,44 @@ pub fn get_upcoming_subscriptions(state: State<'_, AppState>, days: i64, limit: 
         row.credentials = credentials_read(&row.id)?;
     }
     Ok(out)
+}
+
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+pub(crate) const WIDGET_UPCOMING_DAYS: i64 = 30;
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+pub(crate) const WIDGET_UPCOMING_LIMIT: usize = 10;
+
+/// Upcoming subscriptions for the iOS widget snapshot (no credentials, bounded list).
+#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+pub(crate) fn collect_upcoming_subscription_docs_for_widget(
+    guard: &crate::state::AppStateInner,
+) -> Result<Vec<SubscriptionDoc>, String> {
+    let rows = guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?;
+    let today = Local::now().date_naive();
+    let end = today + chrono::Duration::days(WIDGET_UPCOMING_DAYS);
+    let mut rows = rows
+        .into_iter()
+        .filter(|s| {
+            if s.inactive {
+                return false;
+            }
+            parse_subscription_date(&s.next_payment)
+                .map(|d| d >= today && d <= end)
+                .unwrap_or(false)
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        let ad = parse_subscription_date(&a.next_payment);
+        let bd = parse_subscription_date(&b.next_payment);
+        match (ad, bd) {
+            (Some(x), Some(y)) => x.cmp(&y),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.next_payment.cmp(&b.next_payment),
+        }
+    });
+    rows.truncate(WIDGET_UPCOMING_LIMIT);
+    Ok(rows)
 }
 
 #[tauri::command]

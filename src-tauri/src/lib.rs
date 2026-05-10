@@ -9,6 +9,7 @@ pub(crate) mod keyring_store;
 mod models;
 mod state;
 mod state_tables;
+mod widget_snapshot;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]
@@ -531,6 +532,16 @@ pub fn run() {
             }
             app.manage(std::sync::Mutex::new(state::AppStateInner { db, app_data: initial_data }));
             ensure_rates_scheduler_started(app.handle().clone());
+
+            #[cfg(target_os = "ios")]
+            {
+                let handle = app.handle().clone();
+                if let Some(st) = handle.try_state::<AppState>() {
+                    if let Ok(guard) = st.lock() {
+                        widget_snapshot::export_ios_widget_snapshot_from_guard(&guard);
+                    }
+                }
+            }
 
             #[cfg(any(target_os = "linux", target_os = "windows"))]
             {

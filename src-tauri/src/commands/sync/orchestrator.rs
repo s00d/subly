@@ -342,6 +342,12 @@ pub async fn sync_dispatch_internal(
                     "app:data-changed",
                     serde_json::json!({ "entity": "appData", "action": "sync_pull" }),
                 );
+                #[cfg(target_os = "ios")]
+                {
+                    if let Ok(guard) = state.lock() {
+                        crate::widget_snapshot::export_ios_widget_snapshot_from_guard(&guard);
+                    }
+                }
                 SyncDispatchData::Ok(SyncOkDto::success())
             } else {
                 SyncDispatchData::Ok(SyncOkDto::fail("sync_pull_no_remote_file"))
