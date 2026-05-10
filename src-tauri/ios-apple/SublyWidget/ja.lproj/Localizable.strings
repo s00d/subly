@@ -1,0 +1,10 @@
+"widget_upcoming_title" = "予定";
+"widget_no_upcoming" = "予定の支払いはありません";
+"widget_err_no_group" = "ウィジェットを有効にするには Subly を一度開いてください。";
+"widget_err_open_app" = "支払いを読み込むには Subly を開いてください。";
+"widget_err_bad_data" = "更新するには Subly を開いてください。";
+"widget_display_name" = "Subly";
+"widget_description" = "今後のサブスクリプション支払い。";
+"widget_date_today" = "今日";
+"widget_date_tomorrow" = "明日";
+"widget_more_count" = "他 %d 件";

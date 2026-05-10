@@ -1,0 +1,10 @@
+"widget_upcoming_title" = "即将到来";
+"widget_no_upcoming" = "暂无即将扣款";
+"widget_err_no_group" = "请打开一次 Subly 以启用小组件。";
+"widget_err_open_app" = "请打开 Subly 以加载付款。";
+"widget_err_bad_data" = "请打开 Subly 以刷新。";
+"widget_display_name" = "Subly";
+"widget_description" = "即将到来的订阅付款。";
+"widget_date_today" = "今天";
+"widget_date_tomorrow" = "明天";
+"widget_more_count" = "另有 %d 项";

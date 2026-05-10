@@ -64,6 +64,8 @@ jobs:
           echo "$SUBLY_API_KEY_BASE64" | base64 --decode > "$KEY_PATH"
           echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
+      # Main app com.s00d.subly + widget com.s00d.subly.widget share App Group group.com.s00d.subly.
+      # Provisioning must include both targets (or use Automatic Signing locally).
       - name: Validate manual iOS signing secrets
         run: |
           test -n "$IOS_CERTIFICATE" || (echo "Missing IOS_CERTIFICATE secret" && exit 1)

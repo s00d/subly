@@ -1,0 +1,10 @@
+"widget_upcoming_title" = "القادمة";
+"widget_no_upcoming" = "لا توجد مدفوعات قادمة";
+"widget_err_no_group" = "افتح Subly مرة واحدة لتفعيل الودجة.";
+"widget_err_open_app" = "افتح Subly لتحميل المدفوعات.";
+"widget_err_bad_data" = "افتح Subly للتحديث.";
+"widget_display_name" = "Subly";
+"widget_description" = "مدفوعات الاشتراك القادمة.";
+"widget_date_today" = "اليوم";
+"widget_date_tomorrow" = "غداً";
+"widget_more_count" = "+%d أخرى";

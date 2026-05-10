@@ -1,0 +1,10 @@
+"widget_upcoming_title" = "Anstehend";
+"widget_no_upcoming" = "Keine anstehenden Zahlungen";
+"widget_err_no_group" = "Subly einmal öffnen, um das Widget zu aktivieren.";
+"widget_err_open_app" = "Subly öffnen, um Zahlungen zu laden.";
+"widget_err_bad_data" = "Subly öffnen zum Aktualisieren.";
+"widget_display_name" = "Subly";
+"widget_description" = "Anstehende Abonnementzahlungen.";
+"widget_date_today" = "Heute";
+"widget_date_tomorrow" = "Morgen";
+"widget_more_count" = "+%d weitere";

@@ -12,6 +12,8 @@ settingGroups:
     base:
       PRODUCT_NAME: Subly
       PRODUCT_BUNDLE_IDENTIFIER: com.s00d.subly
+      # Same as bundle.iOS.developmentTeam in ../../tauri.conf.json — required for app + SublyWidgetExtension
+      DEVELOPMENT_TEAM: R6VC7JTLE8
 targetTemplates:
   app:
     type: application
@@ -29,8 +31,10 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      - path: ../../ios-apple/widget_reload.swift
       - path: Assets.xcassets
-      - path: Externals
+      # Do not add Externals/ here: both arm64/debug and arm64/release libapp.a would be copied to the same Subly.app/libapp.a and Xcode fails with "Multiple commands produce".
+      # Rust output stays under Externals/...; linking uses LIBRARY_SEARCH_PATHS + dependency libapp.a below.
       - path: subly_iOS
       - path: assets
         buildPhase: resources
@@ -56,8 +60,9 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         CFBundleShortVersionString: 0.1.4
         CFBundleVersion: "0.1.4"
+    # Must match src-tauri/entitlements/ios.plist (App Groups + iCloud). Empty gen/subly_iOS*.entitlements breaks widget + sync.
     entitlements:
-      path: subly_iOS/subly_iOS.entitlements
+      path: ../../entitlements/ios.plist
     scheme:
       environmentVariables:
         RUST_BACKTRACE: full
@@ -84,10 +89,47 @@ targets:
       - sdk: Security.framework
       - sdk: UIKit.framework
       - sdk: WebKit.framework
+      - target: SublyWidgetExtension
+        embed: true
     preBuildScripts:
-      - script: pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}
+      # Do not pass ${FORCE_COLOR} as a shell word here: when Xcode sets FORCE_COLOR=0 it becomes a
+      # separate argv between --configuration and ARCHS; the CLI then treats "0" as the arch →
+      # "Arch specified by Xcode was invalid".
+      - script: export FORCE_COLOR="${FORCE_COLOR:-}"; pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths "${FRAMEWORK_SEARCH_PATHS:?}" --header-search-paths "${HEADER_SEARCH_PATHS:?}" --gcc-preprocessor-definitions "${GCC_PREPROCESSOR_DEFINITIONS:-}" --configuration ${CONFIGURATION:?} ${ARCHS:?}
         name: Build Rust Code
         basedOnDependencyAnalysis: false
         outputFiles:
           - $(SRCROOT)/Externals/x86_64/${CONFIGURATION}/libapp.a
           - $(SRCROOT)/Externals/arm64/${CONFIGURATION}/libapp.a
+
+  SublyWidgetExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: ../../ios-apple/SublyWidget
+        excludes:
+          - "*.entitlements"
+          - "Info.plist"
+    entitlements:
+      path: ../../ios-apple/SublyWidget/SublyWidget.entitlements
+    settings:
+      base:
+        # XcodeGen merged DEVELOPMENT_TEAM into Release only for extensions; Debug must have Team too.
+        DEVELOPMENT_TEAM: R6VC7JTLE8
+        CODE_SIGN_STYLE: Automatic
+        APPLICATION_EXTENSION_API_ONLY: YES
+        CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.s00d.subly.widget
+        PRODUCT_NAME: SublyWidgetExtension
+        INFOPLIST_FILE: ../../ios-apple/SublyWidget/Info.plist
+        MARKETING_VERSION: 0.1.4
+        CURRENT_PROJECT_VERSION: "10002"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        IPHONEOS_DEPLOYMENT_TARGET: 16.0
+        SWIFT_VERSION: "5.0"
+        GENERATE_INFOPLIST_FILE: NO
+      groups: [app]
+    dependencies:
+      - sdk: SwiftUI.framework
+      - sdk: WidgetKit.framework
+      - sdk: UIKit.framework

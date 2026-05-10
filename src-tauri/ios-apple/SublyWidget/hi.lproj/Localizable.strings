@@ -1,0 +1,10 @@
+"widget_upcoming_title" = "आगामी";
+"widget_no_upcoming" = "कोई आगामी भुगतान नहीं";
+"widget_err_no_group" = "विजेट चालू करने के लिए Subly एक बार खोलें।";
+"widget_err_open_app" = "भुगतान लोड करने के लिए Subly खोलें।";
+"widget_err_bad_data" = "ताज़ा करने के लिए Subly खोलें।";
+"widget_display_name" = "Subly";
+"widget_description" = "आगामी सदस्यता भुगतान।";
+"widget_date_today" = "आज";
+"widget_date_tomorrow" = "कल";
+"widget_more_count" = "+%d और";

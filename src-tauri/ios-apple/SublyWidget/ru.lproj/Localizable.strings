@@ -1,0 +1,10 @@
+"widget_upcoming_title" = "Предстоящие";
+"widget_no_upcoming" = "Нет предстоящих платежей";
+"widget_err_no_group" = "Откройте Subly один раз.";
+"widget_err_open_app" = "Откройте Subly для загрузки.";
+"widget_err_bad_data" = "Откройте Subly для обновления.";
+"widget_display_name" = "Subly";
+"widget_description" = "Предстоящие платежи по подпискам.";
+"widget_date_today" = "Сегодня";
+"widget_date_tomorrow" = "Завтра";
+"widget_more_count" = "ещё %d";

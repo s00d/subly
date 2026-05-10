@@ -1,0 +1,10 @@
+"widget_upcoming_title" = "Próximos";
+"widget_no_upcoming" = "Sem pagamentos próximos";
+"widget_err_no_group" = "Abra o Subly uma vez para ativar o widget.";
+"widget_err_open_app" = "Abra o Subly para carregar os pagamentos.";
+"widget_err_bad_data" = "Abra o Subly para atualizar.";
+"widget_display_name" = "Subly";
+"widget_description" = "Próximos pagamentos de assinaturas.";
+"widget_date_today" = "Hoje";
+"widget_date_tomorrow" = "Amanhã";
+"widget_more_count" = "+%d a mais";

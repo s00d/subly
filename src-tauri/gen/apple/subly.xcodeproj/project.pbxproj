@@ -10,72 +10,131 @@
 		037F20A09B259BF9AB586092 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 66334A02F70E92A64C65CE51 /* CoreGraphics.framework */; };
 		051BAD95E495A5D1589E418E /* main.mm in Sources */ = {isa = PBXBuildFile; fileRef = 132077D69CE3D14C99C93CB9 /* main.mm */; };
 		1AFC62DC1F8F4A6FB6174F37 /* assets in Resources */ = {isa = PBXBuildFile; fileRef = FB87BD8C7F240719977B12B7 /* assets */; };
+		1DD703E1EB34D40F06008C34 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F8ED6FE4F5287FEDA73466DE /* WidgetKit.framework */; };
 		311FA3310FF2698BE5F61680 /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 19E1B605BA10704C180EF399 /* QuartzCore.framework */; };
 		39EB91FBAA7376E12E72DB8C /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 11665C5517D652158E167382 /* LaunchScreen.storyboard */; };
 		3AC6DCC8BF96034BD9A7FD72 /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3BC647F7D907A115A2DF56F0 /* UIKit.framework */; };
+		3B1A32617B00DDFE56F82998 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6D658A78B62DF388881DD038 /* SwiftUI.framework */; };
+		4B5CCB8906C9D94391F9F1AA /* widget_reload.swift in Sources */ = {isa = PBXBuildFile; fileRef = B684F52A5E39E36F3BD7A3F0 /* widget_reload.swift */; };
+		4FD1358560174AB26159B34E /* SublyWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D8E9568F8408C360890551 /* SublyWidget.swift */; };
 		5AD405AC00A3A57B2F2B6CBB /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 505CEAD46E6E2FC08055147B /* WebKit.framework */; };
 		5C846B8005E457AD6828163E /* libapp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 2B6B1B9421F4074BC011FE82 /* libapp.a */; };
+		6C36BF66C18619178A9E85FB /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = D91D22573939D147204362B8 /* Localizable.strings */; };
+		8725F5625C63ADA208B7D797 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 214F6638D6E55D498B817F06 /* PrivacyInfo.xcprivacy */; };
 		955E4CE33DF903E362EF0393 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B0E0DEB97FB2CDC3F7CC6276 /* Assets.xcassets */; };
 		9E71E634B7C9ECF6DB361FE5 /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B2E9BF44D46881DE6C9FCD64 /* Security.framework */; };
+		AD406762FE3712F70995F30A /* SublyWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 3F15F35D53D4CD304175F97A /* SublyWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		B409ED9D60CEE8A40CA8E550 /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C892888F89AECE125F06D1A6 /* Metal.framework */; };
+		B995E646364651109625892A /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3BC647F7D907A115A2DF56F0 /* UIKit.framework */; };
 		D605D546A8EC5DA12F071A7F /* MetalKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0158891D53AE86E5D36C646A /* MetalKit.framework */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		ABDC0B29742C173C1E9BBA88 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = D521A2EDDDB3CAA61DCFC983 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C075D986F8B8B053CB6E25B6;
+			remoteInfo = SublyWidgetExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		C6486727A09F622DCE2F1414 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				AD406762FE3712F70995F30A /* SublyWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		0158891D53AE86E5D36C646A /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
-		07521BCCED69C5535B2806B7 /* tray.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = tray.rs; sourceTree = "<group>"; };
-		0F3E5A437CAA674DEE4DFAE8 /* icloud.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = icloud.rs; sourceTree = "<group>"; };
+		07521BCCED69C5535B2806B7 /* tray.rs */ = {isa = PBXFileReference; path = tray.rs; sourceTree = "<group>"; };
+		09925F5A0305364E1496878F /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F100DE001111111111111101 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F100DE001111111111111102 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F100DE001111111111111103 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F100DE001111111111111104 /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pt; path = pt.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F100DE001111111111111105 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F100DE001111111111111106 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F100DE001111111111111107 /* ar */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ar; path = ar.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F100DE001111111111111108 /* hi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = hi; path = hi.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F100DE001111111111111109 /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/Localizable.strings; sourceTree = "<group>"; };
+		F100DE00111111111111110B /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
+		0DFA551B007B40C40A94893A /* fixer.rs */ = {isa = PBXFileReference; path = fixer.rs; sourceTree = "<group>"; };
+		0F3E5A437CAA674DEE4DFAE8 /* icloud.rs */ = {isa = PBXFileReference; path = icloud.rs; sourceTree = "<group>"; };
 		11665C5517D652158E167382 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
-		1175CE70D434B6E291FE78A7 /* mod.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = mod.rs; sourceTree = "<group>"; };
+		1175CE70D434B6E291FE78A7 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		132077D69CE3D14C99C93CB9 /* main.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; path = main.mm; sourceTree = "<group>"; };
 		19E1B605BA10704C180EF399 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
-		29CDD0FFAE10B171416804FD /* config.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = config.rs; sourceTree = "<group>"; };
+		214F6638D6E55D498B817F06 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		2169B651360070C5007C0460 /* config.rs */ = {isa = PBXFileReference; path = config.rs; sourceTree = "<group>"; };
+		22CAC4935CF14107B37B07BB /* wire.rs */ = {isa = PBXFileReference; path = wire.rs; sourceTree = "<group>"; };
+		29CDD0FFAE10B171416804FD /* config.rs */ = {isa = PBXFileReference; path = config.rs; sourceTree = "<group>"; };
 		2B6B1B9421F4074BC011FE82 /* libapp.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; path = libapp.a; sourceTree = "<group>"; };
-		35A1F9626012E6A8678E9B66 /* ecb.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = ecb.rs; sourceTree = "<group>"; };
-		38DBFEF8DB3338A837E490EA /* mod.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = mod.rs; sourceTree = "<group>"; };
-		3AA73DD8EDB598617F6A8F81 /* app_data.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = app_data.rs; sourceTree = "<group>"; };
+		31481D604D42082EFCF87619 /* subscription_credentials.rs */ = {isa = PBXFileReference; path = subscription_credentials.rs; sourceTree = "<group>"; };
+		33BD156F7E320FF979D9815C /* openexchangerates.rs */ = {isa = PBXFileReference; path = openexchangerates.rs; sourceTree = "<group>"; };
+		38DBFEF8DB3338A837E490EA /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		395F658188555AF54BF8FBE6 /* state_tables.rs */ = {isa = PBXFileReference; path = state_tables.rs; sourceTree = "<group>"; };
+		3AA73DD8EDB598617F6A8F81 /* app_data.rs */ = {isa = PBXFileReference; path = app_data.rs; sourceTree = "<group>"; };
 		3BC647F7D907A115A2DF56F0 /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
-		3FE7E7018F5DA90D09621EB0 /* orchestrator.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = orchestrator.rs; sourceTree = "<group>"; };
-		46AD9475D3908363E0F2200C /* bnb.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = bnb.rs; sourceTree = "<group>"; };
+		3CBD9CDB874E7143AFCC9D91 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		3F15F35D53D4CD304175F97A /* SublyWidgetExtension.appex */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = SublyWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		3FE7E7018F5DA90D09621EB0 /* orchestrator.rs */ = {isa = PBXFileReference; path = orchestrator.rs; sourceTree = "<group>"; };
+		46539A23029FC64D3FD29F59 /* secure_storage.rs */ = {isa = PBXFileReference; path = secure_storage.rs; sourceTree = "<group>"; };
 		48C7EB7F0658AD8910792E7C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		4981FC4396630B88C8C99BDC /* catalog.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = catalog.rs; sourceTree = "<group>"; };
-		4C7130D571FC90482920B9C6 /* flags.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = flags.rs; sourceTree = "<group>"; };
-		4F5CDAF88CA32D8C611637D8 /* export.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = export.rs; sourceTree = "<group>"; };
+		4981FC4396630B88C8C99BDC /* catalog.rs */ = {isa = PBXFileReference; path = catalog.rs; sourceTree = "<group>"; };
+		4C7130D571FC90482920B9C6 /* flags.rs */ = {isa = PBXFileReference; path = flags.rs; sourceTree = "<group>"; };
+		4F5CDAF88CA32D8C611637D8 /* export.rs */ = {isa = PBXFileReference; path = export.rs; sourceTree = "<group>"; };
 		505CEAD46E6E2FC08055147B /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
-		51339CD929C336437E681BAC /* mod.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = mod.rs; sourceTree = "<group>"; };
-		563B800DD5042A281AC5797E /* subscriptions.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = subscriptions.rs; sourceTree = "<group>"; };
-		56DFD1A59FB1EF4DA14E09EE /* dropbox.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = dropbox.rs; sourceTree = "<group>"; };
-		5AD388BC5AAF69A91D04E4B4 /* Subly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Subly.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		51339CD929C336437E681BAC /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		563B800DD5042A281AC5797E /* subscriptions.rs */ = {isa = PBXFileReference; path = subscriptions.rs; sourceTree = "<group>"; };
+		56DFD1A59FB1EF4DA14E09EE /* dropbox.rs */ = {isa = PBXFileReference; path = dropbox.rs; sourceTree = "<group>"; };
+		5AD388BC5AAF69A91D04E4B4 /* subly_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = subly_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		5FB03EAE28C6C029F1F492E0 /* restart_smoke_tests.rs */ = {isa = PBXFileReference; path = restart_smoke_tests.rs; sourceTree = "<group>"; };
+		62EAB59D7271E82DD99F46E1 /* widget_snapshot.rs */ = {isa = PBXFileReference; path = widget_snapshot.rs; sourceTree = "<group>"; };
+		661732DA5CAE3FEC9E5200A5 /* icloud_native.rs */ = {isa = PBXFileReference; path = icloud_native.rs; sourceTree = "<group>"; };
 		66334A02F70E92A64C65CE51 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
-		66A8A36FBF4CFF3CF93D1479 /* nbu.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = nbu.rs; sourceTree = "<group>"; };
-		7AF3A896A17CC5EABC209D66 /* crypto.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = crypto.rs; sourceTree = "<group>"; };
-		84FABAB32F8526B2BE6A80F1 /* frankfurter.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = frankfurter.rs; sourceTree = "<group>"; };
-		880F1EAA6D61634CCC75027E /* webdav.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = webdav.rs; sourceTree = "<group>"; };
-		8901C4702B5044F21B5B40A2 /* lib.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = lib.rs; sourceTree = "<group>"; };
-		8EB9002703F78305D7475106 /* oauth.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = oauth.rs; sourceTree = "<group>"; };
-		920A89328179C7F054C1F0BA /* state.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = state.rs; sourceTree = "<group>"; };
-		93FADAC28F68530839CD4261 /* models.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = models.rs; sourceTree = "<group>"; };
-		974B1F2FDC37A7C6400AD28F /* onedrive.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = onedrive.rs; sourceTree = "<group>"; };
-		A1145FC1E18DA437168CC4D6 /* boe.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = boe.rs; sourceTree = "<group>"; };
-		A3787F9E3C0D05B1D3DF7FA8 /* state.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = state.rs; sourceTree = "<group>"; };
+		66878B3FCDBEA29386696188 /* currencyapi.rs */ = {isa = PBXFileReference; path = currencyapi.rs; sourceTree = "<group>"; };
+		6D658A78B62DF388881DD038 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		84FABAB32F8526B2BE6A80F1 /* frankfurter.rs */ = {isa = PBXFileReference; path = frankfurter.rs; sourceTree = "<group>"; };
+		880F1EAA6D61634CCC75027E /* webdav.rs */ = {isa = PBXFileReference; path = webdav.rs; sourceTree = "<group>"; };
+		8901C4702B5044F21B5B40A2 /* lib.rs */ = {isa = PBXFileReference; path = lib.rs; sourceTree = "<group>"; };
+		8AB03DA3AA192461D316AB4F /* apilayer.rs */ = {isa = PBXFileReference; path = apilayer.rs; sourceTree = "<group>"; };
+		8EB9002703F78305D7475106 /* oauth.rs */ = {isa = PBXFileReference; path = oauth.rs; sourceTree = "<group>"; };
+		920A89328179C7F054C1F0BA /* state.rs */ = {isa = PBXFileReference; path = state.rs; sourceTree = "<group>"; };
+		93FADAC28F68530839CD4261 /* models.rs */ = {isa = PBXFileReference; path = models.rs; sourceTree = "<group>"; };
+		974B1F2FDC37A7C6400AD28F /* onedrive.rs */ = {isa = PBXFileReference; path = onedrive.rs; sourceTree = "<group>"; };
+		A3787F9E3C0D05B1D3DF7FA8 /* state.rs */ = {isa = PBXFileReference; path = state.rs; sourceTree = "<group>"; };
+		A3F55468DE88B36489C112EE /* logo.rs */ = {isa = PBXFileReference; path = logo.rs; sourceTree = "<group>"; };
 		B0E0DEB97FB2CDC3F7CC6276 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		B11F52C921F93096544A48A8 /* mod.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = mod.rs; sourceTree = "<group>"; };
+		B11F52C921F93096544A48A8 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		B2E9BF44D46881DE6C9FCD64 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
-		BC68F8483FC145709391A7A3 /* notifications.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = notifications.rs; sourceTree = "<group>"; };
+		B3043D9140F80F9088E72DDD /* exchangerate.rs */ = {isa = PBXFileReference; path = exchangerate.rs; sourceTree = "<group>"; };
+		B684F52A5E39E36F3BD7A3F0 /* widget_reload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = widget_reload.swift; sourceTree = "<group>"; };
+		B82148163859290A418A32A2 /* keyring_store.rs */ = {isa = PBXFileReference; path = keyring_store.rs; sourceTree = "<group>"; };
+		BC68F8483FC145709391A7A3 /* notifications.rs */ = {isa = PBXFileReference; path = notifications.rs; sourceTree = "<group>"; };
 		BEC35E67F4284007EA14BC5B /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
-		C0D36F3885CFF4E7F3F9BB92 /* seed.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = seed.rs; sourceTree = "<group>"; };
-		C88AD0D89A936DBFA46D5484 /* dashboard.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = dashboard.rs; sourceTree = "<group>"; };
+		C0D36F3885CFF4E7F3F9BB92 /* seed.rs */ = {isa = PBXFileReference; path = seed.rs; sourceTree = "<group>"; };
+		C88AD0D89A936DBFA46D5484 /* dashboard.rs */ = {isa = PBXFileReference; path = dashboard.rs; sourceTree = "<group>"; };
 		C892888F89AECE125F06D1A6 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
-		CB0C1D660973217BBF676ED6 /* main.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = main.rs; sourceTree = "<group>"; };
-		D0B2EE3425A789378DA90C56 /* gdrive.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = gdrive.rs; sourceTree = "<group>"; };
-		D4A23A5EB2F24D1AD199E447 /* nbrb.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = nbrb.rs; sourceTree = "<group>"; };
+		CB0C1D660973217BBF676ED6 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
+		D0B2EE3425A789378DA90C56 /* gdrive.rs */ = {isa = PBXFileReference; path = gdrive.rs; sourceTree = "<group>"; };
 		D6F01AA7F9E5EAF65852918D /* subly_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = subly_iOS.entitlements; sourceTree = "<group>"; };
-		DE4717FEC2664E33527ED287 /* mod.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = mod.rs; sourceTree = "<group>"; };
-		E4224CE6E8CA86E4B7B43099 /* expenses.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = expenses.rs; sourceTree = "<group>"; };
-		E541A9444A9026D927454537 /* storage.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = storage.rs; sourceTree = "<group>"; };
-		F752CE6348BA2801B2DD69A9 /* types.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = types.rs; sourceTree = "<group>"; };
-		F8B669FCA01220C2FD62F627 /* history.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = history.rs; sourceTree = "<group>"; };
-		F8D03E60391AFD114064C05C /* cbr.rs */ = {isa = PBXFileReference; lastKnownFileType = text; path = cbr.rs; sourceTree = "<group>"; };
+		DE4717FEC2664E33527ED287 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		E4224CE6E8CA86E4B7B43099 /* expenses.rs */ = {isa = PBXFileReference; path = expenses.rs; sourceTree = "<group>"; };
+		E541A9444A9026D927454537 /* storage.rs */ = {isa = PBXFileReference; path = storage.rs; sourceTree = "<group>"; };
+		E5D8E9568F8408C360890551 /* SublyWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SublyWidget.swift; sourceTree = "<group>"; };
+		E5EF1C88DD872C730175DF6C /* test_support.rs */ = {isa = PBXFileReference; path = test_support.rs; sourceTree = "<group>"; };
+		F752CE6348BA2801B2DD69A9 /* types.rs */ = {isa = PBXFileReference; path = types.rs; sourceTree = "<group>"; };
+		F8B669FCA01220C2FD62F627 /* history.rs */ = {isa = PBXFileReference; path = history.rs; sourceTree = "<group>"; };
+		F8ED6FE4F5287FEDA73466DE /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		FB87BD8C7F240719977B12B7 /* assets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = assets; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
@@ -95,6 +154,16 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		B53A6CE5BD5C6F8CFCB8D102 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3B1A32617B00DDFE56F82998 /* SwiftUI.framework in Frameworks */,
+				1DD703E1EB34D40F06008C34 /* WidgetKit.framework in Frameworks */,
+				B995E646364651109625892A /* UIKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -107,8 +176,10 @@
 				0158891D53AE86E5D36C646A /* MetalKit.framework */,
 				19E1B605BA10704C180EF399 /* QuartzCore.framework */,
 				B2E9BF44D46881DE6C9FCD64 /* Security.framework */,
+				6D658A78B62DF388881DD038 /* SwiftUI.framework */,
 				3BC647F7D907A115A2DF56F0 /* UIKit.framework */,
 				505CEAD46E6E2FC08055147B /* WebKit.framework */,
+				F8ED6FE4F5287FEDA73466DE /* WidgetKit.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -122,9 +193,19 @@
 				3FE7E7018F5DA90D09621EB0 /* orchestrator.rs */,
 				920A89328179C7F054C1F0BA /* state.rs */,
 				F752CE6348BA2801B2DD69A9 /* types.rs */,
+				22CAC4935CF14107B37B07BB /* wire.rs */,
 				687F5E52B139F458290F1283 /* providers */,
 			);
 			path = sync;
+			sourceTree = "<group>";
+		};
+		5291314FA590D2988E5B84D8 /* ios-apple */ = {
+			isa = PBXGroup;
+			children = (
+				B684F52A5E39E36F3BD7A3F0 /* widget_reload.swift */,
+			);
+			name = "ios-apple";
+			path = "../../ios-apple";
 			sourceTree = "<group>";
 		};
 		5A8E27E7D708F95DDE6229CC = {
@@ -133,10 +214,12 @@
 				FB87BD8C7F240719977B12B7 /* assets */,
 				B0E0DEB97FB2CDC3F7CC6276 /* Assets.xcassets */,
 				11665C5517D652158E167382 /* LaunchScreen.storyboard */,
-				FDB736E114A299E006A57ECF /* Externals */,
+				214F6638D6E55D498B817F06 /* PrivacyInfo.xcprivacy */,
+				5291314FA590D2988E5B84D8 /* ios-apple */,
 				622EFFCBBA30E56070B31FFA /* Sources */,
 				D2C3C475F6F0C5DE6EF99061 /* src */,
 				D901A1EBB9B3EBC3B5254A84 /* subly_iOS */,
+				FE06196BBBFC506837008468 /* SublyWidget */,
 				04A27F36B1421BAE2F4CABEF /* Frameworks */,
 				B8D9258F8086E6EC5D0070D6 /* Products */,
 			);
@@ -155,6 +238,7 @@
 			children = (
 				56DFD1A59FB1EF4DA14E09EE /* dropbox.rs */,
 				D0B2EE3425A789378DA90C56 /* gdrive.rs */,
+				661732DA5CAE3FEC9E5200A5 /* icloud_native.rs */,
 				0F3E5A437CAA674DEE4DFAE8 /* icloud.rs */,
 				1175CE70D434B6E291FE78A7 /* mod.rs */,
 				974B1F2FDC37A7C6400AD28F /* onedrive.rs */,
@@ -177,13 +261,17 @@
 			children = (
 				3AA73DD8EDB598617F6A8F81 /* app_data.rs */,
 				4981FC4396630B88C8C99BDC /* catalog.rs */,
+				2169B651360070C5007C0460 /* config.rs */,
 				C88AD0D89A936DBFA46D5484 /* dashboard.rs */,
 				E4224CE6E8CA86E4B7B43099 /* expenses.rs */,
 				4F5CDAF88CA32D8C611637D8 /* export.rs */,
+				A3F55468DE88B36489C112EE /* logo.rs */,
 				DE4717FEC2664E33527ED287 /* mod.rs */,
 				BC68F8483FC145709391A7A3 /* notifications.rs */,
+				46539A23029FC64D3FD29F59 /* secure_storage.rs */,
 				C0D36F3885CFF4E7F3F9BB92 /* seed.rs */,
 				E541A9444A9026D927454537 /* storage.rs */,
+				31481D604D42082EFCF87619 /* subscription_credentials.rs */,
 				563B800DD5042A281AC5797E /* subscriptions.rs */,
 				07521BCCED69C5535B2806B7 /* tray.rs */,
 				6E22AF4400C264AB15C643B6 /* rates */,
@@ -214,7 +302,8 @@
 		B8D9258F8086E6EC5D0070D6 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				5AD388BC5AAF69A91D04E4B4 /* Subly.app */,
+				5AD388BC5AAF69A91D04E4B4 /* subly_iOS.app */,
+				3F15F35D53D4CD304175F97A /* SublyWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -222,15 +311,13 @@
 		CD2F88877DB741B4985E55AE /* providers */ = {
 			isa = PBXGroup;
 			children = (
-				46AD9475D3908363E0F2200C /* bnb.rs */,
-				A1145FC1E18DA437168CC4D6 /* boe.rs */,
-				F8D03E60391AFD114064C05C /* cbr.rs */,
-				7AF3A896A17CC5EABC209D66 /* crypto.rs */,
-				35A1F9626012E6A8678E9B66 /* ecb.rs */,
+				8AB03DA3AA192461D316AB4F /* apilayer.rs */,
+				66878B3FCDBEA29386696188 /* currencyapi.rs */,
+				B3043D9140F80F9088E72DDD /* exchangerate.rs */,
+				0DFA551B007B40C40A94893A /* fixer.rs */,
 				84FABAB32F8526B2BE6A80F1 /* frankfurter.rs */,
 				51339CD929C336437E681BAC /* mod.rs */,
-				D4A23A5EB2F24D1AD199E447 /* nbrb.rs */,
-				66A8A36FBF4CFF3CF93D1479 /* nbu.rs */,
+				33BD156F7E320FF979D9815C /* openexchangerates.rs */,
 			);
 			path = providers;
 			sourceTree = "<group>";
@@ -238,10 +325,15 @@
 		D2C3C475F6F0C5DE6EF99061 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				B82148163859290A418A32A2 /* keyring_store.rs */,
 				8901C4702B5044F21B5B40A2 /* lib.rs */,
 				CB0C1D660973217BBF676ED6 /* main.rs */,
 				93FADAC28F68530839CD4261 /* models.rs */,
+				5FB03EAE28C6C029F1F492E0 /* restart_smoke_tests.rs */,
+				395F658188555AF54BF8FBE6 /* state_tables.rs */,
 				A3787F9E3C0D05B1D3DF7FA8 /* state.rs */,
+				E5EF1C88DD872C730175DF6C /* test_support.rs */,
+				62EAB59D7271E82DD99F46E1 /* widget_snapshot.rs */,
 				6CFF1FE1DEA69AC0FC58B9F5 /* commands */,
 			);
 			name = src;
@@ -257,16 +349,38 @@
 			path = subly_iOS;
 			sourceTree = "<group>";
 		};
-		FDB736E114A299E006A57ECF /* Externals */ = {
+		FE06196BBBFC506837008468 /* SublyWidget */ = {
 			isa = PBXGroup;
 			children = (
+				E5D8E9568F8408C360890551 /* SublyWidget.swift */,
+				D91D22573939D147204362B8 /* Localizable.strings */,
 			);
-			path = Externals;
+			name = SublyWidget;
+			path = "../../ios-apple/SublyWidget";
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		C075D986F8B8B053CB6E25B6 /* SublyWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = B1A0422D6F57DA47E9A323FD /* Build configuration list for PBXNativeTarget "SublyWidgetExtension" */;
+			buildPhases = (
+				C36CA7840297F9F7CCA165AA /* Sources */,
+				A19D0AD3DFF51E5FB57178C1 /* Resources */,
+				B53A6CE5BD5C6F8CFCB8D102 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SublyWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = SublyWidgetExtension;
+			productReference = 3F15F35D53D4CD304175F97A /* SublyWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		D751391BB476D7C42D5E1358 /* subly_iOS */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F044339E96D670A44A964525 /* Build configuration list for PBXNativeTarget "subly_iOS" */;
@@ -275,16 +389,18 @@
 				BF199E6A358B45D5634E99B2 /* Sources */,
 				ACE8A40C1197F6FD976513EC /* Resources */,
 				9A82E90C3979444AD65C74A9 /* Frameworks */,
+				C6486727A09F622DCE2F1414 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				89BC78D749A9778464CE2E38 /* PBXTargetDependency */,
 			);
 			name = subly_iOS;
 			packageProductDependencies = (
 			);
 			productName = subly_iOS;
-			productReference = 5AD388BC5AAF69A91D04E4B4 /* Subly.app */;
+			productReference = 5AD388BC5AAF69A91D04E4B4 /* subly_iOS.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -295,6 +411,15 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					C075D986F8B8B053CB6E25B6 = {
+						DevelopmentTeam = R6VC7JTLE8;
+						ProvisioningStyle = Automatic;
+					};
+					D751391BB476D7C42D5E1358 = {
+						DevelopmentTeam = R6VC7JTLE8;
+					};
+				};
 			};
 			buildConfigurationList = 6D9A7B9E0F8A8023C7B70D40 /* Build configuration list for PBXProject "subly" */;
 			developmentRegion = en;
@@ -302,6 +427,17 @@
 			knownRegions = (
 				Base,
 				en,
+				ru,
+				de,
+				es,
+				fr,
+				pt,
+				ja,
+				ko,
+				ar,
+				hi,
+				tr,
+				"zh-Hans",
 			);
 			mainGroup = 5A8E27E7D708F95DDE6229CC;
 			minimizedProjectReferenceProxies = 1;
@@ -310,18 +446,28 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				C075D986F8B8B053CB6E25B6 /* SublyWidgetExtension */,
 				D751391BB476D7C42D5E1358 /* subly_iOS */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		A19D0AD3DFF51E5FB57178C1 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6C36BF66C18619178A9E85FB /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ACE8A40C1197F6FD976513EC /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				955E4CE33DF903E362EF0393 /* Assets.xcassets in Resources */,
 				39EB91FBAA7376E12E72DB8C /* LaunchScreen.storyboard in Resources */,
+				8725F5625C63ADA208B7D797 /* PrivacyInfo.xcprivacy in Resources */,
 				1AFC62DC1F8F4A6FB6174F37 /* assets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -348,7 +494,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${FORCE_COLOR} ${ARCHS:?}";
+			shellScript = "export FORCE_COLOR=\"${FORCE_COLOR:-}\"; pnpm tauri ios xcode-script -v --platform ${PLATFORM_DISPLAY_NAME:?} --sdk-root ${SDKROOT:?} --framework-search-paths \"${FRAMEWORK_SEARCH_PATHS:?}\" --header-search-paths \"${HEADER_SEARCH_PATHS:?}\" --gcc-preprocessor-definitions \"${GCC_PREPROCESSOR_DEFINITIONS:-}\" --configuration ${CONFIGURATION:?} ${ARCHS:?}";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -358,21 +504,88 @@
 			buildActionMask = 2147483647;
 			files = (
 				051BAD95E495A5D1589E418E /* main.mm in Sources */,
+				4B5CCB8906C9D94391F9F1AA /* widget_reload.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C36CA7840297F9F7CCA165AA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4FD1358560174AB26159B34E /* SublyWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		89BC78D749A9778464CE2E38 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C075D986F8B8B053CB6E25B6 /* SublyWidgetExtension */;
+			targetProxy = ABDC0B29742C173C1E9BBA88 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXVariantGroup section */
+		D91D22573939D147204362B8 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				3CBD9CDB874E7143AFCC9D91 /* en */,
+				09925F5A0305364E1496878F /* ru */,
+				F100DE001111111111111101 /* de */,
+				F100DE001111111111111102 /* es */,
+				F100DE001111111111111103 /* fr */,
+				F100DE001111111111111104 /* pt */,
+				F100DE001111111111111105 /* ja */,
+				F100DE001111111111111106 /* ko */,
+				F100DE001111111111111107 /* ar */,
+				F100DE001111111111111108 /* hi */,
+				F100DE001111111111111109 /* tr */,
+				F100DE00111111111111110B /* zh-Hans */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
+
 /* Begin XCBuildConfiguration section */
+		1370E5C4BD7F1DF122955194 /* release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
+				CODE_SIGN_ENTITLEMENTS = "../../ios-apple/SublyWidget/SublyWidget.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10002;
+				DEVELOPMENT_TEAM = R6VC7JTLE8;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "../../ios-apple/SublyWidget/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.s00d.subly.widget;
+				PRODUCT_NAME = SublyWidgetExtension;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = release;
+		};
 		7D2E5821F9B09211D4A57EFA /* release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				ARCHS = arm64;
+				ARCHS = (
+					arm64,
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
-				CODE_SIGN_ENTITLEMENTS = subly_iOS/subly_iOS.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_ENTITLEMENTS = ../../entitlements/ios.plist;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = "R6VC7JTLE8";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
@@ -385,20 +598,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				"LIBRARY_SEARCH_PATHS[arch=arm64]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)",
-					"$(SDKROOT)/usr/lib/swift",
-					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
-					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
-				);
-				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)",
-					"$(SDKROOT)/usr/lib/swift",
-					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
-					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
-				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.s00d.subly;
 				PRODUCT_NAME = "Subly";
 				SDKROOT = iphoneos;
@@ -530,11 +731,13 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
-				ARCHS = arm64;
+				ARCHS = (
+					arm64,
+				);
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
-				CODE_SIGN_ENTITLEMENTS = subly_iOS/subly_iOS.entitlements;
-				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_ENTITLEMENTS = ../../entitlements/ios.plist;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
 				DEVELOPMENT_TEAM = "R6VC7JTLE8";
 				ENABLE_BITCODE = NO;
 				"EXCLUDED_ARCHS[sdk=iphoneos*]" = x86_64;
@@ -547,25 +750,39 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				"LIBRARY_SEARCH_PATHS[arch=arm64]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)",
-					"$(SDKROOT)/usr/lib/swift",
-					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
-					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
-				);
-				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = (
-					"$(inherited)",
-					"$(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)",
-					"$(SDKROOT)/usr/lib/swift",
-					"$(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
-					"$(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)",
-				);
+				"LIBRARY_SEARCH_PATHS[arch=arm64]" = "$(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
+				"LIBRARY_SEARCH_PATHS[arch=x86_64]" = "$(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION) $(SDKROOT)/usr/lib/swift $(TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME) $(TOOLCHAIN_DIR)/usr/lib/swift-5.0/$(PLATFORM_NAME)";
 				PRODUCT_BUNDLE_IDENTIFIER = com.s00d.subly;
 				PRODUCT_NAME = "Subly";
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALID_ARCHS = arm64;
+			};
+			name = debug;
+		};
+		E67FD19663633C508979029C /* debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = YES;
+				CODE_SIGN_ENTITLEMENTS = "../../ios-apple/SublyWidget/SublyWidget.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 10002;
+				DEVELOPMENT_TEAM = R6VC7JTLE8;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "../../ios-apple/SublyWidget/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.4;
+				PRODUCT_BUNDLE_IDENTIFIER = com.s00d.subly.widget;
+				PRODUCT_NAME = SublyWidgetExtension;
+				SDKROOT = iphoneos;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = debug;
 		};
@@ -577,6 +794,15 @@
 			buildConfigurations = (
 				B44C4D4F79BC15F45D4A2295 /* debug */,
 				88DA0261470A67776BBF36B3 /* release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = debug;
+		};
+		B1A0422D6F57DA47E9A323FD /* Build configuration list for PBXNativeTarget "SublyWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E67FD19663633C508979029C /* debug */,
+				1370E5C4BD7F1DF122955194 /* release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = debug;

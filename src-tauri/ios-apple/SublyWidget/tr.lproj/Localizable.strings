@@ -1,0 +1,10 @@
+"widget_upcoming_title" = "Yaklaşan";
+"widget_no_upcoming" = "Yaklaşan ödeme yok";
+"widget_err_no_group" = "Görünümü etkinleştirmek için Subly\'yi bir kez açın.";
+"widget_err_open_app" = "Ödemeleri yüklemek için Subly\'yi açın.";
+"widget_err_bad_data" = "Yenilemek için Subly\'yi açın.";
+"widget_display_name" = "Subly";
+"widget_description" = "Yaklaşan abonelik ödemeleri.";
+"widget_date_today" = "Bugün";
+"widget_date_tomorrow" = "Yarın";
+"widget_more_count" = "+%d daha";

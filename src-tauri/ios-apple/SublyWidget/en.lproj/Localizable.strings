@@ -1,0 +1,10 @@
+"widget_upcoming_title" = "Upcoming";
+"widget_no_upcoming" = "No upcoming payments";
+"widget_err_no_group" = "Open Subly once to enable the widget.";
+"widget_err_open_app" = "Open Subly to load payments.";
+"widget_err_bad_data" = "Open Subly to refresh.";
+"widget_display_name" = "Subly";
+"widget_description" = "Upcoming subscription payments.";
+"widget_date_today" = "Today";
+"widget_date_tomorrow" = "Tomorrow";
+"widget_more_count" = "+%d more";
