@@ -1,0 +1,21 @@
+src/components/layout/AppHeader.vue
+  s_760a8176b5063e::t_e0b59708e86aa6 36
+  s_760a8176b5063e::t_c8dbfe3bdc6f5b 32-35,38-39
+  s_760a8176b5063e::t_9423cb7d5f57b2 37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "1aa842614de3a1fa0099a3ad42639b5ddf0a5552",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
