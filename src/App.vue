@@ -174,7 +174,7 @@ async function handleOAuthUrls(urls: string[]) {
     if (ok) {
       toast(t("sync_connected"));
     } else {
-      toast(t("sync_oauth_failed"), "error");
+      toast(syncStatus.error?.trim() || t("sync_oauth_failed"), "error");
     }
   }
 }
@@ -235,7 +235,7 @@ onMounted(async () => {
   wakeHandler = () => {
     runNotificationCheck();
     checkRemote().catch((e) => {
-      const message = e instanceof Error ? e.message : String(e);
+      const message = formatErrorForToast(e, t);
       syncStatus.error = message;
       console.error("Sync checkRemote failed:", e);
     });

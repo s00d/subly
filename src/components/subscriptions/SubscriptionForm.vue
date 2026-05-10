@@ -2,6 +2,7 @@
 import { ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
+import { formatErrorForToast } from "@/utils/formatError";
 import type { Subscription, Settings, Currency, PaymentMethod, HouseholdMember, Category, Tag } from "@/schemas/appData";
 import Modal from "@/components/ui/Modal.vue";
 import AppInput from "@/components/ui/AppInput.vue";
@@ -191,6 +192,8 @@ async function applyDomainIcon() {
     }
     form.value.logo = faviconUrl;
     toast("Icon loaded from domain");
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   } finally {
     isResolvingIcon.value = false;
   }
@@ -228,7 +231,7 @@ async function handleSubmit() {
     emit("close");
   } catch (e) {
     console.error("Subscription save failed:", e);
-    toast(t("save_error"), "error");
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 
@@ -243,8 +246,8 @@ async function pasteOtpauthFromClipboard() {
     if (!form.value.credentials) form.value.credentials = emptyCreds();
     form.value.credentials.totpSecret = imported.totpSecret;
     toast(t("totp_imported"));
-  } catch {
-    toast(t("otpauth_invalid"), "error");
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 
@@ -265,8 +268,8 @@ async function onQrFileChange(ev: Event) {
       if (!form.value.credentials) form.value.credentials = emptyCreds();
       form.value.credentials.totpSecret = imported.totpSecret;
       toast(t("totp_imported"));
-    } catch {
-      toast(t("totp_qr_invalid"), "error");
+    } catch (e) {
+      toast(formatErrorForToast(e, t), "error");
     }
   };
   reader.readAsDataURL(file);

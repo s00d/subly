@@ -2,6 +2,7 @@
 import { ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
+import { formatErrorForToast } from "@/utils/formatError";
 import type { Expense, Settings, Currency, PaymentMethod, HouseholdMember, Category, Tag } from "@/schemas/appData";
 import { expenseToIsoDate } from "@/schemas/appData";
 import { useClipboard } from "@/composables/useClipboard";
@@ -164,6 +165,8 @@ async function applyDomainIcon() {
     iconPreview.value = faviconUrl;
     await copyToClipboard(faviconUrl);
     toast("Icon URL copied from domain");
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   } finally {
     isResolvingIcon.value = false;
   }
@@ -214,7 +217,7 @@ async function handleSave() {
     emit("close");
   } catch (e) {
     console.error("Expense save failed:", e);
-    toast(t("save_error"), "error");
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 

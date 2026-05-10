@@ -9,6 +9,8 @@ import IconDisplay from "@/components/ui/IconDisplay.vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import { Pencil, Trash2, Calendar, CreditCard, Tag, User, FileText, Hash, Wallet, Link2, ExternalLink, Link } from "@lucide/vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useToast } from "@/composables/useToast";
+import { formatErrorForToast } from "@/utils/formatError";
 
 const props = defineProps<{
   show: boolean;
@@ -35,6 +37,7 @@ const household = ref<HouseholdMember[]>([]);
 const currencies = ref<Currency[]>([]);
 const settings = ref<Settings | null>(null);
 const { t } = useI18n();
+const { toast } = useToast();
 const { fmtDateFull, fmtCurrency } = useLocaleFormat();
 
 const exp = computed(() => props.expense);
@@ -94,7 +97,12 @@ const linkedSubscription = computed(() => {
 
 async function handleOpenUrl(url: string) {
   const fullUrl = url.startsWith("http") ? url : `https://${url}`;
-  try { await openUrl(fullUrl); } catch (e) { console.error("Failed to open URL:", e); }
+  try {
+    await openUrl(fullUrl);
+  } catch (e) {
+    console.error("Failed to open URL:", e);
+    toast(formatErrorForToast(e, t), "error");
+  }
 }
 watch(
   () => props.lookupData,

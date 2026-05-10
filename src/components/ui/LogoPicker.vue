@@ -5,6 +5,7 @@ import { useI18n } from "vue-i18n";
 import { X, Upload, Image as ImageIcon, Search, Link as LinkIcon } from "@lucide/vue";
 import { tv } from "@/lib/tv";
 import { useToast } from "@/composables/useToast";
+import { formatErrorForToast } from "@/utils/formatError";
 import { useScrollLock } from "@/composables/useScrollLock";
 
 const props = defineProps<{
@@ -112,8 +113,8 @@ async function handleUpload(e: Event) {
     }
     emit("update:modelValue", dataUrl);
     showPicker.value = false;
-  } catch {
-    toast("Failed to process image", "error");
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   } finally {
     input.value = "";
   }

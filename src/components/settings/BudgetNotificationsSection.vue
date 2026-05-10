@@ -169,8 +169,8 @@ async function handleTestNotification() {
     } else {
       toast(t("test_notification_sent_inapp"));
     }
-  } catch {
-    toast(t("test_notification_failed"), "error");
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   } finally {
     testingSending.value = false;
   }

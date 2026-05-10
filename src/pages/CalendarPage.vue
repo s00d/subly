@@ -174,6 +174,7 @@ async function loadMonthExpenses() {
     await calendarStore.loadMonth(currentYear.value, currentMonth.value + 1);
   } catch (e) {
     logPageError("loadMonthExpenses failed", e, { year: currentYear.value, month: currentMonth.value + 1 });
+    toast(formatErrorForToast(e, t), "error");
   }
 }
 

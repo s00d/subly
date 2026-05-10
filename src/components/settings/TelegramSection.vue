@@ -9,6 +9,7 @@ import { notificationsEvent } from "@/services/notificationsClient";
 import { getConfigValue, setConfigValue } from "@/services/configClient";
 import { getSecureValue, setSecureValue } from "@/services/secureStorageClient";
 import { Send } from "@lucide/vue";
+import { formatErrorForToast } from "@/utils/formatError";
 
 const { t } = useI18n();
 const { toast } = useToast();
@@ -60,8 +61,8 @@ async function testTelegram() {
     const ok = result.data.telegram;
     if (ok) toast(t("telegram_test_sent"));
     else toast(t("telegram_test_failed"), "error");
-  } catch {
-    toast(t("telegram_test_failed"), "error");
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   } finally {
     isTesting.value = false;
   }
