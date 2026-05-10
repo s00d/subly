@@ -1,0 +1,27 @@
+.github/workflows/appstore-ios.yml
+  s_760a8176b5063e::t_1183b2f7d403d5 150-151,154,158-159,195,201-204,207-209,212,220
+  s_760a8176b5063e::t_0b30264d40bd37 141
+  s_760a8176b5063e::t_62779f41457413 246
+  s_760a8176b5063e::t_6618cb162e8519 211
+  s_760a8176b5063e::t_6c38dac6132dd1 126-140,142-143,145,147-148
+  s_760a8176b5063e::t_13b155ce9043f6 110-116
+  s_760a8176b5063e::t_997850fc0c61ed 156,160-166,168,170-194,196-200,205-206,210,213-216,221-240
+  s_760a8176b5063e::t_19fff3911ac72e 251-253
+  s_760a8176b5063e::t_704edfcafd4a9a 96,98-106,108-109,118-125,144,146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "1e894cfd5c1c05b5a64030ac4bad9ed3e44044e5",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
