@@ -1,0 +1,22 @@
+.github/workflows/appstore-ios.yml
+  s_760a8176b5063e::t_3d8570d4e36013 101
+  s_760a8176b5063e::t_ec94110cfce3e8 24
+  s_760a8176b5063e::t_8dfd03e12a7ee8 69-70,75-90,92-98,102,104-106
+  s_760a8176b5063e::t_b888a523bd88bf 91,99-100,103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "3b80452110404ec60e96d63b5381681d46f02219",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
