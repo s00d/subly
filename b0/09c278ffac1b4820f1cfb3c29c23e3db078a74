@@ -1,0 +1,99 @@
+splashscreen.html
+  s_760a8176b5063e::t_047a7afdc50edd 49-50,52
+  s_760a8176b5063e::t_a7ea4ffc0e292b 83-98
+  s_760a8176b5063e::t_a8547803dc0978 1-48,51,53-82,99-104
+vite.config.ts
+  s_760a8176b5063e::t_1bc43f18a9c138 43-46
+src-tauri/gen/android/app/src/main/java/com/s00d/subly/MainActivity.kt
+  s_760a8176b5063e::t_968fc108f73943 5,9-12
+src-tauri/gen/android/app/src/main/res/values-night/colors.xml
+  s_760a8176b5063e::t_605d09bd687214 1-4
+src-tauri/gen/android/buildSrc/src/main/java/com/s00d/subly/kotlin/BuildTask.kt
+  s_760a8176b5063e::t_3e8f375e5eef34 19-46,48,50,52-53,58
+src-tauri/tauri.conf.json
+  s_760a8176b5063e::t_342cff66eb3167 15
+  s_760a8176b5063e::t_a9b8c37e344de9 26
+  s_760a8176b5063e::t_499743ab277dc7 21-22
+src-tauri/capabilities/desktop.json
+  s_760a8176b5063e::t_c77bac3c9bca7a 9-10
+src-tauri/gen/android/app/src/main/res/values/colors.xml
+  s_760a8176b5063e::t_fbc22d716e48bb 10
+src-tauri/gen/android/app/src/main/AndroidManifest.xml
+  s_760a8176b5063e::t_d7250c165a9164 33-34
+  s_760a8176b5063e::t_0b03e9bc76749c 22
+index.html
+  s_760a8176b5063e::t_9184276f68b3bd 21-22,29-31
+  s_760a8176b5063e::t_cb3d3a4c2dfb28 37
+  s_760a8176b5063e::t_64e680289b53d8 72,80-88
+  s_760a8176b5063e::t_67a9b81787922f 73-79
+  s_760a8176b5063e::t_7e79fb6857fb07 38-39,41
+  s_760a8176b5063e::t_6e7ef77e7f72ad 10-20,23-28,32-36,40,42-68,71,89-91
+src-tauri/src/commands/mod.rs
+  s_760a8176b5063e::t_6e0abb77145be4 2
+src-tauri/gen/android/app/src/main/res/values/themes.xml
+  s_760a8176b5063e::t_2dd9c2427794cf 12
+  s_760a8176b5063e::t_539038e2c8ebc4 5
+  s_760a8176b5063e::t_44332a8c6f4258 4,6-11,13
+src/App.vue
+  s_760a8176b5063e::t_793e0f5c74d249 190-191
+  s_760a8176b5063e::t_b658b31499ab86 366
+  s_760a8176b5063e::t_76dc61e89deb3f 23
+  s_760a8176b5063e::t_14cee2304185e7 169-175,184,189
+  s_760a8176b5063e::t_e0f5f7adec2dc3 211,239-243,261
+  s_760a8176b5063e::t_476448c2a2feda 176-183,185-188
+src-tauri/gen/android/app/build.gradle.kts
+  s_760a8176b5063e::t_fcb2f7daaec052 64
+src-tauri/src/commands/tray.rs
+  s_760a8176b5063e::t_fb9b84ff756dd6 20
+  s_760a8176b5063e::t_ee594539356fd5 139,141
+  s_760a8176b5063e::t_de89720d8ff785 17
+  s_760a8176b5063e::t_01601995ace04d 181,183
+src-tauri/capabilities/default.json
+  s_760a8176b5063e::t_be05576d56728a 6-7
+src-tauri/src/ios_webview_fix.rs
+  s_760a8176b5063e::t_f7d282e7f5de30 21,46-74
+  s_760a8176b5063e::t_2aee9120ed0fef 1-20,22-45,75-157
+src-tauri/gen/apple/LaunchScreen.storyboard
+  s_760a8176b5063e::t_69f92c8c85cfca 28
+  s_760a8176b5063e::t_2116f300486ce3 2,4,10,17-27,29-31,34-41
+  s_760a8176b5063e::t_6e471b914430a2 50-52
+  s_760a8176b5063e::t_65f5fe64929033 49
+src-tauri/src/commands/app_ready.rs
+  s_760a8176b5063e::t_8a0bf5b9cc585b 2-5,8,13-14
+  s_760a8176b5063e::t_68b4e42294f6fa 1,6-7,9-12
+src-tauri/src/lib.rs
+  s_760a8176b5063e::t_6d653987bcbf0d 213
+  s_760a8176b5063e::t_d055f1102920a5 608-620,633
+  s_760a8176b5063e::t_a7e15fdd3d74a7 143-144,151,157,184-185,200-203
+  s_760a8176b5063e::t_43f2e52b0009e5 14-15
+  s_760a8176b5063e::t_c809e3bb4a1410 607,621-632,634
+  s_760a8176b5063e::t_c60ff12699d5b1 187,189,194-197
+  s_760a8176b5063e::t_1bb23245faa16a 582-585
+  s_760a8176b5063e::t_5c70a0bc7953ed 226,228-229,231-232
+  s_760a8176b5063e::t_1cf9fd58b1d135 566
+  s_760a8176b5063e::t_bdafe6d4f54624 558
+  s_760a8176b5063e::t_037a55ca29095e 589-596
+  s_760a8176b5063e::t_b7cea7c68a6a42 112
+  s_760a8176b5063e::t_6b185060feb694 707
+  s_760a8176b5063e::t_470c0dfc37cb3f 579
+  s_760a8176b5063e::t_a69032b410fa49 145-150,152-156,158-181
+  s_760a8176b5063e::t_c20a9fe52bc545 218-220
+  s_760a8176b5063e::t_de89720d8ff785 193,209,216,224,349,381,388,403,408
+  s_760a8176b5063e::t_5f2264db04f140 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "b009c278ffac1b4820f1cfb3c29c23e3db078a74",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
