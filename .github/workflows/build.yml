@@ -20,7 +20,11 @@ jobs:
           - platform: 'ubuntu-22.04'
             args: ''
             os: 'linux'
-          - platform: 'windows-latest'
+          # Pinned to windows-2022 instead of windows-latest while GitHub
+          # redirects `windows-2025` -> `windows-2025-vs2026` (May 12, 2026):
+          # the new image trips Swatinem/rust-cache@v2 right after
+          # "Restoring cache..." with no log output, killing the job.
+          - platform: 'windows-2022'
             args: ''
             os: 'windows'
 
@@ -47,6 +51,10 @@ jobs:
 
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2
+        # Belt-and-braces: if the GH Actions cache backend is flaky (which
+        # has happened during runner image transitions), don't fail the
+        # whole build — we'll just rebuild Cargo deps from scratch.
+        continue-on-error: true
         with:
           workspaces: "src-tauri -> target"
           shared-key: "build-${{ matrix.platform }}-${{ matrix.args }}"
