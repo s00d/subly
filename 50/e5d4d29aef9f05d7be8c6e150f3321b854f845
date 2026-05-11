@@ -1,0 +1,59 @@
+src/components/ui/LazyVChart.vue
+  s_760a8176b5063e::t_cb4ae44304b6af 8-12,14-15,17,21-36,84-93
+  s_760a8176b5063e::t_680be93ef479f3 1-7,13,16,18-20,37-83,94-99
+src/components/dashboard/TagExpensesWidget.vue
+  s_760a8176b5063e::t_173455be95e0a4 2,10-36
+  s_760a8176b5063e::t_7d505ab4a245d5 45
+  s_760a8176b5063e::t_bda498d05f6b4c 74
+  s_760a8176b5063e::t_940fb54d082766 4
+  s_760a8176b5063e::t_ab6777e2f16ae0 104
+  s_760a8176b5063e::t_ed462e050a9294 102-103
+  s_760a8176b5063e::t_5b0670f8b2c4f7 5
+src/composables/useChartTheme.ts
+  s_760a8176b5063e::t_775540fc0c0d7f 17,19
+  s_760a8176b5063e::t_3d3cdc45e51be7 1-16,18
+src/pages/DashboardPage.vue
+  s_760a8176b5063e::t_570c0d3ffaeeb2 424
+  s_760a8176b5063e::t_9ae09366a339bd 428
+  s_760a8176b5063e::t_980069ea3a8a08 21
+  s_760a8176b5063e::t_2d0ebed787ea64 420
+  s_760a8176b5063e::t_d28d65eb7647a8 3
+  s_760a8176b5063e::t_1c98850f9ce84a 43
+  s_760a8176b5063e::t_6cba280df49a19 57-58
+src/lib/echarts.ts
+  s_760a8176b5063e::t_90a8a2e2d6c342 3-8,19,30
+src/components/dashboard/SpendingTrend.vue
+  s_760a8176b5063e::t_4c63a0a8f1c2bf 4
+  s_760a8176b5063e::t_3cab09c2f32b5e 15
+  s_760a8176b5063e::t_db95e2f73d142b 82
+  s_760a8176b5063e::t_3f614c3f95febe 84-85
+  s_760a8176b5063e::t_1f8d99319f969d 5
+src/components/dashboard/RateHistoryWidget.vue
+  s_760a8176b5063e::t_705cf4f15713f9 27
+  s_760a8176b5063e::t_c90a050e0bb82e 265
+  s_760a8176b5063e::t_f58ff2041ec3d5 9
+  s_760a8176b5063e::t_1f11efcc1cdb39 264
+  s_760a8176b5063e::t_2f533b4e2115dd 11
+src/components/dashboard/DayOfWeekWidget.vue
+  s_760a8176b5063e::t_10f52e1af19bd8 90
+  s_760a8176b5063e::t_16c5951bf8c1ee 12
+  s_760a8176b5063e::t_36c5a5e0293bea 92-93
+  s_760a8176b5063e::t_ee67d1accd2445 5
+  s_760a8176b5063e::t_dc175e23b13939 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "50e5d4d29aef9f05d7be8c6e150f3321b854f845",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
