@@ -40,6 +40,10 @@ export default defineConfig(async () => ({
   build: {
     chunkSizeWarningLimit: 700,
     rollupOptions: {
+      input: {
+        main: resolve(__dirname, "index.html"),
+        splashscreen: resolve(__dirname, "splashscreen.html"),
+      },
       output: {
         manualChunks(id) {
           if (!id.includes("node_modules")) return undefined;

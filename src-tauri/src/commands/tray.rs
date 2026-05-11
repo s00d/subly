@@ -14,10 +14,10 @@ fn show_main_window(app: &tauri::AppHandle) {
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-fn refresh_tray_menu(app: &tauri::AppHandle) -> Result<(), String> {
+fn refresh_tray_menu(app: &tauri::AppHandle) -> Result<(), crate::errors::AppError> {
     let state = app.state::<crate::AppState>();
     let data = {
-        let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         guard.doc()?
     };
     let rates = crate::rate_map(&data);
@@ -136,9 +136,9 @@ fn refresh_tray_menu(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-fn tray_refresh_signature() -> Result<String, String> {
+fn tray_refresh_signature(app: &tauri::AppHandle) -> Result<String, crate::errors::AppError> {
     let today = chrono::Local::now().date_naive().to_string();
-    let db = crate::open_redb()?;
+    let db = crate::open_redb(app)?;
     let (data, cfg) = crate::state::load_app_data_typed(&db)?;
     let payload = serde_json::to_string(&(data, cfg)).map_err(|e| e.to_string())?;
     Ok(format!("{today}|{payload}"))
@@ -178,9 +178,9 @@ pub fn setup_desktop_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let app_handle = app.clone();
     let _ = refresh_tray_menu(&app_handle);
     std::thread::spawn(move || {
-        let mut last_signature = tray_refresh_signature().ok();
+        let mut last_signature = tray_refresh_signature(&app_handle).ok();
         loop {
-            match tray_refresh_signature() {
+            match tray_refresh_signature(&app_handle) {
                 Ok(next_signature) => {
                     let changed = last_signature
                         .as_ref()

@@ -20,6 +20,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { useAlerts } from "@/composables/useAlerts";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrent as getCurrentDeepLinks, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { useDashboardStore } from "@/stores/dashboardStore";
@@ -165,6 +166,29 @@ function parseOAuthUrl(url: string): { code: string; provider: "gdrive" | "dropb
   }
 }
 
+async function finishBoot() {
+  isLoading.value = false;
+  try {
+    await invoke("app_ready");
+  } catch (e) {
+    console.warn("app_ready failed:", e);
+  }
+  const el = document.getElementById("bootSplash");
+  if (!el) return;
+  let removed = false;
+  const finalize = () => {
+    if (removed) return;
+    removed = true;
+    el.remove();
+    // iOS WKWebView caches visualViewport metrics while the fixed overlay is on top,
+    // which leaves MobileTabBar with a stale bottom. Trigger one reflow tick.
+    window.dispatchEvent(new Event("resize"));
+  };
+  el.addEventListener("transitionend", finalize, { once: true });
+  el.classList.add("is-ready");
+  setTimeout(finalize, 350);
+}
+
 async function handleOAuthUrls(urls: string[]) {
   for (const url of urls) {
     if (!url.startsWith("subly://oauth/callback")) continue;
@@ -184,12 +208,11 @@ onMounted(async () => {
   nowStore.ensureStarted();
   await metaStore.ensureLoaded();
   if (!settings.value) {
-    isLoading.value = false;
+    await finishBoot();
     return;
   }
   applyTheme();
   applyColorTheme();
-  isLoading.value = false;
 
   await runNotificationCheck();
 
@@ -213,7 +236,11 @@ onMounted(async () => {
   });
 
   try {
-    await initSync();
+    // Avoid hanging the splash if initSync is slow (e.g. flaky network) — cap at 3s.
+    await Promise.race([
+      initSync(),
+      new Promise<void>((resolve) => setTimeout(resolve, 3000)),
+    ]);
     const startUrls = await getCurrentDeepLinks();
     if (startUrls && startUrls.length > 0) {
       await handleOAuthUrls(startUrls);
@@ -230,6 +257,8 @@ onMounted(async () => {
     console.error("Sync init failed:", e);
     toast(message, "error");
   }
+
+  await finishBoot();
 
   wakeHandler = () => {
     runNotificationCheck();
@@ -334,15 +363,7 @@ if (typeof window !== "undefined") {
 </script>
 
 <template>
-  <div v-if="isLoading" class="h-screen flex items-center justify-center bg-surface-secondary">
-    <div class="text-center">
-      <div class="w-12 h-12 rounded-xl bg-primary flex items-center justify-center mx-auto mb-3">
-        <span class="text-white font-bold text-xl">W</span>
-      </div>
-      <p class="text-sm text-text-muted">Loading...</p>
-    </div>
-  </div>
-  <AppLayout v-else>
+  <AppLayout v-if="!isLoading">
     <!-- Cloud sync update banner -->
     <div
       v-if="syncStatus.pendingUpdate"

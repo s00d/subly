@@ -5,11 +5,14 @@ use redb::{Database, ReadableDatabase, TableDefinition};
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 mod commands;
+pub mod errors;
 pub(crate) mod keyring_store;
 mod models;
 mod state;
 mod state_tables;
 mod widget_snapshot;
+#[cfg(target_os = "ios")]
+mod ios_webview_fix;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]
@@ -106,6 +109,7 @@ use commands::dashboard::{
     get_dashboard_trends,
 };
 use commands::app_data::{load_all_data, load_app_data, reset_app_data};
+use commands::app_ready::app_ready;
 use commands::export::{export_get_path_presets, export_subly_backup, import_subly_backup, import_subly_backup_bytes};
 use commands::rates::{
     get_rate_history_widget,
@@ -136,60 +140,96 @@ use commands::tray::setup_desktop_tray;
 pub(crate) const KV_TABLE: TableDefinition<&str, &str> = TableDefinition::new("subly_kv");
 static APP_DB: OnceLock<Arc<Database>> = OnceLock::new();
 
-fn db_path() -> Result<PathBuf, String> {
-    let base = dirs::data_local_dir()
-        .or_else(dirs::home_dir)
-        .ok_or("Unable to resolve local data directory")?;
-    let dir = base.join("Subly");
-    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    Ok(dir.join("subly.redb"))
-}
+/// Resolves the absolute path to `subly.redb`.
+///
+/// Desktop + iOS use `dirs::data_local_dir()` which has historically been our
+/// storage root: `~/Library/Application Support/Subly/` on macOS/iOS,
+/// `%LOCALAPPDATA%\Subly\` on Windows, `~/.local/share/Subly/` on Linux. We
+/// must keep this exact location so existing installs don't appear empty after
+/// the upgrade (Tauri's `app_local_data_dir` would point at a *different*
+/// directory: `…/Application Support/com.s00d.subly/…`).
+///
+/// Android is the special case: `dirs` returns `None` there (no XDG / no
+/// `$HOME`), which used to crash the setup hook with "Unable to resolve local
+/// data directory". For Android we route through Tauri's path resolver which
+/// internally calls `Context.getFilesDir()` and yields the per-app sandbox
+/// (`/data/user/0/<package>/files/`).
+fn db_path(app: &tauri::AppHandle) -> Result<PathBuf, crate::errors::AppError> {
+    #[cfg(target_os = "android")]
+    {
+        let base = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|e| crate::errors::AppError::from(
+                format!("Unable to resolve local data directory: {e}"),
+            ))?;
+        std::fs::create_dir_all(&base)?;
+        return Ok(base.join("subly.redb"));
+    }
 
-fn open_redb() -> Result<Database, String> {
-    let path = db_path()?;
-    if path.exists() {
-        Database::open(path).map_err(|e| e.to_string())
-    } else {
-        Database::create(path).map_err(|e| e.to_string())
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        let base = dirs::data_local_dir()
+            .or_else(dirs::home_dir)
+            .ok_or_else(|| {
+                crate::errors::AppError::from("Unable to resolve local data directory")
+            })?;
+        let dir = base.join("Subly");
+        std::fs::create_dir_all(&dir)?;
+        Ok(dir.join("subly.redb"))
     }
 }
 
-fn init_kv_table(db: &Database) -> Result<(), String> {
-    let tx = db.begin_write().map_err(|e| e.to_string())?;
-    let _ = tx.open_table(KV_TABLE).map_err(|e| e.to_string())?;
-    tx.commit().map_err(|e| e.to_string())
+fn open_redb(app: &tauri::AppHandle) -> Result<Database, crate::errors::AppError> {
+    let path = db_path(app)?;
+    if path.exists() {
+        Database::open(path).map_err(crate::errors::AppError::from)
+    } else {
+        Database::create(path).map_err(crate::errors::AppError::from)
+    }
 }
 
-fn open_db_with_startup_recovery() -> Result<(Arc<Database>, AppDataDoc, models::AppConfigDoc), String> {
-    let db = Arc::new(open_redb()?);
+fn init_kv_table(db: &Database) -> Result<(), crate::errors::AppError> {
+    let tx = db.begin_write()?;
+    let _ = tx.open_table(KV_TABLE)?;
+    tx.commit()?;
+    Ok(())
+}
+
+fn open_db_with_startup_recovery(
+    app: &tauri::AppHandle,
+) -> Result<(Arc<Database>, AppDataDoc, models::AppConfigDoc), crate::errors::AppError> {
+    let db = Arc::new(open_redb(app)?);
     init_kv_table(db.as_ref())?;
     let (data, cfg) = load_initial_state_for_startup(db.as_ref())?;
     Ok((db, data, cfg))
 }
 
-pub(crate) fn app_db() -> Result<Arc<Database>, String> {
+pub(crate) fn app_db() -> Result<Arc<Database>, crate::errors::AppError> {
     APP_DB
         .get()
         .cloned()
-        .ok_or("database is not initialized".to_string())
+        .ok_or_else(|| crate::errors::AppError::from("database is not initialized"))
 }
 
-pub(crate) fn redb_get_internal(key: String) -> Result<Option<String>, String> {
+pub(crate) fn redb_get_internal(key: String) -> Result<Option<String>, crate::errors::AppError> {
     let db = app_db()?;
-    let tx = db.begin_read().map_err(|e| e.to_string())?;
-    let table = tx.open_table(KV_TABLE).map_err(|e| e.to_string())?;
-    let maybe = table.get(key.as_str()).map_err(|e| e.to_string())?;
+    let tx = db.begin_read()?;
+    let table = tx.open_table(KV_TABLE)?;
+    let maybe = table.get(key.as_str())?;
     Ok(maybe.map(|v| v.value().to_string()))
 }
 
-pub(crate) fn redb_set_internal(key: String, value: String) -> Result<(), String> {
+pub(crate) fn redb_set_internal(key: String, value: String) -> Result<(), crate::errors::AppError> {
     let db = app_db()?;
-    let tx = db.begin_write().map_err(|e| e.to_string())?;
+    let tx = db.begin_write()?;
     {
-        let mut table = tx.open_table(KV_TABLE).map_err(|e| e.to_string())?;
-        table.insert(key.as_str(), value.as_str()).map_err(|e| e.to_string())?;
+        let mut table = tx.open_table(KV_TABLE)?;
+        table.insert(key.as_str(), value.as_str())?;
     }
-    tx.commit().map_err(|e| e.to_string())
+    tx.commit()?;
+    Ok(())
 }
 
 pub(crate) fn rate_map(data: &AppDataDoc) -> std::collections::HashMap<String, f64> {
@@ -306,7 +346,7 @@ fn is_core_snapshot_empty(data: &AppDataDoc) -> bool {
         && data.tags.is_empty()
 }
 
-fn load_initial_state_for_startup(db: &Database) -> Result<(AppDataDoc, models::AppConfigDoc), String> {
+fn load_initial_state_for_startup(db: &Database) -> Result<(AppDataDoc, models::AppConfigDoc), crate::errors::AppError> {
     let (mut initial_data, mut initial_config) = state::load_app_data_typed(db).map_err(|err| {
         eprintln!("[subly][fatal] typed storage read failed on startup: {}", err);
         format!("typed storage is unreadable; startup aborted to prevent data loss: {}", err)
@@ -338,14 +378,14 @@ mod icloud {
     }
 
     #[tauri::command]
-    pub fn icloud_write_file(_app: tauri::AppHandle, filename: String, contents: String) -> Result<(), String> {
+    pub fn icloud_write_file(_app: tauri::AppHandle, filename: String, contents: String) -> Result<(), crate::errors::AppError> {
         let dir = container_dir().ok_or("iCloud container not available")?;
         let path = dir.join(&filename);
         crate::commands::sync::providers::icloud_native::coordinated_write_bytes(&path, contents.as_bytes())
     }
 
     #[tauri::command]
-    pub fn icloud_read_file(_app: tauri::AppHandle, filename: String) -> Result<Option<String>, String> {
+    pub fn icloud_read_file(_app: tauri::AppHandle, filename: String) -> Result<Option<String>, crate::errors::AppError> {
         let dir = container_dir().ok_or("iCloud container not available")?;
         let path = dir.join(&filename);
         crate::commands::sync::providers::icloud_native::coordinated_read_string(&path)
@@ -360,12 +400,12 @@ mod icloud {
     }
 
     #[tauri::command]
-    pub fn icloud_write_file(_filename: String, _contents: String) -> Result<(), String> {
+    pub fn icloud_write_file(_filename: String, _contents: String) -> Result<(), crate::errors::AppError> {
         Err("iCloud not available on this platform".into())
     }
 
     #[tauri::command]
-    pub fn icloud_read_file(_filename: String) -> Result<Option<String>, String> {
+    pub fn icloud_read_file(_filename: String) -> Result<Option<String>, crate::errors::AppError> {
         Err("iCloud not available on this platform".into())
     }
 }
@@ -515,6 +555,7 @@ pub fn run() {
             sync_now,
             sync_flush_before_exit,
             sync_dismiss_pending_update,
+            app_ready,
         ]);
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -522,7 +563,7 @@ pub fn run() {
 
     builder
         .setup(|app| {
-            let (db, initial_data, _initial_config) = open_db_with_startup_recovery()
+            let (db, initial_data, _initial_config) = open_db_with_startup_recovery(app.handle())
                 .map_err(|e| -> Box<dyn std::error::Error> { e.into() })?;
             let _ = APP_DB.set(db.clone());
             if redb_get_internal("config:settings".to_string())?.is_none() {
@@ -535,12 +576,22 @@ pub fn run() {
 
             #[cfg(target_os = "ios")]
             {
-                let handle = app.handle().clone();
-                if let Some(st) = handle.try_state::<AppState>() {
-                    if let Ok(guard) = st.lock() {
-                        widget_snapshot::export_ios_widget_snapshot_from_guard(&guard);
-                    }
+                widget_snapshot::export_ios_widget_snapshot_from_app(app.handle());
+            }
+
+            #[cfg(any(target_os = "android", target_os = "ios"))]
+            {
+                if let Some(main) = app.get_webview_window("main") {
+                    let _ = main.show();
                 }
+            }
+
+            // iOS: stretch WKWebView from `safeAreaLayoutGuide` to the full window
+            // bounds so `position: fixed; bottom: 0` actually reaches the bottom of
+            // the screen (mobile tab bar). See `ios_webview_fix` for the details.
+            #[cfg(target_os = "ios")]
+            {
+                ios_webview_fix::install(app.handle());
             }
 
             #[cfg(any(target_os = "linux", target_os = "windows"))]
@@ -553,6 +604,34 @@ pub fn run() {
             {
                 let app_handle = app.handle().clone();
                 setup_desktop_tray(&app_handle)?;
+
+                let dark_bg = tauri::window::Color(0x0F, 0x17, 0x2A, 0xFF);
+                let light_bg = tauri::window::Color(0xF7, 0xF8, 0xFB, 0xFF);
+                let is_dark = app
+                    .get_webview_window("main")
+                    .and_then(|w| w.theme().ok())
+                    .map(|t| matches!(t, tauri::Theme::Dark))
+                    .unwrap_or(true);
+                let splash_bg = if is_dark { dark_bg } else { light_bg };
+
+                if let Some(main) = app.get_webview_window("main") {
+                    let _ = main.set_background_color(Some(splash_bg));
+                }
+
+                let _ = tauri::WebviewWindowBuilder::new(
+                    app,
+                    "splashscreen",
+                    tauri::WebviewUrl::App("splashscreen.html".into()),
+                )
+                .title("Subly")
+                .inner_size(360.0, 420.0)
+                .resizable(false)
+                .decorations(false)
+                .always_on_top(true)
+                .skip_taskbar(true)
+                .center()
+                .background_color(splash_bg)
+                .build();
             }
 
             Ok(())
@@ -625,7 +704,7 @@ mod tests {
 
         let err = load_initial_state_for_startup(&db).expect_err("startup should fail");
         assert!(
-            err.contains("typed storage is unreadable"),
+            err.to_string().contains("typed storage is unreadable"),
             "error should describe strict fail-fast startup"
         );
     }
