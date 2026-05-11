@@ -1,12 +1,17 @@
 //! Writes a JSON snapshot for the iOS Home Screen widget (App Group shared container).
 //! The widget extension cannot access Tauri/reddb; it only reads `widget/upcoming.json`.
+//!
+//! Heavy work (HTTP logo fetches + filesystem writes) is dispatched onto a background
+//! thread so the UI/main thread never blocks waiting for slow `ureq` calls. A simple
+//! `IN_PROGRESS` + `PENDING_REFRESH` pair coalesces bursts of subscription mutations
+//! into at most one extra refresh after the running job completes.
 
 #[cfg(target_os = "ios")]
 mod ios_impl {
     use crate::commands::subscriptions::collect_upcoming_subscription_docs_for_widget;
-    use crate::models::CurrencyDoc;
-    use crate::state::EntityTable;
+    use crate::models::{CurrencyDoc, SubscriptionDoc};
     use crate::state::AppStateInner;
+    use crate::state::EntityTable;
     use base64::Engine;
     use objc2::rc::autoreleasepool;
     use objc2_foundation::{NSFileManager, NSString};
@@ -15,6 +20,9 @@ mod ios_impl {
     use std::collections::HashMap;
     use std::fs;
     use std::path::{Path, PathBuf};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::OnceLock;
+    use std::time::Duration;
 
     pub(super) const APP_GROUP_ID: &str = "group.com.s00d.subly";
     const RELATIVE_WIDGET_DIR: &str = "widget";
@@ -22,6 +30,17 @@ mod ios_impl {
     /// Raster PNGs keyed by SHA256(trimmed URL); kept until URL changes or user clears app data.
     const HTTP_LOGO_CACHE_SUBDIR: &str = "logo_cache";
     const UPCOMING_FILE: &str = "upcoming.json";
+
+    /// Per-request budget for logo HTTP fetches. Kept tight because the snapshot blocks
+    /// the next widget timeline reload; a slow CDN should not stall app shutdown either.
+    const HTTP_LOGO_TIMEOUT: Duration = Duration::from_secs(4);
+
+    /// True while a background snapshot job is running. Prevents stacking up threads
+    /// when the user makes a burst of changes.
+    static IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+    /// Signals that another snapshot was requested while a job was running, so the
+    /// worker should loop once more with fresh data before exiting.
+    static PENDING_REFRESH: AtomicBool = AtomicBool::new(false);
 
     #[derive(Serialize)]
     struct WidgetUpcomingItem {
@@ -45,6 +64,12 @@ mod ios_impl {
         #[serde(rename = "updatedAt")]
         updated_at: String,
         items: Vec<WidgetUpcomingItem>,
+    }
+
+    /// Owned snapshot input pulled from `AppStateInner`; safe to send across threads.
+    pub(super) struct SnapshotJob {
+        subs: Vec<SubscriptionDoc>,
+        code_by_id: HashMap<String, String>,
     }
 
     /// `widget_reload.swift` defines this with `@_cdecl`; it is linked into the app binary, not into
@@ -114,8 +139,20 @@ mod ios_impl {
         let _ = fs::write(path, png);
     }
 
+    /// Single shared HTTP agent: connection pooling + bounded total per-request timeout
+    /// so a stalled host can't pin a worker thread for minutes.
+    fn http_agent() -> &'static ureq::Agent {
+        static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
+        AGENT.get_or_init(|| {
+            ureq::Agent::config_builder()
+                .timeout_global(Some(HTTP_LOGO_TIMEOUT))
+                .build()
+                .into()
+        })
+    }
+
     fn fetch_http_logo_bytes(url: &str) -> Option<Vec<u8>> {
-        let mut resp = ureq::get(url).call().ok()?;
+        let mut resp = http_agent().get(url).call().ok()?;
         let buf = resp.body_mut().read_to_vec().ok()?;
         if buf.len() > 512 * 1024 {
             return None;
@@ -196,10 +233,12 @@ mod ios_impl {
         Some(format!("{}/{}", ICON_SUBDIR, fname))
     }
 
-    pub(super) fn export_snapshot(inner: &AppStateInner) -> Result<(), String> {
+    /// Synchronously pulls owned data out of the locked state. Cheap; safe to call under a lock.
+    pub(super) fn collect_job(
+        inner: &AppStateInner,
+    ) -> Result<SnapshotJob, crate::errors::AppError> {
         let subs = collect_upcoming_subscription_docs_for_widget(inner)?;
-        let currencies: Vec<CurrencyDoc> =
-            inner.table_list_typed(EntityTable::Currencies)?;
+        let currencies: Vec<CurrencyDoc> = inner.table_list_typed(EntityTable::Currencies)?;
         let code_by_id: HashMap<String, String> = currencies
             .into_iter()
             .map(|c| {
@@ -208,7 +247,11 @@ mod ios_impl {
                 (c.id, iso.to_string())
             })
             .collect();
+        Ok(SnapshotJob { subs, code_by_id })
+    }
 
+    /// Heavy phase: HTTP fetches + filesystem writes. Runs without holding any app lock.
+    fn write_snapshot(job: &SnapshotJob) -> Result<(), crate::errors::AppError> {
         let root = app_group_root().ok_or_else(|| {
             "App Group container unavailable (enable group.com.s00d.subly for the app)".to_string()
         })?;
@@ -222,21 +265,23 @@ mod ios_impl {
         let _ = fs::remove_dir_all(&icons_dir);
         fs::create_dir_all(&icons_dir).map_err(|e| e.to_string())?;
 
-        let items: Vec<WidgetUpcomingItem> = subs
-            .into_iter()
+        let items: Vec<WidgetUpcomingItem> = job
+            .subs
+            .iter()
             .map(|s| {
-                let currency_code = code_by_id
+                let currency_code = job
+                    .code_by_id
                     .get(&s.currency_id)
                     .cloned()
                     .unwrap_or_else(|| "USD".to_string());
                 let icon_file =
                     materialize_logo_png(&icons_dir, &logo_cache_dir, &s.id, &s.logo);
                 WidgetUpcomingItem {
-                    id: s.id,
-                    name: s.name,
-                    next_payment: s.next_payment,
+                    id: s.id.clone(),
+                    name: s.name.clone(),
+                    next_payment: s.next_payment.clone(),
                     price: s.price,
-                    currency_id: s.currency_id,
+                    currency_id: s.currency_id.clone(),
                     currency_code,
                     icon_file,
                 }
@@ -253,36 +298,69 @@ mod ios_impl {
         fs::write(&path, json).map_err(|e| e.to_string())?;
 
         reload_widget_timelines_if_swift_linked();
-
         Ok(())
+    }
+
+    /// Spawns the snapshot worker; returns immediately. If a worker is already running,
+    /// schedules a single follow-up refresh so the very latest state still ships out.
+    pub(super) fn export_snapshot_async(app_handle: tauri::AppHandle, initial: SnapshotJob) {
+        if IN_PROGRESS
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_err()
+        {
+            PENDING_REFRESH.store(true, Ordering::Release);
+            return;
+        }
+
+        std::thread::spawn(move || {
+            use tauri::Manager;
+            let mut job = initial;
+            loop {
+                if let Err(e) = write_snapshot(&job) {
+                    eprintln!("[subly][widget] snapshot failed: {}", e);
+                }
+                if !PENDING_REFRESH.swap(false, Ordering::AcqRel) {
+                    break;
+                }
+                let Some(state) = app_handle.try_state::<crate::AppState>() else { break };
+                let Ok(guard) = state.lock() else { break };
+                match collect_job(&guard) {
+                    Ok(fresh) => job = fresh,
+                    Err(e) => {
+                        eprintln!("[subly][widget] refresh collect failed: {}", e);
+                        break;
+                    }
+                }
+            }
+            IN_PROGRESS.store(false, Ordering::Release);
+        });
     }
 }
 
 /// Refresh widget data from subscription state (no-op outside iOS).
-#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
-pub fn export_ios_widget_snapshot_from_guard(inner: &crate::state::AppStateInner) {
-    #[cfg(target_os = "ios")]
-    {
-        match ios_impl::export_snapshot(inner) {
-            Ok(()) => {}
-            Err(e) => eprintln!("[subly][widget] snapshot failed: {}", e),
-        }
-    }
-    #[cfg(not(target_os = "ios"))]
-    let _ = inner;
-}
-
-/// Same as [`export_ios_widget_snapshot_from_guard`] using managed app state.
+///
+/// Synchronously copies the data we need out of the lock, then dispatches the actual
+/// HTTP/disk work to a background thread. Callers don't block on network. Coalesces
+/// rapid bursts via an internal pending-refresh flag.
 #[cfg_attr(not(target_os = "ios"), allow(dead_code))]
 pub fn export_ios_widget_snapshot_from_app(app: &tauri::AppHandle) {
     #[cfg(target_os = "ios")]
     {
         use tauri::Manager;
-        if let Some(state) = app.try_state::<crate::AppState>() {
-            if let Ok(guard) = state.lock() {
-                export_ios_widget_snapshot_from_guard(&guard);
-            }
-        }
+        let Some(state) = app.try_state::<crate::AppState>() else {
+            return;
+        };
+        let job = match state.lock() {
+            Ok(guard) => match ios_impl::collect_job(&guard) {
+                Ok(j) => j,
+                Err(e) => {
+                    eprintln!("[subly][widget] collect failed: {}", e);
+                    return;
+                }
+            },
+            Err(_) => return,
+        };
+        ios_impl::export_snapshot_async(app.clone(), job);
     }
     #[cfg(not(target_os = "ios"))]
     let _ = app;
