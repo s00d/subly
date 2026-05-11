@@ -63,6 +63,11 @@ function onPointerDown(e: PointerEvent) {
       view: window,
     });
     emit("contextmenu", syn, getAnchorRect());
+    try {
+      navigator.vibrate?.(12);
+    } catch {
+      /* noop */
+    }
   }, LONG_PRESS_MS);
 }
 
@@ -109,9 +114,11 @@ function onContextMenu(e: MouseEvent) {
     ref="rootEl"
     :class="[
       mode === 'expanded' ? 'p-3 sm:p-4' : 'flex items-center',
-      mode === 'compact' ? 'gap-2 px-3 py-2' : '',
-      mode === 'default' ? `gap-2 sm:gap-3 ${ui.listRow()}` : '',
-      clickable ? 'cursor-pointer' : '',
+      mode === 'compact' ? 'min-w-0 w-full gap-2 px-3 py-2' : '',
+      mode === 'default' ? `min-w-0 w-full gap-2 sm:gap-3 ${ui.listRow()}` : '',
+      clickable && mode !== 'expanded'
+        ? 'cursor-pointer transition-transform duration-200 ease-out active:scale-[0.985]'
+        : '',
     ]"
     @click="onClick"
     @contextmenu.prevent="onContextMenu"

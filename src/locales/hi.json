@@ -64,6 +64,8 @@
   "subscription_deleted": "सदस्यता हटाई गई",
   "subscription_added": "सदस्यता सफलतापूर्वक जोड़ी गई",
   "subscription_updated": "सदस्यता अपडेट की गई",
+  "favicon_load_failed": "इस डोमेन से आइकन लोड नहीं हो सका",
+  "favicon_loaded_from_domain": "डोमेन से आइकन लोड हो गया",
   "daily": "दैनिक",
   "weekly": "साप्ताहिक",
   "monthly": "मासिक",
@@ -565,5 +567,7 @@
   "bulk_add_invalid_header": "अमान्य CSV हेडर। अपेक्षित: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
   "bulk_add_invalid_row": "पंक्ति {row}: {error}",
   "csv_file_empty": "CSV file is empty",
-  "csv_file_empty": "CSV file is empty"
+  "calendar_empty_month_title": "शांत महीना",
+  "calendar_empty_month_hint": "इस महीने कैलेंडर पर न कोई सब्सक्रिप्शन नवीकरण, न दर्ज खर्च — आराम कीजिए।",
+  "manual_renewal_short": "मैनुअल"
 }

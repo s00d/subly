@@ -65,6 +65,8 @@
   "subscription_deleted": "Подписка удалена",
   "subscription_added": "Подписка успешно добавлена",
   "subscription_updated": "Подписка успешно обновлена",
+  "favicon_load_failed": "Не удалось загрузить иконку с этого домена",
+  "favicon_loaded_from_domain": "Иконка загружена с домена",
   "daily": "Ежедневно",
   "weekly": "Еженедельно",
   "monthly": "Ежемесячно",
@@ -619,5 +621,7 @@
   "bulk_add_invalid_header": "Неверный заголовок CSV. Ожидается: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
   "bulk_add_invalid_row": "Строка {row}: {error}",
   "csv_file_empty": "CSV файл пуст",
-  "csv_file_empty": "CSV файл пуст"
+  "calendar_empty_month_title": "Спокойный месяц",
+  "calendar_empty_month_hint": "На календаре нет продлений подписок и записанных расходов — можно выдохнуть.",
+  "manual_renewal_short": "Вручную"
 }

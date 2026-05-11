@@ -64,6 +64,8 @@
   "subscription_deleted": "구독이 삭제되었습니다",
   "subscription_added": "구독이 추가되었습니다",
   "subscription_updated": "구독이 업데이트되었습니다",
+  "favicon_load_failed": "이 도메인에서 아이콘을 불러오지 못했습니다",
+  "favicon_loaded_from_domain": "도메인에서 아이콘을 불러왔습니다",
   "daily": "매일",
   "weekly": "매주",
   "monthly": "매월",
@@ -565,5 +567,7 @@
   "bulk_add_invalid_header": "CSV 헤더가 올바르지 않습니다. 예상: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
   "bulk_add_invalid_row": "{row}행: {error}",
   "csv_file_empty": "CSV file is empty",
-  "csv_file_empty": "CSV file is empty"
+  "calendar_empty_month_title": "한가한 한 달",
+  "calendar_empty_month_hint": "이번 달 캘린더에 구독 갱신이나 기록된 지출이 없습니다. 여유를 즐기세요.",
+  "manual_renewal_short": "수동"
 }

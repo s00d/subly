@@ -64,6 +64,8 @@
   "subscription_deleted": "サブスクリプションを削除しました",
   "subscription_added": "サブスクリプションを追加しました",
   "subscription_updated": "サブスクリプションを更新しました",
+  "favicon_load_failed": "このドメインからアイコンを読み込めませんでした",
+  "favicon_loaded_from_domain": "ドメインからアイコンを読み込みました",
   "daily": "毎日",
   "weekly": "毎週",
   "monthly": "毎月",
@@ -565,5 +567,7 @@
   "bulk_add_invalid_header": "CSVヘッダーが不正です。期待値: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
   "bulk_add_invalid_row": "{row} 行目: {error}",
   "csv_file_empty": "CSV file is empty",
-  "csv_file_empty": "CSV file is empty"
+  "calendar_empty_month_title": "静かな月",
+  "calendar_empty_month_hint": "カレンダーにサブスクの更新や記録された支出はありません。一息つきましょう。",
+  "manual_renewal_short": "手動"
 }

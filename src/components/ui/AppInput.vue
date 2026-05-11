@@ -2,6 +2,9 @@
 import { computed } from "vue";
 import { tv, ui } from "@/lib/tv";
 
+/** HTML `inputmode` (мобильная клавиатура). */
+type InputModeAttr = "none" | "text" | "decimal" | "numeric" | "tel" | "search" | "email" | "url";
+
 const props = defineProps<{
   modelValue: string | number;
   type?: string;
@@ -13,6 +16,8 @@ const props = defineProps<{
   min?: number | string;
   max?: number | string;
   step?: number | string;
+  /** Нативный `inputmode` (например `decimal`, `numeric`) для мобильных клавиатур. */
+  inputmode?: InputModeAttr;
   label?: string;
   size?: "sm" | "md";
   error?: string;
@@ -84,6 +89,7 @@ const slots = computed(() =>
       :min="min"
       :max="max"
       :step="step"
+      :inputmode="inputmode"
       @input="onInput"
       :class="slots.inputEl()"
     />

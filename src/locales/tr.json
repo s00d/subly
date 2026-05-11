@@ -64,6 +64,8 @@
   "subscription_deleted": "Abonelik silindi",
   "subscription_added": "Abonelik eklendi",
   "subscription_updated": "Abonelik güncellendi",
+  "favicon_load_failed": "Bu alan adından simge yüklenemedi",
+  "favicon_loaded_from_domain": "Simge alan adından yüklendi",
   "daily": "Günlük",
   "weekly": "Haftalık",
   "monthly": "Aylık",
@@ -565,5 +567,7 @@
   "bulk_add_invalid_header": "Geçersiz CSV başlığı. Beklenen: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
   "bulk_add_invalid_row": "Satır {row}: {error}",
   "csv_file_empty": "CSV file is empty",
-  "csv_file_empty": "CSV file is empty"
+  "calendar_empty_month_title": "Sakin bir ay",
+  "calendar_empty_month_hint": "Takvimde abonelik yenilemesi veya kayıtlı harcama yok — molanın tadını çıkarın.",
+  "manual_renewal_short": "Manuel"
 }

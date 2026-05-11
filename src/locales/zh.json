@@ -64,6 +64,8 @@
   "subscription_deleted": "订阅已删除",
   "subscription_added": "订阅添加成功",
   "subscription_updated": "订阅更新成功",
+  "favicon_load_failed": "无法从此域名加载图标",
+  "favicon_loaded_from_domain": "已从域名加载图标",
   "daily": "每天",
   "weekly": "每周",
   "monthly": "每月",
@@ -565,5 +567,7 @@
   "bulk_add_invalid_header": "CSV 表头无效。应为：name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
   "bulk_add_invalid_row": "第 {row} 行：{error}",
   "csv_file_empty": "CSV file is empty",
-  "csv_file_empty": "CSV file is empty"
+  "calendar_empty_month_title": "平静的月份",
+  "calendar_empty_month_hint": "本月日历上没有订阅续费或已记录支出——好好放松一下。",
+  "manual_renewal_short": "手动"
 }

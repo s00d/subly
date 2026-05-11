@@ -25,6 +25,8 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
 
   const items = ref<SubscriptionListItem[]>([]);
   const loading = ref(false);
+  /** Первая успешная загрузка списка завершена (для скелетона при входе на страницу). */
+  const initialListLoaded = ref(false);
   const currentFilter = ref<SubscriptionFilter>({});
 
   async function loadBrief(filter?: SubscriptionFilter) {
@@ -35,6 +37,7 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
       items.value = rows.map((raw) => parseSubscriptionListItem(raw));
     } finally {
       loading.value = false;
+      initialListLoaded.value = true;
     }
   }
 
@@ -128,6 +131,7 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
   return {
     items,
     loading,
+    initialListLoaded,
     currentFilter,
     loadBrief,
     updateOne,

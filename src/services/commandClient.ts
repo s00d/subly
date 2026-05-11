@@ -1,5 +1,21 @@
 import { invoke } from "@tauri-apps/api/core";
 
+/**
+ * Карта IPC-команд для типобезопасного вызова (расширять по мере необходимости).
+ * Значение: аргументы `invoke` и тип результата.
+ */
+export type CommandMap = {
+  expenses_count: { args?: Record<string, never>; result: number };
+  expenses_get_by_id: { args: { id: string }; result: import("@/schemas/appData").Expense | null };
+};
+
+export async function invokeCommand<K extends keyof CommandMap>(
+  command: K,
+  args?: CommandMap[K]["args"],
+): Promise<CommandMap[K]["result"]> {
+  return callCommand(command as string, args as Record<string, unknown> | undefined);
+}
+
 export class CommandError extends Error {
   command: string;
   cause: unknown;

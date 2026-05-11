@@ -187,11 +187,11 @@ async function applyDomainIcon() {
   try {
     const faviconUrl = await resolveFaviconFromInputUrl(form.value.url || "");
     if (!faviconUrl) {
-      toast("Could not load icon from this domain", "error");
+      toast(t("favicon_load_failed"), "error");
       return;
     }
     form.value.logo = faviconUrl;
-    toast("Icon loaded from domain");
+    toast(t("favicon_loaded_from_domain"));
   } catch (e) {
     toast(formatErrorForToast(e, t), "error");
   } finally {

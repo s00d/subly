@@ -64,6 +64,8 @@
   "subscription_deleted": "Assinatura excluída",
   "subscription_added": "Assinatura adicionada",
   "subscription_updated": "Assinatura atualizada",
+  "favicon_load_failed": "Não foi possível carregar o ícone deste domínio",
+  "favicon_loaded_from_domain": "Ícone carregado do domínio",
   "daily": "Diário",
   "weekly": "Semanal",
   "monthly": "Mensal",
@@ -565,5 +567,7 @@
   "bulk_add_invalid_header": "Cabeçalho CSV inválido. Esperado: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
   "bulk_add_invalid_row": "Linha {row}: {error}",
   "csv_file_empty": "CSV file is empty",
-  "csv_file_empty": "CSV file is empty"
+  "calendar_empty_month_title": "Mês tranquilo",
+  "calendar_empty_month_hint": "Sem renovações de assinaturas nem despesas registradas no calendário — aproveite a pausa.",
+  "manual_renewal_short": "Manual"
 }

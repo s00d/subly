@@ -64,6 +64,8 @@
   "subscription_deleted": "Abonnement gelöscht",
   "subscription_added": "Abonnement hinzugefügt",
   "subscription_updated": "Abonnement aktualisiert",
+  "favicon_load_failed": "Symbol von dieser Domain konnte nicht geladen werden",
+  "favicon_loaded_from_domain": "Symbol von der Domain geladen",
   "daily": "Täglich",
   "weekly": "Wöchentlich",
   "monthly": "Monatlich",
@@ -565,5 +567,7 @@
   "bulk_add_invalid_header": "Ungültiger CSV-Header. Erwartet: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
   "bulk_add_invalid_row": "Zeile {row}: {error}",
   "csv_file_empty": "CSV file is empty",
-  "csv_file_empty": "CSV file is empty"
+  "calendar_empty_month_title": "Ruhiger Monat",
+  "calendar_empty_month_hint": "Keine Abo-Verlängerungen und keine erfassten Ausgaben in diesem Monat — Zeit zum Durchatmen.",
+  "manual_renewal_short": "Manuell"
 }

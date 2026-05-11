@@ -64,6 +64,8 @@
   "subscription_deleted": "Suscripción eliminada",
   "subscription_added": "Suscripción agregada",
   "subscription_updated": "Suscripción actualizada",
+  "favicon_load_failed": "No se pudo cargar el icono desde este dominio",
+  "favicon_loaded_from_domain": "Icono cargado desde el dominio",
   "daily": "Diario",
   "weekly": "Semanal",
   "monthly": "Mensual",
@@ -565,5 +567,7 @@
   "bulk_add_invalid_header": "Encabezado CSV inválido. Se espera: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
   "bulk_add_invalid_row": "Fila {row}: {error}",
   "csv_file_empty": "CSV file is empty",
-  "csv_file_empty": "CSV file is empty"
+  "calendar_empty_month_title": "Mes tranquilo",
+  "calendar_empty_month_hint": "No hay renovaciones de suscripciones ni gastos registrados en tu calendario: disfruta la pausa.",
+  "manual_renewal_short": "Manual"
 }

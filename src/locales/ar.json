@@ -64,6 +64,8 @@
   "subscription_deleted": "تم حذف الاشتراك",
   "subscription_added": "تمت إضافة الاشتراك بنجاح",
   "subscription_updated": "تم تحديث الاشتراك بنجاح",
+  "favicon_load_failed": "تعذر تحميل الأيقونة من هذا النطاق",
+  "favicon_loaded_from_domain": "تم تحميل الأيقونة من النطاق",
   "daily": "يومي",
   "weekly": "أسبوعي",
   "monthly": "شهري",
@@ -565,5 +567,7 @@
   "bulk_add_invalid_header": "رأس CSV غير صالح. المتوقع: name,price,currency,nextPayment,cycle,frequency,category,paymentMethod,tags,url,notes",
   "bulk_add_invalid_row": "السطر {row}: {error}",
   "csv_file_empty": "CSV file is empty",
-  "csv_file_empty": "CSV file is empty"
+  "calendar_empty_month_title": "شهر هادئ",
+  "calendar_empty_month_hint": "لا تجديدات للاشتراكات ولا مصروفات مسجلة في التقويم هذا الشهر — استمتع بالهدوء.",
+  "manual_renewal_short": "يدوي"
 }

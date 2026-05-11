@@ -20,7 +20,7 @@ import Toast from "@/components/ui/Toast.vue";
 import { type Subscription, type Expense, type Settings, type Category, type PaymentMethod, type Currency, type HouseholdMember, type Tag } from "@/schemas/appData";
 import { deleteExpense } from "@/services/expensesClient";
 import { storeToRefs } from "pinia";
-import { AlertTriangle, LayoutList, LayoutGrid, Rows3, CreditCard, Wallet } from "@lucide/vue";
+import { AlertTriangle, LayoutList, LayoutGrid, Rows3, CreditCard, Wallet, Calendar } from "@lucide/vue";
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
 import { useCalendarStore } from "@/stores/calendarStore";
@@ -589,8 +589,17 @@ async function onDetailRecordPayment(id: string) {
           </button>
         </div>
       </div>
-      <div v-if="expandedDays.length === 0" class="md:col-span-2 bg-surface rounded-xl border border-border p-6 text-center text-sm text-text-muted">
-        {{ t("no_data") }}
+      <div
+        v-if="expandedDays.length === 0"
+        class="md:col-span-2 flex flex-col items-center justify-center rounded-2xl border border-border bg-surface px-6 py-12 text-center"
+      >
+        <div
+          class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-secondary text-text-muted [&_svg]:opacity-60"
+        >
+          <Calendar :size="32" stroke-width="1.75" />
+        </div>
+        <p class="text-sm font-semibold text-text-primary">{{ t("calendar_empty_month_title") }}</p>
+        <p class="mt-2 max-w-sm text-xs leading-relaxed text-text-secondary">{{ t("calendar_empty_month_hint") }}</p>
       </div>
     </div>
     <div v-else-if="isCompactView" class="space-y-2">

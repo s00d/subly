@@ -15,6 +15,7 @@ import { useClipboard } from "@/composables/useClipboard";
 import { type Subscription, type Settings, type SubscriptionListItem } from "@/schemas/appData";
 import SubscriptionForm from "@/components/subscriptions/SubscriptionForm.vue";
 import SubscriptionDetail from "@/components/subscriptions/SubscriptionDetail.vue";
+import SubscriptionsListSkeleton from "@/components/subscriptions/SubscriptionsListSkeleton.vue";
 import Toast from "@/components/ui/Toast.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
@@ -68,6 +69,7 @@ const { now } = storeToRefs(nowStore);
 const showFilters = ref(false);
 const metaStore = useAppMetaStore();
 const subscriptionsStore = useSubscriptionsStore();
+const { initialListLoaded } = storeToRefs(subscriptionsStore);
 const metaRefs = storeToRefs(metaStore);
 const settings = computed(() => metaRefs.settings.value);
 const categories = computed(() => metaRefs.categories.value ?? []);
@@ -710,8 +712,10 @@ async function loadInitial() {
       </div>
     </Transition>
 
+    <SubscriptionsListSkeleton v-if="!initialListLoaded" />
+
     <!-- Empty state -->
-    <div v-if="filteredSubscriptions.length === 0" class="text-center py-16">
+    <div v-else-if="filteredSubscriptions.length === 0" class="text-center py-16">
       <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-surface-hover flex items-center justify-center">
         <CreditCard :size="36" class="text-text-muted" />
       </div>
@@ -744,16 +748,24 @@ async function loadInitial() {
           <IconDisplay v-if="groupBy === 'category' && getCategoryIcon(group.key)" :icon="getCategoryIcon(group.key)" :size="16" />
           <FolderOpen v-else :size="14" class="text-primary" />
           <span class="text-xs font-semibold text-text-primary uppercase tracking-wide">{{ group.label }}</span>
-          <span class="text-[10px] text-text-muted">({{ group.subs.length }})</span>
+          <span class="text-[11px] text-text-muted tabular-nums">({{ group.subs.length }})</span>
           <div class="flex-1 h-px bg-border" />
         </div>
 
         <!-- Grid for expanded mode -->
-        <div :class="viewMode === 'expanded' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 mb-3' : 'space-y-1.5 sm:space-y-2 mb-3'">
+        <div
+          :class="
+            viewMode === 'expanded'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-3'
+              : viewMode === 'compact'
+                ? 'flex flex-col gap-2 mb-3'
+                : 'flex flex-col gap-1.5 sm:gap-2 mb-3'
+          "
+        >
           <div
             v-for="sub in group.subs"
             :key="sub.id"
-            class="bg-surface rounded-xl border overflow-hidden transition-colors"
+            class="min-w-0 bg-surface rounded-2xl border overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md hover:border-primary/25 active-scale"
             :class="[
               sub.inactive ? 'opacity-50' : '',
               selectedIds.has(sub.id) ? 'border-primary ring-1 ring-primary/30' : 'border-border',
@@ -788,7 +800,7 @@ async function loadInitial() {
                       <Star :size="12" :fill="sub.favorite ? 'currentColor' : 'none'" />
                     </button>
                   </Tooltip>
-                  <div class="w-6 h-6 rounded bg-primary-light border border-border flex items-center justify-center text-[10px] font-bold text-primary shrink-0 overflow-hidden">
+                  <div class="w-6 h-6 rounded bg-primary-light border border-border flex items-center justify-center text-[11px] font-bold text-primary shrink-0 overflow-hidden">
                     <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
                     <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
                   </div>
@@ -806,35 +818,67 @@ async function loadInitial() {
                 </template>
               </template>
               <template #main>
-                <p v-if="viewMode === 'compact'" class="text-xs font-medium text-text-primary truncate">{{ sub.name }}</p>
+                <div
+                  v-if="viewMode === 'compact'"
+                  class="flex min-w-0 flex-1 items-center gap-x-1 overflow-hidden text-xs"
+                >
+                  <span class="min-w-0 shrink truncate font-medium text-text-primary">{{ sub.name }}</span>
+
+                  <template v-if="sub.inactive">
+                    <span class="hidden shrink-0 select-none text-border sm:inline" aria-hidden="true">·</span>
+                    <span class="hidden shrink-0 text-[10px] font-normal text-text-muted sm:inline">{{ t('inactive') }}</span>
+                  </template>
+                  <template v-else>
+                    <span class="hidden shrink-0 select-none text-border sm:inline" aria-hidden="true">·</span>
+                    <span
+                      class="hidden max-w-[5rem] shrink-0 truncate text-[10px] text-text-muted sm:inline sm:max-w-[8rem] md:max-w-none"
+                    >{{ billingCycleText(sub.cycle, sub.frequency) }}</span>
+
+                    <span class="hidden shrink-0 select-none text-border md:inline" aria-hidden="true">·</span>
+                    <span
+                      class="hidden shrink-0 tabular-nums text-[10px] whitespace-nowrap md:inline"
+                      :class="isSubOverdue(sub) ? 'font-medium text-red-500' : 'text-text-muted'"
+                    >{{ formatDate(sub.nextPayment) }}</span>
+
+                    <span
+                      v-if="!sub.autoRenew"
+                      class="hidden shrink-0 rounded bg-orange-500/15 px-1 py-px text-[9px] font-semibold text-orange-600 lg:inline dark:text-orange-400"
+                    >{{ t('manual_renewal_short') }}</span>
+
+                    <span
+                      v-if="getCategoryName(sub.categoryId)"
+                      class="hidden max-w-[5rem] shrink-0 truncate text-[10px] text-text-muted lg:inline lg:max-w-[7rem]"
+                    >{{ getCategoryName(sub.categoryId) }}</span>
+                  </template>
+                </div>
                 <div v-else-if="viewMode === 'default'" class="min-w-0">
                   <p class="text-xs sm:text-sm font-medium text-text-primary truncate">{{ sub.name }}</p>
                   <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="text-[10px] sm:text-xs text-text-muted">
+                    <span class="text-[11px] sm:text-xs text-text-muted">
                       {{ billingCycleText(sub.cycle, sub.frequency) }}
                       <span v-if="!sub.autoRenew" class="ml-1 text-orange-500">({{ t('manual_renewal') }})</span>
                     </span>
-                    <span v-for="tag in (sub.tags || []).slice(0, 3)" :key="tag" class="hidden sm:inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium bg-surface-hover text-text-muted border border-border">#{{ tag }}</span>
-                    <span v-if="(sub.tags || []).length > 3" class="hidden sm:inline text-[9px] text-text-muted">+{{ sub.tags.length - 3 }}</span>
+                    <span v-for="tag in (sub.tags || []).slice(0, 3)" :key="tag" class="hidden sm:inline-flex items-center px-1.5 py-0 rounded text-[10px] font-medium bg-surface-hover text-text-muted border border-border">#{{ tag }}</span>
+                    <span v-if="(sub.tags || []).length > 3" class="hidden sm:inline text-[10px] text-text-muted">+{{ sub.tags.length - 3 }}</span>
                   </div>
                 </div>
               </template>
               <template #meta>
                 <span
                   v-if="viewMode === 'compact' && !sub.inactive"
-                  class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none shrink-0 w-[56px] tabular-nums"
+                  class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-bold leading-none shrink-0 w-[56px] tabular-nums"
                   :class="getDaysBadgeState(sub)"
                 >
                   {{ getSubDaysLeft(sub) }}{{ t('days_short') }}
                 </span>
-                <div v-else-if="viewMode === 'default'" class="text-right shrink-0 w-[124px] sm:w-[142px]">
+                <div v-else-if="viewMode === 'default'" class="text-right shrink-0 w-[60px] sm:w-[142px]">
                   <div class="flex items-center gap-1 sm:gap-1.5 justify-end">
-                    <p class="text-xs sm:text-sm font-medium tabular-nums" :class="isSubOverdue(sub) ? 'text-red-500' : 'text-text-primary'">
-                      <span class="hidden sm:inline tabular-nums whitespace-nowrap">{{ formatDate(sub.nextPayment) }}</span>
+                    <p class="hidden sm:block text-xs sm:text-sm font-medium tabular-nums" :class="isSubOverdue(sub) ? 'text-red-500' : 'text-text-primary'">
+                      <span class="tabular-nums whitespace-nowrap">{{ formatDate(sub.nextPayment) }}</span>
                     </p>
                     <span
                       v-if="!sub.inactive"
-                      class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none w-[56px] tabular-nums"
+                      class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-bold leading-none w-[56px] tabular-nums"
                       :class="getDaysBadgeState(sub)"
                     >
                       {{ getSubDaysLeft(sub) }}{{ t('days_short') }}
@@ -843,13 +887,21 @@ async function loadInitial() {
                 </div>
               </template>
               <template #value>
-                <p v-if="viewMode === 'compact'" class="text-xs font-semibold text-text-primary shrink-0 w-[96px] text-right tabular-nums whitespace-nowrap">{{ fmt(sub.price, sub.currencyId) }}</p>
-                <div v-else-if="viewMode === 'default'" class="text-right shrink-0 w-[96px] sm:w-[112px]">
-                  <p class="text-xs sm:text-sm font-semibold text-text-primary tabular-nums whitespace-nowrap">{{ fmt(sub.price, sub.currencyId) }}</p>
+                <p v-if="viewMode === 'compact'" class="text-xs font-semibold text-primary shrink-0 w-[96px] text-right tabular-nums whitespace-nowrap">{{ fmt(sub.price, sub.currencyId) }}</p>
+                <div v-else-if="viewMode === 'default'" class="text-right shrink-0 w-[78px] sm:w-[112px]">
+                  <p class="text-xs sm:text-sm font-semibold text-primary tabular-nums whitespace-nowrap">{{ fmt(sub.price, sub.currencyId) }}</p>
                 </div>
               </template>
               <template #trailing>
-                <div v-if="viewMode === 'default'" class="shrink-0 hidden sm:block" :title="getPaymentMethod(sub.paymentMethodId)?.name">
+                <Tooltip
+                  v-if="viewMode === 'compact'"
+                  :text="getPaymentMethod(sub.paymentMethodId)?.name || t('payment_method')"
+                >
+                  <span class="inline-flex shrink-0 opacity-90">
+                    <IconDisplay :icon="getPaymentMethod(sub.paymentMethodId)?.icon || '💳'" :size="18" />
+                  </span>
+                </Tooltip>
+                <div v-else-if="viewMode === 'default'" class="shrink-0 hidden sm:block" :title="getPaymentMethod(sub.paymentMethodId)?.name">
                   <IconDisplay :icon="getPaymentMethod(sub.paymentMethodId)?.icon || '💳'" :size="22" />
                 </div>
               </template>
@@ -882,14 +934,14 @@ async function loadInitial() {
 
                 <div class="flex items-end justify-between">
                   <div>
-                    <p class="text-lg font-bold text-text-primary">{{ fmt(sub.price, sub.currencyId) }}</p>
-                    <p class="text-[10px] text-text-muted">{{ billingCycleText(sub.cycle, sub.frequency) }}</p>
+                    <p class="text-lg font-bold text-primary tabular-nums">{{ fmt(sub.price, sub.currencyId) }}</p>
+                    <p class="text-[11px] text-text-muted">{{ billingCycleText(sub.cycle, sub.frequency) }}</p>
                   </div>
                   <div class="text-right w-[136px]">
                     <p class="text-xs font-medium tabular-nums whitespace-nowrap" :class="isSubOverdue(sub) ? 'text-red-500' : 'text-text-primary'">{{ formatDate(sub.nextPayment) }}</p>
                     <span
                       v-if="!sub.inactive"
-                      class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold leading-none mt-0.5 w-[56px] tabular-nums"
+                      class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-bold leading-none mt-0.5 w-[56px] tabular-nums"
                       :class="getDaysBadgeState(sub)"
                     >
                       {{ getSubDaysLeft(sub) }}{{ t('days_short') }}
@@ -899,13 +951,13 @@ async function loadInitial() {
 
                 <!-- Tags in expanded mode -->
                 <div v-if="(sub.tags || []).length > 0" class="flex items-center gap-1 mt-2 flex-wrap">
-                  <span v-for="tag in sub.tags" :key="tag" class="inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium bg-surface-hover text-text-muted border border-border">#{{ tag }}</span>
+                  <span v-for="tag in sub.tags" :key="tag" class="inline-flex items-center px-1.5 py-0 rounded text-[10px] font-medium bg-surface-hover text-text-muted border border-border">#{{ tag }}</span>
                 </div>
 
                 <!-- Payment method -->
                 <div class="flex items-center gap-1.5 mt-2">
                   <IconDisplay :icon="getPaymentMethod(sub.paymentMethodId)?.icon || '💳'" :size="16" />
-                  <span class="text-[10px] text-text-muted">{{ getPaymentMethod(sub.paymentMethodId)?.name }}</span>
+                  <span class="text-[11px] text-text-muted">{{ getPaymentMethod(sub.paymentMethodId)?.name }}</span>
                 </div>
               </template>
               <template #after>
