@@ -4,7 +4,6 @@ import App from "./App.vue";
 import router from "./router";
 import { setupI18n } from "./i18n";
 import "./style.css";
-import "./lib/echarts";
 
 async function bootstrap() {
   const app = createApp(App);

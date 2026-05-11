@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from "vue";
+import { useChartTheme } from "@/composables/useChartTheme";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -17,6 +18,7 @@ import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useDashboardStore } from "@/stores/dashboardStore";
 import VChart from "vue-echarts";
 import type { EChartsCoreOption } from "echarts/core";
+import "@/lib/echarts";
 import { Wallet, ArrowRight, Settings2, Eye, EyeOff, ChevronUp, ChevronDown } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import { ui, typo, statValue } from "@/lib/tv";
@@ -38,6 +40,7 @@ import TagExpensesWidget from "@/components/dashboard/TagExpensesWidget.vue";
 
 const router = useRouter();
 const { t } = useI18n();
+const chartTheme = useChartTheme();
 const { fmt } = useCurrencyFormat();
 const { fmtPercent } = useLocaleFormat();
 const metaStore = useAppMetaStore();
@@ -51,7 +54,8 @@ const { clearActions } = useHeaderActions();
 onMounted(async () => {
   clearActions();
   unlistenData = await listen("app:data-changed", () => {
-    chartsRemountKey.value += 1;
+    void dashboardStore.loadPage(true);
+    void loadDashboardSubscriptions();
   });
   await metaStore.ensureLoaded();
   await loadDashboardSubscriptions();
@@ -62,8 +66,6 @@ onUnmounted(() => {
 });
 
 const hasSubscriptions = ref(false);
-/** Remount pie charts on global data changes to avoid ECharts instance leaks / stale canvas. */
-const chartsRemountKey = ref(0);
 let unlistenData: UnlistenFn | undefined;
 
 // ---- Widget configuration ----
@@ -409,22 +411,21 @@ const hasAnalytics = computed(() => activeCount.value > 0);
         <!-- charts -->
         <div
           v-if="w.id === 'charts' && w.visible && hasCharts"
-          :key="`charts-${chartsRemountKey}`"
           class="space-y-3 sm:space-y-4"
         >
           <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('split_views') }}</h2>
           <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
             <div v-if="categoryCosts.length > 1" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
               <h3 class="text-xs sm:text-sm font-semibold text-text-primary mb-2.5 sm:mb-3">{{ t('category_split') }}</h3>
-              <VChart class="h-52 w-full min-h-52" :option="categoryChartOption" autoresize />
+              <VChart class="h-52 w-full min-h-52" :theme="chartTheme" :option="categoryChartOption" autoresize />
             </div>
             <div v-if="pmCounts.length > 1" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
               <h3 class="text-xs sm:text-sm font-semibold text-text-primary mb-2.5 sm:mb-3">{{ t('payment_method_split') }}</h3>
-              <VChart class="h-52 w-full min-h-52" :option="pmChartOption" autoresize />
+              <VChart class="h-52 w-full min-h-52" :theme="chartTheme" :option="pmChartOption" autoresize />
             </div>
             <div v-if="memberCosts.length > 1" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
               <h3 class="text-xs sm:text-sm font-semibold text-text-primary mb-2.5 sm:mb-3">{{ t('household_split') }}</h3>
-              <VChart class="h-52 w-full min-h-52" :option="memberChartOption" autoresize />
+              <VChart class="h-52 w-full min-h-52" :theme="chartTheme" :option="memberChartOption" autoresize />
             </div>
           </div>
         </div>

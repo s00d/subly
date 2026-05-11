@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import VChart from "vue-echarts";
+import { useChartTheme } from "@/composables/useChartTheme";
+import VChart from "@/components/ui/LazyVChart.vue";
 import type { EChartsCoreOption } from "echarts/core";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { CalendarDays } from "@lucide/vue";
 
 const { t } = useI18n();
 const { fmt } = useCurrencyFormat();
+const chartTheme = useChartTheme();
 const props = defineProps<{
   rawStats?: Array<{ dayOfWeek: number; total: number; count: number }>;
 }>();
@@ -85,10 +87,10 @@ const peakDay = computed(() => {
         <CalendarDays :size="16" class="text-primary" />
         <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_day_of_week') }}</h2>
       </div>
-      <span v-if="peakDay" class="text-[10px] text-text-muted">{{ t('peak') }}: {{ peakDay }}</span>
+      <span v-if="peakDay" class="text-[11px] text-text-muted">{{ t('peak') }}: {{ peakDay }}</span>
     </div>
-    <div class="h-40 sm:h-48">
-      <VChart class="h-full w-full min-h-[12rem]" :option="chartOption" autoresize />
+    <div class="h-48 sm:h-52">
+      <VChart class="h-full w-full" :theme="chartTheme" :option="chartOption" autoresize />
     </div>
   </div>
 </template>

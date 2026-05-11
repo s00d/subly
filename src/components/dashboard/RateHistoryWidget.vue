@@ -6,8 +6,9 @@ import { getCurrencyFlags } from "@/services/ratesClient";
 import type { Settings, Currency } from "@/schemas/appData";
 import { TrendingUp } from "@lucide/vue";
 import { useRouter } from "vue-router";
-import VChart from "vue-echarts";
+import VChart from "@/components/ui/LazyVChart.vue";
 import type { EChartsCoreOption } from "echarts/core";
+import { useChartTheme } from "@/composables/useChartTheme";
 
 const LINE_COLORS = [
   "#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6",
@@ -23,6 +24,7 @@ const settings = ref<Settings | null>(null);
 const allCurrencies = ref<Currency[]>([]);
 const { t } = useI18n();
 const router = useRouter();
+const chartTheme = useChartTheme();
 
 const history = ref<Record<string, RateHistoryPoint[]>>({});
 const currencyFlags = ref<Record<string, string>>({});
@@ -259,8 +261,8 @@ const rateChartOption = computed((): EChartsCoreOption => {
     </div>
 
     <!-- Line chart -->
-    <div v-if="hasHistory && rateLineSeriesCount > 0" class="h-56 sm:h-72 min-h-[14rem]">
-      <VChart class="h-full w-full" :option="rateChartOption" autoresize />
+    <div v-if="hasHistory && rateLineSeriesCount > 0" class="h-56 sm:h-72">
+      <VChart class="h-full w-full" :theme="chartTheme" :option="rateChartOption" autoresize />
     </div>
   </div>
 </template>
