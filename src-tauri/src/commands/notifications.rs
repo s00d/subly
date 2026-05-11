@@ -264,8 +264,8 @@ fn schedule_hour_for_settings(settings: &NotificationSettingsDto) -> u8 {
     }
 }
 
-fn build_schedule_preview(state: &State<'_, AppState>) -> Result<Vec<NotificationScheduleItemDto>, String> {
-    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+fn build_schedule_preview(state: &State<'_, AppState>) -> Result<Vec<NotificationScheduleItemDto>, crate::errors::AppError> {
+    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let settings: NotificationSettingsDto = guard.settings_typed()?;
     let subscriptions: Vec<crate::models::SubscriptionDoc> =
         guard.table_list_typed(EntityTable::Subscriptions)?;
@@ -311,14 +311,14 @@ fn build_schedule_preview(state: &State<'_, AppState>) -> Result<Vec<Notificatio
 pub(crate) fn notifications_reschedule_with_state(
     app: &tauri::AppHandle,
     state: &State<'_, AppState>,
-) -> Result<NotificationsRescheduleResultDto, String> {
+) -> Result<NotificationsRescheduleResultDto, crate::errors::AppError> {
     let schedule = build_schedule_preview(state)?;
     let settings: NotificationSettingsDto = {
-        let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         guard.settings_typed()?
     };
     let previous_ids = {
-        let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         guard.redb_get("notifications.scheduled.ids")?
     };
     if let Some(raw_ids) = previous_ids {
@@ -393,7 +393,7 @@ pub(crate) fn notifications_reschedule_with_state(
     }
 
     {
-        let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         guard.redb_set(
             "notifications.scheduled.preview",
             &serde_json::to_string(&schedule).map_err(|e| e.to_string())?,
@@ -414,8 +414,8 @@ pub(crate) fn notifications_reschedule_with_state(
 pub fn notifications_cancel_all_scheduled(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
-) -> Result<NotificationsCancelResultDto, String> {
-    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+) -> Result<NotificationsCancelResultDto, crate::errors::AppError> {
+    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     if let Some(raw_ids) = guard.redb_get("notifications.scheduled.ids")? {
         #[cfg(any(target_os = "android", target_os = "ios"))]
         {
@@ -443,18 +443,18 @@ pub fn notifications_cancel_all_scheduled(
 pub fn notifications_reschedule_all(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
-) -> Result<NotificationsRescheduleResultDto, String> {
+) -> Result<NotificationsRescheduleResultDto, crate::errors::AppError> {
     notifications_reschedule_with_state(&app, &state)
 }
 
 async fn notifications_run_check(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
-) -> Result<NotificationsRunCheckResultDto, String> {
+) -> Result<NotificationsRunCheckResultDto, crate::errors::AppError> {
     let today = Local::now().date_naive();
     let today_str = today.format("%Y-%m-%d").to_string();
     let (sent_count, alerts, telegram_jobs) = {
-        let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+        let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         let settings: NotificationSettingsDto = guard.settings_typed()?;
         let config: NotificationConfigDto = guard.config_typed()?;
         let mut subscriptions: Vec<crate::models::SubscriptionDoc> =
@@ -613,7 +613,7 @@ async fn notifications_dispatch(
     telegram_bot_token: Option<String>,
     telegram_chat_id: Option<String>,
     telegram_proxy_base_url: Option<String>,
-) -> Result<NotificationsDispatchResultDto, String> {
+) -> Result<NotificationsDispatchResultDto, crate::errors::AppError> {
     let do_system = show_system.unwrap_or(true);
     let _ = play_sound;
     let _ = force_sound;
@@ -632,7 +632,7 @@ async fn notifications_dispatch(
 
     let telegram_ok = if do_telegram {
         let fallback = {
-            let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+            let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
             let data: NotificationConfigDto = guard.config_typed()?;
             (
                 data.telegram_bot_token,
@@ -662,7 +662,7 @@ pub async fn notifications_event(
     state: State<'_, AppState>,
     event: NotificationsEventKind,
     payload: Option<NotificationsEventPayloadDto>,
-) -> Result<NotificationsEventResponseDto, String> {
+) -> Result<NotificationsEventResponseDto, crate::errors::AppError> {
     let p = payload.unwrap_or_default();
     let data = match event {
         NotificationsEventKind::RunCheck => {

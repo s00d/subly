@@ -4,11 +4,16 @@ use tauri::Emitter;
 use tauri::State;
 use crate::AppState;
 use crate::models::{
-    PaymentRecordDto, SubscriptionDoc, SubscriptionInputDto, SubscriptionListItemDto,
+    ExpenseDoc, PaymentRecordDto, SubscriptionDoc, SubscriptionInputDto, SubscriptionListItemDto,
     SubscriptionsPageRequestDto,
 };
+use crate::commands::expenses::{apply_expense_payment_record_kv_in_tx, emit_expenses_changed};
 use crate::commands::subscription_credentials::{credentials_apply_optional, credentials_delete, credentials_read};
-use crate::state::EntityTable;
+use crate::state::{
+    encode_bin, entity_table_upsert_bin_in_tx, rewrite_expense_day_index_in_tx, run_write_transaction,
+    EntityTable,
+};
+use crate::state_tables::touch_expense_doc;
 
 fn payment_record_index_key(payment_record_id: &str) -> String {
     format!("idx:payment_record:{}", payment_record_id)
@@ -18,7 +23,7 @@ fn sync_subscription_payment_record_index(
     guard: &mut crate::state::AppStateInner,
     old_row: Option<&SubscriptionDoc>,
     new_row: Option<&SubscriptionDoc>,
-) -> Result<(), String> {
+) -> Result<(), crate::errors::AppError> {
     if let Some(old) = old_row {
         for record in &old.payment_history {
             guard.redb_delete(&payment_record_index_key(&record.id))?;
@@ -30,6 +35,57 @@ fn sync_subscription_payment_record_index(
         }
     }
     Ok(())
+}
+
+/// Clear subscription/payment links on expenses tied to this subscription (keeps expense rows).
+fn unlink_expenses_for_subscription(
+    guard: &mut crate::state::AppStateInner,
+    subscription_id: &str,
+) -> Result<bool, crate::errors::AppError> {
+    let ids: Vec<String> = guard
+        .app_data
+        .expenses
+        .iter()
+        .filter(|e| e.subscription_id == subscription_id)
+        .map(|e| e.id.clone())
+        .collect();
+    let mut updates: Vec<(ExpenseDoc, ExpenseDoc)> = Vec::new();
+    for exp_id in ids {
+        let Some(existing) = guard.table_get_by_id_typed::<ExpenseDoc>(EntityTable::Expenses, &exp_id)? else {
+            continue;
+        };
+        let mut exp = existing.clone();
+        exp.subscription_id.clear();
+        exp.payment_record_id.clear();
+        let exp = touch_expense_doc(exp);
+        updates.push((existing, exp));
+    }
+    if updates.is_empty() {
+        return Ok(false);
+    }
+
+    let mut full_expenses = guard.app_data.expenses.clone();
+    for (_, new_row) in &updates {
+        if let Some(i) = full_expenses.iter().position(|e| e.id == new_row.id) {
+            full_expenses[i] = new_row.clone();
+        }
+    }
+
+    let db = guard.db.clone();
+    run_write_transaction(db.as_ref(), |tx| {
+        for (_, new_row) in &updates {
+            let payload = encode_bin(new_row)?;
+            entity_table_upsert_bin_in_tx(tx, EntityTable::Expenses, &new_row.id, &payload)?;
+        }
+        for (old, new) in &updates {
+            apply_expense_payment_record_kv_in_tx(tx, Some(old), Some(new))?;
+        }
+        rewrite_expense_day_index_in_tx(tx, &full_expenses)?;
+        Ok(())
+    })?;
+
+    guard.app_data.expenses = full_expenses;
+    Ok(true)
 }
 
 fn emit_subscriptions_changed(app: &tauri::AppHandle, action: &str) {
@@ -44,7 +100,7 @@ fn emit_subscriptions_changed(app: &tauri::AppHandle, action: &str) {
     crate::widget_snapshot::export_ios_widget_snapshot_from_app(app);
 }
 
-fn subscription_row_from_input(mut input: SubscriptionInputDto) -> Result<SubscriptionDoc, String> {
+fn subscription_row_from_input(mut input: SubscriptionInputDto) -> Result<SubscriptionDoc, crate::errors::AppError> {
     if input.id.trim().is_empty() {
         input.id = format!("sub-{}", chrono::Utc::now().timestamp_millis());
     }
@@ -89,14 +145,14 @@ fn subscription_row_from_input(mut input: SubscriptionInputDto) -> Result<Subscr
                 }
                 Ok(r)
             })
-            .collect::<Result<Vec<PaymentRecordDto>, String>>()?,
+            .collect::<Result<Vec<PaymentRecordDto>, crate::errors::AppError>>()?,
     })
 }
 
-fn normalize_date_ymd(raw: &str) -> Result<String, String> {
+fn normalize_date_ymd(raw: &str) -> Result<String, crate::errors::AppError> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
-        return Err("field_invalid_date:nextPayment".to_string());
+        return Err(crate::errors::AppError::from("field_invalid_date:nextPayment"));
     }
     if let Ok(date) = NaiveDate::parse_from_str(trimmed, "%Y-%m-%d") {
         return Ok(date.format("%Y-%m-%d").to_string());
@@ -109,7 +165,7 @@ fn normalize_date_ymd(raw: &str) -> Result<String, String> {
             return Ok(date.format("%Y-%m-%d").to_string());
         }
     }
-    Err("field_invalid_date:nextPayment".to_string())
+    Err(crate::errors::AppError::from("field_invalid_date:nextPayment"))
 }
 
 fn monthly_price(cycle: u64, frequency: u64, price: f64) -> f64 {
@@ -207,9 +263,9 @@ fn jump_to_window_start(
 pub fn list_subscriptions_page(
     state: State<'_, AppState>,
     request: Option<SubscriptionsPageRequestDto>,
-) -> Result<Vec<SubscriptionListItemDto>, String> {
+) -> Result<Vec<SubscriptionListItemDto>, crate::errors::AppError> {
     let subscriptions = {
-        let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?
     };
     let today = Local::now().date_naive();
@@ -296,7 +352,7 @@ pub fn list_subscriptions_page(
             };
             Ok(dto)
         })
-        .collect::<Result<Vec<_>, String>>()?;
+        .collect::<Result<Vec<_>, crate::errors::AppError>>()?;
 
     match sort_by.as_str() {
         "name" => rows.sort_by(|a, b| a.name.to_ascii_lowercase().cmp(&b.name.to_ascii_lowercase())),
@@ -325,12 +381,12 @@ pub fn list_subscriptions_page(
 }
 
 #[tauri::command]
-pub fn subscriptions_list(state: State<'_, AppState>) -> Result<Vec<SubscriptionListItemDto>, String> {
+pub fn subscriptions_list(state: State<'_, AppState>) -> Result<Vec<SubscriptionListItemDto>, crate::errors::AppError> {
     list_subscriptions_page(state, None)
 }
 
 #[tauri::command]
-pub fn subscriptions_next_cycle_date(date: String, cycle: u64, frequency: u64) -> Result<String, String> {
+pub fn subscriptions_next_cycle_date(date: String, cycle: u64, frequency: u64) -> Result<String, crate::errors::AppError> {
     let parsed = parse_subscription_date(&date).ok_or_else(|| "field_invalid_date:date".to_string())?;
     let next = add_cycle_increment(parsed, cycle, frequency, 1).ok_or("failed to calculate next cycle date")?;
     Ok(next.format("%Y-%m-%d").to_string())
@@ -341,18 +397,22 @@ pub fn subscriptions_payment_dates_in_month(
     state: State<'_, AppState>,
     year: i32,
     month: u32,
-) -> Result<HashMap<String, Vec<u32>>, String> {
+) -> Result<HashMap<String, Vec<u32>>, crate::errors::AppError> {
     if !(1..=12).contains(&month) {
-        return Err("month must be between 1 and 12".to_string());
+        return Err(crate::errors::AppError::from("month must be between 1 and 12"));
     }
 
     let subscriptions = {
-        let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?
     };
 
-    let start = NaiveDate::from_ymd_opt(year, month, 1).ok_or("invalid year/month")?;
-    let end = NaiveDate::from_ymd_opt(year, month, last_day_of_month(year, month)).ok_or("invalid end of month")?;
+    let start = NaiveDate::from_ymd_opt(year, month, 1).ok_or_else(|| {
+        crate::errors::AppError::from("invalid year/month")
+    })?;
+    let end = NaiveDate::from_ymd_opt(year, month, last_day_of_month(year, month)).ok_or_else(|| {
+        crate::errors::AppError::from("invalid end of month")
+    })?;
 
     let mut result: HashMap<String, Vec<u32>> = HashMap::new();
 
@@ -395,9 +455,9 @@ pub fn subscriptions_payment_dates_in_month(
 }
 
 #[tauri::command]
-pub fn get_overdue_subscriptions(state: State<'_, AppState>) -> Result<Vec<SubscriptionListItemDto>, String> {
+pub fn get_overdue_subscriptions(state: State<'_, AppState>) -> Result<Vec<SubscriptionListItemDto>, crate::errors::AppError> {
     let rows = {
-        let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?
     };
     let today = chrono::Local::now().date_naive();
@@ -442,7 +502,7 @@ pub fn get_overdue_subscriptions(state: State<'_, AppState>) -> Result<Vec<Subsc
                 credentials: None,
             })
         })
-        .collect::<Result<Vec<_>, String>>()?;
+        .collect::<Result<Vec<_>, crate::errors::AppError>>()?;
     for row in &mut rows {
         row.credentials = credentials_read(&row.id)?;
     }
@@ -450,9 +510,9 @@ pub fn get_overdue_subscriptions(state: State<'_, AppState>) -> Result<Vec<Subsc
 }
 
 #[tauri::command]
-pub fn get_upcoming_subscriptions(state: State<'_, AppState>, days: i64, limit: usize) -> Result<Vec<SubscriptionListItemDto>, String> {
+pub fn get_upcoming_subscriptions(state: State<'_, AppState>, days: i64, limit: usize) -> Result<Vec<SubscriptionListItemDto>, crate::errors::AppError> {
     let rows = {
-        let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?
     };
     let today = chrono::Local::now().date_naive();
@@ -530,7 +590,7 @@ pub(crate) const WIDGET_UPCOMING_LIMIT: usize = 10;
 #[cfg_attr(not(target_os = "ios"), allow(dead_code))]
 pub(crate) fn collect_upcoming_subscription_docs_for_widget(
     guard: &crate::state::AppStateInner,
-) -> Result<Vec<SubscriptionDoc>, String> {
+) -> Result<Vec<SubscriptionDoc>, crate::errors::AppError> {
     let rows = guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?;
     let today = Local::now().date_naive();
     let end = today + chrono::Duration::days(WIDGET_UPCOMING_DAYS);
@@ -560,12 +620,12 @@ pub(crate) fn collect_upcoming_subscription_docs_for_widget(
 }
 
 #[tauri::command]
-pub fn subscriptions_insert(app: tauri::AppHandle, state: State<'_, AppState>, mut subscription: SubscriptionInputDto) -> Result<(), String> {
+pub fn subscriptions_insert(app: tauri::AppHandle, state: State<'_, AppState>, mut subscription: SubscriptionInputDto) -> Result<(), crate::errors::AppError> {
     subscription.validate()?;
     let creds = subscription.credentials.take();
     let subscription = subscription_row_from_input(subscription)?;
     let sub_id = subscription.id.clone();
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let existing = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &subscription.id)?;
     guard.table_upsert_typed(EntityTable::Subscriptions, &subscription, &subscription.id)?;
     sync_subscription_payment_record_index(&mut guard, existing.as_ref(), Some(&subscription))?;
@@ -577,12 +637,12 @@ pub fn subscriptions_insert(app: tauri::AppHandle, state: State<'_, AppState>, m
 }
 
 #[tauri::command]
-pub fn subscriptions_upsert(app: tauri::AppHandle, state: State<'_, AppState>, mut subscription: SubscriptionInputDto) -> Result<(), String> {
+pub fn subscriptions_upsert(app: tauri::AppHandle, state: State<'_, AppState>, mut subscription: SubscriptionInputDto) -> Result<(), crate::errors::AppError> {
     subscription.validate()?;
     let creds = subscription.credentials.take();
     let subscription = subscription_row_from_input(subscription)?;
     let sub_id = subscription.id.clone();
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let existing = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &subscription.id)?;
     guard.table_upsert_typed(EntityTable::Subscriptions, &subscription, &subscription.id)?;
     sync_subscription_payment_record_index(&mut guard, existing.as_ref(), Some(&subscription))?;
@@ -594,12 +654,12 @@ pub fn subscriptions_upsert(app: tauri::AppHandle, state: State<'_, AppState>, m
 }
 
 #[tauri::command]
-pub fn subscriptions_update(app: tauri::AppHandle, state: State<'_, AppState>, mut subscription: SubscriptionInputDto) -> Result<(), String> {
+pub fn subscriptions_update(app: tauri::AppHandle, state: State<'_, AppState>, mut subscription: SubscriptionInputDto) -> Result<(), crate::errors::AppError> {
     subscription.validate()?;
     let creds = subscription.credentials.take();
     let subscription = subscription_row_from_input(subscription)?;
     let sub_id = subscription.id.clone();
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let existing = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &subscription.id)?;
     guard.table_upsert_typed(EntityTable::Subscriptions, &subscription, &subscription.id)?;
     sync_subscription_payment_record_index(&mut guard, existing.as_ref(), Some(&subscription))?;
@@ -611,8 +671,9 @@ pub fn subscriptions_update(app: tauri::AppHandle, state: State<'_, AppState>, m
 }
 
 #[tauri::command]
-pub fn subscriptions_delete(app: tauri::AppHandle, state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn subscriptions_delete(app: tauri::AppHandle, state: State<'_, AppState>, id: String) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
+    let unlinked = unlink_expenses_for_subscription(&mut guard, &id)?;
     if let Some(sub) = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &id)? {
         sync_subscription_payment_record_index(&mut guard, Some(&sub), None)?;
     }
@@ -620,15 +681,22 @@ pub fn subscriptions_delete(app: tauri::AppHandle, state: State<'_, AppState>, i
     credentials_delete(&id)?;
     drop(guard);
     let _ = crate::commands::notifications::notifications_reschedule_all(app.clone(), state)?;
+    if unlinked {
+        emit_expenses_changed(&app, "unlink_subscription");
+    }
     emit_subscriptions_changed(&app, "delete");
     Ok(())
 }
 
 #[tauri::command]
-pub fn subscriptions_delete_batch(app: tauri::AppHandle, state: State<'_, AppState>, ids: Vec<String>) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn subscriptions_delete_batch(app: tauri::AppHandle, state: State<'_, AppState>, ids: Vec<String>) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
+    let mut any_unlinked = false;
     for id in ids {
         if !id.trim().is_empty() {
+            if unlink_expenses_for_subscription(&mut guard, &id)? {
+                any_unlinked = true;
+            }
             if let Some(sub) = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &id)? {
                 sync_subscription_payment_record_index(&mut guard, Some(&sub), None)?;
             }
@@ -638,6 +706,9 @@ pub fn subscriptions_delete_batch(app: tauri::AppHandle, state: State<'_, AppSta
     }
     drop(guard);
     let _ = crate::commands::notifications::notifications_reschedule_all(app.clone(), state)?;
+    if any_unlinked {
+        emit_expenses_changed(&app, "unlink_subscription");
+    }
     emit_subscriptions_changed(&app, "delete_batch");
     Ok(())
 }
@@ -648,8 +719,8 @@ pub fn subscriptions_insert_payment_record(
     state: State<'_, AppState>,
     sub_id: String,
     payment_record: PaymentRecordDto,
-) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let mut row = guard
         .table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &sub_id)?
         .ok_or_else(|| "subscription not found".to_string())?;
@@ -668,8 +739,8 @@ pub fn subscriptions_delete_payment_record(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     id: String,
-) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let indexed_sub_id = guard.redb_get(&payment_record_index_key(&id))?;
     if let Some(sub_id) = indexed_sub_id {
         if let Some(mut sub) = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &sub_id)? {

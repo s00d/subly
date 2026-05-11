@@ -61,7 +61,7 @@ pub async fn provider_download(
     provider: &SyncProviderType,
     cfg: &SyncConfig,
     access_token: Option<&str>,
-) -> Result<Option<SyncPayload>, String> {
+) -> Result<Option<SyncPayload>, crate::errors::AppError> {
     match provider {
         SyncProviderType::Gdrive => gdrive::download(cfg, access_token.ok_or("missing access token")?).await,
         SyncProviderType::Dropbox => dropbox::download(cfg, access_token.ok_or("missing access token")?).await,
@@ -77,7 +77,7 @@ pub async fn provider_upload(
     cfg: &SyncConfig,
     payload: &SyncPayload,
     access_token: Option<&str>,
-) -> Result<(), String> {
+) -> Result<(), crate::errors::AppError> {
     match provider {
         SyncProviderType::Gdrive => gdrive::upload(cfg, payload, access_token.ok_or("missing access token")?).await,
         SyncProviderType::Dropbox => dropbox::upload(cfg, payload, access_token.ok_or("missing access token")?).await,

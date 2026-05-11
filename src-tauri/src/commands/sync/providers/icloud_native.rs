@@ -16,8 +16,10 @@ use objc2_foundation::{
 #[cfg(any(target_os = "ios", target_os = "macos"))]
 const APP_ICLOUD_CONTAINER_ID: &str = "iCloud.com.s00d.subly";
 
-fn path_to_file_url(path: &Path) -> Result<objc2::rc::Retained<NSURL>, String> {
-    let s = path.to_str().ok_or("non-utf8 path")?;
+fn path_to_file_url(path: &Path) -> Result<objc2::rc::Retained<NSURL>, crate::errors::AppError> {
+    let s = path
+        .to_str()
+        .ok_or_else(|| crate::errors::AppError::from("non-utf8 path"))?;
     Ok(NSURL::fileURLWithPath(&NSString::from_str(s)))
 }
 
@@ -77,7 +79,7 @@ enum LocalItemState {
     Missing,
 }
 
-fn prepare_ubiquitous_item_local(path: &Path) -> Result<LocalItemState, String> {
+fn prepare_ubiquitous_item_local(path: &Path) -> Result<LocalItemState, crate::errors::AppError> {
     autoreleasepool(|_pool| {
         let url = path_to_file_url(path)?;
         let fm = NSFileManager::defaultManager();
@@ -96,27 +98,27 @@ fn prepare_ubiquitous_item_local(path: &Path) -> Result<LocalItemState, String> 
             std::thread::sleep(std::time::Duration::from_millis(250));
         }
         match dl_res {
-            Ok(()) => Err(format!(
+            Ok(()) => Err(crate::errors::AppError::from(format!(
                 "icloud file is not materialized yet (ubiquitous={}, path={})",
                 is_ubiquitous,
                 path.display()
-            )),
-            Err(e) => Err(format!(
+            ))),
+            Err(e) => Err(crate::errors::AppError::from(format!(
                 "startDownloadingUbiquitousItem failed (ubiquitous={}, path={}, err={})",
                 is_ubiquitous,
                 path.display(),
                 e.localizedDescription()
-            )),
+            ))),
         }
     })
 }
 
 /// `None` until the coordinator invokes the accessor (distinguishes “no callback” from “file missing”).
-type ReadOutcome = Option<Result<Option<String>, String>>;
-type ReadBytesOutcome = Option<Result<Option<Vec<u8>>, String>>;
-type WriteOutcome = Option<Result<(), String>>;
+type ReadOutcome = Option<Result<Option<String>, crate::errors::AppError>>;
+type ReadBytesOutcome = Option<Result<Option<Vec<u8>>, crate::errors::AppError>>;
+type WriteOutcome = Option<Result<(), crate::errors::AppError>>;
 
-pub(crate) fn coordinated_read_string(path: &Path) -> Result<Option<String>, String> {
+pub(crate) fn coordinated_read_string(path: &Path) -> Result<Option<String>, crate::errors::AppError> {
     autoreleasepool(|_pool| {
         let url = path_to_file_url(path)?;
         let coordinator = NSFileCoordinator::new();
@@ -132,7 +134,7 @@ pub(crate) fn coordinated_read_string(path: &Path) -> Result<Option<String>, Str
             let done = match std::fs::read_to_string(&pb) {
                 Ok(s) => Ok(Some(s)),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-                Err(e) => Err(e.to_string()),
+                Err(e) => Err(e.into()),
             };
             *out_cb.lock().expect("lock") = Some(done);
         });
@@ -145,21 +147,29 @@ pub(crate) fn coordinated_read_string(path: &Path) -> Result<Option<String>, Str
         );
         drop(block);
         if let Some(e) = coord_err {
-            return Err(e.localizedDescription().to_string());
+            return Err(crate::errors::AppError::Message(
+                e.localizedDescription().to_string(),
+            ));
         }
         let inner = Arc::try_unwrap(out)
-            .map_err(|_| "coordinator internal: Arc still held after drop(block)".to_string())?
+            .map_err(|_| {
+                crate::errors::AppError::from("coordinator internal: Arc still held after drop(block)")
+            })?
             .into_inner()
-            .map_err(|_| "coordinator result poisoned".to_string())?;
+            .map_err(|_| {
+                crate::errors::AppError::from("coordinator result poisoned")
+            })?;
         match inner {
-            None => Err("coordinator callback did not run (NSFileCoordinator did not invoke the accessor)".into()),
+            None => Err(crate::errors::AppError::from(
+                "coordinator callback did not run (NSFileCoordinator did not invoke the accessor)",
+            )),
             Some(Err(e)) => Err(e),
             Some(Ok(v)) => Ok(v),
         }
     })
 }
 
-pub(crate) fn coordinated_read_bytes(path: &Path) -> Result<Option<Vec<u8>>, String> {
+pub(crate) fn coordinated_read_bytes(path: &Path) -> Result<Option<Vec<u8>>, crate::errors::AppError> {
     match prepare_ubiquitous_item_local(path) {
         Ok(LocalItemState::Missing) => return Ok(None),
         Ok(LocalItemState::Ready) => {}
@@ -180,7 +190,7 @@ pub(crate) fn coordinated_read_bytes(path: &Path) -> Result<Option<Vec<u8>>, Str
             let done = match std::fs::read(&pb) {
                 Ok(b) => Ok(Some(b)),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-                Err(e) => Err(e.to_string()),
+                Err(e) => Err(e.into()),
             };
             *out_cb.lock().expect("lock") = Some(done);
         });
@@ -193,25 +203,33 @@ pub(crate) fn coordinated_read_bytes(path: &Path) -> Result<Option<Vec<u8>>, Str
         );
         drop(block);
         if let Some(e) = coord_err {
-            return Err(e.localizedDescription().to_string());
+            return Err(crate::errors::AppError::Message(
+                e.localizedDescription().to_string(),
+            ));
         }
         let inner = Arc::try_unwrap(out)
-            .map_err(|_| "coordinator internal: Arc still held after drop(block)".to_string())?
+            .map_err(|_| {
+                crate::errors::AppError::from("coordinator internal: Arc still held after drop(block)")
+            })?
             .into_inner()
-            .map_err(|_| "coordinator result poisoned".to_string())?;
+            .map_err(|_| {
+                crate::errors::AppError::from("coordinator result poisoned")
+            })?;
         match inner {
-            None => Err("coordinator callback did not run (NSFileCoordinator did not invoke the accessor)".into()),
+            None => Err(crate::errors::AppError::from(
+                "coordinator callback did not run (NSFileCoordinator did not invoke the accessor)",
+            )),
             Some(Err(e)) => Err(e),
             Some(Ok(v)) => Ok(v),
         }
     })
 }
 
-pub(crate) fn coordinated_write_bytes(path: &Path, contents: &[u8]) -> Result<(), String> {
+pub(crate) fn coordinated_write_bytes(path: &Path, contents: &[u8]) -> Result<(), crate::errors::AppError> {
     autoreleasepool(|_pool| {
         let url = path_to_file_url(path)?;
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+            std::fs::create_dir_all(parent)?;
         }
         let coordinator = NSFileCoordinator::new();
         let data = contents.to_vec();
@@ -230,7 +248,7 @@ pub(crate) fn coordinated_write_bytes(path: &Path, contents: &[u8]) -> Result<()
                 .truncate(true)
                 .open(&pb)
                 .and_then(|mut f| std::io::Write::write_all(&mut f, &data).map(|_| ()));
-            *out_cb.lock().expect("lock") = Some(res.map_err(|e| e.to_string()));
+            *out_cb.lock().expect("lock") = Some(res.map_err(crate::errors::AppError::from));
         });
         let mut coord_err: Option<objc2::rc::Retained<NSError>> = None;
         coordinator.coordinateWritingItemAtURL_options_error_byAccessor(
@@ -241,14 +259,22 @@ pub(crate) fn coordinated_write_bytes(path: &Path, contents: &[u8]) -> Result<()
         );
         drop(block);
         if let Some(e) = coord_err {
-            return Err(e.localizedDescription().to_string());
+            return Err(crate::errors::AppError::Message(
+                e.localizedDescription().to_string(),
+            ));
         }
         let inner = Arc::try_unwrap(out)
-            .map_err(|_| "coordinator internal: Arc still held after drop(block)".to_string())?
+            .map_err(|_| {
+                crate::errors::AppError::from("coordinator internal: Arc still held after drop(block)")
+            })?
             .into_inner()
-            .map_err(|_| "coordinator result poisoned".to_string())?;
+            .map_err(|_| {
+                crate::errors::AppError::from("coordinator result poisoned")
+            })?;
         match inner {
-            None => Err("coordinator callback did not run (NSFileCoordinator did not invoke the accessor)".into()),
+            None => Err(crate::errors::AppError::from(
+                "coordinator callback did not run (NSFileCoordinator did not invoke the accessor)",
+            )),
             Some(Err(e)) => Err(e),
             Some(Ok(())) => Ok(()),
         }

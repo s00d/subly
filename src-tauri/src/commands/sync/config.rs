@@ -33,11 +33,13 @@ pub fn gdrive_oauth_client_id() -> &'static str {
     }
 }
 
-fn parse_json_or_err<T: serde::de::DeserializeOwned>(key: &str, raw: &str) -> Result<T, String> {
-    serde_json::from_str::<T>(raw).map_err(|e| format!("invalid {} payload: {}", key, e))
+fn parse_json_or_err<T: serde::de::DeserializeOwned>(key: &str, raw: &str) -> Result<T, crate::errors::AppError> {
+    serde_json::from_str::<T>(raw).map_err(|e| {
+        crate::errors::AppError::from(format!("invalid {} payload: {}", key, e))
+    })
 }
 
-pub fn load_sync_config() -> Result<SyncConfig, String> {
+pub fn load_sync_config() -> Result<SyncConfig, crate::errors::AppError> {
     let raw = crate::redb_get_internal(SYNC_CONFIG_KEY.to_string())?;
     let mut cfg = match raw {
         Some(ref s) => parse_json_or_err(SYNC_CONFIG_KEY, s)?,
@@ -50,16 +52,16 @@ pub fn load_sync_config() -> Result<SyncConfig, String> {
     Ok(cfg)
 }
 
-pub fn save_sync_config(cfg: &SyncConfig) -> Result<(), String> {
-    let raw = serde_json::to_string(cfg).map_err(|e| e.to_string())?;
+pub fn save_sync_config(cfg: &SyncConfig) -> Result<(), crate::errors::AppError> {
+    let raw = serde_json::to_string(cfg)?;
     crate::redb_set_internal(SYNC_CONFIG_KEY.to_string(), raw)
 }
 
-pub(crate) fn dropbox_app_secret() -> Result<String, String> {
+pub(crate) fn dropbox_app_secret() -> Result<String, crate::errors::AppError> {
     Ok(crate::keyring_store::get(KR_SYNC_DROPBOX_APP_SECRET)?.unwrap_or_default())
 }
 
-pub(crate) fn set_dropbox_app_secret(secret: &str) -> Result<(), String> {
+pub(crate) fn set_dropbox_app_secret(secret: &str) -> Result<(), crate::errors::AppError> {
     if secret.trim().is_empty() {
         crate::keyring_store::delete(KR_SYNC_DROPBOX_APP_SECRET)
     } else {
@@ -67,11 +69,11 @@ pub(crate) fn set_dropbox_app_secret(secret: &str) -> Result<(), String> {
     }
 }
 
-pub(crate) fn webdav_password() -> Result<String, String> {
+pub(crate) fn webdav_password() -> Result<String, crate::errors::AppError> {
     Ok(crate::keyring_store::get(KR_SYNC_WEBDAV_PASSWORD)?.unwrap_or_default())
 }
 
-pub(crate) fn set_webdav_password(password: &str) -> Result<(), String> {
+pub(crate) fn set_webdav_password(password: &str) -> Result<(), crate::errors::AppError> {
     if password.trim().is_empty() {
         crate::keyring_store::delete(KR_SYNC_WEBDAV_PASSWORD)
     } else {
@@ -79,7 +81,7 @@ pub(crate) fn set_webdav_password(password: &str) -> Result<(), String> {
     }
 }
 
-pub fn load_oauth_tokens(key: &str) -> Result<Option<OAuthTokens>, String> {
+pub fn load_oauth_tokens(key: &str) -> Result<Option<OAuthTokens>, crate::errors::AppError> {
     let raw = crate::keyring_store::get(key)?;
     match raw {
         Some(ref s) => Ok(Some(parse_json_or_err(key, s)?)),
@@ -87,12 +89,12 @@ pub fn load_oauth_tokens(key: &str) -> Result<Option<OAuthTokens>, String> {
     }
 }
 
-pub fn save_oauth_tokens(key: &str, tokens: &OAuthTokens) -> Result<(), String> {
+pub fn save_oauth_tokens(key: &str, tokens: &OAuthTokens) -> Result<(), crate::errors::AppError> {
     let raw = serde_json::to_string(tokens).map_err(|e| e.to_string())?;
     crate::keyring_store::set(key, &raw)
 }
 
-pub fn clear_oauth_tokens(key: &str) -> Result<(), String> {
+pub fn clear_oauth_tokens(key: &str) -> Result<(), crate::errors::AppError> {
     crate::keyring_store::delete(key)
 }
 

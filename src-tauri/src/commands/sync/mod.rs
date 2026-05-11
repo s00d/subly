@@ -1,6 +1,7 @@
 mod config;
 pub(crate) mod oauth;
 mod orchestrator;
+mod redb_write_flag;
 pub(crate) mod providers;
 mod state;
 mod types;
@@ -24,6 +25,7 @@ pub(crate) use config::{
 pub(crate) use wire::{decode_sync_payload, encode_sync_payload};
 pub(crate) use oauth::{exchange_oauth_code, provider_access_token};
 pub(crate) use orchestrator::{sync_dispatch_internal, SyncDispatchCommand, SyncDispatchResponse};
+pub(crate) use redb_write_flag::{sync_redb_write_begin, sync_redb_write_is_active};
 pub(crate) use providers::{provider_auth_url, provider_download, provider_upload, providers_list};
 pub(crate) use state::{sync_runtime, sync_status_from_config};
 pub(crate) use types::{OAuthTokens, SyncConfig, SyncMeta, SyncPayload};
@@ -98,9 +100,9 @@ pub struct SyncCredentialsDto {
     pub password: Option<String>,
 }
 
-fn extract_data<T: DeserializeOwned>(response: SyncDispatchResponse) -> Result<T, String> {
-    let data = serde_json::to_value(response.data).map_err(|e| e.to_string())?;
-    serde_json::from_value(data).map_err(|e| e.to_string())
+fn extract_data<T: DeserializeOwned>(response: SyncDispatchResponse) -> Result<T, crate::errors::AppError> {
+    let data = serde_json::to_value(response.data)?;
+    Ok(serde_json::from_value(data)?)
 }
 
 fn now_ts() -> i64 {
@@ -118,7 +120,7 @@ pub fn sync_should_pull(
     remote_device_id: String,
     local_updated_at: i64,
     local_device_id: String,
-) -> Result<bool, String> {
+) -> Result<bool, crate::errors::AppError> {
     Ok(remote_updated_at > local_updated_at && remote_device_id != local_device_id)
 }
 
@@ -130,7 +132,7 @@ pub fn sync_has_push_conflict(
     local_device_id: String,
     local_remote_revision: String,
     remote_revision: String,
-) -> Result<bool, String> {
+) -> Result<bool, crate::errors::AppError> {
     Ok(
         remote_device_id != local_device_id
             && remote_updated_at > local_updated_at
@@ -140,7 +142,7 @@ pub fn sync_has_push_conflict(
 }
 
 #[tauri::command]
-pub fn sync_merge_app_data(local: AppDataDoc, remote: AppDataDoc) -> Result<AppDataDoc, String> {
+pub fn sync_merge_app_data(local: AppDataDoc, remote: AppDataDoc) -> Result<AppDataDoc, crate::errors::AppError> {
     Ok(merge_app_data_rows(local, remote))
 }
 
@@ -202,7 +204,7 @@ pub(crate) fn sync_merge_with_tombstones(
     remote: AppDataDoc,
     local_ts: Vec<DeletionTombstone>,
     remote_ts: Vec<DeletionTombstone>,
-) -> Result<(AppDataDoc, Vec<DeletionTombstone>), String> {
+) -> Result<(AppDataDoc, Vec<DeletionTombstone>), crate::errors::AppError> {
     let mut merged = merge_app_data_rows(local, remote);
     let merged_ts = merge_tombstone_vecs(local_ts, remote_ts);
     apply_tombstone_filter(&mut merged, &merged_ts);
@@ -248,7 +250,7 @@ where
 }
 
 #[tauri::command]
-pub fn sync_build_push_meta(local_updated_at: i64, device_id: String) -> Result<SyncMeta, String> {
+pub fn sync_build_push_meta(local_updated_at: i64, device_id: String) -> Result<SyncMeta, crate::errors::AppError> {
     let now = chrono::Utc::now().timestamp_millis();
     let updated_at = if local_updated_at > 0 { local_updated_at } else { now };
     Ok(SyncMeta {
@@ -261,7 +263,7 @@ pub fn sync_build_push_meta(local_updated_at: i64, device_id: String) -> Result<
 }
 
 #[tauri::command]
-pub fn sync_payload_fits_limit(payload: SyncPayload, max_bytes: usize) -> Result<bool, String> {
+pub fn sync_payload_fits_limit(payload: SyncPayload, max_bytes: usize) -> Result<bool, crate::errors::AppError> {
     let bytes = encode_sync_payload(&payload)?;
     Ok(bytes.len() <= max_bytes)
 }
@@ -288,13 +290,13 @@ pub(crate) fn sync_push_revision_mismatch(expected_revision: &str, remote: Optio
 pub async fn sync_get_ui_schema(
     app: tauri::AppHandle,
     state: tauri::State<'_, crate::AppState>,
-) -> Result<SyncUiSchemaDto, String> {
+) -> Result<SyncUiSchemaDto, crate::errors::AppError> {
     let response = sync_dispatch_internal(app, state, SyncDispatchCommand::Init).await?;
     extract_data(response)
 }
 
 #[tauri::command]
-pub async fn sync_get_settings(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncConfig, String> {
+pub async fn sync_get_settings(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncConfig, crate::errors::AppError> {
     let response = sync_dispatch_internal(app, state, SyncDispatchCommand::GetConfig).await?;
     extract_data(response)
 }
@@ -305,7 +307,7 @@ pub async fn sync_save_settings(
     state: tauri::State<'_, crate::AppState>,
     provider: Option<SyncProviderType>,
     credentials: Option<SyncCredentialsDto>,
-) -> Result<SyncConfig, String> {
+) -> Result<SyncConfig, crate::errors::AppError> {
     if let Some(p) = provider {
         sync_dispatch_internal(
             app.clone(),
@@ -321,7 +323,7 @@ pub async fn sync_save_settings(
 }
 
 #[tauri::command]
-pub async fn sync_get_status(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncStatusDto, String> {
+pub async fn sync_get_status(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncStatusDto, crate::errors::AppError> {
     let response = sync_dispatch_internal(app, state, SyncDispatchCommand::GetStatus).await?;
     extract_data(response)
 }
@@ -331,7 +333,7 @@ pub async fn sync_enable_provider(
     app: tauri::AppHandle,
     state: tauri::State<'_, crate::AppState>,
     provider: SyncProviderType,
-) -> Result<SyncEnableDto, String> {
+) -> Result<SyncEnableDto, crate::errors::AppError> {
     let response = sync_dispatch_internal(
         app,
         state,
@@ -342,7 +344,7 @@ pub async fn sync_enable_provider(
 }
 
 #[tauri::command]
-pub async fn sync_disable_provider(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncOkDto, String> {
+pub async fn sync_disable_provider(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncOkDto, crate::errors::AppError> {
     let response = sync_dispatch_internal(app, state, SyncDispatchCommand::Disable).await?;
     extract_data(response)
 }
@@ -352,7 +354,7 @@ pub async fn sync_oauth_start(
     app: tauri::AppHandle,
     state: tauri::State<'_, crate::AppState>,
     provider: SyncProviderType,
-) -> Result<SyncEnableDto, String> {
+) -> Result<SyncEnableDto, crate::errors::AppError> {
     sync_enable_provider(app, state, provider).await
 }
 
@@ -362,7 +364,7 @@ pub async fn sync_oauth_finish(
     state: tauri::State<'_, crate::AppState>,
     code: String,
     provider: Option<SyncProviderType>,
-) -> Result<SyncOkDto, String> {
+) -> Result<SyncOkDto, crate::errors::AppError> {
     let response = sync_dispatch_internal(
         app,
         state,
@@ -373,19 +375,19 @@ pub async fn sync_oauth_finish(
 }
 
 #[tauri::command]
-pub async fn sync_check_remote(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncHasUpdateDto, String> {
+pub async fn sync_check_remote(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncHasUpdateDto, crate::errors::AppError> {
     let response = sync_dispatch_internal(app, state, SyncDispatchCommand::CheckRemote).await?;
     extract_data(response)
 }
 
 #[tauri::command]
-pub async fn sync_pull_remote(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncOkDto, String> {
+pub async fn sync_pull_remote(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncOkDto, crate::errors::AppError> {
     let response = sync_dispatch_internal(app, state, SyncDispatchCommand::PullRemote).await?;
     extract_data(response)
 }
 
 #[tauri::command]
-pub async fn sync_push_local(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncOkDto, String> {
+pub async fn sync_push_local(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncOkDto, crate::errors::AppError> {
     let response = sync_dispatch_internal(
         app,
         state,
@@ -398,7 +400,7 @@ pub async fn sync_push_local(app: tauri::AppHandle, state: tauri::State<'_, crat
 }
 
 #[tauri::command]
-pub async fn sync_force_push_local(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncOkDto, String> {
+pub async fn sync_force_push_local(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncOkDto, crate::errors::AppError> {
     let response = sync_dispatch_internal(
         app,
         state,
@@ -411,7 +413,7 @@ pub async fn sync_force_push_local(app: tauri::AppHandle, state: tauri::State<'_
 }
 
 #[tauri::command]
-pub async fn sync_now(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncOkDto, String> {
+pub async fn sync_now(app: tauri::AppHandle, state: tauri::State<'_, crate::AppState>) -> Result<SyncOkDto, crate::errors::AppError> {
     let response = sync_dispatch_internal(app, state, SyncDispatchCommand::SyncNow).await?;
     extract_data(response)
 }
@@ -421,7 +423,7 @@ pub async fn sync_flush_before_exit(
     app: tauri::AppHandle,
     state: tauri::State<'_, crate::AppState>,
     timeout_ms: Option<u64>,
-) -> Result<SyncOkDto, String> {
+) -> Result<SyncOkDto, crate::errors::AppError> {
     let response = sync_dispatch_internal(
         app,
         state,
@@ -437,7 +439,7 @@ pub async fn sync_flush_before_exit(
 pub async fn sync_dismiss_pending_update(
     app: tauri::AppHandle,
     state: tauri::State<'_, crate::AppState>,
-) -> Result<SyncOkDto, String> {
+) -> Result<SyncOkDto, crate::errors::AppError> {
     let response = sync_dispatch_internal(app, state, SyncDispatchCommand::DismissPending).await?;
     extract_data(response)
 }

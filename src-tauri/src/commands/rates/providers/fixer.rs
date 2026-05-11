@@ -36,9 +36,9 @@ pub async fn fetch_rates(
     main_code: &str,
     target_codes: &[String],
     api_key: &str,
-) -> Result<std::collections::HashMap<String, f64>, String> {
+) -> Result<std::collections::HashMap<String, f64>, crate::errors::AppError> {
     if api_key.trim().is_empty() {
-        return Err("fixer api key is required".to_string());
+        return Err(crate::errors::AppError::from("fixer api key is required"));
     }
     let mut all = target_codes.to_vec();
     if !all.iter().any(|c| c.eq_ignore_ascii_case(main_code)) {
@@ -67,7 +67,7 @@ pub async fn fetch_rates(
             }
         };
         let status = resp.status();
-        let body = resp.text().await.map_err(|e| e.to_string())?;
+        let body = resp.text().await.map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
         let body_preview: String = body.chars().take(500).collect();
         eprintln!(
             "[subly][rates][fixer] response status={} body_preview={}",
@@ -97,9 +97,9 @@ pub async fn fetch_rates(
     }
 
     Err(if last_error.is_empty() {
-        "fixer provider failed".to_string()
+        crate::errors::AppError::from("fixer provider failed")
     } else {
-        last_error
+        crate::errors::AppError::Message(last_error)
     })
 }
 

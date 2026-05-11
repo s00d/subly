@@ -56,7 +56,7 @@ pub fn auth_url(cfg: &SyncConfig) -> Option<String> {
     ))
 }
 
-pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<SyncPayload>, String> {
+pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<SyncPayload>, crate::errors::AppError> {
     let resp = tauri_plugin_http::reqwest::Client::new()
         .post("https://content.dropboxapi.com/2/files/download")
         .header("Authorization", format!("Bearer {}", access_token))
@@ -79,7 +79,7 @@ async fn dropbox_move_v2(
     access_token: &str,
     from_path: &str,
     to_path: &str,
-) -> Result<(), String> {
+) -> Result<(), crate::errors::AppError> {
     let resp = client
         .post("https://api.dropboxapi.com/2/files/move_v2")
         .header("Authorization", format!("Bearer {}", access_token))
@@ -95,12 +95,15 @@ async fn dropbox_move_v2(
         .await
         .map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
-        return Err(format!("dropbox move_v2 failed: {}", resp.status()));
+        return Err(crate::errors::AppError::from(format!(
+            "dropbox move_v2 failed: {}",
+            resp.status()
+        )));
     }
     Ok(())
 }
 
-pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str) -> Result<(), String> {
+pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str) -> Result<(), crate::errors::AppError> {
     let client = tauri_plugin_http::reqwest::Client::new();
     let raw = encode_sync_payload(payload)?;
     let tmp = dropbox_tmp_path();
@@ -125,7 +128,10 @@ pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str
         .await
         .map_err(|e| e.to_string())?;
     if !put.status().is_success() {
-        return Err(format!("dropbox upload failed: {}", put.status()));
+        return Err(crate::errors::AppError::from(format!(
+            "dropbox upload failed: {}",
+            put.status()
+        )));
     }
 
     if let Err(e) = dropbox_move_v2(&client, access_token, &tmp, &fin).await {

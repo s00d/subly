@@ -122,10 +122,10 @@ fn is_supported_date_input(raw: &str) -> bool {
 }
 
 /// Normalizes expense `created_at` to RFC3339 (accepts RFC3339 or `YYYY-MM-DD`).
-pub(crate) fn normalize_expense_timestamp(raw: &str) -> Result<String, String> {
+pub(crate) fn normalize_expense_timestamp(raw: &str) -> Result<String, crate::errors::AppError> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
-        return Err("field_invalid_date:createdAt".to_string());
+        return Err(crate::errors::AppError::from("field_invalid_date:createdAt"));
     }
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(trimmed) {
         return Ok(dt.to_rfc3339());
@@ -133,7 +133,7 @@ pub(crate) fn normalize_expense_timestamp(raw: &str) -> Result<String, String> {
     if let Ok(d) = chrono::NaiveDate::parse_from_str(trimmed, "%Y-%m-%d") {
         let ndt = d
             .and_hms_opt(12, 0, 0)
-            .ok_or_else(|| "field_invalid_date:createdAt".to_string())?;
+            .ok_or_else(|| crate::errors::AppError::from("field_invalid_date:createdAt"))?;
         return Ok(chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(ndt, chrono::Utc).to_rfc3339());
     }
     if trimmed.len() >= 10 {
@@ -141,35 +141,38 @@ pub(crate) fn normalize_expense_timestamp(raw: &str) -> Result<String, String> {
         if let Ok(d) = chrono::NaiveDate::parse_from_str(head, "%Y-%m-%d") {
             let ndt = d
                 .and_hms_opt(12, 0, 0)
-                .ok_or_else(|| "field_invalid_date:createdAt".to_string())?;
+                .ok_or_else(|| crate::errors::AppError::from("field_invalid_date:createdAt"))?;
             return Ok(chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(ndt, chrono::Utc).to_rfc3339());
         }
     }
-    Err("field_invalid_date:createdAt".to_string())
+    Err(crate::errors::AppError::from("field_invalid_date:createdAt"))
 }
 
-pub(crate) fn ymd_to_utc_noon_rfc3339(year: i32, month: u32, day: u32) -> Result<String, String> {
-    let d = chrono::NaiveDate::from_ymd_opt(year, month, day).ok_or_else(|| "field_invalid_date:createdAt".to_string())?;
+pub(crate) fn ymd_to_utc_noon_rfc3339(year: i32, month: u32, day: u32) -> Result<String, crate::errors::AppError> {
+    let d = chrono::NaiveDate::from_ymd_opt(year, month, day)
+        .ok_or_else(|| crate::errors::AppError::from("field_invalid_date:createdAt"))?;
     let ndt = d
         .and_hms_opt(12, 0, 0)
-        .ok_or_else(|| "field_invalid_date:createdAt".to_string())?;
+        .ok_or_else(|| crate::errors::AppError::from("field_invalid_date:createdAt"))?;
     Ok(chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(ndt, chrono::Utc).to_rfc3339())
 }
 
 /// Parse legacy date strings (ISO / RFC3339 / first 10 chars) into calendar components.
-pub(crate) fn parse_loose_date_to_ymd(raw: &str) -> Result<(i32, u32, u32), String> {
+pub(crate) fn parse_loose_date_to_ymd(raw: &str) -> Result<(i32, u32, u32), crate::errors::AppError> {
     let trimmed = raw.trim();
     if trimmed.is_empty() {
-        return Err("field_invalid_date:date".to_string());
+        return Err(crate::errors::AppError::from("field_invalid_date:date"));
     }
     let d = if let Ok(date) = chrono::NaiveDate::parse_from_str(trimmed, "%Y-%m-%d") {
         date
     } else if let Ok(date_time) = chrono::DateTime::parse_from_rfc3339(trimmed) {
         date_time.date_naive()
     } else if trimmed.len() >= 10 {
-        chrono::NaiveDate::parse_from_str(&trimmed[..10], "%Y-%m-%d").map_err(|_| "field_invalid_date:date".to_string())?
+        chrono::NaiveDate::parse_from_str(&trimmed[..10], "%Y-%m-%d").map_err(|_| {
+            crate::errors::AppError::from("field_invalid_date:date")
+        })?
     } else {
-        return Err("field_invalid_date:date".to_string());
+        return Err(crate::errors::AppError::from("field_invalid_date:date"));
     };
     Ok((d.year(), d.month(), d.day()))
 }
@@ -442,8 +445,10 @@ pub(crate) struct SubscriptionListItemDto {
     #[serde(default)]
     pub(crate) url: String,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) cancellation_date: Option<String>,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) replacement_subscription_id: Option<String>,
     #[serde(default)]
     pub(crate) created_at: String,
@@ -460,6 +465,7 @@ pub(crate) struct SubscriptionListItemDto {
     #[serde(default)]
     pub(crate) overdue: bool,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) credentials: Option<SubscriptionCredentialsDto>,
 }
 
@@ -501,8 +507,10 @@ pub(crate) struct SubscriptionInputDto {
     #[serde(default)]
     pub(crate) url: String,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) cancellation_date: Option<String>,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) replacement_subscription_id: Option<String>,
     #[serde(default)]
     pub(crate) created_at: String,
@@ -513,25 +521,26 @@ pub(crate) struct SubscriptionInputDto {
     #[serde(default)]
     pub(crate) payment_history: Vec<PaymentRecordDto>,
     #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) credentials: Option<SubscriptionCredentialsDto>,
 }
 
 impl SubscriptionInputDto {
-    pub(crate) fn validate(&self) -> Result<(), String> {
+    pub(crate) fn validate(&self) -> Result<(), crate::errors::AppError> {
         if self.name.trim().is_empty() {
-            return Err("field_required:name".to_string());
+            return Err(crate::errors::AppError::from("field_required:name"));
         }
         if !self.price.is_finite() || self.price < 0.0 {
-            return Err("field_invalid_number:price".to_string());
+            return Err(crate::errors::AppError::from("field_invalid_number:price"));
         }
         if self.currency_id.trim().is_empty() {
-            return Err("field_required:currencyId".to_string());
+            return Err(crate::errors::AppError::from("field_required:currencyId"));
         }
         if !is_supported_date_input(&self.next_payment) {
-            return Err("field_invalid_date:nextPayment".to_string());
+            return Err(crate::errors::AppError::from("field_invalid_date:nextPayment"));
         }
         if !is_supported_date_input(&self.start_date) {
-            return Err("field_invalid_date:startDate".to_string());
+            return Err(crate::errors::AppError::from("field_invalid_date:startDate"));
         }
         Ok(())
     }
@@ -567,18 +576,18 @@ pub(crate) struct ExpenseInputDto {
 }
 
 impl ExpenseInputDto {
-    pub(crate) fn validate(&self) -> Result<(), String> {
+    pub(crate) fn validate(&self) -> Result<(), crate::errors::AppError> {
         if self.name.trim().is_empty() {
-            return Err("field_required:name".to_string());
+            return Err(crate::errors::AppError::from("field_required:name"));
         }
         if !self.amount.is_finite() || self.amount < 0.0 {
-            return Err("field_invalid_number:amount".to_string());
+            return Err(crate::errors::AppError::from("field_invalid_number:amount"));
         }
         if self.currency_id.trim().is_empty() {
-            return Err("field_required:currencyId".to_string());
+            return Err(crate::errors::AppError::from("field_required:currencyId"));
         }
         if self.created_at.trim().is_empty() {
-            return Err("field_required:createdAt".to_string());
+            return Err(crate::errors::AppError::from("field_required:createdAt"));
         }
         normalize_expense_timestamp(&self.created_at)?;
         Ok(())

@@ -5,16 +5,16 @@ fn storage_account(raw_key: &str) -> String {
 }
 
 #[tauri::command]
-pub fn secure_storage_set(key: String, value: String) -> Result<(), String> {
+pub fn secure_storage_set(key: String, value: String) -> Result<(), crate::errors::AppError> {
     crate::keyring_store::set(&storage_account(&key), &value)
 }
 
 #[tauri::command]
-pub fn secure_storage_get(key: String) -> Result<Option<String>, String> {
+pub fn secure_storage_get(key: String) -> Result<Option<String>, crate::errors::AppError> {
     crate::keyring_store::get(&storage_account(&key))
 }
 
 #[tauri::command]
-pub fn secure_storage_delete(key: String) -> Result<(), String> {
+pub fn secure_storage_delete(key: String) -> Result<(), crate::errors::AppError> {
     crate::keyring_store::delete(&storage_account(&key))
 }

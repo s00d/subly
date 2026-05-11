@@ -49,7 +49,7 @@ fn item_url(base: &str, name: &str) -> String {
     format!("{}/{}", base.trim_end_matches('/'), name)
 }
 
-pub async fn download(cfg: &SyncConfig) -> Result<Option<SyncPayload>, String> {
+pub async fn download(cfg: &SyncConfig) -> Result<Option<SyncPayload>, crate::errors::AppError> {
     if cfg.webdav_url.is_empty() || cfg.webdav_username.is_empty() {
         return Ok(None);
     }
@@ -60,17 +60,20 @@ pub async fn download(cfg: &SyncConfig) -> Result<Option<SyncPayload>, String> {
         .basic_auth(cfg.webdav_username.clone(), Some(pwd))
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     if !resp.status().is_success() {
         return Ok(None);
     }
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     Ok(Some(decode_sync_payload(&bytes)?))
 }
 
-pub async fn upload(cfg: &SyncConfig, payload: &SyncPayload) -> Result<(), String> {
+pub async fn upload(cfg: &SyncConfig, payload: &SyncPayload) -> Result<(), crate::errors::AppError> {
     if cfg.webdav_url.is_empty() || cfg.webdav_username.is_empty() {
-        return Err("webdav credentials missing".to_string());
+        return Err(crate::errors::AppError::from("webdav credentials missing"));
     }
     let pwd = webdav_password()?;
     let base = cfg.webdav_url.trim_end_matches('/').to_string();
@@ -89,12 +92,16 @@ pub async fn upload(cfg: &SyncConfig, payload: &SyncPayload) -> Result<(), Strin
         .body(raw_clone)
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     if !put.status().is_success() {
-        return Err(format!("webdav upload (.tmp) failed: {}", put.status()));
+        return Err(crate::errors::AppError::from(format!(
+            "webdav upload (.tmp) failed: {}",
+            put.status()
+        )));
     }
 
-    let move_method = Method::from_bytes(b"MOVE").map_err(|_| "MOVE method".to_string())?;
+    let move_method =
+        Method::from_bytes(b"MOVE").map_err(|_| crate::errors::AppError::from("MOVE method"))?;
     let mov = client
         .request(move_method, &tmp_url)
         .basic_auth(auth.0.clone(), auth.1.clone())
@@ -102,7 +109,7 @@ pub async fn upload(cfg: &SyncConfig, payload: &SyncPayload) -> Result<(), Strin
         .header("Overwrite", "T")
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
 
     if mov.status().is_success() {
         return Ok(());
@@ -113,10 +120,13 @@ pub async fn upload(cfg: &SyncConfig, payload: &SyncPayload) -> Result<(), Strin
         .basic_auth(auth.0.clone(), auth.1.clone())
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     if !del.status().is_success() && del.status().as_u16() != 404 {
         let _ = client.delete(&tmp_url).basic_auth(auth.0.clone(), auth.1.clone()).send().await;
-        return Err(format!("webdav fallback delete final failed: {}", del.status()));
+        return Err(crate::errors::AppError::from(format!(
+            "webdav fallback delete final failed: {}",
+            del.status()
+        )));
     }
 
     let re_put = client
@@ -126,9 +136,12 @@ pub async fn upload(cfg: &SyncConfig, payload: &SyncPayload) -> Result<(), Strin
         .body(raw)
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     if !re_put.status().is_success() {
-        return Err(format!("webdav fallback put final failed: {}", re_put.status()));
+        return Err(crate::errors::AppError::from(format!(
+            "webdav fallback put final failed: {}",
+            re_put.status()
+        )));
     }
     let _ = client.delete(&tmp_url).basic_auth(auth.0, auth.1).send().await;
     Ok(())

@@ -27,11 +27,13 @@ fn pkce_challenge_s256(verifier: &str) -> String {
 }
 
 /// Builds the Google authorization URL and stores the PKCE verifier in [`super::state::SyncRuntime`].
-pub(crate) fn google_authorize_url() -> Result<String, String> {
+pub(crate) fn google_authorize_url() -> Result<String, crate::errors::AppError> {
     let verifier = random_pkce_verifier();
     let challenge = pkce_challenge_s256(&verifier);
     {
-        let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+        let mut rt = sync_runtime()
+            .lock()
+            .map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
         rt.oauth_pkce_verifier = Some(verifier);
     }
     let client_id = gdrive_oauth_client_id();
@@ -63,18 +65,21 @@ pub async fn exchange_oauth_code(
     provider: &SyncProviderType,
     cfg: &SyncConfig,
     code: &str,
-) -> Result<OAuthTokens, String> {
+) -> Result<OAuthTokens, crate::errors::AppError> {
     let client = tauri_plugin_http::reqwest::Client::new();
     let redirect_uri = OAUTH_REDIRECT_URI;
     let (url, body) = match provider {
         SyncProviderType::Gdrive => {
             let verifier = {
-                let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                let mut rt = sync_runtime()
+                    .lock()
+                    .map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                 rt.oauth_pkce_verifier.take()
             }
             .ok_or_else(|| {
-                "google oauth: PKCE verifier missing — open Connect again and complete sign-in in one flow"
-                    .to_string()
+                crate::errors::AppError::from(
+                    "google oauth: PKCE verifier missing — open Connect again and complete sign-in in one flow",
+                )
             })?;
             (
                 "https://oauth2.googleapis.com/token",
@@ -107,20 +112,25 @@ pub async fn exchange_oauth_code(
                 ("scope", "Files.ReadWrite.AppFolder offline_access".to_string()),
             ],
         ),
-        _ => return Err("provider does not require oauth".to_string()),
+        _ => return Err(crate::errors::AppError::from("provider does not require oauth")),
     };
 
-    let resp = client.post(url).form(&body).send().await.map_err(|e| e.to_string())?;
+    let resp = client.post(url).form(&body).send().await.map_err(|e| {
+        crate::errors::AppError::Message(e.to_string())
+    })?;
     let status = resp.status();
-    let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     if !status.is_success() {
-        return Err(format!(
+        return Err(crate::errors::AppError::from(format!(
             "oauth exchange failed: {} {}",
             status,
             String::from_utf8_lossy(&bytes)
-        ));
+        )));
     }
-    let data: OAuthTokenResponse = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
+    let data: OAuthTokenResponse = serde_json::from_slice(&bytes)?;
     Ok(OAuthTokens {
         access_token: data.access_token,
         refresh_token: data.refresh_token,
@@ -132,7 +142,7 @@ pub async fn refresh_oauth_token(
     provider: &SyncProviderType,
     cfg: &SyncConfig,
     tokens: &OAuthTokens,
-) -> Result<OAuthTokens, String> {
+) -> Result<OAuthTokens, crate::errors::AppError> {
     let client = tauri_plugin_http::reqwest::Client::new();
     let (url, body) = match provider {
         SyncProviderType::Gdrive => (
@@ -161,13 +171,21 @@ pub async fn refresh_oauth_token(
                 ("scope", "Files.ReadWrite.AppFolder offline_access".to_string()),
             ],
         ),
-        _ => return Err("provider has no oauth refresh".to_string()),
+        _ => return Err(crate::errors::AppError::from("provider has no oauth refresh")),
     };
-    let resp = client.post(url).form(&body).send().await.map_err(|e| e.to_string())?;
+    let resp = client.post(url).form(&body).send().await.map_err(|e| {
+        crate::errors::AppError::Message(e.to_string())
+    })?;
     if !resp.status().is_success() {
-        return Err(format!("token refresh failed: {}", resp.status()));
+        return Err(crate::errors::AppError::from(format!(
+            "token refresh failed: {}",
+            resp.status()
+        )));
     }
-    let data: OAuthTokenResponse = resp.json().await.map_err(|e| e.to_string())?;
+    let data: OAuthTokenResponse = resp
+        .json()
+        .await
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     Ok(OAuthTokens {
         access_token: data.access_token,
         refresh_token: if data.refresh_token.is_empty() {
@@ -179,9 +197,13 @@ pub async fn refresh_oauth_token(
     })
 }
 
-async fn ensure_provider_access_token(provider: &SyncProviderType, cfg: &SyncConfig) -> Result<String, String> {
-    let key = token_key(provider).ok_or("provider has no oauth token")?;
-    let mut tokens = load_oauth_tokens(key)?.ok_or("oauth tokens missing")?;
+async fn ensure_provider_access_token(provider: &SyncProviderType, cfg: &SyncConfig) -> Result<String, crate::errors::AppError> {
+    let key = token_key(provider).ok_or_else(|| {
+        crate::errors::AppError::from("provider has no oauth token")
+    })?;
+    let mut tokens = load_oauth_tokens(key)?.ok_or_else(|| {
+        crate::errors::AppError::from("oauth tokens missing")
+    })?;
     const REFRESH_MARGIN_MS: i64 = 5 * 60 * 1000;
     if tokens.expires_at <= now_ts() + REFRESH_MARGIN_MS {
         tokens = refresh_oauth_token(provider, cfg, &tokens).await?;
@@ -190,7 +212,7 @@ async fn ensure_provider_access_token(provider: &SyncProviderType, cfg: &SyncCon
     Ok(tokens.access_token)
 }
 
-pub async fn provider_access_token(provider: &SyncProviderType, cfg: &SyncConfig) -> Result<Option<String>, String> {
+pub async fn provider_access_token(provider: &SyncProviderType, cfg: &SyncConfig) -> Result<Option<String>, crate::errors::AppError> {
     match provider {
         SyncProviderType::Gdrive | SyncProviderType::Dropbox | SyncProviderType::Onedrive => {
             Ok(Some(ensure_provider_access_token(provider, cfg).await?))

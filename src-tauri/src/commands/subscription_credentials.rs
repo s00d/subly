@@ -15,17 +15,19 @@ fn credentials_storage_account(subscription_id: &str) -> String {
     format!("{SECURE_PREFIX}subscription_credentials:{id}")
 }
 
-pub(crate) fn credentials_read(subscription_id: &str) -> Result<Option<SubscriptionCredentialsDto>, String> {
+pub(crate) fn credentials_read(subscription_id: &str) -> Result<Option<SubscriptionCredentialsDto>, crate::errors::AppError> {
     let account = credentials_storage_account(subscription_id);
     let Some(raw) = crate::keyring_store::get(&account)? else {
         return Ok(None);
     };
     serde_json::from_str::<SubscriptionCredentialsDto>(&raw)
         .map(Some)
-        .map_err(|e| format!("credentials decode failed: {e}"))
+        .map_err(|e| {
+            crate::errors::AppError::from(format!("credentials decode failed: {e}"))
+        })
 }
 
-pub(crate) fn credentials_delete(subscription_id: &str) -> Result<(), String> {
+pub(crate) fn credentials_delete(subscription_id: &str) -> Result<(), crate::errors::AppError> {
     crate::keyring_store::delete(&credentials_storage_account(subscription_id))
 }
 
@@ -34,7 +36,7 @@ pub(crate) fn credentials_delete(subscription_id: &str) -> Result<(), String> {
 pub(crate) fn credentials_apply_optional(
     subscription_id: &str,
     credentials: Option<SubscriptionCredentialsDto>,
-) -> Result<(), String> {
+) -> Result<(), crate::errors::AppError> {
     let Some(dto) = credentials else {
         return Ok(());
     };
@@ -73,22 +75,24 @@ pub struct OtpauthImportDto {
     pub issuer: String,
 }
 
-fn save_credentials_json(subscription_id: &str, dto: &SubscriptionCredentialsDto) -> Result<(), String> {
+fn save_credentials_json(subscription_id: &str, dto: &SubscriptionCredentialsDto) -> Result<(), crate::errors::AppError> {
     let account = credentials_storage_account(subscription_id);
-    let json = serde_json::to_string(dto).map_err(|e| e.to_string())?;
+    let json = serde_json::to_string(dto)?;
     crate::keyring_store::set(&account, &json)
 }
 
-fn totp_from_secret_b32(secret_b32: &str) -> Result<TOTP, String> {
+fn totp_from_secret_b32(secret_b32: &str) -> Result<TOTP, crate::errors::AppError> {
     let cleaned: String = secret_b32.chars().filter(|c| !c.is_whitespace()).collect();
     if cleaned.is_empty() {
-        return Err("totp_secret_missing".to_string());
+        return Err(crate::errors::AppError::from("totp_secret_missing"));
     }
     let upper = cleaned.to_uppercase();
     let bytes = Secret::Encoded(upper)
         .to_bytes()
-        .map_err(|e| format!("invalid_totp_secret:{e}"))?;
-    TOTP::new(Algorithm::SHA1, 6, 1, 30, bytes).map_err(|e| format!("totp_init:{e}"))
+        .map_err(|e| crate::errors::AppError::from(format!("invalid_totp_secret:{e}")))?;
+    TOTP::new(Algorithm::SHA1, 6, 1, 30, bytes).map_err(|e| {
+        crate::errors::AppError::from(format!("totp_init:{e}"))
+    })
 }
 
 /// Next Unix ms when the current period rolls (exclusive end for displayed code).
@@ -102,28 +106,30 @@ fn valid_until_ms_for_step(step_sec: u64) -> i64 {
 }
 
 #[tauri::command]
-pub fn subscription_credentials_get(subscription_id: String) -> Result<Option<SubscriptionCredentialsDto>, String> {
+pub fn subscription_credentials_get(subscription_id: String) -> Result<Option<SubscriptionCredentialsDto>, crate::errors::AppError> {
     credentials_read(&subscription_id)
 }
 
 #[tauri::command]
-pub fn subscription_credentials_set(subscription_id: String, dto: SubscriptionCredentialsDto) -> Result<(), String> {
+pub fn subscription_credentials_set(subscription_id: String, dto: SubscriptionCredentialsDto) -> Result<(), crate::errors::AppError> {
     save_credentials_json(&subscription_id, &dto)
 }
 
 #[tauri::command]
-pub fn subscription_credentials_delete(subscription_id: String) -> Result<(), String> {
+pub fn subscription_credentials_delete(subscription_id: String) -> Result<(), crate::errors::AppError> {
     credentials_delete(&subscription_id)
 }
 
 #[tauri::command]
-pub fn subscription_totp_current(subscription_id: String) -> Result<SubscriptionTotpCurrentDto, String> {
-    let creds = credentials_read(&subscription_id)?.ok_or_else(|| "no_credentials".to_string())?;
+pub fn subscription_totp_current(subscription_id: String) -> Result<SubscriptionTotpCurrentDto, crate::errors::AppError> {
+    let creds = credentials_read(&subscription_id)?.ok_or_else(|| {
+        crate::errors::AppError::from("no_credentials")
+    })?;
     let totp = totp_from_secret_b32(&creds.totp_secret)?;
     let step = totp.step;
     let code = totp
         .generate_current()
-        .map_err(|e| format!("totp_time:{e}"))?;
+        .map_err(|e| crate::errors::AppError::from(format!("totp_time:{e}")))?;
     Ok(SubscriptionTotpCurrentDto {
         code,
         period_sec: step,
@@ -133,14 +139,16 @@ pub fn subscription_totp_current(subscription_id: String) -> Result<Subscription
 
 /// Parse `otpauth://totp/...` or `otpauth://hotp/...` (TOTP only; hotp returns error).
 #[tauri::command]
-pub fn subscription_totp_import_otpauth(uri: String) -> Result<OtpauthImportDto, String> {
-    let u = Url::parse(uri.trim()).map_err(|e| format!("invalid_otpauth_url:{e}"))?;
+pub fn subscription_totp_import_otpauth(uri: String) -> Result<OtpauthImportDto, crate::errors::AppError> {
+    let u = Url::parse(uri.trim()).map_err(|e| {
+        crate::errors::AppError::from(format!("invalid_otpauth_url:{e}"))
+    })?;
     if u.scheme() != "otpauth" {
-        return Err("otpauth_scheme_required".to_string());
+        return Err(crate::errors::AppError::from("otpauth_scheme_required"));
     }
     let typ = u.host_str().unwrap_or("").to_ascii_lowercase();
     if typ != "totp" {
-        return Err("totp_only_supported".to_string());
+        return Err(crate::errors::AppError::from("totp_only_supported"));
     }
 
     let get_q = |key: &str| -> Option<String> {
@@ -149,9 +157,11 @@ pub fn subscription_totp_import_otpauth(uri: String) -> Result<OtpauthImportDto,
             .map(|(_, v)| v.into_owned())
     };
 
-    let secret = get_q("secret").ok_or_else(|| "otpauth_missing_secret".to_string())?;
+    let secret = get_q("secret").ok_or_else(|| {
+        crate::errors::AppError::from("otpauth_missing_secret")
+    })?;
     if secret.trim().is_empty() {
-        return Err("otpauth_empty_secret".to_string());
+        return Err(crate::errors::AppError::from("otpauth_empty_secret"));
     }
 
     let issuer_q = get_q("issuer").unwrap_or_default();
@@ -181,23 +191,27 @@ fn split_label_and_issuer(label_raw: &str, issuer_query: &str) -> (String, Strin
 
 /// PNG/JPEG/GIF image as standard base64 or data-URL; decode QR and parse otpauth payload.
 #[tauri::command]
-pub fn subscription_totp_decode_qr_base64(data_base64: String) -> Result<OtpauthImportDto, String> {
+pub fn subscription_totp_decode_qr_base64(data_base64: String) -> Result<OtpauthImportDto, crate::errors::AppError> {
     let b64 = strip_data_url_prefix(&data_base64);
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(b64.trim())
-        .map_err(|e| format!("invalid_base64:{e}"))?;
+        .map_err(|e| crate::errors::AppError::from(format!("invalid_base64:{e}")))?;
 
-    let img = image::load_from_memory(&bytes).map_err(|e| format!("invalid_image:{e}"))?;
+    let img = image::load_from_memory(&bytes).map_err(|e| {
+        crate::errors::AppError::from(format!("invalid_image:{e}"))
+    })?;
     let luma = img.to_luma8();
     let mut prepared = rqrr::PreparedImage::prepare(luma);
     let grids = prepared.detect_grids();
-    let grid = grids.first().ok_or_else(|| "qr_not_found".to_string())?;
-    let (_meta, content) = grid.decode().map_err(|e| format!("qr_decode:{e}"))?;
+    let grid = grids.first().ok_or_else(|| crate::errors::AppError::from("qr_not_found"))?;
+    let (_meta, content) = grid.decode().map_err(|e| {
+        crate::errors::AppError::from(format!("qr_decode:{e}"))
+    })?;
     let content = content.trim();
     if content.starts_with("otpauth://") {
         return subscription_totp_import_otpauth(content.to_string());
     }
-    Err("qr_not_otpauth".to_string())
+    Err(crate::errors::AppError::from("qr_not_otpauth"))
 }
 
 fn strip_data_url_prefix(s: &str) -> &str {

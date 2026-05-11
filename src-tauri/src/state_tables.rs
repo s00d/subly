@@ -1,24 +1,27 @@
 use redb::{ReadableDatabase, TableDefinition};
 use serde::{de::DeserializeOwned, Serialize};
 
-use crate::models::TombstoneEntityKind;
+use crate::errors::{AppError, AppResult};
+use crate::models::{ExpenseDoc, SubscriptionDoc, TombstoneEntityKind};
 use crate::state::{
     decode_bin, encode_bin, read_singleton_bin_typed, upsert_deletion_tombstone, AppStateInner, T2_CATEGORIES,
     T2_CONFIG, T2_CURRENCIES, T2_EXPENSES, T2_HOUSEHOLD, T2_PAYMENT_METHODS, T2_SETTINGS, T2_SUBSCRIPTIONS, T2_TAGS,
 };
 
 /// Touch `updatedAt` on subscriptions and expenses (same as per-table replace) for a full snapshot apply.
-pub(crate) fn touch_app_data_for_apply_snapshot(data: &crate::AppDataDoc) -> Result<crate::AppDataDoc, String> {
-    let subscriptions = data
-        .subscriptions
-        .iter()
-        .map(apply_updated_at_touch)
-        .collect::<Result<Vec<_>, _>>()?;
-    let expenses = data
-        .expenses
-        .iter()
-        .map(apply_updated_at_touch)
-        .collect::<Result<Vec<_>, _>>()?;
+pub(crate) fn touch_subscription_doc(mut row: SubscriptionDoc) -> SubscriptionDoc {
+    row.updated_at = chrono::Utc::now().timestamp_millis();
+    row
+}
+
+pub(crate) fn touch_expense_doc(mut row: ExpenseDoc) -> ExpenseDoc {
+    row.updated_at = chrono::Utc::now().timestamp_millis();
+    row
+}
+
+pub(crate) fn touch_app_data_for_apply_snapshot(data: &crate::AppDataDoc) -> AppResult<crate::AppDataDoc> {
+    let subscriptions = data.subscriptions.iter().cloned().map(touch_subscription_doc).collect::<Vec<_>>();
+    let expenses = data.expenses.iter().cloned().map(touch_expense_doc).collect::<Vec<_>>();
     Ok(crate::AppDataDoc {
         subscriptions,
         expenses,
@@ -61,7 +64,7 @@ impl AppStateInner {
         matches!(table, EntityTable::Subscriptions | EntityTable::Expenses)
     }
 
-    fn table_def(table: EntityTable) -> TableDefinition<'static, &'static str, &'static [u8]> {
+    pub(crate) fn table_def(table: EntityTable) -> TableDefinition<'static, &'static str, &'static [u8]> {
         match table {
             EntityTable::Subscriptions => T2_SUBSCRIPTIONS,
             EntityTable::Expenses => T2_EXPENSES,
@@ -73,7 +76,7 @@ impl AppStateInner {
         }
     }
 
-    pub fn table_list_typed<T>(&self, table: EntityTable) -> Result<Vec<T>, String>
+    pub fn table_list_typed<T>(&self, table: EntityTable) -> AppResult<Vec<T>>
     where
         T: Clone + DeserializeOwned,
     {
@@ -88,56 +91,56 @@ impl AppStateInner {
         }
     }
 
-    pub fn table_get_by_id_typed<T>(&self, table: EntityTable, id: &str) -> Result<Option<T>, String>
+    pub fn table_get_by_id_typed<T>(&self, table: EntityTable, id: &str) -> AppResult<Option<T>>
     where
         T: DeserializeOwned,
     {
-        let tx = self.db.begin_read().map_err(|e| e.to_string())?;
+        let tx = self.db.begin_read().map_err(AppError::from)?;
         let table_def = Self::table_def(table);
-        let t = tx.open_table(table_def).map_err(|e| e.to_string())?;
-        let maybe = t.get(id).map_err(|e| e.to_string())?;
+        let t = tx.open_table(table_def).map_err(AppError::from)?;
+        let maybe = t.get(id).map_err(AppError::from)?;
         match maybe {
             Some(raw) => Ok(Some(decode_bin::<T>(raw.value())?)),
             None => Ok(None),
         }
     }
 
-    pub fn table_get_expense_by_id(&self, id: &str) -> Result<Option<crate::models::ExpenseDoc>, String> {
-        let tx = self.db.begin_read().map_err(|e| e.to_string())?;
-        let t = tx.open_table(Self::table_def(EntityTable::Expenses)).map_err(|e| e.to_string())?;
-        let maybe = t.get(id).map_err(|e| e.to_string())?;
+    pub fn table_get_expense_by_id(&self, id: &str) -> AppResult<Option<crate::models::ExpenseDoc>> {
+        let tx = self.db.begin_read().map_err(AppError::from)?;
+        let t = tx.open_table(Self::table_def(EntityTable::Expenses)).map_err(AppError::from)?;
+        let maybe = t.get(id).map_err(AppError::from)?;
         match maybe {
             Some(raw) => Ok(Some(decode_bin::<crate::models::ExpenseDoc>(raw.value())?)),
             None => Ok(None),
         }
     }
 
-    pub fn table_upsert_typed<T>(&mut self, table: EntityTable, row: &T, id: &str) -> Result<(), String>
+    pub fn table_upsert_typed<T>(&mut self, table: EntityTable, row: &T, id: &str) -> AppResult<()>
     where
         T: Clone + Serialize + DeserializeOwned,
     {
         let row_to_write = if Self::is_timestamped_entity_table(table) {
-            apply_updated_at_touch(row)?
+            touch_timestamped_row(table, row)?
         } else {
             row.clone()
         };
-        let tx = self.db.begin_write().map_err(|e| e.to_string())?;
+        let tx = self.db.begin_write().map_err(AppError::from)?;
         {
-            let mut t = tx.open_table(Self::table_def(table)).map_err(|e| e.to_string())?;
+            let mut t = tx.open_table(Self::table_def(table)).map_err(AppError::from)?;
             let payload = encode_bin(&row_to_write)?;
-            t.insert(id, payload.as_slice()).map_err(|e| e.to_string())?;
+            t.insert(id, payload.as_slice()).map_err(AppError::from)?;
         }
-        tx.commit().map_err(|e| e.to_string())?;
+        tx.commit().map_err(AppError::from)?;
         self.patch_cache_upsert_typed(table, &row_to_write, id)
     }
 
-    pub fn table_delete_by_id(&mut self, table: EntityTable, id: &str) -> Result<(), String> {
-        let tx = self.db.begin_write().map_err(|e| e.to_string())?;
+    pub fn table_delete_by_id(&mut self, table: EntityTable, id: &str) -> AppResult<()> {
+        let tx = self.db.begin_write().map_err(AppError::from)?;
         {
-            let mut t = tx.open_table(Self::table_def(table)).map_err(|e| e.to_string())?;
-            let _ = t.remove(id).map_err(|e| e.to_string())?;
+            let mut t = tx.open_table(Self::table_def(table)).map_err(AppError::from)?;
+            let _ = t.remove(id).map_err(AppError::from)?;
         }
-        tx.commit().map_err(|e| e.to_string())?;
+        tx.commit().map_err(AppError::from)?;
         self.patch_cache_delete(table, id);
         let device_id = crate::commands::sync::load_sync_config()
             .map(|c| c.device_id)
@@ -155,21 +158,21 @@ impl AppStateInner {
         Ok(())
     }
 
-    pub fn settings_typed<T>(&self) -> Result<T, String>
+    pub fn settings_typed<T>(&self) -> AppResult<T>
     where
         T: Default + DeserializeOwned,
     {
         read_singleton_bin_typed(self.db.as_ref(), T2_SETTINGS, T::default())
     }
 
-    pub fn config_typed<T>(&self) -> Result<T, String>
+    pub fn config_typed<T>(&self) -> AppResult<T>
     where
         T: Default + DeserializeOwned,
     {
         read_singleton_bin_typed(self.db.as_ref(), T2_CONFIG, T::default())
     }
 
-    fn patch_cache_upsert_typed<T>(&mut self, table: EntityTable, row: &T, id: &str) -> Result<(), String>
+    fn patch_cache_upsert_typed<T>(&mut self, table: EntityTable, row: &T, id: &str) -> AppResult<()>
     where
         T: Clone + Serialize + DeserializeOwned,
     {
@@ -198,13 +201,12 @@ impl AppStateInner {
     }
 }
 
-fn upsert_doc_typed<T, U>(target: &mut Vec<T>, row: &U, id: &str) -> Result<(), String>
+fn upsert_doc_typed<T, U>(target: &mut Vec<T>, row: &U, id: &str) -> AppResult<()>
 where
     T: serde::Serialize + serde::de::DeserializeOwned,
     U: Serialize,
 {
-    let parsed: T = serde_json::from_value(serde_json::to_value(row).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
+    let parsed: T = serde_json::from_value(serde_json::to_value(row).map_err(AppError::from)?).map_err(AppError::from)?;
     if let Some(pos) = target
         .iter()
         .position(|x| convert_id(x).ok().as_deref() == Some(id))
@@ -216,7 +218,7 @@ where
     Ok(())
 }
 
-fn convert_vec<TSrc, TDst>(src: &[TSrc]) -> Result<Vec<TDst>, String>
+fn convert_vec<TSrc, TDst>(src: &[TSrc]) -> AppResult<Vec<TDst>>
 where
     TSrc: Serialize,
     TDst: DeserializeOwned,
@@ -224,8 +226,7 @@ where
     src.iter()
         .map(|row| {
             let decoded: TDst =
-                serde_json::from_value(serde_json::to_value(row).map_err(|e| e.to_string())?)
-                    .map_err(|e| e.to_string())?;
+                serde_json::from_value(serde_json::to_value(row).map_err(AppError::from)?).map_err(AppError::from)?;
             Ok(decoded)
         })
         .collect()
@@ -236,26 +237,32 @@ struct EntityIdOnly {
     id: String,
 }
 
-fn convert_id<T: Serialize>(value: &T) -> Result<String, String> {
-    let id_only: EntityIdOnly = serde_json::from_value(serde_json::to_value(value).map_err(|e| e.to_string())?)
-        .map_err(|e| e.to_string())?;
+fn convert_id<T: Serialize>(value: &T) -> AppResult<String> {
+    let id_only: EntityIdOnly =
+        serde_json::from_value(serde_json::to_value(value).map_err(AppError::from)?).map_err(AppError::from)?;
     if id_only.id.is_empty() {
-        return Err("entity id missing".to_string());
+        return Err(AppError::EntityIdMissing);
     }
     Ok(id_only.id)
 }
 
-fn apply_updated_at_touch<T>(value: &T) -> Result<T, String>
+fn touch_timestamped_row<T>(table: EntityTable, row: &T) -> AppResult<T>
 where
-    T: Serialize + DeserializeOwned,
+    T: Serialize + DeserializeOwned + Clone,
 {
-    let mut json_value = serde_json::to_value(value).map_err(|e| e.to_string())?;
-    let obj = json_value
-        .as_object_mut()
-        .ok_or("timestamped row must be object".to_string())?;
-    obj.insert(
-        "updatedAt".to_string(),
-        serde_json::json!(chrono::Utc::now().timestamp_millis()),
-    );
-    serde_json::from_value(json_value).map_err(|e| e.to_string())
+    match table {
+        EntityTable::Subscriptions => {
+            let parsed: SubscriptionDoc =
+                serde_json::from_value(serde_json::to_value(row).map_err(AppError::from)?).map_err(AppError::from)?;
+            let touched = touch_subscription_doc(parsed);
+            serde_json::from_value(serde_json::to_value(&touched).map_err(AppError::from)?).map_err(AppError::from)
+        }
+        EntityTable::Expenses => {
+            let parsed: ExpenseDoc =
+                serde_json::from_value(serde_json::to_value(row).map_err(AppError::from)?).map_err(AppError::from)?;
+            let touched = touch_expense_doc(parsed);
+            serde_json::from_value(serde_json::to_value(&touched).map_err(AppError::from)?).map_err(AppError::from)
+        }
+        _ => Ok(row.clone()),
+    }
 }

@@ -3,7 +3,7 @@ use crate::AppState;
 use crate::models::{AppDataDoc, CategoryDoc, CurrencyDoc, HouseholdMemberDoc, PaymentMethodDoc, SettingsDoc, TagDoc};
 
 #[tauri::command]
-pub fn seed_get_default_data() -> Result<AppDataDoc, String> {
+pub fn seed_get_default_data() -> Result<AppDataDoc, crate::errors::AppError> {
     let categories = vec![
         CategoryDoc { id: "cat-1".to_string(), name: "No category".to_string(), icon: "".to_string(), sort_order: 0, i18n_key: "cat_no_category".to_string() },
         CategoryDoc { id: "cat-2".to_string(), name: "Entertainment".to_string(), icon: "".to_string(), sort_order: 1, i18n_key: "cat_entertainment".to_string() },
@@ -124,8 +124,8 @@ pub fn seed_get_default_data() -> Result<AppDataDoc, String> {
 }
 
 #[tauri::command]
-pub fn seed_apply_if_empty(state: State<'_, AppState>) -> Result<AppDataDoc, String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn seed_apply_if_empty(state: State<'_, AppState>) -> Result<AppDataDoc, crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let root = guard.doc()?;
     let needs_init = root.subscriptions.is_empty()
         && root.expenses.is_empty()

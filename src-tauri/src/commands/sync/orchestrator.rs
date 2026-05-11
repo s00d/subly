@@ -3,6 +3,7 @@ use super::{
     provider_auth_url,
     provider_download, provider_upload, providers_list, save_oauth_tokens, save_sync_config,
     set_dropbox_app_secret, set_webdav_password,
+    sync_redb_write_begin, sync_redb_write_is_active,
     SyncEnableDto, SyncHasUpdateDto, SyncOkDto, SyncUiSchemaDto,
     sync_build_push_meta, sync_merge_with_tombstones, sync_payload_fits_limit, sync_push_revision_mismatch, sync_runtime,
     sync_should_pull, sync_status_from_config, token_key, SyncCredentialsDto, SyncPayload, SyncProviderType,
@@ -15,7 +16,7 @@ fn persist_merged_snapshot(
     guard: &mut crate::state::AppStateInner,
     merged: &crate::models::AppDataDoc,
     app_config: &crate::models::AppConfigDoc,
-) -> Result<(), String> {
+) -> Result<(), crate::errors::AppError> {
     guard.apply_snapshot_typed_with_config(merged, app_config)
 }
 
@@ -110,12 +111,16 @@ pub fn ensure_sync_scheduler_started(app: tauri::AppHandle) {
             loop {
                 if let Ok(cfg) = load_sync_config() {
                     if cfg.enabled {
+                        if sync_redb_write_is_active() {
+                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                            continue;
+                        }
                         if let Some(provider) = cfg.provider.clone() {
                             let token = match provider_access_token(&provider, &cfg).await {
                                 Ok(v) => v,
                                 Err(err) => {
                                     if let Ok(mut rt) = sync_runtime().lock() {
-                                        rt.status.error = Some(err);
+                                        rt.status.error = Some(err.to_string());
                                     }
                                     None
                                 }
@@ -150,14 +155,14 @@ pub async fn sync_dispatch_internal(
     app: tauri::AppHandle,
     state: tauri::State<'_, crate::AppState>,
     command: SyncDispatchCommand,
-) -> Result<SyncDispatchResponse, String> {
+) -> Result<SyncDispatchResponse, crate::errors::AppError> {
     let event = command.event_name().to_string();
     let mut cfg = load_sync_config()?;
     if matches!(command, SyncDispatchCommand::Init) {
         ensure_sync_scheduler_started(app.clone());
     }
     let current_status = {
-        let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+        let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
         rt.status = sync_status_from_config(&cfg);
         rt.status.clone()
     };
@@ -201,12 +206,12 @@ pub async fn sync_dispatch_internal(
             cfg.enabled = true;
             save_sync_config(&cfg)?;
             {
-                let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                 rt.oauth_pkce_verifier = None;
             }
             if let Some(url) = provider_auth_url(&provider, &cfg) {
                 {
-                    let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                    let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                     rt.oauth_pending_provider = Some(provider);
                 }
                 SyncDispatchData::Enable(SyncEnableDto {
@@ -237,7 +242,7 @@ pub async fn sync_dispatch_internal(
             cfg.remote_revision.clear();
             save_sync_config(&cfg)?;
             {
-                let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                 rt.oauth_pending_provider = None;
                 rt.oauth_pkce_verifier = None;
                 rt.status = sync_status_from_config(&cfg);
@@ -255,7 +260,7 @@ pub async fn sync_dispatch_internal(
             cfg.provider = Some(provider.clone());
             save_sync_config(&cfg)?;
             {
-                let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                 rt.oauth_pending_provider = None;
             }
             SyncDispatchData::Ok(SyncOkDto::success())
@@ -276,7 +281,7 @@ pub async fn sync_dispatch_internal(
             if let Some(payload) = remote {
                 let remote_ts = payload.meta.updated_at.max(payload.meta.last_synced_at);
                 {
-                    let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                    let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                     rt.status.remote_updated_at = remote_ts;
                 }
                 cfg.remote_revision = payload.meta.revision.unwrap_or_default();
@@ -287,7 +292,7 @@ pub async fn sync_dispatch_internal(
                     cfg.device_id.clone(),
                 )?;
                 {
-                    let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                    let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                     rt.status.pending_update = should_pull;
                 }
                 save_sync_config(&cfg)?;
@@ -296,7 +301,7 @@ pub async fn sync_dispatch_internal(
                 })
             } else {
                 {
-                    let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                    let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                     rt.status.pending_update = false;
                 }
                 SyncDispatchData::HasUpdate(SyncHasUpdateDto { has_update: false })
@@ -316,16 +321,21 @@ pub async fn sync_dispatch_internal(
             let token = provider_access_token(&provider, &cfg).await?;
             if let Some(remote) = provider_download(&app, &provider, &cfg, token.as_deref()).await? {
                 let (merged, merged_tombstones) = {
-                    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+                    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
                     let local_ts = crate::state::load_deletion_tombstones(guard.db.as_ref())?;
                     let local = guard.doc()?;
                     drop(guard);
                     sync_merge_with_tombstones(local, remote.data, local_ts, remote.tombstones)?
                 };
                 {
-                    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+                    let _redb_write = sync_redb_write_begin();
+                    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
                     persist_merged_snapshot(&mut guard, &merged, &remote.app_config)?;
                     crate::state::replace_deletion_tombstones(guard.db.as_ref(), &merged_tombstones)?;
+                    crate::state::prune_deletion_tombstones_older_than(
+                        guard.db.as_ref(),
+                        crate::state::DELETION_TOMBSTONE_RETAIN_MS,
+                    )?;
                 }
                 let remote_ts = remote.meta.updated_at.max(remote.meta.last_synced_at);
                 cfg.local_updated_at = remote_ts;
@@ -333,7 +343,7 @@ pub async fn sync_dispatch_internal(
                 cfg.remote_revision = remote.meta.revision.unwrap_or_default();
                 save_sync_config(&cfg)?;
                 {
-                    let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                    let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                     rt.status = sync_status_from_config(&cfg);
                     rt.status.remote_updated_at = remote_ts;
                     rt.status.pending_update = false;
@@ -344,9 +354,7 @@ pub async fn sync_dispatch_internal(
                 );
                 #[cfg(target_os = "ios")]
                 {
-                    if let Ok(guard) = state.lock() {
-                        crate::widget_snapshot::export_ios_widget_snapshot_from_guard(&guard);
-                    }
+                    crate::widget_snapshot::export_ios_widget_snapshot_from_app(&app);
                 }
                 SyncDispatchData::Ok(SyncOkDto::success())
             } else {
@@ -378,7 +386,7 @@ pub async fn sync_dispatch_internal(
                 }
             }
             let (local_data, app_config, tombstones) = {
-                let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+                let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
                 load_local_sync_snapshot(&guard)?
             };
             let meta = sync_build_push_meta(cfg.local_updated_at, cfg.device_id.clone())?;
@@ -389,7 +397,7 @@ pub async fn sync_dispatch_internal(
                 tombstones,
             };
             if !sync_payload_fits_limit(payload.clone(), MAX_SYNC_PAYLOAD_BYTES)? {
-                return Err("sync payload too large".to_string());
+                return Err(crate::errors::AppError::from("sync payload too large"));
             }
             provider_upload(&app, &provider, &cfg, &payload, token.as_deref()).await?;
             cfg.last_synced = payload.meta.last_synced_at;
@@ -397,7 +405,7 @@ pub async fn sync_dispatch_internal(
             cfg.local_updated_at = payload.meta.updated_at;
             save_sync_config(&cfg)?;
             {
-                let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                 rt.status = sync_status_from_config(&cfg);
                 rt.status.remote_updated_at = payload.meta.updated_at;
             }
@@ -429,7 +437,7 @@ pub async fn sync_dispatch_internal(
             };
             if has_update {
                 {
-                    let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                    let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                     rt.status.pending_update = true;
                 }
                 SyncDispatchData::Ok(SyncOkDto {
@@ -441,7 +449,7 @@ pub async fn sync_dispatch_internal(
                 SyncDispatchData::Ok(SyncOkDto::fail("sync_push_revision_conflict"))
             } else {
                 let (local_data, app_config, tombstones) = {
-                    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+                    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
                     load_local_sync_snapshot(&guard)?
                 };
                 let meta = sync_build_push_meta(cfg.local_updated_at, cfg.device_id.clone())?;
@@ -452,7 +460,7 @@ pub async fn sync_dispatch_internal(
                     tombstones,
                 };
                 if !sync_payload_fits_limit(payload.clone(), MAX_SYNC_PAYLOAD_BYTES)? {
-                    return Err("sync payload too large".to_string());
+                    return Err(crate::errors::AppError::from("sync payload too large"));
                 }
                 provider_upload(&app, &provider, &cfg, &payload, token.as_deref()).await?;
                 cfg.last_synced = payload.meta.last_synced_at;
@@ -460,7 +468,7 @@ pub async fn sync_dispatch_internal(
                 cfg.local_updated_at = payload.meta.updated_at;
                 save_sync_config(&cfg)?;
                 {
-                    let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                    let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                     rt.status = sync_status_from_config(&cfg);
                 }
                 SyncDispatchData::Ok(SyncOkDto::success())
@@ -475,7 +483,7 @@ pub async fn sync_dispatch_internal(
                     false
                 } else {
                     let (local_data, app_config, tombstones) = {
-                        let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+                        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
                         load_local_sync_snapshot(&guard)?
                     };
                     let meta = sync_build_push_meta(cfg.local_updated_at, cfg.device_id.clone())?;
@@ -499,7 +507,7 @@ pub async fn sync_dispatch_internal(
         }
         SyncDispatchCommand::DismissPending => {
             {
-                let mut rt = sync_runtime().lock().map_err(|_| "sync runtime lock poisoned".to_string())?;
+                let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                 rt.status.pending_update = false;
             }
             SyncDispatchData::Ok(SyncOkDto::success())

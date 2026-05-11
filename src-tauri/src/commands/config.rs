@@ -4,8 +4,8 @@ use crate::AppState;
 const CONFIG_PREFIX: &str = "config:";
 
 #[tauri::command]
-pub fn config_get(state: State<'_, AppState>, key: String) -> Result<Option<serde_json::Value>, String> {
-    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn config_get(state: State<'_, AppState>, key: String) -> Result<Option<serde_json::Value>, crate::errors::AppError> {
+    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let full_key = format!("{CONFIG_PREFIX}{key}");
     let raw = guard.redb_get(&full_key)?;
     let Some(raw) = raw else {
@@ -24,16 +24,16 @@ pub fn config_get(state: State<'_, AppState>, key: String) -> Result<Option<serd
 }
 
 #[tauri::command]
-pub fn config_set(state: State<'_, AppState>, key: String, value: serde_json::Value) -> Result<(), String> {
-    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn config_set(state: State<'_, AppState>, key: String, value: serde_json::Value) -> Result<(), crate::errors::AppError> {
+    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let full_key = format!("{CONFIG_PREFIX}{key}");
     let raw = serde_json::to_string(&value).map_err(|e| e.to_string())?;
     guard.redb_set(&full_key, &raw)
 }
 
 #[tauri::command]
-pub fn config_delete(state: State<'_, AppState>, key: String) -> Result<(), String> {
-    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn config_delete(state: State<'_, AppState>, key: String) -> Result<(), crate::errors::AppError> {
+    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let full_key = format!("{CONFIG_PREFIX}{key}");
     guard.redb_delete(&full_key)
 }

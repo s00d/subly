@@ -42,7 +42,7 @@ pub fn auth_url(cfg: &SyncConfig) -> Option<String> {
     ))
 }
 
-pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<SyncPayload>, String> {
+pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<SyncPayload>, crate::errors::AppError> {
     let resp = tauri_plugin_http::reqwest::Client::new()
         .get(format!(
             "https://graph.microsoft.com/v1.0/me/drive/special/approot:/{}:/content",
@@ -59,7 +59,7 @@ pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<Sy
     Ok(Some(decode_sync_payload(&bytes)?))
 }
 
-pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str) -> Result<(), String> {
+pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str) -> Result<(), crate::errors::AppError> {
     let client = tauri_plugin_http::reqwest::Client::new();
     let raw = encode_sync_payload(payload)?;
     let put_url = format!(
@@ -75,7 +75,10 @@ pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str
         .await
         .map_err(|e| e.to_string())?;
     if !put.status().is_success() {
-        return Err(format!("onedrive upload (tmp) failed: {}", put.status()));
+        return Err(crate::errors::AppError::from(format!(
+            "onedrive upload (tmp) failed: {}",
+            put.status()
+        )));
     }
 
     let patch_url = format!(
@@ -100,7 +103,10 @@ pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str
             .bearer_auth(access_token)
             .send()
             .await;
-        return Err(format!("onedrive rename (tmp→final) failed: {}", patch.status()));
+        return Err(crate::errors::AppError::from(format!(
+            "onedrive rename (tmp→final) failed: {}",
+            patch.status()
+        )));
     }
 
     Ok(())

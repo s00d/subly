@@ -4,18 +4,18 @@ use tempfile::TempDir;
 use crate::commands::seed::seed_get_default_data;
 use crate::models::{AppConfigDoc, AppDataDoc, ExpenseDoc, PaymentRecordDto, SubscriptionDoc};
 
-pub(crate) fn temp_db() -> Result<(TempDir, Database), String> {
+pub(crate) fn temp_db() -> Result<(TempDir, Database), crate::errors::AppError> {
     let dir = tempfile::tempdir().map_err(|e| e.to_string())?;
     let db_path = dir.path().join("test.redb");
     let db = Database::create(db_path).map_err(|e| e.to_string())?;
     Ok((dir, db))
 }
 
-pub(crate) fn base_seeded_doc() -> Result<AppDataDoc, String> {
+pub(crate) fn base_seeded_doc() -> Result<AppDataDoc, crate::errors::AppError> {
     seed_get_default_data()
 }
 
-pub(crate) fn doc_with_restart_sensitive_fields() -> Result<AppDataDoc, String> {
+pub(crate) fn doc_with_restart_sensitive_fields() -> Result<AppDataDoc, crate::errors::AppError> {
     let mut doc = base_seeded_doc()?;
     let main_currency = doc
         .currencies

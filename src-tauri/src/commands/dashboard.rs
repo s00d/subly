@@ -437,8 +437,8 @@ pub struct DashboardTrendsDto {
 }
 
 #[tauri::command]
-pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSummaryDto, String> {
-    let data = { let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?; guard.doc()? };
+pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSummaryDto, crate::errors::AppError> {
+    let data = { let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?; guard.doc()? };
     let rates = crate::rate_map(&data);
     let today = chrono::Local::now().date_naive();
 
@@ -554,8 +554,8 @@ pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSumm
 }
 
 #[tauri::command]
-pub fn get_dashboard_charts(state: State<'_, AppState>) -> Result<DashboardChartsDto, String> {
-    let data = { let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?; guard.doc()? };
+pub fn get_dashboard_charts(state: State<'_, AppState>) -> Result<DashboardChartsDto, crate::errors::AppError> {
+    let data = { let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?; guard.doc()? };
     let rates = crate::rate_map(&data);
     let active = data.subscriptions.iter().filter(|s| !s.inactive).collect::<Vec<_>>();
 
@@ -606,8 +606,8 @@ pub fn get_dashboard_charts(state: State<'_, AppState>) -> Result<DashboardChart
 }
 
 #[tauri::command]
-pub fn get_dashboard_forecast(state: State<'_, AppState>) -> Result<DashboardForecastDto, String> {
-    let data = { let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?; guard.doc()? };
+pub fn get_dashboard_forecast(state: State<'_, AppState>) -> Result<DashboardForecastDto, crate::errors::AppError> {
+    let data = { let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?; guard.doc()? };
     let rates = crate::rate_map(&data);
     let active = data.subscriptions.iter().filter(|s| !s.inactive).collect::<Vec<_>>();
     let next_month: f64 = active
@@ -646,8 +646,8 @@ pub fn get_dashboard_forecast(state: State<'_, AppState>) -> Result<DashboardFor
 }
 
 #[tauri::command]
-pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrendsDto, String> {
-    let data = { let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?; guard.doc()? };
+pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrendsDto, crate::errors::AppError> {
+    let data = { let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?; guard.doc()? };
     let rates = crate::rate_map(&data);
     let now = chrono::Local::now().date_naive();
 

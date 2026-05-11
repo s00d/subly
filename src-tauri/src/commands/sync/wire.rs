@@ -20,14 +20,14 @@ fn is_base64_icon(icon: &str) -> bool {
     icon.starts_with("data:")
 }
 
-fn data_uri_to_bytes(data_uri: &str) -> Result<Vec<u8>, String> {
+fn data_uri_to_bytes(data_uri: &str) -> Result<Vec<u8>, crate::errors::AppError> {
     let base64_part = data_uri
         .split(',')
         .nth(1)
-        .ok_or("invalid data uri")?;
+        .ok_or_else(|| crate::errors::AppError::from("invalid data uri"))?;
     base64::engine::general_purpose::STANDARD
         .decode(base64_part)
-        .map_err(|e| e.to_string())
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))
 }
 
 fn bytes_to_data_uri(bytes: &[u8], filename: &str) -> String {
@@ -50,7 +50,7 @@ fn bytes_to_data_uri(bytes: &[u8], filename: &str) -> String {
 fn build_sync_snapshot_archive(
     data: crate::models::AppDataDoc,
     app_config: crate::models::AppConfigDoc,
-) -> Result<Vec<u8>, String> {
+) -> Result<Vec<u8>, crate::errors::AppError> {
     let mut data = data;
     let mut icons: HashMap<String, String> = HashMap::new();
     let mut idx = 0usize;
@@ -104,7 +104,7 @@ fn build_sync_snapshot_archive(
 
 fn parse_sync_snapshot_archive(
     bytes: Vec<u8>,
-) -> Result<(crate::models::AppDataDoc, crate::models::AppConfigDoc), String> {
+) -> Result<(crate::models::AppDataDoc, crate::models::AppConfigDoc), crate::errors::AppError> {
     let reader = Cursor::new(bytes);
     let mut archive = ZipArchive::new(reader).map_err(|e| e.to_string())?;
     let mut data_json = String::new();
@@ -148,7 +148,7 @@ fn parse_sync_snapshot_archive(
     Ok((app_data, app_config))
 }
 
-pub fn encode_sync_payload(payload: &SyncPayload) -> Result<Vec<u8>, String> {
+pub fn encode_sync_payload(payload: &SyncPayload) -> Result<Vec<u8>, crate::errors::AppError> {
     let snapshot_archive = build_sync_snapshot_archive(payload.data.clone(), payload.app_config.clone())?;
     let envelope = SyncWireEnvelope {
         version: 2,
@@ -156,22 +156,22 @@ pub fn encode_sync_payload(payload: &SyncPayload) -> Result<Vec<u8>, String> {
         tombstones: payload.tombstones.clone(),
         snapshot_archive,
     };
-    let raw = postcard::to_allocvec(&envelope).map_err(|e| e.to_string())?;
-    let compressed = zstd::encode_all(raw.as_slice(), 3).map_err(|e| e.to_string())?;
+    let raw = postcard::to_allocvec(&envelope)?;
+    let compressed = zstd::encode_all(raw.as_slice(), 3).map_err(crate::errors::AppError::from)?;
     let mut out = Vec::with_capacity(MAGIC.len() + compressed.len());
     out.extend_from_slice(MAGIC);
     out.extend_from_slice(&compressed);
     Ok(out)
 }
 
-pub fn decode_sync_payload(bytes: &[u8]) -> Result<SyncPayload, String> {
+pub fn decode_sync_payload(bytes: &[u8]) -> Result<SyncPayload, crate::errors::AppError> {
     if !bytes.starts_with(MAGIC) {
-        return Err("unsupported sync payload format".to_string());
+        return Err(crate::errors::AppError::from("unsupported sync payload format"));
     }
-    let raw = zstd::decode_all(&bytes[MAGIC.len()..]).map_err(|e| e.to_string())?;
-    let envelope: SyncWireEnvelope = postcard::from_bytes(&raw).map_err(|e| e.to_string())?;
+    let raw = zstd::decode_all(&bytes[MAGIC.len()..]).map_err(crate::errors::AppError::from)?;
+    let envelope: SyncWireEnvelope = postcard::from_bytes(&raw)?;
     if envelope.version != 2 {
-        return Err("unsupported sync payload version".to_string());
+        return Err(crate::errors::AppError::from("unsupported sync payload version"));
     }
     let (data, app_config) = parse_sync_snapshot_archive(envelope.snapshot_archive)?;
     Ok(SyncPayload {

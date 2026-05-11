@@ -27,7 +27,7 @@ fn apply_imported_snapshot(
     guard: &mut crate::state::AppStateInner,
     data: &AppDataDoc,
     config: &AppConfigDoc,
-) -> Result<(), String> {
+) -> Result<(), crate::errors::AppError> {
     guard.apply_snapshot_typed_with_config(data, config)
 }
 
@@ -44,8 +44,8 @@ pub struct ExportPathPresets {
     pub downloads: Option<ExportPathSet>,
 }
 
-fn parse_file_path(path: &str) -> Result<FilePath, String> {
-    FilePath::from_str(path).map_err(|e| e.to_string())
+fn parse_file_path(path: &str) -> Result<FilePath, crate::errors::AppError> {
+    FilePath::from_str(path).map_err(|e| crate::errors::AppError::Message(e.to_string()))
 }
 
 fn require_path(path: Option<String>) -> Result<FilePath, ExportResult> {
@@ -75,7 +75,7 @@ fn build_path_set(base: &Path) -> ExportPathSet {
 }
 
 #[tauri::command]
-pub fn export_get_path_presets() -> Result<ExportPathPresets, String> {
+pub fn export_get_path_presets() -> Result<ExportPathPresets, crate::errors::AppError> {
     Ok(ExportPathPresets {
         documents: dirs::document_dir().map(|p| build_path_set(&p)),
         downloads: dirs::download_dir().map(|p| build_path_set(&p)),
@@ -99,14 +99,14 @@ pub fn export_subly_backup(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     args: Option<ExportPathArgs>,
-) -> Result<ExportResult, String> {
+) -> Result<ExportResult, crate::errors::AppError> {
     let fp = match require_path(args.and_then(|a| a.path)) {
         Ok(p) => p,
         Err(e) => return Ok(e),
     };
 
     let (data, config) = {
-        let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         let data = guard.app_data.clone();
         let config: AppConfigDoc =
             read_singleton_bin_typed(guard.db.as_ref(), T2_CONFIG, AppConfigDoc::default())?;
@@ -139,7 +139,7 @@ pub fn import_subly_backup(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     args: Option<ExportPathArgs>,
-) -> Result<ExportResult, String> {
+) -> Result<ExportResult, crate::errors::AppError> {
     let fp = match require_path(args.and_then(|a| a.path)) {
         Ok(p) => p,
         Err(e) => return Ok(e),
@@ -153,7 +153,7 @@ pub fn import_subly_backup_bytes(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     args: ImportSublyBytesArgs,
-) -> Result<ExportResult, String> {
+) -> Result<ExportResult, crate::errors::AppError> {
     import_apply_subly_bytes(&app, &state, args.bytes)
 }
 
@@ -161,7 +161,7 @@ fn import_apply_subly_bytes(
     app: &tauri::AppHandle,
     state: &State<'_, AppState>,
     bytes: Vec<u8>,
-) -> Result<ExportResult, String> {
+) -> Result<ExportResult, crate::errors::AppError> {
     let parsed = import_parse_subly_archive_with_config(bytes).map_err(|e| e.to_string())?;
     let Some((data, cfg)) = parsed else {
         return Ok(ExportResult {
@@ -170,7 +170,7 @@ fn import_apply_subly_bytes(
             imported_count: None,
         });
     };
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     apply_imported_snapshot(&mut guard, &data, &cfg)?;
     let _ = app.emit(
         "app:data-changed",
@@ -187,14 +187,14 @@ fn is_base64_icon(icon: &str) -> bool {
     icon.starts_with("data:")
 }
 
-fn data_uri_to_bytes(data_uri: &str) -> Result<Vec<u8>, String> {
+fn data_uri_to_bytes(data_uri: &str) -> Result<Vec<u8>, crate::errors::AppError> {
     let base64_part = data_uri
         .split(',')
         .nth(1)
-        .ok_or("invalid data uri")?;
+        .ok_or_else(|| crate::errors::AppError::from("invalid data uri"))?;
     base64::engine::general_purpose::STANDARD
         .decode(base64_part)
-        .map_err(|e| e.to_string())
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))
 }
 
 fn bytes_to_data_uri(bytes: &[u8], filename: &str) -> String {
@@ -216,13 +216,13 @@ fn bytes_to_data_uri(bytes: &[u8], filename: &str) -> String {
 
 #[tauri::command]
 #[allow(dead_code)]
-pub fn export_build_subly_archive(data: AppDataDoc) -> Result<Vec<u8>, String> {
+pub fn export_build_subly_archive(data: AppDataDoc) -> Result<Vec<u8>, crate::errors::AppError> {
     let mut cfg = AppConfigDoc::default();
     cfg.initialized = true;
     export_build_subly_archive_with_config(data, cfg)
 }
 
-fn export_build_subly_archive_with_config(data: AppDataDoc, config: AppConfigDoc) -> Result<Vec<u8>, String> {
+fn export_build_subly_archive_with_config(data: AppDataDoc, config: AppConfigDoc) -> Result<Vec<u8>, crate::errors::AppError> {
     let mut data = data;
     let mut icons: HashMap<String, String> = HashMap::new();
     let mut idx = 0usize;
@@ -303,7 +303,7 @@ fn validate_import_payload(data: &AppDataDoc) -> bool {
 
 #[tauri::command]
 #[allow(dead_code)]
-pub fn import_parse_subly_archive(bytes: Vec<u8>) -> Result<Option<AppDataDoc>, String> {
+pub fn import_parse_subly_archive(bytes: Vec<u8>) -> Result<Option<AppDataDoc>, crate::errors::AppError> {
     let parsed = import_parse_subly_archive_with_config(bytes)?;
     Ok(parsed.map(|(data, _)| data))
 }
@@ -347,7 +347,7 @@ fn normalize_legacy_expense_dates_in_import_json(value: &mut serde_json::Value) 
     }
 }
 
-fn parse_import_payload_json(raw_json: &str) -> Result<(AppDataDoc, AppConfigDoc), String> {
+fn parse_import_payload_json(raw_json: &str) -> Result<(AppDataDoc, AppConfigDoc), crate::errors::AppError> {
     let raw_value: serde_json::Value = serde_json::from_str(raw_json).map_err(|e| e.to_string())?;
     let data: AppDataDoc = if let Some(app_data) = raw_value.get("appData") {
         let mut v = app_data.clone();
@@ -367,7 +367,7 @@ fn parse_import_payload_json(raw_json: &str) -> Result<(AppDataDoc, AppConfigDoc
     Ok((data, config))
 }
 
-fn import_parse_subly_archive_with_config(bytes: Vec<u8>) -> Result<Option<(AppDataDoc, AppConfigDoc)>, String> {
+fn import_parse_subly_archive_with_config(bytes: Vec<u8>) -> Result<Option<(AppDataDoc, AppConfigDoc)>, crate::errors::AppError> {
     let reader = Cursor::new(bytes);
     let mut archive = ZipArchive::new(reader).map_err(|e| e.to_string())?;
     let mut data_json = String::new();

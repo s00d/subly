@@ -84,12 +84,12 @@ const CONFIG_SETTINGS_KEY: &str = "config:settings";
 const CONFIG_PROVIDER_KEY: &str = "config:ratesProvider";
 const SECURE_RATES_API_KEY: &str = "secure_storage.ratesApiKey";
 
-fn daily_update_allowed(last_update: &str) -> Result<bool, String> {
+fn daily_update_allowed(last_update: &str) -> Result<bool, crate::errors::AppError> {
     if last_update.trim().is_empty() {
         return Ok(true);
     }
     let parsed = chrono::NaiveDate::parse_from_str(last_update.trim(), "%Y-%m-%d")
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     let now = chrono::Local::now().date_naive();
     Ok((now - parsed).num_days() >= 1)
 }
@@ -98,17 +98,17 @@ fn today_ymd() -> String {
     chrono::Local::now().date_naive().format("%Y-%m-%d").to_string()
 }
 
-fn load_rates_settings() -> Result<RatesSettingsDto, String> {
+fn load_rates_settings() -> Result<RatesSettingsDto, crate::errors::AppError> {
     let raw = crate::redb_get_internal(CONFIG_SETTINGS_KEY.to_string())?;
     match raw {
-        Some(value) => serde_json::from_str::<RatesSettingsDto>(&value).map_err(|e| e.to_string()),
+        Some(value) => serde_json::from_str::<RatesSettingsDto>(&value).map_err(|e| crate::errors::AppError::Message(e.to_string())),
         None => Ok(RatesSettingsDto::default()),
     }
 }
 
-fn update_last_currency_update(next_date: &str) -> Result<(), String> {
+fn update_last_currency_update(next_date: &str) -> Result<(), crate::errors::AppError> {
     let mut settings_value = match crate::redb_get_internal(CONFIG_SETTINGS_KEY.to_string())? {
-        Some(raw) => serde_json::from_str::<serde_json::Value>(&raw).map_err(|e| e.to_string())?,
+        Some(raw) => serde_json::from_str::<serde_json::Value>(&raw).map_err(|e| crate::errors::AppError::Message(e.to_string()))?,
         None => serde_json::json!({}),
     };
     if !settings_value.is_object() {
@@ -117,11 +117,11 @@ fn update_last_currency_update(next_date: &str) -> Result<(), String> {
     settings_value["lastCurrencyUpdate"] = serde_json::Value::String(next_date.to_string());
     crate::redb_set_internal(
         CONFIG_SETTINGS_KEY.to_string(),
-        serde_json::to_string(&settings_value).map_err(|e| e.to_string())?,
+        serde_json::to_string(&settings_value).map_err(|e| crate::errors::AppError::Message(e.to_string()))?,
     )
 }
 
-fn load_provider_and_key() -> Result<(String, String), String> {
+fn load_provider_and_key() -> Result<(String, String), crate::errors::AppError> {
     let provider = crate::redb_get_internal(CONFIG_PROVIDER_KEY.to_string())?
         .and_then(|raw| serde_json::from_str::<String>(&raw).ok())
         .filter(|v| !v.trim().is_empty())
@@ -138,16 +138,16 @@ fn load_provider_and_key() -> Result<(String, String), String> {
 
 static RATES_UPDATE_LOCK: OnceLock<tokio::sync::Mutex<()>> = OnceLock::new();
 
-fn resolve_main_currency<'a>(currencies: &'a [CurrencyRowDto], main_currency_id: &str) -> Result<&'a CurrencyRowDto, String> {
+fn resolve_main_currency<'a>(currencies: &'a [CurrencyRowDto], main_currency_id: &str) -> Result<&'a CurrencyRowDto, crate::errors::AppError> {
     if currencies.is_empty() {
-        return Err("No currencies available for update".to_string());
+        return Err(crate::errors::AppError::from("No currencies available for update"));
     }
     currencies
         .iter()
         .find(|c| c.id == main_currency_id)
         .or_else(|| currencies.iter().find(|c| c.code.eq_ignore_ascii_case(main_currency_id)))
         .or_else(|| currencies.first())
-        .ok_or("Main currency not found".to_string())
+        .ok_or_else(|| crate::errors::AppError::from("Main currency not found"))
 }
 
 fn currency_rows_from_docs(currencies: &[crate::models::CurrencyDoc]) -> Vec<CurrencyRowDto> {
@@ -232,13 +232,15 @@ async fn perform_rates_update(
     main_currency_id: String,
     target_currency_ids: Vec<String>,
     opts: Option<RatesUpdateOptionsDto>,
-) -> Result<RatesUpdateResultDto, String> {
+) -> Result<RatesUpdateResultDto, crate::errors::AppError> {
     eprintln!(
         "[subly][rates] perform update provider={} main_currency_id={} targets={:?}",
         provider_type, main_currency_id, target_currency_ids
     );
     let currencies_docs = {
-        let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+        let guard = state
+            .lock()
+            .map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         guard.table_list_typed::<crate::models::CurrencyDoc>(EntityTable::Currencies)?
     };
     let currencies = currency_rows_from_docs(&currencies_docs);
@@ -246,12 +248,12 @@ async fn perform_rates_update(
     let main_id = main.id.clone();
     let main_code = normalize_currency_code(&main.code);
     if main_code.is_empty() {
-        return Err("Main currency code missing".to_string());
+        return Err(crate::errors::AppError::from("Main currency code missing"));
     }
     let target_ids = resolve_target_ids(&currencies, target_currency_ids, &main_id);
 
     if target_ids.is_empty() {
-        return Err("No target currencies configured for rates update".to_string());
+        return Err(crate::errors::AppError::from("No target currencies configured for rates update"));
     }
 
     let target_codes: Vec<String> = target_ids
@@ -265,7 +267,7 @@ async fn perform_rates_update(
         .filter(|code| !code.is_empty())
         .collect();
     if target_codes.is_empty() {
-        return Err("No valid target currency codes configured".to_string());
+        return Err(crate::errors::AppError::from("No valid target currency codes configured"));
     }
 
     let provider_chain: Vec<&str> = {
@@ -289,7 +291,7 @@ async fn perform_rates_update(
             "exchangerate" => exchangerate::fetch_rates(&main_code, &target_codes, api_key.as_str()).await,
             "currencyapi" => currencyapi::fetch_rates(&main_code, &target_codes, api_key.as_str()).await,
             "openexchangerates" => openexchangerates::fetch_rates(&main_code, &target_codes, api_key.as_str()).await,
-            _ => Err("provider not implemented".to_string()),
+            _ => Err(crate::errors::AppError::from("provider not implemented")),
         };
         match fetched_for_provider {
             Ok(rates) => {
@@ -348,14 +350,16 @@ async fn perform_rates_update(
         }
     }
     if rate_by_id.is_empty() {
-        return Err(format!(
+        return Err(crate::errors::AppError::from(format!(
             "Provider returned no rates for target currencies: {}",
             target_codes.join(", ")
-        ));
+        )));
     }
 
     let updated = {
-        let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+        let mut guard = state
+            .lock()
+            .map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         let mut currencies = guard.table_list_typed::<crate::models::CurrencyDoc>(EntityTable::Currencies)?;
         let mut updated = 0usize;
         let mut touched_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
@@ -384,7 +388,7 @@ async fn perform_rates_update(
         updated
     };
     if updated == 0 {
-        return Err("No rates changed for selected currencies".to_string());
+        return Err(crate::errors::AppError::from("No rates changed for selected currencies"));
     }
     Ok(RatesUpdateResultDto { updated, error: None })
 }
@@ -392,7 +396,7 @@ async fn perform_rates_update(
 async fn run_currency_update_if_needed(
     state: &AppState,
     manual_trigger: bool,
-) -> Result<RatesUpdateResultDto, String> {
+) -> Result<RatesUpdateResultDto, crate::errors::AppError> {
     eprintln!(
         "[subly][rates] run_currency_update_if_needed start manual_trigger={}",
         manual_trigger
@@ -479,12 +483,12 @@ fn provider_descriptors() -> Vec<ProviderDescriptor> {
 }
 
 #[tauri::command]
-pub fn rates_should_update(last_update: String) -> Result<bool, String> {
+pub fn rates_should_update(last_update: String) -> Result<bool, crate::errors::AppError> {
     daily_update_allowed(&last_update)
 }
 
 #[tauri::command]
-pub fn rates_get_providers() -> Result<Vec<RatesProviderMetaDto>, String> {
+pub fn rates_get_providers() -> Result<Vec<RatesProviderMetaDto>, crate::errors::AppError> {
     Ok(provider_descriptors()
         .into_iter()
         .map(|d| RatesProviderMetaDto {
@@ -504,7 +508,7 @@ pub async fn rates_update_with_fallback(
     main_currency_id: String,
     target_currency_ids: Vec<String>,
     opts: Option<RatesUpdateOptionsDto>,
-) -> Result<RatesUpdateResultDto, String> {
+) -> Result<RatesUpdateResultDto, crate::errors::AppError> {
     perform_rates_update(
         &state,
         provider_type,
@@ -518,7 +522,7 @@ pub async fn rates_update_with_fallback(
 #[tauri::command]
 pub async fn rates_run_backend_update(
     state: State<'_, AppState>,
-) -> Result<RatesUpdateResultDto, String> {
+) -> Result<RatesUpdateResultDto, crate::errors::AppError> {
     eprintln!("[subly][rates] rates_run_backend_update invoked");
     let result = run_currency_update_if_needed(&state, true).await;
     match &result {
@@ -580,7 +584,10 @@ mod tests {
     fn resolve_main_currency_errors_when_empty() {
         let currencies: Vec<CurrencyRowDto> = Vec::new();
         let err = resolve_main_currency(&currencies, "cur-1").expect_err("should fail");
-        assert!(err.contains("No currencies available"), "should explain empty currency list");
+        assert!(
+            err.to_string().contains("No currencies available"),
+            "should explain empty currency list"
+        );
     }
 
     #[test]

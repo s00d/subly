@@ -22,9 +22,9 @@ pub async fn fetch_rates(
     main_code: &str,
     target_codes: &[String],
     api_key: &str,
-) -> Result<std::collections::HashMap<String, f64>, String> {
+) -> Result<std::collections::HashMap<String, f64>, crate::errors::AppError> {
     if api_key.trim().is_empty() {
-        return Err("currencyapi api key is required".to_string());
+        return Err(crate::errors::AppError::from("currencyapi api key is required"));
     }
     let currencies = target_codes.join(",");
     let url = format!(
@@ -42,21 +42,24 @@ pub async fn fetch_rates(
         .header("apikey", api_key)
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     let status = resp.status();
-    let body = resp.text().await.map_err(|e| e.to_string())?;
+    let body = resp.text().await.map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     let body_preview: String = body.chars().take(500).collect();
     eprintln!(
         "[subly][rates][currencyapi] response status={} body_preview={}",
         status, body_preview
     );
     if !status.is_success() {
-        return Err(format!("currencyapi returned {}: {}", status, body));
+        return Err(crate::errors::AppError::from(format!(
+            "currencyapi returned {}: {}",
+            status, body
+        )));
     }
     let parsed: CurrencyApiResponse =
-        serde_json::from_str(&body).map_err(|e| format!("invalid currencyapi JSON: {}", e))?;
+        serde_json::from_str(&body).map_err(|e| crate::errors::AppError::from(format!("invalid currencyapi JSON: {}", e)))?;
     if let Some(err) = parsed.errors {
-        return Err(format!("currencyapi api error: {}", err));
+        return Err(crate::errors::AppError::from(format!("currencyapi api error: {}", err)));
     }
     let mut out = std::collections::HashMap::new();
     for (code, payload) in parsed.data.unwrap_or_default() {

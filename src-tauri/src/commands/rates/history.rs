@@ -1,17 +1,17 @@
 use tauri::State;
 use crate::{AppState, RatePoint};
 
-fn read_history(state: &State<'_, AppState>) -> Result<std::collections::HashMap<String, Vec<RatePoint>>, String> {
-    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+fn read_history(state: &State<'_, AppState>) -> Result<std::collections::HashMap<String, Vec<RatePoint>>, crate::errors::AppError> {
+    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let raw = crate::state::load_rate_history(guard.db.as_ref())?;
-    serde_json::from_str(&raw).map_err(|e| e.to_string())
+    serde_json::from_str(&raw).map_err(crate::errors::AppError::from)
 }
 
-fn save_history(state: &State<'_, AppState>, history: &std::collections::HashMap<String, Vec<RatePoint>>) -> Result<(), String> {
-    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+fn save_history(state: &State<'_, AppState>, history: &std::collections::HashMap<String, Vec<RatePoint>>) -> Result<(), crate::errors::AppError> {
+    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     crate::state::save_rate_history(
         guard.db.as_ref(),
-        &serde_json::to_string(history).map_err(|e| e.to_string())?,
+        &serde_json::to_string(history)?,
     )
 }
 
@@ -20,7 +20,7 @@ pub fn get_rate_history_widget(
     state: State<'_, AppState>,
     target_ids: Vec<String>,
     days: u32,
-) -> Result<std::collections::HashMap<String, Vec<RatePoint>>, String> {
+) -> Result<std::collections::HashMap<String, Vec<RatePoint>>, crate::errors::AppError> {
     let history = read_history(&state)?;
     if target_ids.is_empty() {
         return Ok(std::collections::HashMap::new());
@@ -40,7 +40,7 @@ pub fn get_rate_history_widget(
 }
 
 #[tauri::command]
-pub fn rate_history_save_snapshot(state: State<'_, AppState>, currency_id: String, rate: f64) -> Result<(), String> {
+pub fn rate_history_save_snapshot(state: State<'_, AppState>, currency_id: String, rate: f64) -> Result<(), crate::errors::AppError> {
     let mut history = read_history(&state)?;
     let today = chrono::Local::now().date_naive().to_string();
     history.entry(currency_id).or_default().push(RatePoint { rate, recorded_at: today });
@@ -48,13 +48,13 @@ pub fn rate_history_save_snapshot(state: State<'_, AppState>, currency_id: Strin
 }
 
 #[tauri::command]
-pub fn rate_history_get(state: State<'_, AppState>, currency_id: String, days: u32) -> Result<Vec<RatePoint>, String> {
+pub fn rate_history_get(state: State<'_, AppState>, currency_id: String, days: u32) -> Result<Vec<RatePoint>, crate::errors::AppError> {
     let v = get_rate_history_widget(state, vec![currency_id.clone()], days)?;
     Ok(v.get(currency_id.as_str()).cloned().unwrap_or_default())
 }
 
 #[tauri::command]
-pub fn rate_history_prune(state: State<'_, AppState>, keep_days: i64) -> Result<usize, String> {
+pub fn rate_history_prune(state: State<'_, AppState>, keep_days: i64) -> Result<usize, crate::errors::AppError> {
     let mut h = read_history(&state)?;
     let since = chrono::Local::now().date_naive() - chrono::Duration::days(keep_days);
     let mut removed = 0usize;
@@ -68,13 +68,13 @@ pub fn rate_history_prune(state: State<'_, AppState>, keep_days: i64) -> Result<
 }
 
 #[tauri::command]
-pub fn rate_history_clear(state: State<'_, AppState>) -> Result<(), String> {
-    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn rate_history_clear(state: State<'_, AppState>) -> Result<(), crate::errors::AppError> {
+    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     crate::state::save_rate_history(guard.db.as_ref(), "{}")
 }
 
 #[tauri::command]
-pub fn rate_history_count(state: State<'_, AppState>) -> Result<usize, String> {
+pub fn rate_history_count(state: State<'_, AppState>) -> Result<usize, crate::errors::AppError> {
     let h = read_history(&state)?;
     Ok(h.values().map(|v| v.len()).sum())
 }

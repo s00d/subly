@@ -24,7 +24,7 @@ pub fn auth_url() -> Option<String> {
     oauth::google_authorize_url().ok()
 }
 
-pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<SyncPayload>, String> {
+pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<SyncPayload>, crate::errors::AppError> {
     let client = tauri_plugin_http::reqwest::Client::new();
     let list_url = format!(
         "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='{}'&fields=files(id)",
@@ -55,7 +55,7 @@ pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<Sy
     Ok(Some(decode_sync_payload(&bytes)?))
 }
 
-pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str) -> Result<(), String> {
+pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str) -> Result<(), crate::errors::AppError> {
     let client = tauri_plugin_http::reqwest::Client::new();
     let list_url = format!(
         "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='{}'&fields=files(id)",
@@ -105,7 +105,10 @@ pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str
         .await
         .map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
-        return Err(format!("gdrive upload failed: {}", resp.status()));
+        return Err(crate::errors::AppError::from(format!(
+            "gdrive upload failed: {}",
+            resp.status()
+        )));
     }
     Ok(())
 }

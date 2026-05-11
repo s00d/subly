@@ -19,9 +19,9 @@ pub async fn fetch_rates(
     main_code: &str,
     target_codes: &[String],
     api_key: &str,
-) -> Result<std::collections::HashMap<String, f64>, String> {
+) -> Result<std::collections::HashMap<String, f64>, crate::errors::AppError> {
     if api_key.trim().is_empty() {
-        return Err("exchangerate api key is required".to_string());
+        return Err(crate::errors::AppError::from("exchangerate api key is required"));
     }
     let url = format!(
         "https://v6.exchangerate-api.com/v6/{}/latest/{}",
@@ -33,24 +33,27 @@ pub async fn fetch_rates(
     );
     let resp = tauri_plugin_http::reqwest::get(&url)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     let status = resp.status();
-    let body = resp.text().await.map_err(|e| e.to_string())?;
+    let body = resp.text().await.map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     let body_preview: String = body.chars().take(500).collect();
     eprintln!(
         "[subly][rates][exchangerate] response status={} body_preview={}",
         status, body_preview
     );
     if !status.is_success() {
-        return Err(format!("exchangerate returned {}: {}", status, body));
+        return Err(crate::errors::AppError::from(format!(
+            "exchangerate returned {}: {}",
+            status, body
+        )));
     }
     let parsed: ExchangeRateResponse =
-        serde_json::from_str(&body).map_err(|e| format!("invalid exchangerate JSON: {}", e))?;
+        serde_json::from_str(&body).map_err(|e| crate::errors::AppError::from(format!("invalid exchangerate JSON: {}", e)))?;
     if parsed.result.as_deref() != Some("success") {
-        return Err(format!(
+        return Err(crate::errors::AppError::from(format!(
             "exchangerate api error: {}",
             parsed.error_type.unwrap_or_else(|| "unknown".to_string())
-        ));
+        )));
     }
     let all = parsed.conversion_rates.unwrap_or_default();
     let mut filtered = std::collections::HashMap::new();

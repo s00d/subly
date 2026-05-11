@@ -16,7 +16,7 @@ pub async fn fetch_rates(
     main_code: &str,
     _target_codes: &[String],
     _api_key: &str,
-) -> Result<std::collections::HashMap<String, f64>, String> {
+) -> Result<std::collections::HashMap<String, f64>, crate::errors::AppError> {
     let urls = [
         format!("https://api.frankfurter.dev/v1/latest?base={}", main_code),
     ];
@@ -29,7 +29,14 @@ pub async fn fetch_rates(
             "[subly][rates][frankfurter] request url={} main_code={} target_codes={:?}",
             url, main_code, _target_codes
         );
-        let resp = match client.get(&url).send().await {
+        let ua = format!("Subly/{} (subscription tracker)", env!("CARGO_PKG_VERSION"));
+        let resp = match client
+            .get(&url)
+            .header("Accept", "application/json")
+            .header("User-Agent", ua)
+            .send()
+            .await
+        {
             Ok(v) => v,
             Err(e) => {
                 last_error = format!("request failed for {}: {}", url, e);
@@ -72,8 +79,8 @@ pub async fn fetch_rates(
     }
 
     Err(if last_error.is_empty() {
-        "frankfurter provider failed".to_string()
+        crate::errors::AppError::from("frankfurter provider failed")
     } else {
-        last_error
+        crate::errors::AppError::Message(last_error)
     })
 }

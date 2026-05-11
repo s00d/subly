@@ -36,9 +36,9 @@ pub async fn fetch_rates(
     main_code: &str,
     target_codes: &[String],
     api_key: &str,
-) -> Result<std::collections::HashMap<String, f64>, String> {
+) -> Result<std::collections::HashMap<String, f64>, crate::errors::AppError> {
     if api_key.trim().is_empty() {
-        return Err("apilayer api key is required".to_string());
+        return Err(crate::errors::AppError::from("apilayer api key is required"));
     }
     let mut all = target_codes.to_vec();
     if !all.iter().any(|c| c.eq_ignore_ascii_case(main_code)) {
@@ -61,27 +61,30 @@ pub async fn fetch_rates(
         .header("apikey", api_key)
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     let status = resp.status();
-    let body = resp.text().await.map_err(|e| e.to_string())?;
+    let body = resp.text().await.map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     let body_preview: String = body.chars().take(500).collect();
     eprintln!(
         "[subly][rates][apilayer] response status={} body_preview={}",
         status, body_preview
     );
     if !status.is_success() {
-        return Err(format!("apilayer returned {}: {}", status, body));
+        return Err(crate::errors::AppError::from(format!(
+            "apilayer returned {}: {}",
+            status, body
+        )));
     }
     let parsed: ApiLayerResponse =
-        serde_json::from_str(&body).map_err(|e| format!("invalid apilayer JSON: {}", e))?;
+        serde_json::from_str(&body).map_err(|e| crate::errors::AppError::from(format!("invalid apilayer JSON: {}", e)))?;
     if parsed.success == Some(false) {
-        return Err(format!(
+        return Err(crate::errors::AppError::from(format!(
             "apilayer api error: {}",
             parsed
                 .error
                 .map(|v| v.to_string())
                 .unwrap_or_else(|| "unknown".to_string())
-        ));
+        )));
     }
     let rates = parsed.rates.unwrap_or_default();
     let fetch_base = parsed.base.unwrap_or_else(|| "EUR".to_string());

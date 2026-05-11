@@ -11,8 +11,8 @@ struct SortableRowDto {
 }
 
 #[tauri::command]
-pub fn catalogs_load(state: State<'_, AppState>) -> Result<CatalogsLoadDto, String> {
-    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_load(state: State<'_, AppState>) -> Result<CatalogsLoadDto, crate::errors::AppError> {
+    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     Ok(CatalogsLoadDto {
         categories: guard.table_list_typed(EntityTable::Categories)?,
         currencies: guard.table_list_typed(EntityTable::Currencies)?,
@@ -23,8 +23,8 @@ pub fn catalogs_load(state: State<'_, AppState>) -> Result<CatalogsLoadDto, Stri
 }
 
 #[tauri::command]
-pub fn catalogs_usage_summary(state: State<'_, AppState>) -> Result<CatalogsUsageSummaryDto, String> {
-    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_usage_summary(state: State<'_, AppState>) -> Result<CatalogsUsageSummaryDto, crate::errors::AppError> {
+    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let subscriptions: Vec<SubscriptionDoc> = guard.table_list_typed(EntityTable::Subscriptions)?;
     let expenses: Vec<ExpenseDoc> = guard.table_list_typed(EntityTable::Expenses)?;
 
@@ -68,28 +68,28 @@ pub fn catalogs_usage_summary(state: State<'_, AppState>) -> Result<CatalogsUsag
 }
 
 #[tauri::command]
-pub fn catalogs_upsert_category(state: State<'_, AppState>, category: CategoryDoc) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_upsert_category(state: State<'_, AppState>, category: CategoryDoc) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     guard.table_upsert_typed(EntityTable::Categories, &category, &category.id)
 }
 #[tauri::command]
-pub fn catalogs_delete_category(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_delete_category(state: State<'_, AppState>, id: String) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     guard.table_delete_by_id(EntityTable::Categories, &id)
 }
 #[tauri::command]
-pub fn catalogs_upsert_currency(state: State<'_, AppState>, currency: CurrencyDoc) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_upsert_currency(state: State<'_, AppState>, currency: CurrencyDoc) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     guard.table_upsert_typed(EntityTable::Currencies, &currency, &currency.id)
 }
 #[tauri::command]
-pub fn catalogs_delete_currency(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_delete_currency(state: State<'_, AppState>, id: String) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     guard.table_delete_by_id(EntityTable::Currencies, &id)
 }
 #[tauri::command]
-pub fn catalogs_update_currency_rates(state: State<'_, AppState>, updates: Vec<CurrencyRateUpdateDto>) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_update_currency_rates(state: State<'_, AppState>, updates: Vec<CurrencyRateUpdateDto>) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let mut arr: Vec<CurrencyDoc> = guard.table_list_typed(EntityTable::Currencies)?;
     let mut touched_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
     for u in updates {
@@ -106,38 +106,38 @@ pub fn catalogs_update_currency_rates(state: State<'_, AppState>, updates: Vec<C
     Ok(())
 }
 #[tauri::command]
-pub fn catalogs_upsert_household_member(state: State<'_, AppState>, household_member: HouseholdMemberDoc) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_upsert_household_member(state: State<'_, AppState>, household_member: HouseholdMemberDoc) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     guard.table_upsert_typed(EntityTable::Household, &household_member, &household_member.id)
 }
 #[tauri::command]
-pub fn catalogs_delete_household_member(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_delete_household_member(state: State<'_, AppState>, id: String) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     guard.table_delete_by_id(EntityTable::Household, &id)
 }
 #[tauri::command]
-pub fn catalogs_upsert_payment_method(state: State<'_, AppState>, payment_method: PaymentMethodDoc) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_upsert_payment_method(state: State<'_, AppState>, payment_method: PaymentMethodDoc) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     guard.table_upsert_typed(EntityTable::PaymentMethods, &payment_method, &payment_method.id)
 }
 #[tauri::command]
-pub fn catalogs_delete_payment_method(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_delete_payment_method(state: State<'_, AppState>, id: String) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     guard.table_delete_by_id(EntityTable::PaymentMethods, &id)
 }
 #[tauri::command]
-pub fn catalogs_upsert_tag(state: State<'_, AppState>, tag: TagDoc) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_upsert_tag(state: State<'_, AppState>, tag: TagDoc) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     guard.table_upsert_typed(EntityTable::Tags, &tag, &tag.id)
 }
 #[tauri::command]
-pub fn catalogs_delete_tag(state: State<'_, AppState>, id: String) -> Result<(), String> {
-    let mut guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_delete_tag(state: State<'_, AppState>, id: String) -> Result<(), crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     guard.table_delete_by_id(EntityTable::Tags, &id)
 }
 #[tauri::command]
-pub fn catalogs_max_sort_order(state: State<'_, AppState>, table: String) -> Result<i64, String> {
-    let guard = state.lock().map_err(|_| "state lock poisoned".to_string())?;
+pub fn catalogs_max_sort_order(state: State<'_, AppState>, table: String) -> Result<i64, crate::errors::AppError> {
+    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let max = match table.as_str() {
         "categories" => guard
             .table_list_typed::<SortableRowDto>(EntityTable::Categories)?

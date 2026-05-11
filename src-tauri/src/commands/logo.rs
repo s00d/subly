@@ -135,7 +135,7 @@ pub fn logo_get_assets() -> Vec<LogoAssetDto> {
 }
 
 #[tauri::command]
-pub async fn logo_resolve_favicon_from_input_url(input: String, size: Option<u32>) -> Result<Option<String>, String> {
+pub async fn logo_resolve_favicon_from_input_url(input: String, size: Option<u32>) -> Result<Option<String>, crate::errors::AppError> {
     let Some(domain) = extract_domain(&input) else {
         return Ok(None);
     };

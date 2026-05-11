@@ -1,5 +1,5 @@
 #[tauri::command]
-pub fn currency_get_flags(codes: Vec<String>) -> Result<std::collections::HashMap<String, String>, String> {
+pub fn currency_get_flags(codes: Vec<String>) -> Result<std::collections::HashMap<String, String>, crate::errors::AppError> {
     let mut result = std::collections::HashMap::new();
     for raw in codes {
         let code = raw.to_ascii_uppercase();

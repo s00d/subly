@@ -36,9 +36,9 @@ pub async fn fetch_rates(
     main_code: &str,
     target_codes: &[String],
     api_key: &str,
-) -> Result<std::collections::HashMap<String, f64>, String> {
+) -> Result<std::collections::HashMap<String, f64>, crate::errors::AppError> {
     if api_key.trim().is_empty() {
-        return Err("openexchangerates api key is required".to_string());
+        return Err(crate::errors::AppError::from("openexchangerates api key is required"));
     }
     let mut all = target_codes.to_vec();
     if !all.iter().any(|c| c.eq_ignore_ascii_case(main_code)) {
@@ -57,23 +57,28 @@ pub async fn fetch_rates(
 
     let resp = tauri_plugin_http::reqwest::get(&url)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     let status = resp.status();
-    let body = resp.text().await.map_err(|e| e.to_string())?;
+    let body = resp.text().await.map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     let body_preview: String = body.chars().take(500).collect();
     eprintln!(
         "[subly][rates][openexchangerates] response status={} body_preview={}",
         status, body_preview
     );
     if !status.is_success() {
-        return Err(format!("openexchangerates returned {}: {}", status, body));
+        return Err(crate::errors::AppError::from(format!(
+            "openexchangerates returned {}: {}",
+            status, body
+        )));
     }
     let parsed: OpenExchangeRatesResponse = serde_json::from_str(&body)
-        .map_err(|e| format!("invalid openexchangerates JSON: {}", e))?;
+        .map_err(|e| crate::errors::AppError::from(format!("invalid openexchangerates JSON: {}", e)))?;
     if parsed.error == Some(true) {
-        return Err(parsed
-            .description
-            .unwrap_or_else(|| "openexchangerates api error".to_string()));
+        return Err(crate::errors::AppError::Message(
+            parsed
+                .description
+                .unwrap_or_else(|| "openexchangerates api error".to_string()),
+        ));
     }
     let rates = parsed.rates.unwrap_or_default();
     let fetch_base = parsed.base.unwrap_or_else(|| "USD".to_string());
