@@ -15,26 +15,27 @@ name = "subly_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.6.0", features = [] }
+tauri-build = { version = "2.6.1", features = [] }
 
 [dependencies]
-tauri = { version = "2.11.0", features = ["tray-icon"] }
-tauri-plugin-opener = "2"
+tauri = { version = "2.11.1", features = ["tray-icon"] }
+tauri-plugin-opener = "2.5.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+thiserror = "2"
 tauri-plugin-clipboard-manager = "2"
-tauri-plugin-dialog = "2"
-# 2.4.8 yanked on crates.io; 2.4.1 of single-instance requires ^2.4.8 — keep 2.4.7 until Tauri republishes.
-tauri-plugin-deep-link = "2.4.7"
+tauri-plugin-dialog = "2.7.1"
+# 2.4.8 was yanked; current 2.4.9 is fine and unlocks newer tauri-plugin-single-instance (≥2.4.1).
+tauri-plugin-deep-link = "2.4.9"
 tauri-plugin-log = "2"
-tauri-plugin-fs = "2"
-tauri-plugin-http = { version = "2", features = ["json"] }
+tauri-plugin-fs = "2.5.1"
+tauri-plugin-http = { version = "2.5.9", features = ["json"] }
 tauri-plugin-notification = "2"
 tauri-plugin-os = "2"
 dirs = "6"
 libc = "0.2"
 redb = "4"
-tauri-plugin-persisted-scope = "2"
+tauri-plugin-persisted-scope = "2.3.7"
 chrono = { version = "0.4", default-features = true }
 zip = "8"
 base64 = "0.22"
@@ -70,8 +71,8 @@ ureq = { version = "3", default-features = true }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
-# Pin 2.4.0: 2.4.1 depends on tauri-plugin-deep-link ^2.4.8 (yanked). `cargo outdated` latest-workspace fails unless you use e.g. `-x tauri-plugin-single-instance` (see package.json script `cargo:outdated`).
-tauri-plugin-single-instance = { version = "=2.4.0", features = ["deep-link"] }
+# Now usable: tauri-plugin-deep-link 2.4.9 is published (no longer yanked), so single-instance ≥2.4.1 resolves cleanly.
+tauri-plugin-single-instance = { version = "2.4.2", features = ["deep-link"] }
 
 [dev-dependencies]
 tempfile = "3"
