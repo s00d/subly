@@ -1,0 +1,36 @@
+src/components/layout/AppHeader.vue
+  s_760a8176b5063e::t_0b71ebf00adb03 86
+  s_760a8176b5063e::t_222f445b7049b7 35,39
+src/lib/tv.ts
+  s_760a8176b5063e::t_5c3391d60eb298 26-30,32,34-37,39
+  s_760a8176b5063e::t_cce0ed613e3493 55
+src/style.css
+  s_760a8176b5063e::t_41937ee40bad08 3-12,20,24,36-38,41,43-47,50
+  s_760a8176b5063e::t_2806c3688b8623 216-226
+src/components/layout/AppLayout.vue
+  s_760a8176b5063e::t_82aa8eb3778af4 33-36
+  s_760a8176b5063e::t_7ce306bd5859c4 78
+src/components/layout/MobileTabBar.vue
+  s_760a8176b5063e::t_ae5bca941bed1b 45-52,60,68-69,71-72,92,107-112,124-127,130-133
+  s_760a8176b5063e::t_72619c38768b63 26-40,56-59,61-64,70,86,94-101,113-123,128-129
+src/components/layout/AppSidebar.vue
+  s_760a8176b5063e::t_385040e043d345 48,52
+  s_760a8176b5063e::t_97df110d8af82d 111-119
+  s_760a8176b5063e::t_5a1f12b42e7ef2 69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "83a1a142fe8b57a3bfc43c56a1977b2cf76b4482",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
