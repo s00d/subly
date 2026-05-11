@@ -30,7 +30,10 @@ const slots = layoutTv();
     <Teleport to="body">
       <Transition name="sidebar-fade">
         <div v-if="sidebarOpen" class="fixed inset-0 z-50 md:hidden" @click.self="sidebarOpen = false">
-          <div class="absolute inset-0 bg-black/40" @click="sidebarOpen = false" />
+          <div
+            class="absolute inset-0 bg-slate-900/45 backdrop-blur-[10px]"
+            @click="sidebarOpen = false"
+          />
           <Transition name="sidebar-slide">
             <div v-if="sidebarOpen" class="absolute inset-y-0 left-0 w-64">
               <AppSidebar class="flex w-full" :mobile="true" @navigate="sidebarOpen = false" />
@@ -72,7 +75,7 @@ const slots = layoutTv();
 }
 
 .app-main-safe {
-  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(5rem + var(--sab, 0px));
 }
 
 @media (min-width: 768px) {

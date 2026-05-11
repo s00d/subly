@@ -45,11 +45,11 @@ function handleNav(path: string) {
 
 const sidebarTv = tv({
   slots: {
-    root: "w-56 shrink-0 bg-surface border-r border-border flex flex-col h-full",
+    root: "app-sidebar w-56 shrink-0 bg-surface border-r border-border flex flex-col h-full",
     logoWrap: "h-16 flex items-center px-5 border-b border-border",
     logoIcon: "w-8 h-8 rounded-lg bg-primary flex items-center justify-center",
     logoText: "font-semibold text-sm text-text-primary tracking-tight",
-    nav: "flex-1 p-3 space-y-1",
+    nav: "flex-1 p-3 space-y-1 overflow-y-auto",
     navItem: "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
     footer: "p-4 border-t border-border",
     footerText: "text-xs text-text-muted",
@@ -66,7 +66,7 @@ const slots = sidebarTv();
 </script>
 
 <template>
-  <aside :class="slots.root()">
+  <aside :class="[slots.root(), { 'app-sidebar--mobile': mobile }]">
     <div :class="slots.logoWrap()">
       <div class="flex items-center gap-2">
         <div :class="slots.logoIcon()">
@@ -108,3 +108,12 @@ const slots = sidebarTv();
     </div>
   </aside>
 </template>
+
+<style scoped>
+/* Mobile drawer покрывает status bar / home indicator: padding'ом сдвигаем
+   контент ниже часов и выше home indicator. На desktop инсеты = 0, эффекта нет. */
+.app-sidebar--mobile {
+  padding-top: var(--sat, 0px);
+  padding-bottom: var(--sab, 0px);
+}
+</style>

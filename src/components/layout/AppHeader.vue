@@ -32,11 +32,11 @@ const headerTv = tv({
     root:
       "max-md:min-h-[4.75rem] md:min-h-16 bg-surface border-b border-border flex items-center px-3 sm:px-6 shrink-0 gap-1.5 sm:gap-2 max-md:py-2",
     burgerBtn:
-      "md:hidden w-9 h-9 p-0 -ml-0.5 rounded-lg text-text-secondary hover:bg-surface-hover transition-colors shrink-0 inline-flex items-center justify-center",
+      "md:hidden w-11 h-11 min-w-[44px] min-h-[44px] p-0 -ml-0.5 rounded-xl text-text-secondary hover:bg-surface-hover transition-colors shrink-0 inline-flex items-center justify-center",
     title: `${typo.pageTitle()} flex-1 min-w-0`,
     actionsWrap: "flex items-center gap-1 sm:gap-2 ml-auto shrink-0",
     actionBtn:
-      "w-9 h-9 rounded-lg inline-flex items-center justify-center shadow-sm transition-colors shrink-0",
+      "w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl inline-flex items-center justify-center shadow-sm transition-colors shrink-0",
   },
 });
 
@@ -83,6 +83,6 @@ function getActionBtnClass(style?: "primary" | "neutral" | "accent" | "success" 
 
 <style scoped>
 .app-header-safe {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: var(--sat, 0px);
 }
 </style>

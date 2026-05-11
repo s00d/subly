@@ -23,16 +23,20 @@ export const tv: TV = (options, config) =>
  */
 const uiRecipe = tv({
   slots: {
-    card: "rounded-xl border border-border bg-surface p-2.5 sm:p-4",
-    panel: "rounded-lg border border-border bg-surface-secondary",
+    card: [
+      "rounded-2xl border border-border bg-surface p-3 sm:p-5",
+      "shadow-sm transition-all duration-200 hover:shadow-md",
+    ],
+    panel: "rounded-2xl border border-border bg-surface-secondary overflow-hidden",
     listContainer:
-      "rounded-lg border border-border bg-surface-secondary overflow-hidden divide-y divide-border",
+      "rounded-xl border border-border bg-surface-secondary overflow-hidden divide-y divide-border",
     listRow:
-      "px-3 py-2.5 sm:py-3 transition-colors hover:bg-surface dark:hover:bg-white/6",
-    sectionTitle: "text-xs sm:text-sm font-semibold text-text-primary",
-    metaText: "text-[10px] sm:text-xs text-text-muted",
+      "px-3 py-2.5 sm:py-3 transition-colors hover:bg-surface dark:hover:bg-white/[0.06]",
+    sectionTitle:
+      "text-xs sm:text-sm font-semibold text-text-primary tracking-tight",
+    metaText: "text-[11px] sm:text-xs text-text-muted",
     field:
-      "w-full rounded-lg border border-border bg-surface text-text-primary placeholder-text-muted transition-shadow hover:border-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed",
+      "w-full rounded-xl border border-border bg-surface px-4 py-2.5 text-sm text-text-primary placeholder-text-muted transition-all hover:border-text-muted focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed",
     fieldLabel: "block text-xs font-medium text-text-secondary mb-1.5",
     fieldError: "mt-1 text-xs text-red-500",
   },
@@ -48,7 +52,7 @@ const typoRecipe = tv({
     screenTitle:
       "text-base sm:text-lg font-semibold text-text-primary tracking-tight",
     subsection: "text-xs font-medium text-text-secondary",
-    statLabel: "text-[10px] sm:text-xs text-text-muted",
+    statLabel: "text-[11px] sm:text-xs text-text-muted",
     statValueMd:
       "text-base sm:text-lg font-bold tabular-nums text-text-primary",
   },
