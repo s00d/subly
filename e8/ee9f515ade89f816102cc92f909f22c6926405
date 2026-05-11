@@ -1,0 +1,24 @@
+src-tauri/Cargo.toml
+  s_760a8176b5063e::t_40be758ca0e878 21-22,27-29,31-32,38
+  s_760a8176b5063e::t_802a55c387c467 74-75
+  s_760a8176b5063e::t_b7bb1c8032dab2 18
+  s_760a8176b5063e::t_fdbc764310782e 25
+package.json
+  s_760a8176b5063e::t_a114ef2625b519 23-25,28,30-31,33,35,38,41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "e8ee9f515ade89f816102cc92f909f22c6926405",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
