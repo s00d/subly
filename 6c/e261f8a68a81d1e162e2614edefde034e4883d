@@ -1,0 +1,26 @@
+src-tauri/gen/apple/Assets.xcassets/BrandLogo.imageset/brand-logo.svg
+  s_760a8176b5063e::t_28562e0cb49316 1-22
+src-tauri/gen/apple/Assets.xcassets/BrandLogo.imageset/Contents.json
+  s_760a8176b5063e::t_303fdad561044d 5,11-13
+  s_760a8176b5063e::t_71d78c550a26bc 1-4,6-10,14-15
+public/brand-logo.svg
+  s_760a8176b5063e::t_4c3505fa37e051 2-10
+  s_760a8176b5063e::t_8ee8ccf90f118d 1,11-21
+  s_760a8176b5063e::t_3eb0a227496baf 22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "6ce261f8a68a81d1e162e2614edefde034e4883d",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
