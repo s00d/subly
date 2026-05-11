@@ -57,10 +57,10 @@
     "iOS": {
       "developmentTeam": "R6VC7JTLE8",
       "minimumSystemVersion": "16.0",
-      "bundleVersion": "10003"
+      "bundleVersion": "10004"
     },
     "macOS": {
-      "bundleVersion": "10003",
+      "bundleVersion": "10004",
       "entitlements": "entitlements/macos.plist",
       "files": {
         "embedded.provisionprofile": "profiles/Subly_DeveloperID_iCloud_macOS.provisionprofile"

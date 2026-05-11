@@ -56,17 +56,8 @@
 /* Begin PBXFileReference section */
 		0158891D53AE86E5D36C646A /* MetalKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = MetalKit.framework; path = System/Library/Frameworks/MetalKit.framework; sourceTree = SDKROOT; };
 		07521BCCED69C5535B2806B7 /* tray.rs */ = {isa = PBXFileReference; path = tray.rs; sourceTree = "<group>"; };
+		08AE813F3F00BC2FEBB58EAF /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Localizable.strings; sourceTree = "<group>"; };
 		09925F5A0305364E1496878F /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
-		F100DE001111111111111101 /* de */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = de; path = de.lproj/Localizable.strings; sourceTree = "<group>"; };
-		F100DE001111111111111102 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
-		F100DE001111111111111103 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
-		F100DE001111111111111104 /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pt; path = pt.lproj/Localizable.strings; sourceTree = "<group>"; };
-		F100DE001111111111111105 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
-		F100DE001111111111111106 /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Localizable.strings; sourceTree = "<group>"; };
-		F100DE001111111111111107 /* ar */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ar; path = ar.lproj/Localizable.strings; sourceTree = "<group>"; };
-		F100DE001111111111111108 /* hi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = hi; path = hi.lproj/Localizable.strings; sourceTree = "<group>"; };
-		F100DE001111111111111109 /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/Localizable.strings; sourceTree = "<group>"; };
-		F100DE00111111111111110B /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		0DFA551B007B40C40A94893A /* fixer.rs */ = {isa = PBXFileReference; path = fixer.rs; sourceTree = "<group>"; };
 		0F3E5A437CAA674DEE4DFAE8 /* icloud.rs */ = {isa = PBXFileReference; path = icloud.rs; sourceTree = "<group>"; };
 		11665C5517D652158E167382 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -94,14 +85,18 @@
 		4F5CDAF88CA32D8C611637D8 /* export.rs */ = {isa = PBXFileReference; path = export.rs; sourceTree = "<group>"; };
 		505CEAD46E6E2FC08055147B /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
 		51339CD929C336437E681BAC /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
+		53598684465D40503C534275 /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		563B800DD5042A281AC5797E /* subscriptions.rs */ = {isa = PBXFileReference; path = subscriptions.rs; sourceTree = "<group>"; };
 		56DFD1A59FB1EF4DA14E09EE /* dropbox.rs */ = {isa = PBXFileReference; path = dropbox.rs; sourceTree = "<group>"; };
+		583C74FDF039852E3F9A6776 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
 		5AD388BC5AAF69A91D04E4B4 /* subly_iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = subly_iOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5FB03EAE28C6C029F1F492E0 /* restart_smoke_tests.rs */ = {isa = PBXFileReference; path = restart_smoke_tests.rs; sourceTree = "<group>"; };
 		62EAB59D7271E82DD99F46E1 /* widget_snapshot.rs */ = {isa = PBXFileReference; path = widget_snapshot.rs; sourceTree = "<group>"; };
 		661732DA5CAE3FEC9E5200A5 /* icloud_native.rs */ = {isa = PBXFileReference; path = icloud_native.rs; sourceTree = "<group>"; };
 		66334A02F70E92A64C65CE51 /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		66878B3FCDBEA29386696188 /* currencyapi.rs */ = {isa = PBXFileReference; path = currencyapi.rs; sourceTree = "<group>"; };
+		67335EAEFAEA93A157D8F804 /* errors.rs */ = {isa = PBXFileReference; path = errors.rs; sourceTree = "<group>"; };
+		6CBE859165B553BA9CA26C2F /* pt */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = pt; path = pt.lproj/Localizable.strings; sourceTree = "<group>"; };
 		6D658A78B62DF388881DD038 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		84FABAB32F8526B2BE6A80F1 /* frankfurter.rs */ = {isa = PBXFileReference; path = frankfurter.rs; sourceTree = "<group>"; };
 		880F1EAA6D61634CCC75027E /* webdav.rs */ = {isa = PBXFileReference; path = webdav.rs; sourceTree = "<group>"; };
@@ -113,6 +108,8 @@
 		974B1F2FDC37A7C6400AD28F /* onedrive.rs */ = {isa = PBXFileReference; path = onedrive.rs; sourceTree = "<group>"; };
 		A3787F9E3C0D05B1D3DF7FA8 /* state.rs */ = {isa = PBXFileReference; path = state.rs; sourceTree = "<group>"; };
 		A3F55468DE88B36489C112EE /* logo.rs */ = {isa = PBXFileReference; path = logo.rs; sourceTree = "<group>"; };
+		A41677243555F7FF0D841D5E /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/Localizable.strings; sourceTree = "<group>"; };
+		A6C2125EA9525798C3F28DCF /* ko */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ko; path = ko.lproj/Localizable.strings; sourceTree = "<group>"; };
 		B0E0DEB97FB2CDC3F7CC6276 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B11F52C921F93096544A48A8 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		B2E9BF44D46881DE6C9FCD64 /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
@@ -120,18 +117,24 @@
 		B684F52A5E39E36F3BD7A3F0 /* widget_reload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = widget_reload.swift; sourceTree = "<group>"; };
 		B82148163859290A418A32A2 /* keyring_store.rs */ = {isa = PBXFileReference; path = keyring_store.rs; sourceTree = "<group>"; };
 		BC68F8483FC145709391A7A3 /* notifications.rs */ = {isa = PBXFileReference; path = notifications.rs; sourceTree = "<group>"; };
+		BE2848F49CAFC3979A93C0A6 /* es */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = es; path = es.lproj/Localizable.strings; sourceTree = "<group>"; };
 		BEC35E67F4284007EA14BC5B /* bindings.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = bindings.h; sourceTree = "<group>"; };
 		C0D36F3885CFF4E7F3F9BB92 /* seed.rs */ = {isa = PBXFileReference; path = seed.rs; sourceTree = "<group>"; };
+		C51DD9C36D2A91FD7C9FC415 /* tr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = tr; path = tr.lproj/Localizable.strings; sourceTree = "<group>"; };
 		C88AD0D89A936DBFA46D5484 /* dashboard.rs */ = {isa = PBXFileReference; path = dashboard.rs; sourceTree = "<group>"; };
 		C892888F89AECE125F06D1A6 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		CB0C1D660973217BBF676ED6 /* main.rs */ = {isa = PBXFileReference; path = main.rs; sourceTree = "<group>"; };
 		D0B2EE3425A789378DA90C56 /* gdrive.rs */ = {isa = PBXFileReference; path = gdrive.rs; sourceTree = "<group>"; };
 		D6F01AA7F9E5EAF65852918D /* subly_iOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = subly_iOS.entitlements; sourceTree = "<group>"; };
+		DD4B082EE568B966427CBE6D /* hi */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = hi; path = hi.lproj/Localizable.strings; sourceTree = "<group>"; };
 		DE4717FEC2664E33527ED287 /* mod.rs */ = {isa = PBXFileReference; path = mod.rs; sourceTree = "<group>"; };
 		E4224CE6E8CA86E4B7B43099 /* expenses.rs */ = {isa = PBXFileReference; path = expenses.rs; sourceTree = "<group>"; };
 		E541A9444A9026D927454537 /* storage.rs */ = {isa = PBXFileReference; path = storage.rs; sourceTree = "<group>"; };
 		E5D8E9568F8408C360890551 /* SublyWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SublyWidget.swift; sourceTree = "<group>"; };
 		E5EF1C88DD872C730175DF6C /* test_support.rs */ = {isa = PBXFileReference; path = test_support.rs; sourceTree = "<group>"; };
+		E607A5475167530815ECA3B1 /* ar */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ar; path = ar.lproj/Localizable.strings; sourceTree = "<group>"; };
+		EEEFCAE27B79D5F3D21280D9 /* app_ready.rs */ = {isa = PBXFileReference; path = app_ready.rs; sourceTree = "<group>"; };
+		F1EDE82A2F421CF381E5C978 /* redb_write_flag.rs */ = {isa = PBXFileReference; path = redb_write_flag.rs; sourceTree = "<group>"; };
 		F752CE6348BA2801B2DD69A9 /* types.rs */ = {isa = PBXFileReference; path = types.rs; sourceTree = "<group>"; };
 		F8B669FCA01220C2FD62F627 /* history.rs */ = {isa = PBXFileReference; path = history.rs; sourceTree = "<group>"; };
 		F8ED6FE4F5287FEDA73466DE /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
@@ -191,6 +194,7 @@
 				38DBFEF8DB3338A837E490EA /* mod.rs */,
 				8EB9002703F78305D7475106 /* oauth.rs */,
 				3FE7E7018F5DA90D09621EB0 /* orchestrator.rs */,
+				F1EDE82A2F421CF381E5C978 /* redb_write_flag.rs */,
 				920A89328179C7F054C1F0BA /* state.rs */,
 				F752CE6348BA2801B2DD69A9 /* types.rs */,
 				22CAC4935CF14107B37B07BB /* wire.rs */,
@@ -260,6 +264,7 @@
 			isa = PBXGroup;
 			children = (
 				3AA73DD8EDB598617F6A8F81 /* app_data.rs */,
+				EEEFCAE27B79D5F3D21280D9 /* app_ready.rs */,
 				4981FC4396630B88C8C99BDC /* catalog.rs */,
 				2169B651360070C5007C0460 /* config.rs */,
 				C88AD0D89A936DBFA46D5484 /* dashboard.rs */,
@@ -325,6 +330,7 @@
 		D2C3C475F6F0C5DE6EF99061 /* src */ = {
 			isa = PBXGroup;
 			children = (
+				67335EAEFAEA93A157D8F804 /* errors.rs */,
 				B82148163859290A418A32A2 /* keyring_store.rs */,
 				8901C4702B5044F21B5B40A2 /* lib.rs */,
 				CB0C1D660973217BBF676ED6 /* main.rs */,
@@ -426,16 +432,16 @@
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
-				en,
-				ru,
+				ar,
 				de,
+				en,
 				es,
 				fr,
-				pt,
+				hi,
 				ja,
 				ko,
-				ar,
-				hi,
+				pt,
+				ru,
 				tr,
 				"zh-Hans",
 			);
@@ -530,18 +536,18 @@
 		D91D22573939D147204362B8 /* Localizable.strings */ = {
 			isa = PBXVariantGroup;
 			children = (
+				E607A5475167530815ECA3B1 /* ar */,
+				08AE813F3F00BC2FEBB58EAF /* de */,
 				3CBD9CDB874E7143AFCC9D91 /* en */,
+				BE2848F49CAFC3979A93C0A6 /* es */,
+				583C74FDF039852E3F9A6776 /* fr */,
+				DD4B082EE568B966427CBE6D /* hi */,
+				A41677243555F7FF0D841D5E /* ja */,
+				A6C2125EA9525798C3F28DCF /* ko */,
+				6CBE859165B553BA9CA26C2F /* pt */,
 				09925F5A0305364E1496878F /* ru */,
-				F100DE001111111111111101 /* de */,
-				F100DE001111111111111102 /* es */,
-				F100DE001111111111111103 /* fr */,
-				F100DE001111111111111104 /* pt */,
-				F100DE001111111111111105 /* ja */,
-				F100DE001111111111111106 /* ko */,
-				F100DE001111111111111107 /* ar */,
-				F100DE001111111111111108 /* hi */,
-				F100DE001111111111111109 /* tr */,
-				F100DE00111111111111110B /* zh-Hans */,
+				C51DD9C36D2A91FD7C9FC415 /* tr */,
+				53598684465D40503C534275 /* zh-Hans */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";
@@ -556,7 +562,7 @@
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = NO;
 				CODE_SIGN_ENTITLEMENTS = "../../ios-apple/SublyWidget/SublyWidget.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10003;
+				CURRENT_PROJECT_VERSION = 10004;
 				DEVELOPMENT_TEAM = R6VC7JTLE8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "../../ios-apple/SublyWidget/Info.plist";
@@ -566,7 +572,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.s00d.subly.widget;
 				PRODUCT_NAME = SublyWidgetExtension;
 				SDKROOT = iphoneos;
@@ -767,7 +773,7 @@
 				CODE_SIGN_ALLOW_ENTITLEMENTS_MODIFICATION = NO;
 				CODE_SIGN_ENTITLEMENTS = "../../ios-apple/SublyWidget/SublyWidget.entitlements";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10003;
+				CURRENT_PROJECT_VERSION = 10004;
 				DEVELOPMENT_TEAM = R6VC7JTLE8;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "../../ios-apple/SublyWidget/Info.plist";
@@ -777,7 +783,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.0.2;
+				MARKETING_VERSION = 1.0.3;
 				PRODUCT_BUNDLE_IDENTIFIER = com.s00d.subly.widget;
 				PRODUCT_NAME = SublyWidgetExtension;
 				SDKROOT = iphoneos;
