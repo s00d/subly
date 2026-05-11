@@ -1,0 +1,21 @@
+src/components/settings/AppearanceSection.vue
+  s_760a8176b5063e::t_d352e3ccac786a 117
+  s_760a8176b5063e::t_5be4f9a501dac2 119-120
+  s_760a8176b5063e::t_586a4b050aa25f 121,124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "8250e011438045177247c9b5d164facb44188872",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
