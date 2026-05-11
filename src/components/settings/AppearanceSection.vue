@@ -114,13 +114,14 @@ function closeLangModal() {
     </div>
 
     <h3 :class="[typo.subsection(), 'mb-2']">{{ t('colors') }}</h3>
-    <div class="flex flex-wrap gap-2 mb-5">
+    <div class="flex flex-wrap justify-center gap-2.5 mb-5">
       <button v-for="theme in colorThemes" :key="theme.id" @click="setColorTheme(theme.id)"
-        class="w-8 h-8 rounded-full border-2 flex items-center justify-center transition-transform hover:scale-110"
-        :class="[settings?.colorTheme === theme.id ? 'border-text-primary scale-110' : 'border-transparent', theme.bg]"
+        type="button"
+        class="color-swatch appearance-none shrink-0 grow-0 basis-9 aspect-square w-9 h-9 min-w-9 min-h-9 p-0 m-0 leading-none rounded-full border-2 inline-flex items-center justify-center transition-transform duration-200 hover:scale-110 active:scale-95"
+        :class="[settings?.colorTheme === theme.id ? 'border-text-primary scale-110 shadow-sm' : 'border-transparent', theme.bg]"
         :title="theme.id"
       >
-        <Check v-if="settings?.colorTheme === theme.id" :size="14" class="text-white" />
+        <Check v-if="settings?.colorTheme === theme.id" :size="14" class="text-white drop-shadow-sm" />
       </button>
     </div>
 
