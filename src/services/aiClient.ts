@@ -136,13 +136,6 @@ export async function aiTestConnection(): Promise<AiTestResult> {
   return callCommand("ai_test_connection");
 }
 
-export async function aiExtractSubscriptionFromText(
-  text: string,
-  locale?: string,
-): Promise<SubscriptionDraft> {
-  return callCommand("ai_extract_subscription_from_text", { text, locale });
-}
-
 /**
  * LLM-extracted one-off expense. Same conventions as `SubscriptionDraft`:
  * unresolved IDs are empty strings, original LLM hints (`currencyCode`,
@@ -171,39 +164,19 @@ export interface ExpenseDraftLineItem {
   amount: number;
 }
 
-export async function aiExtractExpenseFromText(
-  text: string,
-  locale?: string,
-): Promise<ExpenseDraft> {
-  return callCommand("ai_extract_expense_from_text", { text, locale });
-}
+/**
+ * What the LLM classified the expense-side input as. Drives the badge in
+ * the preview dialog and the receipt-only `metadata.lineItems` block.
+ */
+export type AiImportKind = "receipt" | "statement";
 
 /**
- * Vision-LLM receipt extraction. Accepts image/png|jpeg|webp|gif or
- * application/pdf. Returns an `ExpenseDraft` with optional `lineItems`.
+ * Optional receipt-specific extras returned alongside the expense row list.
  */
-export async function aiExtractReceipt(
-  bytes: Uint8Array,
-  mime: string,
-  locale?: string,
-): Promise<ExpenseDraft> {
-  return callCommand("ai_extract_receipt", {
-    bytes: Array.from(bytes),
-    mime,
-    locale,
-  });
-}
-
-/**
- * Result of `ai_import_statement_file`. Each row carries a `source` tag so
- * the UI can highlight which rows were resolved cheaply (heuristics) vs
- * which required an LLM round-trip.
- */
-export interface StatementImportResult {
-  format: "csv" | "xlsx" | "json" | "pdf" | "text";
-  rows: StatementDraftRow[];
-  stats: StatementImportStats;
-  usage?: AiUsage;
+export interface AiImportMetadata {
+  merchantName?: string;
+  totalAmount?: number;
+  lineItems: ExpenseDraftLineItem[];
 }
 
 export interface StatementDraftRow {
@@ -218,39 +191,97 @@ export interface StatementImportStats {
   total: number;
 }
 
-/** Streamed progress event emitted while parsing a statement file. */
-export type StatementImportProgress =
+/**
+ * Subscription-side classification. The model decides between a single
+ * confirmation (`single`, e.g. one App Store receipt) or a list of
+ * active services (`list`, e.g. the Google Play subscriptions screen).
+ */
+export type AiSubscriptionImportKind = "single" | "list";
+
+export interface AiSubscriptionDraftRow {
+  source: "llm";
+  draft: SubscriptionDraft;
+}
+
+/**
+ * Surface the smart command is operating against. Drives the schema /
+ * row shape returned by the backend and the preview list the frontend
+ * renders.
+ */
+export type AiSmartSurface = "expense" | "subscription";
+
+/**
+ * Tagged result of `ai_smart_input`. Frontend uses TS-discriminated-union
+ * narrowing on `surface` to render the right preview list and bulk-save
+ * handler. Mirrors `AiSmartResultDto` in `commands/ai/dto.rs`.
+ */
+export type AiSmartResult =
+  | {
+      surface: "expense";
+      kind: AiImportKind;
+      format: "text" | "image" | "csv" | "xlsx" | "json" | "pdf";
+      rows: StatementDraftRow[];
+      metadata: AiImportMetadata;
+      stats: StatementImportStats;
+      usage?: AiUsage;
+    }
+  | {
+      surface: "subscription";
+      kind: AiSubscriptionImportKind;
+      format: "text" | "image" | "csv" | "xlsx" | "json" | "pdf";
+      rows: AiSubscriptionDraftRow[];
+      stats: StatementImportStats;
+      usage?: AiUsage;
+    };
+
+/** Streamed progress event emitted while the backend extracts drafts. */
+export type AiImportProgress =
   | { kind: "detected"; format: string }
   | { kind: "heuristic"; resolved: number; unresolved: number }
   | { kind: "llmStart"; chunks: number }
   | { kind: "llmChunk"; index: number; total: number }
   | { kind: "done"; total: number };
 
+export interface AiSmartInputArgs {
+  surface: AiSmartSurface;
+  /** Free-form description. Mutually optional with `bytes`. */
+  text?: string;
+  /** File / image bytes. Mutually optional with `text`. */
+  bytes?: Uint8Array;
+  /** Required when `bytes` is set. Ignored otherwise. */
+  mime?: string;
+  /** BCP-47 short tag; the backend instructs the LLM to reply in this language. */
+  locale?: string;
+}
+
 /**
- * Stream-aware statement import. We bypass `callCommand` here because the
- * backend signature uses `tauri::ipc::Channel`, which the generic helper
- * doesn't model.
+ * Single entry point for every AI extraction in the app. Accepts text *or*
+ * file bytes (one of the two), routes to the right backend pipeline based
+ * on `surface` + MIME, and returns the surface-tagged result envelope.
+ *
+ * Uses `invoke` directly (bypassing `callCommand`) because the Tauri
+ * signature wires a `tauri::ipc::Channel` for streamed progress.
  */
-export async function aiImportStatementFile(
-  bytes: Uint8Array,
-  mime: string,
-  locale: string | undefined,
-  onProgress?: (ev: StatementImportProgress) => void,
-): Promise<StatementImportResult> {
-  const channel = new Channel<StatementImportProgress>();
+export async function aiSmartInput(
+  args: AiSmartInputArgs,
+  onProgress?: (ev: AiImportProgress) => void,
+): Promise<AiSmartResult> {
+  const channel = new Channel<AiImportProgress>();
   if (onProgress) {
     channel.onmessage = (ev) => {
       try {
         onProgress(ev);
       } catch (e) {
-        console.warn("[aiImportStatementFile] progress handler threw", e);
+        console.warn("[aiSmartInput] progress handler threw", e);
       }
     };
   }
-  return invoke("ai_import_statement_file", {
-    bytes: Array.from(bytes),
-    mime,
-    locale,
+  return invoke("ai_smart_input", {
+    surface: args.surface,
+    text: args.text ?? "",
+    bytes: args.bytes ? Array.from(args.bytes) : [],
+    mime: args.mime ?? "",
+    locale: args.locale,
     onProgress: channel,
   });
 }

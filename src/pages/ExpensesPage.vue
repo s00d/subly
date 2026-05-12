@@ -16,9 +16,9 @@ import { useHeaderActions, type HeaderAction } from "@/composables/useHeaderActi
 import { useToast } from "@/composables/useToast";
 import { useClipboard } from "@/composables/useClipboard";
 import { useScrollLock } from "@/composables/useScrollLock";
-import ExpenseForm, { type ExpensePrefill } from "@/components/expenses/ExpenseForm.vue";
+import ExpenseForm from "@/components/expenses/ExpenseForm.vue";
 import ExpenseDetail from "@/components/expenses/ExpenseDetail.vue";
-import AiQuickAddExpense from "@/components/ai/AiQuickAddExpense.vue";
+import AiSmartDialog from "@/components/ai/AiSmartDialog.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import UniversalListRow from "@/components/ui/UniversalListRow.vue";
@@ -54,7 +54,6 @@ import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
 import { useExpensesStore } from "@/stores/expensesStore";
 import { ui } from "@/lib/tv";
-import { type ExpenseDraft } from "@/services/aiClient";
 import { useAiConfigStore } from "@/stores/aiConfigStore";
 
 const PAGE_SIZE = 10;
@@ -91,9 +90,9 @@ function logPageError(scope: string, error: unknown, extra?: Record<string, unkn
   });
 }
 
-// AI quick-add state — must be declared before updateHeaderActions so the
+// AI smart-input state — must be declared before updateHeaderActions so the
 // action builder can read the availability flag without forward refs.
-const showAiQuickAdd = ref(false);
+const showAiSmart = ref(false);
 const aiConfigStore = useAiConfigStore();
 const {
   enabled: aiEnabled,
@@ -103,10 +102,10 @@ const {
   loaded: aiLoaded,
 } = storeToRefs(aiConfigStore);
 /**
- * Header AI button state. The expense surface treats `expenseInput` as the
- * primary action and only goes into "setup" mode when neither of the two
- * supported features is even toggled in config — in that case we still
- * want a clear path back to settings.
+ * Header AI button state. One button covers all expense-side AI features
+ * (text, receipt, statement) — the dialog routes by file MIME at submit
+ * time. We surface the button when at least one of the three features is
+ * toggled on in config.
  */
 const aiHeaderState = computed<"ready" | "setup" | "hidden">(() => {
   if (!aiLoaded.value) return "hidden";
@@ -126,8 +125,15 @@ function openAiSettings() {
   aiRouter.push("/settings?section=ai");
 }
 
-function openAiQuickAdd() {
-  showAiQuickAdd.value = true;
+function openAiSmart() {
+  showAiSmart.value = true;
+}
+
+function onAiImported() {
+  fetchPage(currentPage.value, activeFilter.value).catch((e) => {
+    logPageError("onAiImported reload failed", e);
+  });
+  updateTotal();
 }
 
 function updateHeaderActions() {
@@ -142,7 +148,7 @@ function updateHeaderActions() {
     { id: "expense-selection-mode", icon: CheckSquare, title: selectionMode.value ? `${t("select")} ✓` : `${t("select")} ✕`, onClick: toggleSelectionMode, style: selectionMode.value ? "success" : "neutral" },
   ];
   if (aiHeaderState.value === "ready") {
-    actions.push({ id: "ai-add-expense", icon: Sparkles, title: t("ai_quick_add_expense"), onClick: openAiQuickAdd, style: "accent" });
+    actions.push({ id: "ai-smart-expense", icon: Sparkles, title: t("ai_smart_open"), onClick: openAiSmart, style: "accent" });
   } else if (aiHeaderState.value === "setup") {
     actions.push({ id: "ai-setup-expense", icon: Sparkles, title: t("ai_setup_assistant"), onClick: openAiSettings, style: "neutral" });
   }
@@ -231,28 +237,6 @@ async function updateTotal() {
 // ---- Form ----
 const showForm = ref(false);
 const editingExpense = ref<Expense | null>(null);
-const formPrefill = ref<ExpensePrefill | null>(null);
-
-function applyAiDraft(draft: ExpenseDraft) {
-  const prefill: ExpensePrefill = {};
-  if (draft.name) prefill.name = draft.name;
-  if (draft.amount > 0) prefill.amount = draft.amount;
-  if (draft.currencyId) prefill.currencyId = draft.currencyId;
-  if (draft.date) prefill.date = draft.date;
-  if (draft.categoryId) prefill.categoryId = draft.categoryId;
-  if (draft.paymentMethodId) prefill.paymentMethodId = draft.paymentMethodId;
-  if (draft.tags?.length) prefill.tags = [...draft.tags];
-  if (draft.notes) prefill.notes = draft.notes;
-  if (draft.url) prefill.url = draft.url;
-
-  editingExpense.value = null;
-  formPrefill.value = prefill;
-  showForm.value = true;
-
-  if (draft.warnings.length) {
-    toast(t("ai_draft_warnings", { count: draft.warnings.length }));
-  }
-}
 
 // ---- Detail panel ----
 const showDetail = ref(false);
@@ -434,7 +418,7 @@ function getConvertedAmounts(amount: number, currencyId: string) {
 }
 
 // ---- Actions ----
-function openAdd() { editingExpense.value = null; formPrefill.value = null; showForm.value = true; }
+function openAdd() { editingExpense.value = null; showForm.value = true; }
 
 function openDetail(exp: Expense) {
   detailExpId.value = exp.id;
@@ -813,16 +797,16 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
       v-if="expenseFormLookupData"
       :show="showForm"
       :editExpense="editingExpense"
-      :prefill="formPrefill"
       :lookupData="expenseFormLookupData"
-      @close="showForm = false; formPrefill = null"
+      @close="showForm = false"
       @saved="onSaved"
     />
 
-    <AiQuickAddExpense
-      :show="showAiQuickAdd"
-      @close="showAiQuickAdd = false"
-      @draft="applyAiDraft"
+    <AiSmartDialog
+      :show="showAiSmart"
+      surface="expense"
+      @close="showAiSmart = false"
+      @imported="onAiImported"
     />
 
     <!-- Delete Confirmation -->

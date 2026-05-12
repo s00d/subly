@@ -22,10 +22,5 @@ pub mod prompts;
 pub mod providers;
 pub mod shared;
 
-pub use extract::{
-    ai_extract_expense_from_text,
-    ai_extract_receipt,
-    ai_extract_subscription_from_text,
-    ai_import_statement_file,
-};
+pub use extract::ai_smart_input;
 pub use providers::{ai_get_providers, ai_test_connection};

@@ -80,10 +80,48 @@ pub fn currency_rules(currencies: &str) -> String {
 
 /// Constrain `categoryHint` to one of the user's existing categories.
 pub fn category_rules(categories: &str) -> String {
+    if categories.trim().is_empty() {
+        return "Categories:\n\
+                 - The user has no custom categories yet. Omit `categoryHint`."
+            .to_string();
+    }
     format!(
         "Categories:\n\
          - Allowed values for `categoryHint`: {categories}.\n\
          - Pick the closest match. If nothing fits cleanly, omit `categoryHint`."
+    )
+}
+
+/// Constrain `paymentMethodHint` to one of the user's enabled methods so the
+/// downstream resolver can map it to a real `payment_method_id`.
+pub fn payment_method_rules(methods: &str) -> String {
+    if methods.trim().is_empty() {
+        return "Payment methods:\n\
+                 - The user hasn't configured payment methods. Omit `paymentMethodHint`."
+            .to_string();
+    }
+    format!(
+        "Payment methods:\n\
+         - Allowed values for `paymentMethodHint`: {methods}.\n\
+         - Match cues like \"card\", \"наличные\", \"Apple Pay\" to the closest \
+         entry. If nothing fits, omit `paymentMethodHint`."
+    )
+}
+
+/// Bias the model towards reusing existing tags. Tags stay free-form (we
+/// don't reject unknowns), but reusing names lets the frontend deduplicate
+/// on save.
+pub fn tag_rules(tags: &str) -> String {
+    if tags.trim().is_empty() {
+        return "Tags:\n\
+                 - Optional, max 3 short keywords. Skip when uncertain."
+            .to_string();
+    }
+    format!(
+        "Tags:\n\
+         - Optional, max 3 short keywords.\n\
+         - Strongly prefer reusing existing tag names: {tags}.\n\
+         - You may invent a new one only if no existing tag fits."
     )
 }
 
@@ -140,5 +178,39 @@ mod tests {
     fn language_rule_defaults_to_english_for_none() {
         let out = language_rule(None);
         assert!(out.contains("English"));
+    }
+
+    #[test]
+    fn category_rules_empty_list_tells_model_to_omit() {
+        let out = category_rules("");
+        assert!(out.contains("Omit `categoryHint`"));
+    }
+
+    #[test]
+    fn payment_method_rules_lists_values() {
+        let out = payment_method_rules("Card, Cash");
+        assert!(out.contains("Card, Cash"));
+        assert!(out.contains("paymentMethodHint"));
+    }
+
+    #[test]
+    fn payment_method_rules_empty_list_tells_model_to_omit() {
+        let out = payment_method_rules("");
+        assert!(out.contains("Omit `paymentMethodHint`"));
+    }
+
+    #[test]
+    fn tag_rules_lists_values_when_present() {
+        let out = tag_rules("Work, Coffee");
+        assert!(out.contains("Work, Coffee"));
+        assert!(out.contains("max 3"));
+        assert!(out.contains("reusing existing tag names"));
+    }
+
+    #[test]
+    fn tag_rules_empty_list_only_keeps_max_three_rule() {
+        let out = tag_rules("");
+        assert!(out.contains("max 3"));
+        assert!(!out.contains("reusing existing tag names"));
     }
 }

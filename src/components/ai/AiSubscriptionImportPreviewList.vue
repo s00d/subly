@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
-import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import AppSelect, { type SelectOption } from "@/components/ui/AppSelect.vue";
-import { Sparkles, Cpu, AlertTriangle, CheckSquare, Square, X } from "@lucide/vue";
+import { Sparkles, AlertTriangle, CheckSquare, Square, X } from "@lucide/vue";
 import type { Category, Currency, PaymentMethod } from "@/schemas/appData";
-import type { StatementDraftRow } from "@/services/aiClient";
+import type { AiSubscriptionDraftRow } from "@/services/aiClient";
 
 interface RowState {
-  row: StatementDraftRow;
+  row: AiSubscriptionDraftRow;
   selected: boolean;
 }
 
@@ -20,7 +19,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  "update:row": [index: number, patch: Partial<StatementDraftRow["draft"]>];
+  "update:row": [index: number, patch: Partial<AiSubscriptionDraftRow["draft"]>];
   "toggle-selection": [index: number];
   remove: [index: number];
   "select-all": [];
@@ -28,7 +27,6 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const { fmtCurrency, fmtDateMedium } = useLocaleFormat();
 
 const currencyOptions = computed<SelectOption[]>(() =>
   props.currencies.map((c) => ({
@@ -51,15 +49,17 @@ const paymentOptions = computed<SelectOption[]>(() => [
     .map((p) => ({ label: p.name, value: p.id, icon: p.icon })),
 ]);
 
-function currencyCode(id: string): string {
-  return props.currencies.find((c) => c.id === id)?.code ?? "USD";
-}
+const cycleOptions = computed<SelectOption[]>(() => [
+  { label: t("days"), value: 1 },
+  { label: t("weeks"), value: 2 },
+  { label: t("months"), value: 3 },
+  { label: t("years"), value: 4 },
+]);
 
-function rowWarning(row: StatementDraftRow): string | null {
+function rowWarning(row: AiSubscriptionDraftRow): string | null {
   if (!row.draft.warnings || row.draft.warnings.length === 0) return null;
   return row.draft.warnings
     .map((w) => {
-      // We translate the well-known keys, fall back to the raw value.
       const key = w as string;
       const translated = t(key);
       return translated === key ? w : translated;
@@ -151,17 +151,16 @@ function rowWarning(row: StatementDraftRow): string | null {
             </div>
             <div class="col-span-6 sm:col-span-2">
               <input
-                :value="state.row.draft.amount"
+                :value="state.row.draft.price"
                 @input="
                   emit('update:row', idx, {
-                    amount: Number(
-                      ($event.target as HTMLInputElement).value || 0,
-                    ),
+                    price: Number(($event.target as HTMLInputElement).value || 0),
                   })
                 "
                 type="number"
                 step="0.01"
                 inputmode="decimal"
+                :placeholder="t('price')"
                 class="w-full px-2 py-1.5 rounded-md border border-border bg-surface text-xs text-text-primary text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
               />
             </div>
@@ -175,20 +174,31 @@ function rowWarning(row: StatementDraftRow): string | null {
                 size="sm"
               />
             </div>
-            <div class="col-span-12 sm:col-span-3">
-              <input
-                :value="state.row.draft.date"
-                @input="
-                  emit('update:row', idx, {
-                    date: ($event.target as HTMLInputElement).value,
-                  })
+            <div class="col-span-6 sm:col-span-3">
+              <AppSelect
+                :modelValue="state.row.draft.cycle"
+                @update:modelValue="
+                  (v) => emit('update:row', idx, { cycle: Number(v) })
                 "
-                type="date"
-                class="w-full px-2 py-1.5 rounded-md border border-border bg-surface text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                :options="cycleOptions"
+                size="sm"
               />
             </div>
 
-            <div class="col-span-6">
+            <div class="col-span-6 sm:col-span-3">
+              <input
+                :value="state.row.draft.nextPayment ?? ''"
+                @input="
+                  emit('update:row', idx, {
+                    nextPayment: ($event.target as HTMLInputElement).value || undefined,
+                  })
+                "
+                type="date"
+                :placeholder="t('next_payment')"
+                class="w-full px-2 py-1.5 rounded-md border border-border bg-surface text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+              />
+            </div>
+            <div class="col-span-6 sm:col-span-4">
               <AppSelect
                 :modelValue="state.row.draft.categoryId"
                 @update:modelValue="
@@ -199,12 +209,11 @@ function rowWarning(row: StatementDraftRow): string | null {
                 :placeholder="t('category')"
               />
             </div>
-            <div class="col-span-6">
+            <div class="col-span-12 sm:col-span-5">
               <AppSelect
                 :modelValue="state.row.draft.paymentMethodId"
                 @update:modelValue="
-                  (v) =>
-                    emit('update:row', idx, { paymentMethodId: v as string })
+                  (v) => emit('update:row', idx, { paymentMethodId: v as string })
                 "
                 :options="paymentOptions"
                 size="sm"
@@ -216,20 +225,10 @@ function rowWarning(row: StatementDraftRow): string | null {
 
         <div class="flex items-center gap-2 mt-1.5 pl-7">
           <span
-            class="inline-flex items-center gap-1 px-1.5 py-0 rounded text-[9px] font-medium"
-            :class="
-              state.row.source === 'heuristic'
-                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
-                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-            "
+            class="inline-flex items-center gap-1 px-1.5 py-0 rounded text-[9px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
           >
-            <Cpu v-if="state.row.source === 'heuristic'" :size="9" />
-            <Sparkles v-else :size="9" />
-            {{
-              state.row.source === "heuristic"
-                ? t("ai_source_heuristic")
-                : t("ai_source_llm")
-            }}
+            <Sparkles :size="9" />
+            {{ t("ai_source_llm") }}
           </span>
           <span
             v-if="rowWarning(state.row)"
@@ -238,17 +237,6 @@ function rowWarning(row: StatementDraftRow): string | null {
           >
             <AlertTriangle :size="10" />
             {{ rowWarning(state.row) }}
-          </span>
-          <div class="flex-1" />
-          <span class="text-[10px] text-text-muted tabular-nums">
-            {{ fmtDateMedium(state.row.draft.date || new Date().toISOString()) }}
-            ·
-            {{
-              fmtCurrency(
-                state.row.draft.amount,
-                currencyCode(state.row.draft.currencyId),
-              )
-            }}
           </span>
         </div>
       </div>

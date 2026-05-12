@@ -59,7 +59,6 @@ pub struct CatalogSnapshot {
     pub categories: Vec<CategoryDoc>,
     pub currencies: Vec<CurrencyDoc>,
     pub payment_methods: Vec<PaymentMethodDoc>,
-    #[allow(dead_code)] // Consumed by Phases 3–5 (expenses use tag pool).
     pub tags: Vec<TagDoc>,
 }
 
@@ -158,17 +157,37 @@ pub struct ExpenseLineItem {
     pub amount: f64,
 }
 
-/// Aggregate result of `ai_import_statement_file` — what reached the UI for
-/// preview / confirmation.
-#[derive(Debug, Clone, Serialize)]
+/// What the AI thought it was looking at. Drives the metadata payload and
+/// the UI badge in `AiImportDialog`. The row list is treated uniformly —
+/// even a `Receipt` carries exactly one row, so frontend code paths never
+/// need to branch on `kind` for the save flow.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AiImportKind {
+    /// A single sales receipt: one expense, optional `lineItems` breakdown.
+    Receipt,
+    /// A list of transactions (bank statement, screenshot of an in-app
+    /// transaction history, CSV export, etc.). One row per expense.
+    Statement,
+}
+
+/// Optional extras that only make sense for one of the [`AiImportKind`]
+/// variants. Frontend treats every field as optional and renders the bits
+/// it actually has.
+#[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct StatementImportResultDto {
-    pub format: &'static str,
-    pub rows: Vec<StatementDraftRow>,
-    pub stats: StatementImportStats,
-    /// Aggregate token usage across all LLM chunks (when reported).
+pub struct AiImportMetadata {
+    /// Receipt: merchant / store name as printed on the receipt.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub usage: Option<AiUsage>,
+    pub merchant_name: Option<String>,
+    /// Receipt: grand total (echoed from the row for convenience).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub total_amount: Option<f64>,
+    /// Receipt: itemised lines from the bill. Always present (possibly
+    /// empty) so the UI can render `lineItems.length > 0` conditionals
+    /// without a `?? []` dance.
+    #[serde(default)]
+    pub line_items: Vec<ExpenseLineItem>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -186,6 +205,56 @@ pub struct StatementImportStats {
     pub matched_by_llm: usize,
     pub failed: usize,
     pub total: usize,
+}
+
+/// Sibling of [`AiImportKind`] used by the subscription branch. The model
+/// classifies the input as either one subscription confirmation (`Single`)
+/// or a list of active subscriptions (`List`).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum AiSubscriptionImportKind {
+    Single,
+    List,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiSubscriptionDraftRow {
+    /// "heuristic" never applies to subscriptions, but kept as a tagged
+    /// string so the preview component can stay identical to the expense
+    /// one.
+    pub source: &'static str,
+    pub draft: SubscriptionDraftDto,
+}
+
+/// Aggregate result of `ai_smart_input`. The discriminator is `surface` —
+/// frontend uses TS's discriminated-union pattern to pick the right
+/// preview list and bulk-save handler. Row schemas differ between the two
+/// variants, so the shared bits (format, stats, usage) are repeated
+/// rather than promoted to a parent struct.
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "surface", rename_all = "lowercase")]
+pub enum AiSmartResultDto {
+    Expense {
+        /// `Receipt` for single-item inputs (text, single-receipt photo),
+        /// `Statement` for multi-row inputs (CSV, bank screenshot).
+        kind: AiImportKind,
+        /// `"text" | "image" | "csv" | "xlsx" | "json" | "pdf"`.
+        format: &'static str,
+        rows: Vec<StatementDraftRow>,
+        metadata: AiImportMetadata,
+        stats: StatementImportStats,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        usage: Option<AiUsage>,
+    },
+    Subscription {
+        kind: AiSubscriptionImportKind,
+        format: &'static str,
+        rows: Vec<AiSubscriptionDraftRow>,
+        stats: StatementImportStats,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        usage: Option<AiUsage>,
+    },
 }
 
 /// Streamed progress events sent over `tauri::ipc::Channel`.

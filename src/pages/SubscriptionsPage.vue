@@ -13,10 +13,10 @@ import { useToast } from "@/composables/useToast";
 import { useScrollLock } from "@/composables/useScrollLock";
 import { useClipboard } from "@/composables/useClipboard";
 import { type Subscription, type Settings, type SubscriptionListItem } from "@/schemas/appData";
-import SubscriptionForm, { type SubscriptionPrefill } from "@/components/subscriptions/SubscriptionForm.vue";
+import SubscriptionForm from "@/components/subscriptions/SubscriptionForm.vue";
 import SubscriptionDetail from "@/components/subscriptions/SubscriptionDetail.vue";
 import SubscriptionsListSkeleton from "@/components/subscriptions/SubscriptionsListSkeleton.vue";
-import AiQuickAddSubscription from "@/components/ai/AiQuickAddSubscription.vue";
+import AiSmartDialog from "@/components/ai/AiSmartDialog.vue";
 import Toast from "@/components/ui/Toast.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
@@ -57,7 +57,6 @@ import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
 import { useNowStore } from "@/stores/nowStore";
 import { ui } from "@/lib/tv";
 import { formatErrorForToast } from "@/utils/formatError";
-import type { SubscriptionDraft } from "@/services/aiClient";
 import { useAiConfigStore } from "@/stores/aiConfigStore";
 
 const route = useRoute();
@@ -83,9 +82,9 @@ const currencies = computed(() => metaRefs.currencies.value ?? []);
 const household = computed(() => metaRefs.household.value ?? []);
 const subscriptions = computed(() => subscriptionsStore.items);
 
-// AI quick-add state (must be declared before updateHeaderActions so the
+// AI smart-input state (must be declared before updateHeaderActions so the
 // header-action builder can read the availability flag without forward refs).
-const showAiQuickAdd = ref(false);
+const showAiSmart = ref(false);
 const aiConfigStore = useAiConfigStore();
 const {
   enabled: aiEnabled,
@@ -96,10 +95,10 @@ const {
 } = storeToRefs(aiConfigStore);
 /**
  * Header AI button is in one of three states:
- *   - "ready":  AI is fully usable for subscriptions → opens quick-add.
- *   - "setup":  AI is reachable but not configured (off, no key, ...) →
- *               opens settings so the user can fix it in one tap.
- *   - "hidden": Store still loading or feature explicitly disabled.
+ *   - "ready":  AI is fully usable → opens the smart dialog.
+ *   - "setup":  AI reachable but not configured (off / no key) → opens
+ *               settings so the user can fix it in one tap.
+ *   - "hidden": Store still loading or feature toggle off.
  */
 const aiHeaderState = computed<"ready" | "setup" | "hidden">(() => {
   if (!aiLoaded.value) return "hidden";
@@ -110,12 +109,18 @@ const aiHeaderState = computed<"ready" | "setup" | "hidden">(() => {
   return "setup";
 });
 
-function openAiQuickAdd() {
-  showAiQuickAdd.value = true;
+function openAiSmart() {
+  showAiSmart.value = true;
 }
 
 function openAiSettings() {
   vueRouter.push("/settings?section=ai");
+}
+
+function onAiImported(_count: number) {
+  fetchFilteredSubs().catch((e) => {
+    console.warn("[SubscriptionsPage] reload after AI import failed", e);
+  });
 }
 
 // Register header action
@@ -131,7 +136,7 @@ function updateHeaderActions() {
     { id: "sub-selection-mode", icon: CheckSquare, title: selectionMode.value ? `${t("select")} ✓` : `${t("select")} ✕`, onClick: toggleSelectionMode, style: selectionMode.value ? "success" : "neutral" },
   ];
   if (aiHeaderState.value === "ready") {
-    actions.push({ id: "ai-add-sub", icon: Sparkles, title: t("ai_quick_add_subscription"), onClick: openAiQuickAdd, style: "accent" });
+    actions.push({ id: "ai-smart-sub", icon: Sparkles, title: t("ai_smart_open"), onClick: openAiSmart, style: "accent" });
   } else if (aiHeaderState.value === "setup") {
     actions.push({ id: "ai-setup-sub", icon: Sparkles, title: t("ai_setup_assistant"), onClick: openAiSettings, style: "neutral" });
   }
@@ -172,31 +177,6 @@ function handleSubQueryParam() {
 // Form
 const showForm = ref(false);
 const editingSub = ref<Subscription | null>(null);
-const formPrefill = ref<SubscriptionPrefill | null>(null);
-
-function applyAiDraft(draft: SubscriptionDraft) {
-  const prefill: SubscriptionPrefill = {};
-  if (draft.name) prefill.name = draft.name;
-  if (draft.price > 0) prefill.price = draft.price;
-  if (draft.currencyId) prefill.currencyId = draft.currencyId;
-  if (draft.cycle) prefill.cycle = draft.cycle as 1 | 2 | 3 | 4;
-  if (draft.frequency) prefill.frequency = draft.frequency;
-  if (draft.categoryId) prefill.categoryId = draft.categoryId;
-  if (draft.paymentMethodId) prefill.paymentMethodId = draft.paymentMethodId;
-  if (draft.startDate) prefill.startDate = draft.startDate;
-  if (draft.nextPayment) prefill.nextPayment = draft.nextPayment;
-  if (draft.notes) prefill.notes = draft.notes;
-  if (draft.url) prefill.url = draft.url;
-  if (draft.tags?.length) prefill.tags = [...draft.tags];
-
-  editingSub.value = null;
-  formPrefill.value = prefill;
-  showForm.value = true;
-
-  if (draft.warnings.length) {
-    toast(t("ai_draft_warnings", { count: draft.warnings.length }));
-  }
-}
 
 // Detail panel
 const showDetail = ref(false);
@@ -575,7 +555,6 @@ const subscriptionFormLookupData = computed(() => {
 // Actions
 function openAdd() {
   editingSub.value = null;
-  formPrefill.value = null;
   showForm.value = true;
 }
 
@@ -1069,16 +1048,16 @@ async function loadInitial() {
       v-if="subscriptionFormLookupData"
       :show="showForm"
       :edit-subscription="editingSub"
-      :prefill="formPrefill"
       :lookupData="subscriptionFormLookupData"
-      @close="showForm = false; formPrefill = null"
+      @close="showForm = false"
       @saved="onSaved"
     />
 
-    <AiQuickAddSubscription
-      :show="showAiQuickAdd"
-      @close="showAiQuickAdd = false"
-      @draft="applyAiDraft"
+    <AiSmartDialog
+      :show="showAiSmart"
+      surface="subscription"
+      @close="showAiSmart = false"
+      @imported="onAiImported"
     />
 
     <!-- Delete Confirmation Modal -->

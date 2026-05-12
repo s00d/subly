@@ -12,7 +12,6 @@
 pub enum FeatureKind {
     Subscription,
     Expense,
-    Receipt,
     Statement,
 }
 
@@ -27,7 +26,6 @@ pub fn block(feature: FeatureKind, today: &str) -> String {
         FeatureKind::Expense => EXPENSE
             .replace("<today>", today)
             .replace("<yesterday>", &yesterday),
-        FeatureKind::Receipt => RECEIPT.to_string(),
         FeatureKind::Statement => STATEMENT.to_string(),
     }
 }
@@ -64,16 +62,6 @@ JSON: {"name":"Такси","amount":450,"currencyCode":"RUB","date":"<yesterday>
 
 Input: "Domain renewal hover.com 14.99 today"
 JSON: {"name":"hover.com domain renewal","amount":14.99,"currencyCode":"USD","date":"<today>","url":"https://hover.com","confidence":0.85}
-"#;
-
-const RECEIPT: &str = r#"
-Examples:
-
-Receipt (image): grocery receipt, total $42.50
-JSON: {"name":"Whole Foods","amount":42.5,"currencyCode":"USD","categoryHint":"Groceries","paymentMethodHint":"Card","confidence":0.9,"lineItems":[{"name":"Bananas","amount":3.5},{"name":"Bread","amount":4.2}]}
-
-Receipt (PDF text): "Магнит\n01.05.2026\nИтого: 1 234,56 ₽"
-JSON: {"name":"Магнит","amount":1234.56,"currencyCode":"RUB","date":"2026-05-01","categoryHint":"Groceries","confidence":0.9}
 "#;
 
 const STATEMENT: &str = r#"

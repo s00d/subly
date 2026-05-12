@@ -1,24 +1,20 @@
 //! Centralised system prompts for AI features.
 //!
 //! Layout:
-//! * Per-feature builder modules (`subscription`, `expense`, `receipt`,
-//!   `statement`) — each exposes a `pub fn build(ctx) -> String` that
-//!   assembles the final system prompt.
+//! * [`smart`] — single surface-aware builder used by `ai_smart_input`.
+//!   Produces an envelope-shaped prompt for any `(surface, input_kind)`
+//!   pair by stitching together the shared fragments.
+//! * [`statement`] — chunk-level prompt used by the heuristics fallback
+//!   pipeline when we already have parsed tabular data and only need the
+//!   LLM to enrich the un-resolved rows.
 //! * [`fragments`] — small reusable blocks (header, JSON-reply rule,
-//!   currency rules, category rules, date rules, **language rule**).
-//! * [`fewshot`] — short Input → JSON exemplars per feature, including
-//!   Russian examples so models behave well on RU input.
-//!
-//! Phase 1 ships the file layout with the old prompts ported 1:1.
-//! Phase 2 enriches the fragments (language_rule with explicit `Reply in
-//! <Language>`, few-shot examples, etc.).
+//!   currency rules, category rules, date rules, language rule).
+//! * [`fewshot`] — short Input → JSON exemplars per surface.
 
-pub mod expense;
 pub mod fewshot;
 pub mod fragments;
-pub mod receipt;
+pub mod smart;
 pub mod statement;
-pub mod subscription;
 
 /// Connectivity probe used by `ai_test_connection`.
 ///

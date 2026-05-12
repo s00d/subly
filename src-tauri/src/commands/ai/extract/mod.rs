@@ -1,8 +1,12 @@
-//! AI-driven extraction pipelines.
+//! AI-driven extraction pipeline.
+//!
+//! The frontend has exactly one entry point — `ai_smart_input` — which
+//! accepts a `surface` ("expense" | "subscription") and *either* free-form
+//! text or a file/image. The command picks the right route internally:
 //!
 //! ```text
 //!   ┌──────────────────────────────────────────────────┐
-//!   │           text / image / file bytes              │
+//!   │   surface + (text | file bytes) + mime + locale  │
 //!   └────────────────────────┬─────────────────────────┘
 //!                            │
 //!                ┌───────────▼────────────┐
@@ -11,46 +15,33 @@
 //!                └───────────┬────────────┘
 //!                            │
 //!                ┌───────────▼────────────┐
-//!                │  feature-specific prompt │
-//!                │   (prompts/<feature>.rs)  │
+//!                │  prompts/smart.rs        │
+//!                │  build(surface, kind, ctx) │
 //!                └───────────┬────────────┘
 //!                            │
 //!                ┌───────────▼────────────┐
-//!                │ providers::run_text /    │
-//!                │ direct vision-POST       │
+//!                │ run_text / call_vision /  │
+//!                │ heuristics + chunk LLM    │
 //!                └───────────┬────────────┘
 //!                            │
 //!                ┌───────────▼────────────┐
-//!                │  json_parse::parse_llm_json │
-//!                └───────────┬────────────┘
-//!                            │
-//!                ┌───────────▼────────────┐
-//!                │ apply_common (mapping.rs) │
-//!                │   → ResolvedCommon        │
-//!                │   + feature-specific map  │
-//!                └───────────┬────────────┘
-//!                            │
-//!                ┌───────────▼────────────┐
-//!                │  *DraftDto              │
+//!                │ AiSmartResultDto         │
+//!                │ (tagged by `surface`)    │
 //!                └────────────────────────┘
 //! ```
 //!
 //! Submodules:
 //! * [`context`] — request-scoped [`ExtractContext`] (catalogs + locale + today).
-//! * [`mapping`] — shared mappers (`apply_common`, `resolve_amount`, `resolve_date`).
-//! * [`raw`] — [`AiCommonFields`] flattened into every `Ai*Raw` struct.
-//! * [`subscription`], [`expense`], [`receipt`], [`statement`] — feature
-//!   commands. Each one is a thin shell: prompt + LLM call + map.
+//! * [`mapping`] — shared mappers (`apply_common`, `resolve_amount`, …).
+//! * [`raw`] — [`AiCommonFields`] flattened into LLM-response structs.
+//! * [`vision_io`] — vision endpoint POST + HEIC transcoding, shared by
+//!   both surfaces.
+//! * [`smart`] — the single `ai_smart_input` command with 4-way dispatch.
 
 pub mod context;
-pub mod expense;
 pub mod mapping;
 pub mod raw;
-pub mod receipt;
-pub mod statement;
-pub mod subscription;
+pub mod smart;
+pub mod vision_io;
 
-pub use expense::ai_extract_expense_from_text;
-pub use receipt::ai_extract_receipt;
-pub use statement::ai_import_statement_file;
-pub use subscription::ai_extract_subscription_from_text;
+pub use smart::ai_smart_input;

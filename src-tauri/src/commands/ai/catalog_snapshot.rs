@@ -138,6 +138,54 @@ impl CatalogSnapshot {
         codes.dedup();
         codes.join(", ")
     }
+
+    /// Format enabled payment methods for inclusion in a system prompt.
+    /// Disabled methods are dropped because the model shouldn't propose them.
+    pub fn render_payment_method_names(&self) -> String {
+        let mut names: Vec<&str> = self
+            .payment_methods
+            .iter()
+            .filter(|p| p.enabled)
+            .map(|p| p.name.as_str())
+            .filter(|n| !n.is_empty())
+            .collect();
+        names.sort_unstable();
+        names.dedup();
+        names.join(", ")
+    }
+
+    /// Format tag list for inclusion in a system prompt.
+    ///
+    /// Strategy: favourites first (alphabetised inside the favourite group),
+    /// then everyone else by `sort_order`, capped at `TAG_PROMPT_CAP` so the
+    /// system prompt stays light on tokens for users with hundreds of tags.
+    pub fn render_tag_names(&self) -> String {
+        const TAG_PROMPT_CAP: usize = 30;
+        let mut tags: Vec<&crate::models::TagDoc> = self
+            .tags
+            .iter()
+            .filter(|t| !t.name.trim().is_empty())
+            .collect();
+        // (-favourite, sort_order, name) — favourites first, stable inside each group.
+        tags.sort_by(|a, b| {
+            (!a.favorite)
+                .cmp(&!b.favorite)
+                .then_with(|| a.sort_order.cmp(&b.sort_order))
+                .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+        });
+        let mut seen = std::collections::HashSet::<String>::new();
+        let mut names: Vec<&str> = Vec::with_capacity(tags.len().min(TAG_PROMPT_CAP));
+        for tag in tags.iter() {
+            let key = tag.name.to_lowercase();
+            if seen.insert(key) {
+                names.push(tag.name.as_str());
+                if names.len() >= TAG_PROMPT_CAP {
+                    break;
+                }
+            }
+        }
+        names.join(", ")
+    }
 }
 
 #[cfg(test)]
@@ -195,6 +243,16 @@ mod tests {
                 payment("pm-disabled", "Cheque", false),
             ],
             tags: vec![],
+        }
+    }
+
+    fn tag(id: &str, name: &str, favorite: bool, sort_order: i64) -> crate::models::TagDoc {
+        crate::models::TagDoc {
+            id: id.to_string(),
+            name: name.to_string(),
+            favorite,
+            sort_order,
+            i18n_key: String::new(),
         }
     }
 
@@ -259,5 +317,49 @@ mod tests {
     fn render_category_names_sorted() {
         let s = snapshot();
         assert_eq!(s.render_category_names(), "Food, Transport");
+    }
+
+    #[test]
+    fn render_payment_methods_drops_disabled() {
+        let s = snapshot();
+        assert_eq!(s.render_payment_method_names(), "Card, Cash");
+    }
+
+    #[test]
+    fn render_tag_names_favorites_first_then_sort_order() {
+        let mut s = snapshot();
+        s.tags = vec![
+            tag("t-a", "Coffee", false, 30),
+            tag("t-b", "Work", true, 5),
+            tag("t-c", "Snack", false, 10),
+            tag("t-d", "Travel", true, 20),
+        ];
+        assert_eq!(s.render_tag_names(), "Work, Travel, Snack, Coffee");
+    }
+
+    #[test]
+    fn render_tag_names_caps_at_thirty_and_dedupes() {
+        let mut s = snapshot();
+        s.tags = (0..40)
+            .map(|i| tag(&format!("t-{i}"), &format!("tag-{i:02}"), false, i))
+            .collect();
+        // Add a duplicate (case-insensitive) — must be dropped.
+        s.tags.push(tag("dup", "Tag-00", false, 100));
+        let rendered = s.render_tag_names();
+        let names: Vec<&str> = rendered.split(", ").collect();
+        assert_eq!(names.len(), 30);
+        assert_eq!(names.first(), Some(&"tag-00"));
+        assert_eq!(names.last(), Some(&"tag-29"));
+    }
+
+    #[test]
+    fn render_tag_names_skips_blank_names() {
+        let mut s = snapshot();
+        s.tags = vec![
+            tag("t-1", "  ", false, 1),
+            tag("t-2", "Important", true, 2),
+            tag("t-3", "", false, 3),
+        ];
+        assert_eq!(s.render_tag_names(), "Important");
     }
 }
