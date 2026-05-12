@@ -1,0 +1,26 @@
+.github/workflows/play-store-release.yml
+  s_760a8176b5063e::t_fdbef94682ee47 136-143
+  s_760a8176b5063e::t_334f3199204875 1-135,144-178
+  s_760a8176b5063e::t_869d0401ed9809 179-181
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "a21619405c43a2deafff13094c59af2e1237521b",
+  "prompts": {},
+  "humans": {
+    "h_ee6cac30a1b83a": {
+      "author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
