@@ -1,0 +1,21 @@
+.github/workflows/android-release.yml
+  s_760a8176b5063e::t_7e58fab7be2ade 44-98
+.github/workflows/play-store-release.yml
+  s_760a8176b5063e::t_945e9ff4560d0a 82-136
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "2b8ba687230e2361252beca914d2449a0fd9cd24",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
