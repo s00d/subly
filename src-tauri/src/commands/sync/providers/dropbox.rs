@@ -30,6 +30,7 @@ pub fn descriptor() -> super::ProviderInfo {
                 input_type: Some("text".to_string()),
                 help_text: Some("sync_help_dropbox_app_key".to_string()),
                 validation: Some(super::ProviderFieldValidation { min_length: Some(8), pattern: None }),
+                has_saved_value: None,
             },
             super::ProviderField {
                 key: "dropboxAppSecret".to_string(),
@@ -40,6 +41,7 @@ pub fn descriptor() -> super::ProviderInfo {
                 input_type: Some("password".to_string()),
                 help_text: Some("sync_help_dropbox_app_secret".to_string()),
                 validation: Some(super::ProviderFieldValidation { min_length: Some(8), pattern: None }),
+                has_saved_value: None,
             },
         ],
     }

@@ -14,9 +14,13 @@ export function buildSyncCredentialsSchema(provider: SyncProviderSchema) {
   const shape: Record<string, z.ZodType<string>> = {};
   for (const f of fields) {
     const base = z.preprocess(preprocessEmptyString, z.string());
+    // A secret with `hasSavedValue` is treated as "already provided" — an
+    // empty input doesn't fail `required`, because we'll keep the saved
+    // keyring value on save (the field is simply not echoed back to UI).
+    const requiredEffective = f.required && !(f.secret && f.hasSavedValue);
     shape[f.key] = base.superRefine((val, ctx) => {
       const t = val.trim();
-      if (f.required && !t) {
+      if (requiredEffective && !t) {
         ctx.addIssue({ code: "custom", message: "required" });
         return;
       }

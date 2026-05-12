@@ -20,6 +20,7 @@ pub fn descriptor() -> super::ProviderInfo {
                 input_type: Some("url".to_string()),
                 help_text: Some("sync_help_webdav_url".to_string()),
                 validation: Some(super::ProviderFieldValidation { min_length: Some(8), pattern: Some(r"^https?://".to_string()) }),
+                has_saved_value: None,
             },
             super::ProviderField {
                 key: "webdavUsername".to_string(),
@@ -30,6 +31,7 @@ pub fn descriptor() -> super::ProviderInfo {
                 input_type: Some("text".to_string()),
                 help_text: Some("sync_help_webdav_username".to_string()),
                 validation: Some(super::ProviderFieldValidation { min_length: Some(1), pattern: None }),
+                has_saved_value: None,
             },
             super::ProviderField {
                 key: "webdavPassword".to_string(),
@@ -40,6 +42,7 @@ pub fn descriptor() -> super::ProviderInfo {
                 input_type: Some("password".to_string()),
                 help_text: Some("sync_help_webdav_password".to_string()),
                 validation: None,
+                has_saved_value: None,
             },
         ],
     }

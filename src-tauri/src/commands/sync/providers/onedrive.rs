@@ -25,6 +25,7 @@ pub fn descriptor() -> super::ProviderInfo {
                 input_type: Some("text".to_string()),
                 help_text: Some("sync_help_onedrive_client_id".to_string()),
                 validation: Some(super::ProviderFieldValidation { min_length: Some(8), pattern: None }),
+                has_saved_value: None,
             },
         ],
     }

@@ -29,6 +29,11 @@ export interface SyncProviderFieldSchema {
   inputType?: string;
   helpText?: string;
   validation?: SyncProviderFieldValidation;
+  /**
+   * `true` ⇔ a value for this secret field is already stored in the OS
+   * keyring (backend has probed it). Only meaningful when `secret = true`.
+   */
+  hasSavedValue?: boolean;
 }
 
 export interface SyncProviderSchema {
@@ -114,6 +119,17 @@ export async function initSync(): Promise<void> {
   providersSchema = schema.providers ?? [];
 }
 
+/**
+ * Re-fetch the providers UI schema. Use after credential mutations so the
+ * `hasSavedValue` flags reflect the new keyring state without forcing a
+ * full app reload.
+ */
+export async function refreshProvidersSchema(): Promise<SyncProviderSchema[]> {
+  const schema = await callCommand<SyncUiSchemaResponse>("sync_get_ui_schema");
+  providersSchema = schema.providers ?? [];
+  return providersSchema;
+}
+
 export function getProviders(): SyncProviderSchema[] {
   return providersSchema;
 }
@@ -125,6 +141,9 @@ export function getSyncSettings(): SyncSettings {
 export async function saveProviderSettings(provider: SyncProviderType, credentials: Record<string, string>): Promise<void> {
   const settings = await callCommand<SyncSettings>("sync_save_settings", { provider, credentials });
   syncSettings = { ...defaultSettings, ...settings };
+  // Keep `hasSavedValue` indicators in sync with the keyring without
+  // forcing the caller to reload the whole UI.
+  await refreshProvidersSchema();
 }
 
 export type EnableProviderResult = {

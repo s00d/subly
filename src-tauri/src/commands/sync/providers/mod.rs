@@ -1,4 +1,5 @@
 use super::{SyncConfig, SyncPayload, SyncProviderType};
+use crate::keyring_store;
 use serde::{Deserialize, Serialize};
 mod gdrive;
 mod dropbox;
@@ -28,6 +29,11 @@ pub struct ProviderField {
     pub input_type: Option<String>,
     pub help_text: Option<String>,
     pub validation: Option<ProviderFieldValidation>,
+    /// `Some(true)` ⇔ the corresponding secret is already stored in the OS
+    /// keyring. The field name itself never carries the value; this flag is
+    /// only meant to drive UI affordances (mask, "Save" button enablement).
+    /// `None` for non-secret fields.
+    pub has_saved_value: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,6 +41,36 @@ pub struct ProviderField {
 pub struct ProviderFieldValidation {
     pub min_length: Option<usize>,
     pub pattern: Option<String>,
+}
+
+/// Maps a `ProviderField.key` (the camelCase identifier shipped to the UI) to
+/// the keyring account name under which we persist its secret. The lookup is
+/// deliberately exhaustive and falls back to `None` for fields we do *not*
+/// store in the keyring — those should always render with an empty input.
+fn keyring_account_for_field(field_key: &str) -> Option<&'static str> {
+    match field_key {
+        "dropboxAppSecret" => Some(super::config::KR_SYNC_DROPBOX_APP_SECRET),
+        "webdavPassword" => Some(super::config::KR_SYNC_WEBDAV_PASSWORD),
+        _ => None,
+    }
+}
+
+/// Fills `has_saved_value` for every secret field by probing the keyring.
+/// Errors from the keyring (e.g. locked iOS data-protection class) collapse
+/// to `Some(false)` — the UI then prompts the user to type a fresh value,
+/// which is the correct fallback for an unreachable secret.
+fn annotate_saved_secrets(mut info: ProviderInfo) -> ProviderInfo {
+    for field in info.fields.iter_mut() {
+        if !field.secret {
+            field.has_saved_value = None;
+            continue;
+        }
+        let saved = keyring_account_for_field(&field.key)
+            .map(|account| keyring_store::exists(account).unwrap_or(false))
+            .unwrap_or(false);
+        field.has_saved_value = Some(saved);
+    }
+    info
 }
 
 pub fn providers_list() -> Vec<ProviderInfo> {
@@ -45,6 +81,9 @@ pub fn providers_list() -> Vec<ProviderInfo> {
         onedrive::descriptor(),
         webdav::descriptor(),
     ]
+    .into_iter()
+    .map(annotate_saved_secrets)
+    .collect()
 }
 
 pub fn provider_auth_url(provider: &SyncProviderType, cfg: &SyncConfig) -> Option<String> {

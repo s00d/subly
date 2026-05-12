@@ -17,6 +17,7 @@ import {
 } from "@/services/syncClient";
 import type { SyncProviderType, SyncProviderSchema } from "@/services/syncClient";
 import Modal from "@/components/ui/Modal.vue";
+import SecretInput from "@/components/ui/SecretInput.vue";
 import { ChevronRight, Cloud, CloudOff, Download, Save, Upload } from "@lucide/vue";
 import { ui } from "@/lib/tv";
 import { formatErrorForToast } from "@/utils/formatError";
@@ -115,12 +116,35 @@ watch(expandedProvider, (type) => {
   if (provider) validateProviderFields(provider);
 });
 
+/**
+ * Strip empty secret values from the payload before pushing it to the
+ * backend. The dispatcher interprets a missing secret key as "keep the
+ * already-saved keyring value", so leaving the input blank simply leaves
+ * the previous secret untouched. Non-secret fields are always sent.
+ */
+function buildSaveCredentials(provider: SyncProviderSchema): Record<string, string> {
+  const raw = formValues[provider.type] ?? {};
+  const out: Record<string, string> = {};
+  for (const f of provider.fields ?? []) {
+    const v = raw[f.key];
+    if (f.secret && !(v ?? "").trim()) continue;
+    out[f.key] = v ?? "";
+  }
+  return out;
+}
+
 async function saveProvider(provider: SyncProviderSchema) {
   if (!validateProviderFields(provider)) return;
   isSaving.value = provider.type;
-  await saveProviderSettings(provider.type, formValues[provider.type] ?? {});
+  await saveProviderSettings(provider.type, buildSaveCredentials(provider));
   isSaving.value = null;
   toast(t("sync_credentials_saved"));
+  // Clear any secret inputs the user typed — `saveProviderSettings` already
+  // refreshed `providersSchema`, so the corresponding `hasSavedValue` flag
+  // will surface the mask through `SecretInput` again.
+  for (const f of provider.fields ?? []) {
+    if (f.secret) formValues[provider.type][f.key] = "";
+  }
 }
 
 async function connectProvider(type: SyncProviderType) {
@@ -255,12 +279,24 @@ async function handleConflictForcePush() {
           <template v-for="field in (provider.fields ?? [])" :key="field.key">
             <div>
               <label class="block text-[10px] text-text-muted mb-1">{{ t(field.label) }}</label>
-              <input
+              <SecretInput
+                v-if="field.secret"
                 v-model="formValues[provider.type][field.key]"
-                :type="field.inputType || (field.secret ? 'password' : 'text')"
+                :has-saved-value="!!field.hasSavedValue"
+                size="sm"
+                :placeholder="field.placeholder ? t(field.placeholder) : ''"
+              />
+              <input
+                v-else
+                v-model="formValues[provider.type][field.key]"
+                :type="field.inputType || 'text'"
                 :placeholder="field.placeholder ? t(field.placeholder) : ''"
                 class="w-full px-2.5 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary"
               />
+              <p v-if="field.secret && field.hasSavedValue && !(formValues[provider.type][field.key] ?? '').trim()"
+                class="mt-1 text-[10px] text-green-600 dark:text-green-400">
+                {{ t('ai_api_key_configured') }}
+              </p>
               <p v-if="field.helpText" class="mt-1 text-[10px] text-text-muted">{{ t(field.helpText) }}</p>
               <p v-if="fieldErrors[`${provider.type}:${field.key}`]" class="mt-1 text-[10px] text-red-500">
                 {{ fieldErrors[`${provider.type}:${field.key}`] }}
