@@ -10,7 +10,7 @@ import { useCatalogsUsageStore } from "@/stores/catalogsUsageStore";
 import Toast from "@/components/ui/Toast.vue";
 import {
   Palette, Bell, FolderTree, Coins, CreditCard, Tags,
-  Users, Cloud, Database, ArrowRightLeft, Send,
+  Users, Cloud, Database, ArrowRightLeft, Send, Sparkles,
 } from "@lucide/vue";
 
 import AppearanceSection from "@/components/settings/AppearanceSection.vue";
@@ -22,6 +22,7 @@ const PaymentMethodsSection = defineAsyncComponent(() => import("@/components/se
 const TagsSection = defineAsyncComponent(() => import("@/components/settings/TagsSection.vue"));
 const HouseholdSection = defineAsyncComponent(() => import("@/components/settings/HouseholdSection.vue"));
 const ExchangeRatesSection = defineAsyncComponent(() => import("@/components/settings/ExchangeRatesSection.vue"));
+const AiSection = defineAsyncComponent(() => import("@/components/settings/AiSection.vue"));
 const TelegramSection = defineAsyncComponent(() => import("@/components/settings/TelegramSection.vue"));
 const CloudSyncSection = defineAsyncComponent(() => import("@/components/settings/CloudSyncSection.vue"));
 const ConverterPresetsSection = defineAsyncComponent(() => import("@/components/settings/ConverterPresetsSection.vue"));
@@ -126,6 +127,7 @@ const slots = tabsTv();
         <template v-if="activeTab === 'integrations'">
           <ExchangeRatesSection :lookupData="{ settings: settings!, currencies }" />
           <RateHistorySection :lookupSettings="settings!" />
+          <AiSection />
           <TelegramSection />
           <CloudSyncSection />
         </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
+import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import {
   deleteExpense,
@@ -11,12 +12,13 @@ import { storeToRefs } from "pinia";
 import type { Currency, Expense, Subscription, Category, PaymentMethod, Tag, Settings, HouseholdMember } from "@/schemas/appData";
 import { expenseToIsoDate, parseExpense } from "@/schemas/appData";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
-import { useHeaderActions } from "@/composables/useHeaderActions";
+import { useHeaderActions, type HeaderAction } from "@/composables/useHeaderActions";
 import { useToast } from "@/composables/useToast";
 import { useClipboard } from "@/composables/useClipboard";
 import { useScrollLock } from "@/composables/useScrollLock";
-import ExpenseForm from "@/components/expenses/ExpenseForm.vue";
+import ExpenseForm, { type ExpensePrefill } from "@/components/expenses/ExpenseForm.vue";
 import ExpenseDetail from "@/components/expenses/ExpenseDetail.vue";
+import AiQuickAddExpense from "@/components/ai/AiQuickAddExpense.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import UniversalListRow from "@/components/ui/UniversalListRow.vue";
@@ -44,6 +46,7 @@ import {
   LayoutList,
   LayoutGrid,
   Filter,
+  Sparkles,
 } from "@lucide/vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { formatErrorForToast } from "@/utils/formatError";
@@ -51,6 +54,8 @@ import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
 import { useExpensesStore } from "@/stores/expensesStore";
 import { ui } from "@/lib/tv";
+import { type ExpenseDraft } from "@/services/aiClient";
+import { useAiConfigStore } from "@/stores/aiConfigStore";
 
 const PAGE_SIZE = 10;
 const subscriptions = ref<Subscription[]>([]);
@@ -86,24 +91,71 @@ function logPageError(scope: string, error: unknown, extra?: Record<string, unkn
   });
 }
 
+// AI quick-add state — must be declared before updateHeaderActions so the
+// action builder can read the availability flag without forward refs.
+const showAiQuickAdd = ref(false);
+const aiConfigStore = useAiConfigStore();
+const {
+  enabled: aiEnabled,
+  features: aiFeatures,
+  hasApiKey: aiHasApiKey,
+  activeProvider: aiActiveProvider,
+  loaded: aiLoaded,
+} = storeToRefs(aiConfigStore);
+/**
+ * Header AI button state. The expense surface treats `expenseInput` as the
+ * primary action and only goes into "setup" mode when neither of the two
+ * supported features is even toggled in config — in that case we still
+ * want a clear path back to settings.
+ */
+const aiHeaderState = computed<"ready" | "setup" | "hidden">(() => {
+  if (!aiLoaded.value) return "hidden";
+  const wantsAnyFeature =
+    aiFeatures.value.expenseInput ||
+    aiFeatures.value.receiptImport ||
+    aiFeatures.value.statementImport;
+  if (!wantsAnyFeature) return "hidden";
+  const requiresKey = !!aiActiveProvider.value?.requiresKey;
+  const keyOk = !requiresKey || aiHasApiKey.value;
+  if (aiEnabled.value && keyOk) return "ready";
+  return "setup";
+});
+
+const aiRouter = useRouter();
+function openAiSettings() {
+  aiRouter.push("/settings?section=ai");
+}
+
+function openAiQuickAdd() {
+  showAiQuickAdd.value = true;
+}
+
 function updateHeaderActions() {
   const viewIcon = viewMode.value === "compact" ? Rows3 : viewMode.value === "expanded" ? LayoutGrid : LayoutList;
   const nextViewMode = viewMode.value === "compact" ? "default" : viewMode.value === "default" ? "expanded" : "compact";
   const currentViewTitle = viewMode.value === "compact" ? t("view_compact") : viewMode.value === "expanded" ? t("view_expanded") : t("view_default");
   const nextViewTitle = nextViewMode === "compact" ? t("view_compact") : nextViewMode === "expanded" ? t("view_expanded") : t("view_default");
 
-  setActions([
+  const actions: HeaderAction[] = [
     { id: "toggle-expense-filters", icon: Filter, title: showFilters.value ? `${t("filter")} ✓` : `${t("filter")} ✕`, onClick: () => { showFilters.value = !showFilters.value; }, style: showFilters.value ? "warning" : "neutral" },
     { id: "cycle-expense-view", icon: viewIcon, title: `${currentViewTitle} → ${nextViewTitle}`, onClick: () => setViewMode(nextViewMode), style: "accent" },
     { id: "expense-selection-mode", icon: CheckSquare, title: selectionMode.value ? `${t("select")} ✓` : `${t("select")} ✕`, onClick: toggleSelectionMode, style: selectionMode.value ? "success" : "neutral" },
-    { id: "add-expense", icon: Plus, title: t("add_expense"), onClick: openAdd, style: "primary" },
-  ]);
+  ];
+  if (aiHeaderState.value === "ready") {
+    actions.push({ id: "ai-add-expense", icon: Sparkles, title: t("ai_quick_add_expense"), onClick: openAiQuickAdd, style: "accent" });
+  } else if (aiHeaderState.value === "setup") {
+    actions.push({ id: "ai-setup-expense", icon: Sparkles, title: t("ai_setup_assistant"), onClick: openAiSettings, style: "neutral" });
+  }
+  actions.push({ id: "add-expense", icon: Plus, title: t("add_expense"), onClick: openAdd, style: "primary" });
+  setActions(actions);
 }
 
 onMounted(() => {
   updateHeaderActions();
   loadInitial().then(() => applyFilters());
+  aiConfigStore.load().then(() => updateHeaderActions());
 });
+watch(aiHeaderState, () => updateHeaderActions());
 onUnmounted(() => clearActions());
 
 // ---- View mode ----
@@ -179,6 +231,28 @@ async function updateTotal() {
 // ---- Form ----
 const showForm = ref(false);
 const editingExpense = ref<Expense | null>(null);
+const formPrefill = ref<ExpensePrefill | null>(null);
+
+function applyAiDraft(draft: ExpenseDraft) {
+  const prefill: ExpensePrefill = {};
+  if (draft.name) prefill.name = draft.name;
+  if (draft.amount > 0) prefill.amount = draft.amount;
+  if (draft.currencyId) prefill.currencyId = draft.currencyId;
+  if (draft.date) prefill.date = draft.date;
+  if (draft.categoryId) prefill.categoryId = draft.categoryId;
+  if (draft.paymentMethodId) prefill.paymentMethodId = draft.paymentMethodId;
+  if (draft.tags?.length) prefill.tags = [...draft.tags];
+  if (draft.notes) prefill.notes = draft.notes;
+  if (draft.url) prefill.url = draft.url;
+
+  editingExpense.value = null;
+  formPrefill.value = prefill;
+  showForm.value = true;
+
+  if (draft.warnings.length) {
+    toast(t("ai_draft_warnings", { count: draft.warnings.length }));
+  }
+}
 
 // ---- Detail panel ----
 const showDetail = ref(false);
@@ -360,7 +434,7 @@ function getConvertedAmounts(amount: number, currencyId: string) {
 }
 
 // ---- Actions ----
-function openAdd() { editingExpense.value = null; showForm.value = true; }
+function openAdd() { editingExpense.value = null; formPrefill.value = null; showForm.value = true; }
 
 function openDetail(exp: Expense) {
   detailExpId.value = exp.id;
@@ -598,7 +672,7 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
     </div>
 
     <!-- Expense list -->
-    <div v-else :class="viewMode === 'expanded' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3' : 'space-y-1.5 sm:space-y-2'">
+    <div v-if="!loading && items.length > 0" :class="viewMode === 'expanded' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3' : 'space-y-1.5 sm:space-y-2'">
       <div
         v-for="exp in items"
         :key="exp.id"
@@ -735,7 +809,21 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
     </div>
 
     <ExpenseDetail v-if="expenseLookupData" :show="showDetail" :expense="detailExp" :lookupData="expenseLookupData" @close="showDetail = false" @edit="onDetailEdit" @delete="onDetailDelete" @openUrl="onDetailOpenUrl" />
-    <ExpenseForm v-if="expenseFormLookupData" :show="showForm" :editExpense="editingExpense" :lookupData="expenseFormLookupData" @close="showForm = false" @saved="onSaved" />
+    <ExpenseForm
+      v-if="expenseFormLookupData"
+      :show="showForm"
+      :editExpense="editingExpense"
+      :prefill="formPrefill"
+      :lookupData="expenseFormLookupData"
+      @close="showForm = false; formPrefill = null"
+      @saved="onSaved"
+    />
+
+    <AiQuickAddExpense
+      :show="showAiQuickAdd"
+      @close="showAiQuickAdd = false"
+      @draft="applyAiDraft"
+    />
 
     <!-- Delete Confirmation -->
     <Teleport to="body">

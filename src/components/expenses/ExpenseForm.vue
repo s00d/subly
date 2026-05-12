@@ -20,10 +20,28 @@ import { expenseFormFieldsSchema, coerceExpenseFormForValidation } from "@/schem
 import { useZodLiveForm } from "@/composables/useZodLiveForm";
 import type { ZodFieldMeta } from "@/composables/useZodErrors";
 
+/**
+ * Subset of `Expense` fields the form can pre-fill. Used by the AI quick-add
+ * flow and the existing "duplicate expense" / "import preview" paths.
+ */
+export interface ExpensePrefill {
+  name?: string;
+  amount?: number;
+  currencyId?: string;
+  /** UI date in `YYYY-MM-DD`. */
+  date?: string;
+  categoryId?: string;
+  paymentMethodId?: string;
+  payerUserId?: string;
+  tags?: string[];
+  notes?: string;
+  url?: string;
+}
+
 const props = defineProps<{
   show: boolean;
   editExpense?: Expense | null;
-  prefill?: { amount?: number; currencyId?: string; name?: string } | null;
+  prefill?: ExpensePrefill | null;
   lookupData: {
     settings: Settings;
     currencies: Currency[];
@@ -123,9 +141,17 @@ watch(() => props.show, (val) => {
     } else {
       resetForm();
       if (props.prefill) {
-        if (props.prefill.amount != null) form.value.amount = props.prefill.amount;
-        if (props.prefill.currencyId) form.value.currencyId = props.prefill.currencyId;
-        if (props.prefill.name) form.value.name = props.prefill.name;
+        const p = props.prefill;
+        if (p.name) form.value.name = p.name;
+        if (p.amount != null && Number.isFinite(p.amount)) form.value.amount = p.amount;
+        if (p.currencyId) form.value.currencyId = p.currencyId;
+        if (p.date) form.value.date = p.date;
+        if (p.categoryId) form.value.categoryId = p.categoryId;
+        if (p.paymentMethodId) form.value.paymentMethodId = p.paymentMethodId;
+        if (p.payerUserId) form.value.payerUserId = p.payerUserId;
+        if (p.tags && p.tags.length) form.value.tags = [...p.tags];
+        if (p.notes) form.value.notes = p.notes;
+        if (p.url) form.value.url = p.url;
       }
     }
   }

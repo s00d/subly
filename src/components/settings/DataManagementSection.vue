@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { onMounted, ref } from "vue";
+import { storeToRefs } from "pinia";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import {
@@ -8,9 +9,11 @@ import {
   getExportPathPresets,
 } from "@/services/exportClient";
 import { resetAppData } from "@/services/appDataClient";
-import { Archive, RotateCcw } from "@lucide/vue";
+import { Archive, RotateCcw, Sparkles } from "@lucide/vue";
 import { ui } from "@/lib/tv";
 import { formatErrorForToast } from "@/utils/formatError";
+import AiImportDialog from "@/components/ai/AiImportDialog.vue";
+import { useAiConfigStore } from "@/stores/aiConfigStore";
 
 const { t } = useI18n();
 const { toast } = useToast();
@@ -18,6 +21,23 @@ const { toast } = useToast();
 const isExporting = ref(false);
 const showResetConfirm = ref(false);
 const sublyInput = ref<HTMLInputElement | null>(null);
+const showAiImport = ref(false);
+
+const aiConfigStore = useAiConfigStore();
+const { enabled: aiEnabled, features: aiFeatures } = storeToRefs(aiConfigStore);
+
+onMounted(() => {
+  aiConfigStore.load();
+});
+
+function openAiImport() {
+  showAiImport.value = true;
+}
+
+function onAiImported(_count: number) {
+  // Currently the section is shown standalone; pages will refresh on their
+  // own visit. Nothing else to do here.
+}
 
 function isSublyArchive(file: File): boolean {
   return file.name.toLowerCase().endsWith(".subly");
@@ -122,6 +142,25 @@ async function handleResetData() {
           </button>
         </div>
       </div>
+
+      <div
+        v-if="aiEnabled && aiFeatures.statementImport"
+        class="rounded-lg border border-border p-3"
+      >
+        <h3 :class="[ui.sectionTitle(), 'mb-1.5 flex items-center gap-1.5']">
+          <Sparkles :size="14" class="text-primary" />
+          {{ t('ai_import_statement') }}
+        </h3>
+        <p class="text-[11px] text-text-muted mb-2.5">
+          {{ t('ai_import_statement_short_hint') }}
+        </p>
+        <button
+          @click="openAiImport"
+          class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg bg-primary text-white text-xs sm:text-sm font-medium hover:bg-primary-hover"
+        >
+          <Sparkles :size="14" /> {{ t('ai_import_open') }}
+        </button>
+      </div>
     </div>
 
     <div class="pt-4 border-t border-border">
@@ -140,4 +179,10 @@ async function handleResetData() {
     </div>
   </section>
   <input ref="sublyInput" type="file" accept=".subly" class="hidden" @change="onPickSubly" />
+
+  <AiImportDialog
+    :show="showAiImport"
+    @close="showAiImport = false"
+    @imported="onAiImported"
+  />
 </template>

@@ -134,6 +134,14 @@ use commands::subscription_credentials::{
 };
 use commands::storage::{redb_delete, redb_get, redb_set};
 use commands::config::{config_get, config_set, config_delete};
+use commands::ai::{
+    ai_extract_expense_from_text,
+    ai_extract_receipt,
+    ai_extract_subscription_from_text,
+    ai_get_providers,
+    ai_import_statement_file,
+    ai_test_connection,
+};
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use commands::tray::setup_desktop_tray;
 
@@ -556,6 +564,12 @@ pub fn run() {
             sync_flush_before_exit,
             sync_dismiss_pending_update,
             app_ready,
+            ai_get_providers,
+            ai_test_connection,
+            ai_extract_subscription_from_text,
+            ai_extract_expense_from_text,
+            ai_import_statement_file,
+            ai_extract_receipt,
         ]);
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]

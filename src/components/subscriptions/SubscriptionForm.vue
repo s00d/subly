@@ -24,9 +24,35 @@ import { subscriptionFormFieldsSchema, coerceSubscriptionFormForValidation } fro
 import { useZodLiveForm } from "@/composables/useZodLiveForm";
 import type { ZodFieldMeta } from "@/composables/useZodErrors";
 
+/**
+ * Subset of `Subscription` fields that can be auto-filled by the AI quick-add
+ * flow (or any future "create from template" feature). Every field is optional;
+ * unspecified keys fall back to `createDefaultForm()`.
+ */
+export type SubscriptionPrefill = Partial<
+  Pick<
+    Subscription,
+    | "name"
+    | "logo"
+    | "price"
+    | "currencyId"
+    | "cycle"
+    | "frequency"
+    | "categoryId"
+    | "paymentMethodId"
+    | "startDate"
+    | "nextPayment"
+    | "notes"
+    | "url"
+    | "tags"
+  >
+>;
+
 const props = defineProps<{
   show: boolean;
   editSubscription?: Subscription | null;
+  /** One-shot AI-supplied initial values; consumed once on modal open. */
+  prefill?: SubscriptionPrefill | null;
   lookupData: {
     settings: Settings;
     currencies: Currency[];
@@ -125,6 +151,18 @@ function resetForm() {
   form.value = createDefaultForm();
 }
 
+function applyPrefill(target: Partial<Subscription>, source: SubscriptionPrefill): Partial<Subscription> {
+  const next: Partial<Subscription> = { ...target };
+  // Only assign keys the AI actually returned; never overwrite defaults with empty/undefined values.
+  for (const [key, value] of Object.entries(source) as Array<[keyof SubscriptionPrefill, unknown]>) {
+    if (value === undefined || value === null) continue;
+    if (typeof value === "string" && value.trim() === "") continue;
+    if (typeof value === "number" && !Number.isFinite(value)) continue;
+    (next as Record<string, unknown>)[key] = value;
+  }
+  return next;
+}
+
 watch(
   () => props.show,
   (val) => {
@@ -140,6 +178,9 @@ watch(
       };
     } else {
       resetForm();
+      if (props.prefill) {
+        form.value = applyPrefill(form.value, props.prefill);
+      }
     }
   },
 );

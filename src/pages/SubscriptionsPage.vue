@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { useHeaderActions } from "@/composables/useHeaderActions";
+import { useHeaderActions, type HeaderAction } from "@/composables/useHeaderActions";
 import {
   type SubscriptionFilter,
 } from "@/services/subscriptionsClient";
@@ -13,9 +13,10 @@ import { useToast } from "@/composables/useToast";
 import { useScrollLock } from "@/composables/useScrollLock";
 import { useClipboard } from "@/composables/useClipboard";
 import { type Subscription, type Settings, type SubscriptionListItem } from "@/schemas/appData";
-import SubscriptionForm from "@/components/subscriptions/SubscriptionForm.vue";
+import SubscriptionForm, { type SubscriptionPrefill } from "@/components/subscriptions/SubscriptionForm.vue";
 import SubscriptionDetail from "@/components/subscriptions/SubscriptionDetail.vue";
 import SubscriptionsListSkeleton from "@/components/subscriptions/SubscriptionsListSkeleton.vue";
+import AiQuickAddSubscription from "@/components/ai/AiQuickAddSubscription.vue";
 import Toast from "@/components/ui/Toast.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
@@ -47,6 +48,7 @@ import {
   Rows3,
   FolderOpen,
   Filter,
+  Sparkles,
 } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -55,6 +57,8 @@ import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
 import { useNowStore } from "@/stores/nowStore";
 import { ui } from "@/lib/tv";
 import { formatErrorForToast } from "@/utils/formatError";
+import type { SubscriptionDraft } from "@/services/aiClient";
+import { useAiConfigStore } from "@/stores/aiConfigStore";
 
 const route = useRoute();
 const vueRouter = useRouter();
@@ -79,6 +83,41 @@ const currencies = computed(() => metaRefs.currencies.value ?? []);
 const household = computed(() => metaRefs.household.value ?? []);
 const subscriptions = computed(() => subscriptionsStore.items);
 
+// AI quick-add state (must be declared before updateHeaderActions so the
+// header-action builder can read the availability flag without forward refs).
+const showAiQuickAdd = ref(false);
+const aiConfigStore = useAiConfigStore();
+const {
+  enabled: aiEnabled,
+  features: aiFeatures,
+  hasApiKey: aiHasApiKey,
+  activeProvider: aiActiveProvider,
+  loaded: aiLoaded,
+} = storeToRefs(aiConfigStore);
+/**
+ * Header AI button is in one of three states:
+ *   - "ready":  AI is fully usable for subscriptions → opens quick-add.
+ *   - "setup":  AI is reachable but not configured (off, no key, ...) →
+ *               opens settings so the user can fix it in one tap.
+ *   - "hidden": Store still loading or feature explicitly disabled.
+ */
+const aiHeaderState = computed<"ready" | "setup" | "hidden">(() => {
+  if (!aiLoaded.value) return "hidden";
+  if (!aiFeatures.value.subscriptionInput) return "hidden";
+  const requiresKey = !!aiActiveProvider.value?.requiresKey;
+  const keyOk = !requiresKey || aiHasApiKey.value;
+  if (aiEnabled.value && keyOk) return "ready";
+  return "setup";
+});
+
+function openAiQuickAdd() {
+  showAiQuickAdd.value = true;
+}
+
+function openAiSettings() {
+  vueRouter.push("/settings?section=ai");
+}
+
 // Register header action
 function updateHeaderActions() {
   const viewIcon = viewMode.value === "compact" ? Rows3 : viewMode.value === "expanded" ? LayoutGrid : LayoutList;
@@ -86,12 +125,18 @@ function updateHeaderActions() {
   const currentViewTitle = viewMode.value === "compact" ? t("view_compact") : viewMode.value === "expanded" ? t("view_expanded") : t("view_default");
   const nextViewTitle = nextViewMode === "compact" ? t("view_compact") : nextViewMode === "expanded" ? t("view_expanded") : t("view_default");
 
-  setActions([
+  const actions: HeaderAction[] = [
     { id: "toggle-sub-filters", icon: Filter, title: showFilters.value ? `${t("filter")} ✓` : `${t("filter")} ✕`, onClick: () => { showFilters.value = !showFilters.value; }, style: showFilters.value ? "warning" : "neutral" },
     { id: "cycle-sub-view", icon: viewIcon, title: `${currentViewTitle} → ${nextViewTitle}`, onClick: () => setViewMode(nextViewMode), style: "accent" },
     { id: "sub-selection-mode", icon: CheckSquare, title: selectionMode.value ? `${t("select")} ✓` : `${t("select")} ✕`, onClick: toggleSelectionMode, style: selectionMode.value ? "success" : "neutral" },
-    { id: "add-sub", icon: Plus, title: t("new_subscription"), onClick: openAdd, style: "primary" },
-  ]);
+  ];
+  if (aiHeaderState.value === "ready") {
+    actions.push({ id: "ai-add-sub", icon: Sparkles, title: t("ai_quick_add_subscription"), onClick: openAiQuickAdd, style: "accent" });
+  } else if (aiHeaderState.value === "setup") {
+    actions.push({ id: "ai-setup-sub", icon: Sparkles, title: t("ai_setup_assistant"), onClick: openAiSettings, style: "neutral" });
+  }
+  actions.push({ id: "add-sub", icon: Plus, title: t("new_subscription"), onClick: openAdd, style: "primary" });
+  setActions(actions);
 }
 
 onMounted(() => {
@@ -101,7 +146,10 @@ onMounted(() => {
     handleSubQueryParam();
     fetchFilteredSubs();
   });
+  aiConfigStore.load().then(() => updateHeaderActions());
 });
+
+watch(aiHeaderState, () => updateHeaderActions());
 onUnmounted(() => {
   clearActions();
 });
@@ -124,6 +172,31 @@ function handleSubQueryParam() {
 // Form
 const showForm = ref(false);
 const editingSub = ref<Subscription | null>(null);
+const formPrefill = ref<SubscriptionPrefill | null>(null);
+
+function applyAiDraft(draft: SubscriptionDraft) {
+  const prefill: SubscriptionPrefill = {};
+  if (draft.name) prefill.name = draft.name;
+  if (draft.price > 0) prefill.price = draft.price;
+  if (draft.currencyId) prefill.currencyId = draft.currencyId;
+  if (draft.cycle) prefill.cycle = draft.cycle as 1 | 2 | 3 | 4;
+  if (draft.frequency) prefill.frequency = draft.frequency;
+  if (draft.categoryId) prefill.categoryId = draft.categoryId;
+  if (draft.paymentMethodId) prefill.paymentMethodId = draft.paymentMethodId;
+  if (draft.startDate) prefill.startDate = draft.startDate;
+  if (draft.nextPayment) prefill.nextPayment = draft.nextPayment;
+  if (draft.notes) prefill.notes = draft.notes;
+  if (draft.url) prefill.url = draft.url;
+  if (draft.tags?.length) prefill.tags = [...draft.tags];
+
+  editingSub.value = null;
+  formPrefill.value = prefill;
+  showForm.value = true;
+
+  if (draft.warnings.length) {
+    toast(t("ai_draft_warnings", { count: draft.warnings.length }));
+  }
+}
 
 // Detail panel
 const showDetail = ref(false);
@@ -502,6 +575,7 @@ const subscriptionFormLookupData = computed(() => {
 // Actions
 function openAdd() {
   editingSub.value = null;
+  formPrefill.value = null;
   showForm.value = true;
 }
 
@@ -995,9 +1069,16 @@ async function loadInitial() {
       v-if="subscriptionFormLookupData"
       :show="showForm"
       :edit-subscription="editingSub"
+      :prefill="formPrefill"
       :lookupData="subscriptionFormLookupData"
-      @close="showForm = false"
+      @close="showForm = false; formPrefill = null"
       @saved="onSaved"
+    />
+
+    <AiQuickAddSubscription
+      :show="showAiQuickAdd"
+      @close="showAiQuickAdd = false"
+      @draft="applyAiDraft"
     />
 
     <!-- Delete Confirmation Modal -->

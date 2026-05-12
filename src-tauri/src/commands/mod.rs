@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod app_data;
 pub mod app_ready;
 pub mod export;
