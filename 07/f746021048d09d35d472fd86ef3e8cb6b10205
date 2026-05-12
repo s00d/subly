@@ -1,0 +1,39 @@
+src/components/settings/CloudSyncSection.vue
+  s_760a8176b5063e::t_43de6f96a98a0f 119-135,139,142-147
+  s_760a8176b5063e::t_9d90f440d0ad9f 20
+  s_760a8176b5063e::t_10f69a82ba5cf7 282-288,290,292,296-299
+src-tauri/src/commands/sync/providers/webdav.rs
+  s_760a8176b5063e::t_676f490820a129 23,34,45
+src-tauri/src/commands/sync/providers/dropbox.rs
+  s_760a8176b5063e::t_742ae4d451f7e5 33,44
+src/services/syncClient.ts
+  s_760a8176b5063e::t_b7e98a9b94228d 122-132,144-146
+  s_760a8176b5063e::t_192a36a2f0076d 32-36
+src-tauri/src/commands/sync/providers/mod.rs
+  s_760a8176b5063e::t_5b30e65168c62a 2,32-36,46-75,84-86
+src/schemas/zod/syncCredentials.ts
+  s_760a8176b5063e::t_6541fd2a226a0b 17-20,23
+src-tauri/src/commands/sync/providers/onedrive.rs
+  s_760a8176b5063e::t_d14dd48e9620fd 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "07f746021048d09d35d472fd86ef3e8cb6b10205",
+  "prompts": {},
+  "humans": {
+    "h_ee6cac30a1b83a": {
+      "author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
