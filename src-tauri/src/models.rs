@@ -42,6 +42,23 @@ pub(crate) struct SubscriptionCredentialsDto {
     pub(crate) totp_secret: String,
 }
 
+/// Lightweight "is each field stored?" probe for the subscriptions list. We
+/// can't touch the keyring on every list reload (Keychain prompts the user
+/// for the system password after each rebuild), so the actual secrets live
+/// in the OS keyring while this struct lives in redb under
+/// `idx:subscription_creds:{id}`. Reveal / copy buttons in the UI explicitly
+/// call `subscription_credentials_get` to pull the secret on demand.
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct SubscriptionCredentialsMetaDto {
+    #[serde(default)]
+    pub(crate) has_login: bool,
+    #[serde(default)]
+    pub(crate) has_password: bool,
+    #[serde(default)]
+    pub(crate) has_totp: bool,
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SubscriptionDoc {
@@ -464,9 +481,11 @@ pub(crate) struct SubscriptionListItemDto {
     pub(crate) days_left: u64,
     #[serde(default)]
     pub(crate) overdue: bool,
+    /// Non-secret indicator of which credential fields the user has saved.
+    /// Read from redb on every list call. Reading the actual secrets is a
+    /// separate explicit step that goes through the OS keyring.
     #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) credentials: Option<SubscriptionCredentialsDto>,
+    pub(crate) credentials_meta: SubscriptionCredentialsMetaDto,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]

@@ -33,11 +33,19 @@ const props = withDefaults(
     maskLength?: number;
     /** Optional CSS class forwarded to the underlying input wrapper. */
     class?: string;
+    /**
+     * Underlying input type once the mask has been cleared. Defaults to
+     * `"password"` so passwords stay obscured even after the user starts
+     * editing; pass `"text"` for non-sensitive secrets (logins, API base
+     * URLs, etc.) where typing in plaintext is friendlier.
+     */
+    type?: "text" | "password";
   }>(),
   {
     hasSavedValue: false,
     disabled: false,
     maskLength: 16,
+    type: "password",
   },
 );
 
@@ -84,7 +92,7 @@ defineExpose({ reset });
 
 <template>
   <AppInput
-    type="password"
+    :type="editing || !hasSavedValue ? type : 'password'"
     :modelValue="displayValue"
     :label="label"
     :placeholder="placeholder"

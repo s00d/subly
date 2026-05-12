@@ -4,11 +4,13 @@ use tauri::Emitter;
 use tauri::State;
 use crate::AppState;
 use crate::models::{
-    ExpenseDoc, PaymentRecordDto, SubscriptionDoc, SubscriptionInputDto, SubscriptionListItemDto,
-    SubscriptionsPageRequestDto,
+    ExpenseDoc, PaymentRecordDto, SubscriptionCredentialsMetaDto, SubscriptionDoc,
+    SubscriptionInputDto, SubscriptionListItemDto, SubscriptionsPageRequestDto,
 };
 use crate::commands::expenses::{apply_expense_payment_record_kv_in_tx, emit_expenses_changed};
-use crate::commands::subscription_credentials::{credentials_apply_optional, credentials_delete, credentials_read};
+use crate::commands::subscription_credentials::{
+    credentials_apply_optional, credentials_delete, read_meta_index,
+};
 use crate::state::{
     encode_bin, entity_table_upsert_bin_in_tx, rewrite_expense_day_index_in_tx, run_write_transaction,
     EntityTable,
@@ -264,10 +266,10 @@ pub fn list_subscriptions_page(
     state: State<'_, AppState>,
     request: Option<SubscriptionsPageRequestDto>,
 ) -> Result<Vec<SubscriptionListItemDto>, crate::errors::AppError> {
-    let subscriptions = {
-        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
-        guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?
-    };
+    let guard = state
+        .lock()
+        .map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
+    let subscriptions = guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?;
     let today = Local::now().date_naive();
     let req = request.unwrap_or_default();
     let search = req.search.trim().to_ascii_lowercase();
@@ -348,7 +350,7 @@ pub fn list_subscriptions_page(
                 monthly_price: monthly,
                 days_left,
                 overdue,
-                credentials: None,
+                credentials_meta: SubscriptionCredentialsMetaDto::default(),
             };
             Ok(dto)
         })
@@ -374,7 +376,7 @@ pub fn list_subscriptions_page(
     }
 
     for row in &mut rows {
-        row.credentials = credentials_read(&row.id)?;
+        row.credentials_meta = read_meta_index(&guard, &row.id)?;
     }
 
     Ok(rows)
@@ -456,10 +458,10 @@ pub fn subscriptions_payment_dates_in_month(
 
 #[tauri::command]
 pub fn get_overdue_subscriptions(state: State<'_, AppState>) -> Result<Vec<SubscriptionListItemDto>, crate::errors::AppError> {
-    let rows = {
-        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
-        guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?
-    };
+    let guard = state
+        .lock()
+        .map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
+    let rows = guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?;
     let today = chrono::Local::now().date_naive();
     let mut rows = rows
         .into_iter()
@@ -499,22 +501,22 @@ pub fn get_overdue_subscriptions(state: State<'_, AppState>) -> Result<Vec<Subsc
                 monthly_price: 0.0,
                 days_left: 0,
                 overdue: true,
-                credentials: None,
+                credentials_meta: SubscriptionCredentialsMetaDto::default(),
             })
         })
         .collect::<Result<Vec<_>, crate::errors::AppError>>()?;
     for row in &mut rows {
-        row.credentials = credentials_read(&row.id)?;
+        row.credentials_meta = read_meta_index(&guard, &row.id)?;
     }
     Ok(rows)
 }
 
 #[tauri::command]
 pub fn get_upcoming_subscriptions(state: State<'_, AppState>, days: i64, limit: usize) -> Result<Vec<SubscriptionListItemDto>, crate::errors::AppError> {
-    let rows = {
-        let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
-        guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?
-    };
+    let guard = state
+        .lock()
+        .map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
+    let rows = guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?;
     let today = chrono::Local::now().date_naive();
     let end = today + chrono::Duration::days(days);
     let mut rows = rows
@@ -571,12 +573,12 @@ pub fn get_upcoming_subscriptions(state: State<'_, AppState>, days: i64, limit: 
                 monthly_price: 0.0,
                 days_left: 0,
                 overdue: false,
-                credentials: None,
+                credentials_meta: SubscriptionCredentialsMetaDto::default(),
             }
         })
         .collect();
     for row in &mut out {
-        row.credentials = credentials_read(&row.id)?;
+        row.credentials_meta = read_meta_index(&guard, &row.id)?;
     }
     Ok(out)
 }
@@ -629,8 +631,8 @@ pub fn subscriptions_insert(app: tauri::AppHandle, state: State<'_, AppState>, m
     let existing = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &subscription.id)?;
     guard.table_upsert_typed(EntityTable::Subscriptions, &subscription, &subscription.id)?;
     sync_subscription_payment_record_index(&mut guard, existing.as_ref(), Some(&subscription))?;
+    credentials_apply_optional(&guard, &sub_id, creds)?;
     drop(guard);
-    credentials_apply_optional(&sub_id, creds)?;
     let _ = crate::commands::notifications::notifications_reschedule_all(app.clone(), state)?;
     emit_subscriptions_changed(&app, "insert");
     Ok(())
@@ -646,8 +648,8 @@ pub fn subscriptions_upsert(app: tauri::AppHandle, state: State<'_, AppState>, m
     let existing = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &subscription.id)?;
     guard.table_upsert_typed(EntityTable::Subscriptions, &subscription, &subscription.id)?;
     sync_subscription_payment_record_index(&mut guard, existing.as_ref(), Some(&subscription))?;
+    credentials_apply_optional(&guard, &sub_id, creds)?;
     drop(guard);
-    credentials_apply_optional(&sub_id, creds)?;
     let _ = crate::commands::notifications::notifications_reschedule_all(app.clone(), state)?;
     emit_subscriptions_changed(&app, "upsert");
     Ok(())
@@ -663,8 +665,8 @@ pub fn subscriptions_update(app: tauri::AppHandle, state: State<'_, AppState>, m
     let existing = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &subscription.id)?;
     guard.table_upsert_typed(EntityTable::Subscriptions, &subscription, &subscription.id)?;
     sync_subscription_payment_record_index(&mut guard, existing.as_ref(), Some(&subscription))?;
+    credentials_apply_optional(&guard, &sub_id, creds)?;
     drop(guard);
-    credentials_apply_optional(&sub_id, creds)?;
     let _ = crate::commands::notifications::notifications_reschedule_all(app.clone(), state)?;
     emit_subscriptions_changed(&app, "update");
     Ok(())
@@ -678,7 +680,7 @@ pub fn subscriptions_delete(app: tauri::AppHandle, state: State<'_, AppState>, i
         sync_subscription_payment_record_index(&mut guard, Some(&sub), None)?;
     }
     guard.table_delete_by_id(EntityTable::Subscriptions, &id)?;
-    credentials_delete(&id)?;
+    credentials_delete(&guard, &id)?;
     drop(guard);
     let _ = crate::commands::notifications::notifications_reschedule_all(app.clone(), state)?;
     if unlinked {
@@ -701,7 +703,7 @@ pub fn subscriptions_delete_batch(app: tauri::AppHandle, state: State<'_, AppSta
                 sync_subscription_payment_record_index(&mut guard, Some(&sub), None)?;
             }
             guard.table_delete_by_id(EntityTable::Subscriptions, &id)?;
-            credentials_delete(&id)?;
+            credentials_delete(&guard, &id)?;
         }
     }
     drop(guard);

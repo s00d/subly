@@ -9,6 +9,17 @@ export interface SubscriptionCredentials {
   totpSecret: string;
 }
 
+/**
+ * Lightweight "is each field stored?" probe returned by the list endpoint.
+ * Mirrors `SubscriptionCredentialsMetaDto` on the backend. Lets the UI render
+ * Reveal / Copy controls without ever decrypting the keyring entry.
+ */
+export interface SubscriptionCredentialsMeta {
+  hasLogin: boolean;
+  hasPassword: boolean;
+  hasTotp: boolean;
+}
+
 export interface PaymentRecord {
   id: string;
   date: string;
@@ -52,6 +63,8 @@ export interface SubscriptionListItem extends Subscription {
   monthlyPrice: number;
   daysLeft: number;
   overdue: boolean;
+  /** Non-secret bitmap: which credential fields the user has saved. */
+  credentialsMeta: SubscriptionCredentialsMeta;
 }
 
 export interface Expense {
@@ -317,6 +330,15 @@ export function parseSubscription(raw: unknown): Subscription {
   };
 }
 
+function parseCredentialsMeta(raw: unknown): SubscriptionCredentialsMeta {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  return {
+    hasLogin: asBool(r.hasLogin, false),
+    hasPassword: asBool(r.hasPassword, false),
+    hasTotp: asBool(r.hasTotp, false),
+  };
+}
+
 /** Строка списка подписок из `list_subscriptions_page`. */
 export function parseSubscriptionListItem(raw: unknown): SubscriptionListItem {
   const r = (raw ?? {}) as Record<string, unknown>;
@@ -326,6 +348,7 @@ export function parseSubscriptionListItem(raw: unknown): SubscriptionListItem {
     monthlyPrice: asNumber(r.monthlyPrice, 0),
     daysLeft: asNumber(r.daysLeft, 0),
     overdue: asBool(r.overdue, false),
+    credentialsMeta: parseCredentialsMeta(r.credentialsMeta),
   };
 }
 

@@ -3,7 +3,7 @@ import { ref, watch, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { formatErrorForToast } from "@/utils/formatError";
-import type { Subscription, Settings, Currency, PaymentMethod, HouseholdMember, Category, Tag } from "@/schemas/appData";
+import type { Subscription, Settings, Currency, PaymentMethod, HouseholdMember, Category, Tag, SubscriptionListItem, SubscriptionCredentialsMeta } from "@/schemas/appData";
 import Modal from "@/components/ui/Modal.vue";
 import AppInput from "@/components/ui/AppInput.vue";
 import AppDatePicker from "@/components/ui/AppDatePicker.vue";
@@ -11,12 +11,14 @@ import AppTextarea from "@/components/ui/AppTextarea.vue";
 import AppSelect from "@/components/ui/AppSelect.vue";
 import AppCheckbox from "@/components/ui/AppCheckbox.vue";
 import LogoPicker from "@/components/ui/LogoPicker.vue";
+import SecretInput from "@/components/ui/SecretInput.vue";
 import TagInput from "@/components/ui/TagInput.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
-import { Sparkles, Globe, Loader2, KeyRound, ClipboardPaste, ImagePlus } from "@lucide/vue";
+import { Sparkles, Globe, Loader2, KeyRound, ClipboardPaste, ImagePlus, DownloadCloud } from "@lucide/vue";
 import { resolveFaviconFromInputUrl } from "@/services/logoClient";
 import { getNextCycleDate as getNextCycleDateBackend, upsertSubscription } from "@/services/subscriptionsClient";
 import {
+  subscriptionCredentialsGet,
   subscriptionTotpDecodeQrBase64,
   subscriptionTotpImportOtpauth,
 } from "@/services/subscriptionCredentialsClient";
@@ -50,7 +52,12 @@ export type SubscriptionPrefill = Partial<
 
 const props = defineProps<{
   show: boolean;
-  editSubscription?: Subscription | null;
+  /**
+   * Accept both `Subscription` and the richer `SubscriptionListItem` because
+   * the page always opens the form with a list row, and we need its
+   * `credentialsMeta` to know which Secret fields are already populated.
+   */
+  editSubscription?: Subscription | SubscriptionListItem | null;
   /** One-shot AI-supplied initial values; consumed once on modal open. */
   prefill?: SubscriptionPrefill | null;
   lookupData: {
@@ -143,12 +150,70 @@ watchSubscriptionZod(form);
 const isResolvingIcon = ref(false);
 const qrFileInput = ref<HTMLInputElement | null>(null);
 
+/**
+ * "Did the user actually edit (or explicitly load) the credentials block in
+ * this dialog session?" When `false` at submit time we omit the `credentials`
+ * field entirely, which tells the backend's `credentials_apply_optional` to
+ * leave the keyring untouched — the user only edited unrelated subscription
+ * fields and shouldn't lose stored secrets.
+ */
+const credentialsTouched = ref(false);
+const isLoadingSavedCreds = ref(false);
+
+/** Non-secret bitmap echoed back by the list endpoint; drives Secret masks. */
+const credentialsMeta = computed<SubscriptionCredentialsMeta>(() => {
+  const edit = props.editSubscription as SubscriptionListItem | null | undefined;
+  return (
+    edit?.credentialsMeta ?? { hasLogin: false, hasPassword: false, hasTotp: false }
+  );
+});
+
+const hasAnySavedCredential = computed(
+  () =>
+    credentialsMeta.value.hasLogin ||
+    credentialsMeta.value.hasPassword ||
+    credentialsMeta.value.hasTotp,
+);
+
 function emptyCreds() {
   return { login: "", password: "", totpSecret: "" };
 }
 
 function resetForm() {
   form.value = createDefaultForm();
+}
+
+function markCredsTouched() {
+  credentialsTouched.value = true;
+}
+
+/**
+ * Pull the saved credentials out of the keyring (one OS prompt) and drop
+ * them into the form so the user can edit in place instead of overwriting
+ * from scratch. Auto-marks the section as touched so the next submit sends
+ * the values back, even if the user only nudged one field.
+ */
+async function loadSavedCredentials() {
+  if (!props.editSubscription) return;
+  isLoadingSavedCreds.value = true;
+  try {
+    const fetched = await subscriptionCredentialsGet(props.editSubscription.id);
+    if (!fetched) {
+      toast(t("credentials_not_found"), "error");
+      return;
+    }
+    form.value.credentials = {
+      login: fetched.login ?? "",
+      password: fetched.password ?? "",
+      totpSecret: fetched.totpSecret ?? "",
+    };
+    credentialsTouched.value = true;
+    toast(t("credentials_loaded"));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  } finally {
+    isLoadingSavedCreds.value = false;
+  }
 }
 
 function applyPrefill(target: Partial<Subscription>, source: SubscriptionPrefill): Partial<Subscription> {
@@ -169,12 +234,15 @@ watch(
     if (!val) return;
     loadLookupData();
     clearSubscriptionZodDirty();
+    credentialsTouched.value = false;
     if (props.editSubscription) {
+      // Credentials no longer ship with the list row — they live in the
+      // keyring and are fetched only when the user clicks "Load saved".
+      // Start the form with blank credentials and let `credentialsMeta`
+      // drive the SecretInput masks instead.
       form.value = {
         ...props.editSubscription,
-        credentials: props.editSubscription.credentials
-          ? { ...props.editSubscription.credentials }
-          : emptyCreds(),
+        credentials: emptyCreds(),
       };
     } else {
       resetForm();
@@ -250,20 +318,27 @@ async function handleSubmit() {
     ? { ...props.editSubscription, ...form.value }
     : { ...form.value, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
 
-  // Coerce numeric fields — HTML inputs always return strings
   const cred = form.value.credentials ?? emptyCreds();
-  const raw = {
+  const raw: Record<string, unknown> = {
     ...base,
     price: Number(base.price) || 0,
     frequency: Number(base.frequency) || 1,
     notifyDaysBefore: Number(base.notifyDaysBefore ?? 1),
     cycle: Number(base.cycle) || 3,
-    credentials: {
+  };
+  if (credentialsTouched.value) {
+    // Send the (possibly partially-empty) credentials. The backend treats
+    // an all-empty triplet as "delete the keyring entry".
+    raw.credentials = {
       login: cred.login.trim(),
       password: cred.password,
       totpSecret: cred.totpSecret.trim(),
-    },
-  };
+    };
+  }
+  // When `credentials` is absent, `credentials_apply_optional` early-returns
+  // and the keyring entry stays exactly as it was — important so that
+  // editing a subscription's name (etc.) without touching the secrets block
+  // doesn't wipe stored logins.
 
   try {
     await upsertSubscription(raw);
@@ -286,6 +361,7 @@ async function pasteOtpauthFromClipboard() {
     const imported = await subscriptionTotpImportOtpauth(text.trim());
     if (!form.value.credentials) form.value.credentials = emptyCreds();
     form.value.credentials.totpSecret = imported.totpSecret;
+    markCredsTouched();
     toast(t("totp_imported"));
   } catch (e) {
     toast(formatErrorForToast(e, t), "error");
@@ -308,6 +384,7 @@ async function onQrFileChange(ev: Event) {
       const imported = await subscriptionTotpDecodeQrBase64(data);
       if (!form.value.credentials) form.value.credentials = emptyCreds();
       form.value.credentials.totpSecret = imported.totpSecret;
+      markCredsTouched();
       toast(t("totp_imported"));
     } catch (e) {
       toast(formatErrorForToast(e, t), "error");
@@ -475,24 +552,45 @@ function loadLookupData() {
 
       <!-- Credentials (secure storage, not in sync snapshot) -->
       <div class="rounded-xl border border-border p-3 sm:p-4 space-y-3 bg-surface-secondary/50">
-        <div class="flex items-center gap-2">
-          <KeyRound :size="16" class="text-primary shrink-0" />
-          <span class="text-sm font-medium text-text-primary">{{ t("credentials_section") }}</span>
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <KeyRound :size="16" class="text-primary shrink-0" />
+            <span class="text-sm font-medium text-text-primary">{{ t("credentials_section") }}</span>
+          </div>
+          <button
+            v-if="isEdit && hasAnySavedCredential"
+            type="button"
+            class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
+            :disabled="isLoadingSavedCreds"
+            @click="loadSavedCredentials"
+          >
+            <Loader2 v-if="isLoadingSavedCreds" :size="12" class="animate-spin" />
+            <DownloadCloud v-else :size="12" />
+            {{ t("credentials_load_saved") }}
+          </button>
         </div>
         <p class="text-xs text-text-muted">{{ t("credentials_secure_hint") }}</p>
-        <AppInput
-          v-model="form.credentials!.login"
+        <SecretInput
+          :modelValue="form.credentials!.login"
+          :has-saved-value="credentialsMeta.hasLogin && !credentialsTouched"
+          type="text"
           :label="t('login_username')"
+          @update:modelValue="(v: string) => { form.credentials!.login = v; markCredsTouched(); }"
         />
-        <AppInput
-          v-model="form.credentials!.password"
+        <SecretInput
+          :modelValue="form.credentials!.password"
+          :has-saved-value="credentialsMeta.hasPassword && !credentialsTouched"
           type="password"
           :label="t('password')"
+          @update:modelValue="(v: string) => { form.credentials!.password = v; markCredsTouched(); }"
         />
-        <AppInput
-          v-model="form.credentials!.totpSecret"
+        <SecretInput
+          :modelValue="form.credentials!.totpSecret"
+          :has-saved-value="credentialsMeta.hasTotp && !credentialsTouched"
+          type="text"
           :label="t('totp_secret')"
           :placeholder="t('totp_secret_placeholder')"
+          @update:modelValue="(v: string) => { form.credentials!.totpSecret = v; markCredsTouched(); }"
         />
         <div class="flex flex-wrap gap-2">
           <button

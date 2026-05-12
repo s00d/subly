@@ -7,8 +7,9 @@ import Modal from "@/components/ui/Modal.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import PaymentHistory from "@/components/subscriptions/PaymentHistory.vue";
-import { Pencil, Copy, RefreshCw, Trash2, Calendar, CreditCard, Tag, User, Bell, BellOff, Link, FileText, Clock, AlertTriangle, Power, Star, Hash, CircleDollarSign, KeyRound } from "@lucide/vue";
+import { Pencil, Copy, RefreshCw, Trash2, Calendar, CreditCard, Tag, User, Bell, BellOff, Link, FileText, Clock, AlertTriangle, Power, Star, Hash, CircleDollarSign, KeyRound, Eye, EyeOff } from "@lucide/vue";
 import {
+  subscriptionCredentialsGet,
   subscriptionTotpCurrent,
   type SubscriptionTotpCurrentDto,
 } from "@/services/subscriptionCredentialsClient";
@@ -54,14 +55,27 @@ let otpPollTimer: ReturnType<typeof setInterval> | null = null;
 
 const sub = computed(() => props.subscription as SubscriptionListItem | null);
 
-/** Учётные данные приходят в объекте подписки из списка (secure storage на бэкенде). */
-const creds = computed<SubscriptionCredentials | null>(() => sub.value?.credentials ?? null);
+/**
+ * Non-secret bitmap (`hasLogin/hasPassword/hasTotp`) that ships with every
+ * list row from the backend. Drives which Reveal buttons we render — no
+ * keyring access happens until the user clicks one.
+ */
+const meta = computed(() => sub.value?.credentialsMeta ?? null);
 
 const hasSavedCredentials = computed(() => {
-  const c = creds.value;
-  if (!c) return false;
-  return Boolean(c.login?.trim() || c.password || c.totpSecret?.trim());
+  const m = meta.value;
+  return Boolean(m?.hasLogin || m?.hasPassword || m?.hasTotp);
 });
+
+/**
+ * Secrets pulled from the keyring on demand. Cleared on dialog close so the
+ * detail card forgets sensitive values as soon as it disappears.
+ */
+const revealedCreds = ref<SubscriptionCredentials | null>(null);
+const loginVisible = ref(false);
+const passwordVisible = ref(false);
+const otpVisible = ref(false);
+const revealLoading = ref(false);
 
 const otpSecondsLeft = computed(() => {
   if (!totpCurrent.value) return 0;
@@ -76,6 +90,75 @@ function clearOtpPoll() {
   }
 }
 
+function resetReveal() {
+  clearOtpPoll();
+  revealedCreds.value = null;
+  totpCurrent.value = null;
+  loginVisible.value = false;
+  passwordVisible.value = false;
+  otpVisible.value = false;
+}
+
+/**
+ * Make sure `revealedCreds` is populated. First call after the dialog opens
+ * triggers one OS keyring prompt; subsequent calls in the same session are
+ * silent. Returns `null` if the backend has nothing for this subscription.
+ */
+async function ensureCredentials(): Promise<SubscriptionCredentials | null> {
+  if (revealedCreds.value) return revealedCreds.value;
+  if (!sub.value) return null;
+  revealLoading.value = true;
+  try {
+    const fetched = await subscriptionCredentialsGet(sub.value.id);
+    if (!fetched) {
+      toast(t("credentials_not_found"), "error");
+      return null;
+    }
+    revealedCreds.value = fetched;
+    return fetched;
+  } catch (e) {
+    toast(typeof e === "string" ? e : (e as Error)?.message || "error", "error");
+    return null;
+  } finally {
+    revealLoading.value = false;
+  }
+}
+
+async function toggleLogin() {
+  if (loginVisible.value) {
+    loginVisible.value = false;
+    return;
+  }
+  const c = await ensureCredentials();
+  if (c?.login?.trim()) loginVisible.value = true;
+}
+
+async function togglePassword() {
+  if (passwordVisible.value) {
+    passwordVisible.value = false;
+    return;
+  }
+  const c = await ensureCredentials();
+  if (c?.password) passwordVisible.value = true;
+}
+
+async function toggleOtp() {
+  if (otpVisible.value) {
+    otpVisible.value = false;
+    clearOtpPoll();
+    totpCurrent.value = null;
+    return;
+  }
+  if (!sub.value) return;
+  // Validate the totpSecret exists by loading creds first (also self-heals
+  // the meta index on the backend).
+  const c = await ensureCredentials();
+  if (!c?.totpSecret?.trim()) return;
+  otpVisible.value = true;
+  void refreshTotpOnly();
+  otpPollTimer = setInterval(() => void refreshTotpOnly(), 2500);
+}
+
 async function refreshTotpOnly() {
   if (!sub.value) return;
   try {
@@ -86,14 +169,16 @@ async function refreshTotpOnly() {
 }
 
 async function copyLoginField() {
-  const v = creds.value?.login?.trim() ?? "";
+  const c = revealedCreds.value ?? (await ensureCredentials());
+  const v = c?.login?.trim() ?? "";
   if (!v) return;
   if (await copyToClipboard(v)) toast(t("copied_to_clipboard"));
   else toast(t("clipboard_copy_failed"), "error");
 }
 
 async function copyPasswordField() {
-  const v = creds.value?.password ?? "";
+  const c = revealedCreds.value ?? (await ensureCredentials());
+  const v = c?.password ?? "";
   if (!v) return;
   if (await copyToClipboard(v)) toast(t("copied_to_clipboard"));
   else toast(t("clipboard_copy_failed"), "error");
@@ -107,18 +192,12 @@ async function copyOtpField() {
 }
 
 watch(
-  () => ({
-    open: props.show,
-    totpSecret: sub.value?.credentials?.totpSecret ?? "",
-  }),
+  () => ({ open: props.show, id: sub.value?.id ?? "" }),
   () => {
-    clearOtpPoll();
-    totpCurrent.value = null;
-    if (!props.show || !sub.value?.credentials?.totpSecret?.trim()) return;
-    void refreshTotpOnly();
-    otpPollTimer = setInterval(() => void refreshTotpOnly(), 2500);
+    // Any state change to the dialog (close OR navigate to a different
+    // subscription) flushes the revealed cache.
+    resetReveal();
   },
-  { immediate: true },
 );
 
 function fmt(price: number, currencyId: string): string {
@@ -322,39 +401,84 @@ onUnmounted(() => clearOtpPoll());
           </button>
         </div>
         <template v-if="hasSavedCredentials">
-          <div class="flex flex-wrap gap-2">
-            <button
-              v-if="creds?.login?.trim()"
-              type="button"
-              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover"
-              @click="copyLoginField"
-            >
-              <Copy :size="12" /> {{ t("copy_login") }}
-            </button>
-            <button
-              v-if="creds?.password"
-              type="button"
-              class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover"
-              @click="copyPasswordField"
-            >
-              <Copy :size="12" /> {{ t("copy_password") }}
-            </button>
+          <!-- Login row: Reveal button toggles plaintext display; Copy pulls from in-memory cache (or fetches it once). -->
+          <div v-if="meta?.hasLogin" class="space-y-1">
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
+                :disabled="revealLoading"
+                @click="toggleLogin"
+              >
+                <component :is="loginVisible ? EyeOff : Eye" :size="12" />
+                {{ loginVisible ? t("credentials_hide") : t("credentials_show_login") }}
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
+                :disabled="revealLoading"
+                @click="copyLoginField"
+              >
+                <Copy :size="12" /> {{ t("copy_login") }}
+              </button>
+            </div>
+            <p
+              v-if="loginVisible && revealedCreds?.login?.trim()"
+              class="text-sm text-text-primary font-mono truncate"
+            >{{ revealedCreds.login }}</p>
           </div>
-          <p v-if="creds?.login?.trim()" class="text-sm text-text-primary font-mono truncate">{{ creds.login }}</p>
-          <p v-if="creds?.password" class="text-sm font-mono tracking-widest text-text-secondary">
-            ••••••••
-          </p>
-          <div v-if="creds?.totpSecret?.trim() && totpCurrent" class="rounded-lg border border-border p-2 bg-surface">
-            <p class="text-[10px] text-text-muted mb-1">{{ t("current_otp") }}</p>
-            <p class="font-mono text-lg tracking-widest text-center">{{ totpCurrent.code }}</p>
-            <p class="text-[11px] text-center text-text-muted mt-1">{{ t("otp_expires_in", { s: otpSecondsLeft }) }}</p>
-            <button
-              type="button"
-              class="mt-2 w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-surface-hover text-xs font-medium"
-              @click="copyOtpField"
-            >
-              <Copy :size="12" /> {{ t("copy_otp") }}
-            </button>
+
+          <div v-if="meta?.hasPassword" class="space-y-1">
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
+                :disabled="revealLoading"
+                @click="togglePassword"
+              >
+                <component :is="passwordVisible ? EyeOff : Eye" :size="12" />
+                {{ passwordVisible ? t("credentials_hide") : t("credentials_show_password") }}
+              </button>
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
+                :disabled="revealLoading"
+                @click="copyPasswordField"
+              >
+                <Copy :size="12" /> {{ t("copy_password") }}
+              </button>
+            </div>
+            <p
+              v-if="passwordVisible && revealedCreds?.password"
+              class="text-sm text-text-primary font-mono break-all"
+            >{{ revealedCreds.password }}</p>
+          </div>
+
+          <!-- TOTP row: clicking starts the 2.5 s polling loop; clicking again stops it. -->
+          <div v-if="meta?.hasTotp" class="space-y-1">
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
+                :disabled="revealLoading"
+                @click="toggleOtp"
+              >
+                <component :is="otpVisible ? EyeOff : Eye" :size="12" />
+                {{ otpVisible ? t("credentials_hide") : t("credentials_show_otp") }}
+              </button>
+            </div>
+            <div v-if="otpVisible && totpCurrent" class="rounded-lg border border-border p-2 bg-surface">
+              <p class="text-[10px] text-text-muted mb-1">{{ t("current_otp") }}</p>
+              <p class="font-mono text-lg tracking-widest text-center">{{ totpCurrent.code }}</p>
+              <p class="text-[11px] text-center text-text-muted mt-1">{{ t("otp_expires_in", { s: otpSecondsLeft }) }}</p>
+              <button
+                type="button"
+                class="mt-2 w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-surface-hover text-xs font-medium"
+                @click="copyOtpField"
+              >
+                <Copy :size="12" /> {{ t("copy_otp") }}
+              </button>
+            </div>
           </div>
         </template>
         <p v-else class="text-xs text-text-muted">{{ t("credentials_none_hint") }}</p>
