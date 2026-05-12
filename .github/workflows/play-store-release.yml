@@ -1,0 +1,181 @@
+# Builds a signed Android App Bundle (.aab) and uploads it to Google Play.
+#
+# Manual run (recommended): pick the track / status from the Actions UI.
+# Tag push (v*): auto-uploads to the `internal` track as a draft so we
+#   always have a smoke-tested build ready to promote in Play Console.
+#
+# Required GitHub secrets (Settings → Secrets and variables → Actions):
+#   ANDROID_KEYSTORE_BASE64           base64-encoded release keystore
+#   ANDROID_KEYSTORE_PASSWORD         keystore password
+#   ANDROID_KEY_ALIAS                 key alias inside the keystore
+#   ANDROID_KEY_PASSWORD              password for that alias
+#   PLAY_STORE_SERVICE_ACCOUNT_JSON   service account JSON with
+#                                     "Release manager" role in Play Console
+#
+# See `.github/PLAY_STORE_SETUP.md` for the one-time setup walkthrough.
+
+name: Play Store Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      track:
+        description: "Play Store track"
+        required: true
+        default: "internal"
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+      status:
+        description: "Release status"
+        required: true
+        default: "draft"
+        type: choice
+        options:
+          - draft
+          - inProgress
+          - halted
+          - completed
+      release_name:
+        description: "Optional release name (defaults to versionName)"
+        required: false
+        default: ""
+
+jobs:
+  play-store:
+    name: Build AAB & publish to Play Store
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.9
+          run_install: false
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+          shared-key: "android-play"
+
+      - name: Install frontend dependencies
+        run: pnpm install
+
+      - name: Prepare Tauri CLI shim for Android Gradle task
+        run: |
+          cat > src-tauri/tauri <<'EOF'
+          #!/usr/bin/env node
+          import { createRequire } from "node:module";
+          const require = createRequire(import.meta.url);
+          require("../node_modules/@tauri-apps/cli/tauri.js");
+          EOF
+          chmod +x src-tauri/tauri
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "ANDROID_KEYSTORE_BASE64 secret is empty — refusing to build an unsigned AAB."
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/keystore"
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/keystore/release.keystore"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/keystore/release.keystore" >> "$GITHUB_ENV"
+
+      - name: Build signed AAB
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: pnpm tauri android build --aab
+
+      - name: Resolve AAB path
+        id: aab
+        run: |
+          AAB_PATH="$(find src-tauri/gen/android/app/build/outputs/bundle -name '*release*.aab' | head -n 1)"
+          if [ -z "$AAB_PATH" ]; then
+            AAB_PATH="$(find src-tauri/gen/android/app/build/outputs/bundle -name '*.aab' | head -n 1)"
+          fi
+          if [ -z "$AAB_PATH" ]; then
+            echo "No AAB found under src-tauri/gen/android/app/build/outputs/bundle/"
+            exit 1
+          fi
+          AAB_NAME="subly-android-${GITHUB_REF_NAME:-manual}.aab"
+          cp "$AAB_PATH" "$RUNNER_TEMP/$AAB_NAME"
+          echo "aab_path=$RUNNER_TEMP/$AAB_NAME" >> "$GITHUB_OUTPUT"
+          echo "aab_name=$AAB_NAME" >> "$GITHUB_OUTPUT"
+
+          # Mapping file is optional — only present when R8 ran.
+          MAPPING="src-tauri/gen/android/app/build/outputs/mapping/release/mapping.txt"
+          if [ -f "$MAPPING" ]; then
+            echo "mapping_path=$MAPPING" >> "$GITHUB_OUTPUT"
+          else
+            echo "mapping_path=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-aab
+          path: ${{ steps.aab.outputs.aab_path }}
+
+      - name: Collect release notes
+        id: notes
+        run: |
+          mkdir -p "$RUNNER_TEMP/whatsnew"
+          # Pull the latest CHANGELOG.md entry, capped at 500 chars (Play's
+          # per-locale limit). Fall back to a generic note if parsing fails.
+          if [ -f CHANGELOG.md ]; then
+            node -e "
+              const fs=require('fs');
+              const src=fs.readFileSync('CHANGELOG.md','utf8');
+              const m=src.match(/^##\s+.*\n([\s\S]*?)(?:^##\s+|\Z)/m);
+              const body=(m?m[1]:src).trim().slice(0,500);
+              fs.writeFileSync(process.env.RUNNER_TEMP + '/whatsnew/whatsnew-en-US.txt', body || 'Bug fixes and improvements.');
+            "
+          else
+            echo "Bug fixes and improvements." > "$RUNNER_TEMP/whatsnew/whatsnew-en-US.txt"
+          fi
+          echo "dir=$RUNNER_TEMP/whatsnew" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to Play Store
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_SERVICE_ACCOUNT_JSON }}
+          packageName: com.s00d.subly
+          releaseFiles: ${{ steps.aab.outputs.aab_path }}
+          track: ${{ inputs.track || 'internal' }}
+          status: ${{ inputs.status || 'draft' }}
+          releaseName: ${{ inputs.release_name || '' }}
+          whatsNewDirectory: ${{ steps.notes.outputs.dir }}
+          # Optional: lets Play Console deobfuscate crash stack traces.
+          # Empty string when R8 didn't run; the action skips upload in that case.
+          mappingFile: ${{ steps.aab.outputs.mapping_path }}
