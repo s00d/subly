@@ -13,6 +13,29 @@ val tauriProperties = Properties().apply {
     }
 }
 
+// Release signing: prefer `keystore.properties` (local dev) but transparently
+// fall back to env vars so CI can supply secrets without writing a file.
+// When none of these are present the release variant stays unsigned — same
+// behaviour as before this block was introduced.
+val keystoreProperties = Properties().apply {
+    val propFile = rootProject.file("keystore.properties")
+    if (propFile.exists()) {
+        propFile.inputStream().use { load(it) }
+    }
+}
+fun keystoreField(key: String, env: String): String? {
+    val v = keystoreProperties.getProperty(key) ?: System.getenv(env)
+    return v?.takeIf { it.isNotBlank() }
+}
+val releaseStoreFile = keystoreField("storeFile", "ANDROID_KEYSTORE_PATH")
+val releaseStorePassword = keystoreField("storePassword", "ANDROID_KEYSTORE_PASSWORD")
+val releaseKeyAlias = keystoreField("keyAlias", "ANDROID_KEY_ALIAS")
+val releaseKeyPassword = keystoreField("keyPassword", "ANDROID_KEY_PASSWORD")
+val canSignRelease = releaseStoreFile != null
+        && releaseStorePassword != null
+        && releaseKeyAlias != null
+        && releaseKeyPassword != null
+
 android {
     compileSdk = 36
     namespace = "com.s00d.subly"
@@ -23,6 +46,16 @@ android {
         targetSdk = 36
         versionCode = tauriProperties.getProperty("tauri.android.versionCode", "1").toInt()
         versionName = tauriProperties.getProperty("tauri.android.versionName", "1.0")
+    }
+    if (canSignRelease) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         getByName("debug") {
@@ -43,6 +76,17 @@ android {
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
                     .toList().toTypedArray()
             )
+            if (canSignRelease) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            // Ship a `BUNDLE-METADATA/com.android.tools.build.debugsymbols/`
+            // entry inside the AAB so Play Console can deobfuscate Rust
+            // native crash traces. SYMBOL_TABLE = lightweight (function
+            // names only); use "FULL" if you also want source lines —
+            // significantly larger AAB.
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
         }
     }
     kotlinOptions {
