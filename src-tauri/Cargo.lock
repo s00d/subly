@@ -5249,6 +5249,7 @@ dependencies = [
  "libc",
  "objc2",
  "objc2-foundation",
+ "openssl-sys",
  "pdf-extract",
  "percent-encoding",
  "postcard",

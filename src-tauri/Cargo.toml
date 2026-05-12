@@ -113,6 +113,13 @@ dbus-secret-service-keyring-store = { version = "1", features = ["vendored"] }
 # SharedPreferences. Tauri Mobile initialises `ndk-context` automatically,
 # so no extra Kotlin glue is required.
 android-native-keyring-store = "1"
+# `aisdk` and `tauri-plugin-http` pull in `reqwest` with the default `native-tls`
+# feature, which expects a system OpenSSL via pkg-config. The Android NDK
+# sysroot doesn't ship one, so we vendor OpenSSL for cross-builds — Cargo
+# unions features across the dependency graph, so flipping `vendored` here
+# is enough to force a self-built libssl on `aarch64-linux-android` and the
+# other Android targets.
+openssl-sys = { version = "0.9", features = ["vendored"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
