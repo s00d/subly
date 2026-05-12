@@ -1,0 +1,19 @@
+src-tauri/src/commands/ai/prompts/smart.rs
+  s_760a8176b5063e::t_5016b848c8995c 21-22,44-45,77-80,91-92,222,239-299,329-367
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "0997f20858f388861e63da3b596f2822b8443bdc",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
