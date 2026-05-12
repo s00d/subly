@@ -103,9 +103,10 @@ apple-native-keyring-store = { version = "1", features = ["protected"] }
 windows-native-keyring-store = "1"
 
 [target.'cfg(target_os = "linux")'.dependencies]
-# Linux Secret Service backend (gnome-keyring, KWallet via DBus). `vendored`
-# statically links openssl so we don't depend on system libssl.
-dbus-secret-service-keyring-store = { version = "1", features = ["vendored"] }
+# Linux Secret Service backend (gnome-keyring, KWallet via DBus). `crypto-rust`
+# uses RustCrypto for the DH session encryption so we don't need a system
+# libssl on the build host or in deployed builds.
+dbus-secret-service-keyring-store = { version = "1", default-features = false, features = ["crypto-rust"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 # Android Keystore-backed credential store. Encrypts secrets with a key from
