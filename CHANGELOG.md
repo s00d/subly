@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **AI-powered assistance** (opt-in, off by default) across four surfaces:
+  - **Quick-add subscription** — natural-language input ("Telegram premium 300₽ monthly card") that extracts price, currency, billing cycle, category, payment method and tags using the existing catalog as context.
+  - **Quick-add expense** — same flow for one-off transactions with description, amount, date and tag parsing.
+  - **Receipt OCR** — point a vision-capable model at a photo / scan of a receipt; line items, totals, currency, merchant and date come back as a draft expense.
+  - **Statement import** — bulk import of bank/card statements (CSV, XLSX, PDF, JSON) with heuristic pre-parsing and per-row preview before saving.
+  Backend uses the `aisdk` crate for text generation, direct `reqwest` for vision endpoints, prompted-JSON output (instead of `aisdk` schema validation) and a robust JSON parser that tolerates LLM markdown fences.
+- **Seven AI providers** out of the box: OpenRouter, OpenAI, OpenAI-compatible (Ollama / custom), Groq, DeepSeek, Google Gemini (OpenAI-compatible endpoint), Mistral — each with curated recommended-model presets and vision-capability flags.
+- New **AI Settings panel** with master toggle, per-feature switches, provider/model picker, custom model input, test-connection button, and an auto-enable shortcut on first successful save.
+- **Single AI header button** on subscriptions and expenses pages: opens the Quick-Add dialog when AI is ready, or shortcuts to settings when no provider/key is configured.
+- **`SecretInput` component** — reusable password-style field that displays a saved-value mask, clears on focus, and disables Save until the user actually edits.
+- **Backend signal for saved secrets**: `ProviderField.has_saved_value` is now returned by CloudSync provider descriptors so the UI can show a masked field with "API key saved" instead of an empty input.
+- **GitHub Actions workflow + setup doc** for publishing Android AAB to Google Play (signed release, internal/alpha/beta/production tracks, release notes auto-extracted from this changelog, native debug symbols, mapping upload).
 - **Splash screens** on every platform: dedicated splash window on desktop with theme-aware background, native iOS `LaunchScreen.storyboard` with brand logo, and Android `androidx.core.splashscreen` flow with light/dark color variants.
 - **Skeleton loaders** for the subscriptions list while data is loading.
 - **`LazyVChart`** wrapper for `vue-echarts` that delays mount until the container has a real size, eliminating ECharts "Can't get DOM width or height" race.
@@ -20,6 +32,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Keyring migration**: replaced the legacy v3 `keyring` crate (which silently fell back to an in-memory mock without explicit platform features — causing API keys and OAuth tokens to "disappear" after each restart) with `keyring-core` 1.x and platform-specific backends — `apple-native-keyring-store`, `windows-native-keyring-store`, `dbus-secret-service-keyring-store`, `android-native-keyring-store`. AI keys, sync credentials and Telegram tokens now reliably persist on every platform without the previous redb fallback layer.
+- **Telegram bot token** and **exchange-rate provider API keys** migrated to the new `SecretInput` flow — fields no longer pre-fill the actual secret into the input, just show a masked placeholder.
+- **CloudSync** secret fields (Dropbox app secret, WebDAV password, ...) use `SecretInput` with `has_saved_value` from the backend, so the form correctly reflects "credentials already stored" without leaking the values.
+- **Android release builds are now signed** via `keystore.properties` (local dev) or env vars (CI). Unsigned release stays as fallback for dev machines without a keystore.
+- Android release bundle ships with **native debug symbols** (`ndk.debugSymbolLevel = "SYMBOL_TABLE"`) so Play Console can deobfuscate Rust crash traces.
 - Major **Rust error-handling refactor**: all `commands/*` migrated to a unified `AppError` enum (new `src/errors.rs`) with `From` impls for `redb` / IO / serde / keyring errors, enabling clean `?` propagation across the backend.
 - **iOS widget snapshot export** moved to a background thread with a shared `ureq` agent and deduplication flags. The HTTP fetch for subscription logos no longer blocks app startup, sync-pull, or subscription save.
 - Settings → Appearance: color-theme swatches now render as perfect circles on all platforms (iOS Safari previously squashed them into ovals) and the row is centered so the trailing gap on the right no longer looks crooked.
@@ -31,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **API keys / OAuth tokens no longer "disappear" after app restart** — see Keyring migration above. Affects AI provider keys, sync credentials and Telegram bot tokens on all platforms.
+- **AI feature visibility race** on subscriptions/expenses pages: the Pinia `features` slot was a `reactive()` object instead of a `ref()`, so `storeToRefs()` couldn't track it and the header button stayed grey-disabled until a full reload. Now correct everywhere.
+- **AI prompts speak the user's language**: prompts are kept English (more reliable LLM behaviour) but explicitly instruct the model to write free-form fields (descriptions, tag names, notes) in the user's UI locale.
 - **Android crash on launch** ("Unable to resolve local data directory"). On Android the `dirs` crate has no `$HOME` / XDG paths and always returned `None`, panicking the setup hook. The DB path is now resolved via Tauri's path API on Android (`Context.getFilesDir()` → `/data/user/0/<package>/files/`); desktop + iOS keep the existing `~/Library/Application Support/Subly/` location so no data migration is required.
 - **Android Gradle build** "Cannot find module '...src-tauri/tauri'" fixed by resolving the Tauri CLI through the project's package manager (`TAURI_CLI_PACKAGE_MANAGER` → pnpm/npm/yarn/node) instead of invoking `node tauri` directly.
 - **iOS bottom tab bar** no longer floats with a gap below it — WKWebView is now stretched to `view.bounds` and `contentInsetAdjustmentBehavior = .never`, so `position: fixed; bottom: 0` reaches the actual bottom of the screen.
