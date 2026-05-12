@@ -1,0 +1,37 @@
+src/components/settings/ExchangeRatesSection.vue
+  s_760a8176b5063e::t_931e42a84f8de6 6
+  s_760a8176b5063e::t_66d9881a9b62b8 105-112
+  s_760a8176b5063e::t_770fe2bb919066 193-194,198-203
+  s_760a8176b5063e::t_be42c97d70828c 53-61,66
+  s_760a8176b5063e::t_42889059992a34 387-392,395-399
+  s_760a8176b5063e::t_5da1a80f2eeda9 427-428,430-431,433,437,443-448
+  s_760a8176b5063e::t_dd7f7e8ea34499 34-38,40-41
+src/components/ui/SecretInput.vue
+  s_760a8176b5063e::t_534ede9aeb18f0 92
+  s_760a8176b5063e::t_6e14ed877a2dfb 31
+  s_760a8176b5063e::t_fb2853512fcafc 1-30,32-91,93-98
+src/components/settings/TelegramSection.vue
+  s_760a8176b5063e::t_ae81e74e917e32 2,6,18-22,24,30-37,40,45,52-57,65-68,80
+  s_760a8176b5063e::t_069c00f91302c9 100-113,120
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "cc6da33c5ef87b40e7b4502723930f6b467bd171",
+  "prompts": {},
+  "humans": {
+    "h_ee6cac30a1b83a": {
+      "author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
