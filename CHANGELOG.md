@@ -5,11 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.3] - 2026-05-11
+## [1.0.3] - 2026-05-12
 
 ### Added
 
-- **AI-powered assistance** (opt-in, off by default) across four surfaces:
+- **AI-powered assistance** (opt-in, off by default), exposed through a single
+  `ai_smart_input` backend command and unified `AiSmartDialog` on the frontend.
+  One entry point handles all four capabilities — the model decides whether
+  the input is one item or a list based on the picture / file / text:
   - **Quick-add subscription** — natural-language input ("Telegram premium 300₽ monthly card") that extracts price, currency, billing cycle, category, payment method and tags using the existing catalog as context.
   - **Quick-add expense** — same flow for one-off transactions with description, amount, date and tag parsing.
   - **Receipt OCR** — point a vision-capable model at a photo / scan of a receipt; line items, totals, currency, merchant and date come back as a draft expense.
@@ -17,7 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Backend uses the `aisdk` crate for text generation, direct `reqwest` for vision endpoints, prompted-JSON output (instead of `aisdk` schema validation) and a robust JSON parser that tolerates LLM markdown fences.
 - **Seven AI providers** out of the box: OpenRouter, OpenAI, OpenAI-compatible (Ollama / custom), Groq, DeepSeek, Google Gemini (OpenAI-compatible endpoint), Mistral — each with curated recommended-model presets and vision-capability flags.
 - New **AI Settings panel** with master toggle, per-feature switches, provider/model picker, custom model input, test-connection button, and an auto-enable shortcut on first successful save.
-- **Single AI header button** on subscriptions and expenses pages: opens the Quick-Add dialog when AI is ready, or shortcuts to settings when no provider/key is configured.
+- **Single AI header button** on subscriptions and expenses pages: opens the AI assist dialog when AI is ready, or shortcuts to settings when no provider/key is configured.
+- **Drag-and-drop, paste-from-clipboard and image preview** in the AI assist dialog. Drops are wired through Tauri's `onDragDropEvent` (the WebView's HTML5 `drop` event is suppressed in Tauri 2); files are read via `@tauri-apps/plugin-fs` and capped at 64 MiB. Images get a checkerboard-backed preview with a one-tap clear button; non-image files render as a rich row with icon + size + filename.
+- **Responsive AI dialog layout**: larger touch targets, full-width dropzone on mobile, wrap-friendly result header with thumbnail, and a 44×44 cancel target during parsing.
 - **`SecretInput` component** — reusable password-style field that displays a saved-value mask, clears on focus, and disables Save until the user actually edits.
 - **Backend signal for saved secrets**: `ProviderField.has_saved_value` is now returned by CloudSync provider descriptors so the UI can show a masked field with "API key saved" instead of an empty input.
 - **GitHub Actions workflow + setup doc** for publishing Android AAB to Google Play (signed release, internal/alpha/beta/production tracks, release notes auto-extracted from this changelog, native debug symbols, mapping upload).
@@ -38,6 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Android release builds are now signed** via `keystore.properties` (local dev) or env vars (CI). Unsigned release stays as fallback for dev machines without a keystore.
 - Android release bundle ships with **native debug symbols** (`ndk.debugSymbolLevel = "SYMBOL_TABLE"`) so Play Console can deobfuscate Rust crash traces.
 - Major **Rust error-handling refactor**: all `commands/*` migrated to a unified `AppError` enum (new `src/errors.rs`) with `From` impls for `redb` / IO / serde / keyring errors, enabling clean `?` propagation across the backend.
+- **AI prompts now ship the user's real taxonomy** — categories, enabled payment methods and a tag pool (favourites first, then by `sortOrder`, capped at 30) are rendered directly into every `ai_smart_input` system prompt. The model is told to reuse existing names instead of inventing new ones, which cuts duplicate categories/tags on save and improves payment-method matching.
+- **`commands/ai/extract/smart.rs` split** into a `smart/` module (`mod.rs` dispatch, `expense.rs`, `subscription.rs`) so each surface owns its parsing/mapping/heuristics in isolation. The prior single-file extractor is gone along with the obsolete per-feature commands (`ai_quick_add_*`, `ai_extract_receipt`, `ai_import_statement_file`, `ai_import_subscriptions_file`).
+- **Prompt fragments** gained reusable `payment_method_rules` and `tag_rules` helpers in `commands/ai/prompts/fragments.rs`; the `category_rules` helper now gracefully degrades to "omit the field" when the catalog is empty.
 - **iOS widget snapshot export** moved to a background thread with a shared `ureq` agent and deduplication flags. The HTTP fetch for subscription logos no longer blocks app startup, sync-pull, or subscription save.
 - Settings → Appearance: color-theme swatches now render as perfect circles on all platforms (iOS Safari previously squashed them into ovals) and the row is centered so the trailing gap on the right no longer looks crooked.
 - Dashboard **Stats cards** redesigned into a clean tile layout.
