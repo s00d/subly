@@ -2,8 +2,8 @@
 import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
-import AppInput from "@/components/ui/AppInput.vue";
 import AppToggle from "@/components/ui/AppToggle.vue";
+import SecretInput from "@/components/ui/SecretInput.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import Toast from "@/components/ui/Toast.vue";
 import { ratesGetProviders, ratesRunBackendUpdate } from "@/services/ratesClient";
@@ -31,7 +31,14 @@ const currencies = ref<Currency[]>([]);
 
 const providers = ref<RatesProviderMeta[]>([]);
 const selectedProvider = ref<RatesProviderType>("frankfurter");
+/**
+ * Local input value. Empty unless the user is typing a *new* key — the
+ * previously-saved one stays in the keyring and is represented in the UI by
+ * the mask rendered by `SecretInput`.
+ */
 const apiKey = ref("");
+/** True ⇔ a key is already persisted in secure storage for current provider. */
+const hasSavedKey = ref(false);
 const expandedProvider = ref<RatesProviderType | null>(null);
 const showChangeProvider = ref(false);
 const targetSearch = ref("");
@@ -43,11 +50,20 @@ async function updateSettings(updates: Partial<Settings>) {
   await metaStore.updateSettings(next);
 }
 
+async function refreshHasSavedKey() {
+  try {
+    const stored = (await getSecureValue("ratesApiKey")) || "";
+    hasSavedKey.value = stored.trim().length > 0;
+  } catch {
+    hasSavedKey.value = false;
+  }
+}
+
 onMounted(async () => {
   settings.value = props.lookupData?.settings ?? null;
   currencies.value = props.lookupData?.currencies ?? [];
   selectedProvider.value = ((await getConfigValue<string>("ratesProvider")) || "frankfurter") as RatesProviderType;
-  apiKey.value = (await getSecureValue("ratesApiKey")) || "";
+  await refreshHasSavedKey();
   ratesGetProviders()
     .then((items) => { providers.value = items; })
     .catch((e) => {
@@ -86,7 +102,14 @@ async function selectProvider(type: RatesProviderType) {
 async function saveProviderConfig(type: RatesProviderType) {
   try {
     selectedProvider.value = type;
-    await setSecureValue("ratesApiKey", apiKey.value);
+    const fresh = apiKey.value.trim();
+    if (fresh.length > 0) {
+      // Persist a newly-typed key. An empty `apiKey` means "user didn't
+      // touch the field" and we leave the previously-saved key alone.
+      await setSecureValue("ratesApiKey", fresh);
+      apiKey.value = "";
+      hasSavedKey.value = true;
+    }
     await setConfigValue("ratesProvider", type);
     expandedProvider.value = null;
     showChangeProvider.value = false;
@@ -167,15 +190,18 @@ async function manualUpdate() {
   isUpdating.value = true;
   try {
     if (activeProvider.value?.requiresKey) {
-      const key = apiKey.value.trim();
-      if (!key) {
+      const fresh = apiKey.value.trim();
+      if (!fresh && !hasSavedKey.value) {
         toast(t("rates_key_required"), "error");
         return;
       }
-      // Keep backend keyring/config in sync before manual update.
-      await setSecureValue("ratesApiKey", key);
+      if (fresh) {
+        // User typed a new key right before updating — persist it.
+        await setSecureValue("ratesApiKey", fresh);
+        hasSavedKey.value = true;
+        apiKey.value = "";
+      }
       await setConfigValue("ratesProvider", selectedProvider.value);
-      apiKey.value = key;
     }
 
     console.log("[ExchangeRatesSection] manualUpdate start", {
@@ -358,10 +384,19 @@ async function openProviderDocs(type: RatesProviderType) {
                 <div :class="s.credFormInner()">
                   <div>
                     <label :class="s.credLabel()">{{ t('api_key') }}</label>
-                    <input v-model="apiKey" type="password" :class="s.credInput()" :placeholder="t('api_key')" />
+                    <SecretInput
+                      v-model="apiKey"
+                      :has-saved-value="hasSavedKey && provider.type === selectedProvider"
+                      size="sm"
+                      :placeholder="t('api_key')"
+                    />
                   </div>
                   <div class="flex items-center gap-2">
-                    <button @click.stop="saveProviderConfig(provider.type)" :disabled="!apiKey" :class="s.saveBtn()">
+                    <button
+                      @click.stop="saveProviderConfig(provider.type)"
+                      :disabled="!apiKey && !(hasSavedKey && provider.type === selectedProvider)"
+                      :class="s.saveBtn()"
+                    >
                       {{ t('sync_connect') }}
                     </button>
                   </div>
@@ -389,20 +424,28 @@ async function openProviderDocs(type: RatesProviderType) {
       >
         {{ t('open_url') }} (API key)
       </button>
-      <div class="flex flex-col sm:flex-row gap-2">
-        <input
+      <div class="flex flex-col sm:flex-row gap-2 items-start">
+        <SecretInput
           v-model="apiKey"
-          type="password"
-          :class="[s.credInput(), 'flex-1']"
+          :has-saved-value="hasSavedKey"
+          size="sm"
           :placeholder="t('api_key')"
+          class="flex-1"
         />
         <button
           @click="saveProviderConfig(activeProvider.type)"
+          :disabled="!apiKey && !hasSavedKey"
           :class="s.saveBtn()"
         >
           {{ t('save') }}
         </button>
       </div>
+      <p
+        v-if="hasSavedKey && !apiKey"
+        class="mt-1 text-[10px] text-green-600 dark:text-green-400"
+      >
+        {{ t("ai_api_key_configured") }}
+      </p>
     </div>
 
     <!-- Target currencies -->
