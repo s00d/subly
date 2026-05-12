@@ -1,0 +1,21 @@
+src-tauri/Cargo.lock
+  ai_agent 1273-1275,1277-1281,1442,1692,2459-2467,3278,3390-3422,3429-3459,3817,4750,5203,6014,6436,6491,7091
+src-tauri/Cargo.toml
+  s_760a8176b5063e::t_2bf54e7e92c422 106-109
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "80c75319484307dd3e25973715bef626d0bdb61f",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
