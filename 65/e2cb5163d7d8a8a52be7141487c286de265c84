@@ -1,0 +1,28 @@
+src-tauri/gen/android/app/build.gradle.kts
+  s_760a8176b5063e::t_95598bcfea968e 82-89
+  s_760a8176b5063e::t_06de0a458f8764 16-38,50-59,79-81
+.gitignore
+  s_760a8176b5063e::t_a63c288e84c746 28,30-34
+  h_ee6cac30a1b83a 29
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "65e2cb5163d7d8a8a52be7141487c286de265c84",
+  "prompts": {},
+  "humans": {
+    "h_ee6cac30a1b83a": {
+      "author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
