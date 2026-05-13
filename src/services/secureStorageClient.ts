@@ -1,13 +1,26 @@
-import { callCommand } from "@/services/commandClient";
+import {
+  deletePasswords,
+  getPasswords,
+  setPasswords,
+} from "tauri-plugin-keyring-store-api";
+
+/** Same prefix as legacy `secure_storage_*` IPC (`src-tauri` subscription / AI keys). */
+const SECURE_PREFIX = "secure_storage.";
+
+function storageAccount(rawKey: string): string {
+  return `${SECURE_PREFIX}${rawKey.trim()}`;
+}
 
 export async function setSecureValue(name: string, value: string): Promise<void> {
-  await callCommand("secure_storage_set", { key: name, value });
+  await setPasswords([{ account: storageAccount(name), secret: value }]);
 }
 
 export async function getSecureValue(name: string): Promise<string | null> {
-  return callCommand<string | null>("secure_storage_get", { key: name });
+  const out = await getPasswords([storageAccount(name)]);
+  const first = out[0];
+  return first ?? null;
 }
 
 export async function deleteSecureValue(name: string): Promise<void> {
-  await callCommand("secure_storage_delete", { key: name });
+  await deletePasswords([storageAccount(name)]);
 }

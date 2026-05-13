@@ -692,5 +692,6 @@
   "ai_smart_drop_here": "ファイルまたは画像をここにドロップ",
   "ai_smart_drop_active": "離して添付",
   "ai_smart_image_preview_alt": "添付画像のプレビュー",
-  "ai_smart_paste_hint": "ヒント：スクリーンショットを Cmd/Ctrl + V で直接貼り付けできます。"
+  "ai_smart_paste_hint": "ヒント：スクリーンショットを Cmd/Ctrl + V で直接貼り付けできます。",
+  "ai_smart_touch_upload_sub": "タップで写真・ファイルを選びます。レシート、PDF、表、スクリーンショット（PCと同じ形式に対応）。"
 }

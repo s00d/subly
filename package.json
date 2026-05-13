@@ -1,7 +1,7 @@
 {
   "name": "subly",
   "private": true,
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -29,6 +29,7 @@
     "tailwind-merge": "^3.6.0",
     "tailwind-variants": "^3.2.2",
     "tailwindcss": "^4.3.0",
+    "tauri-plugin-keyring-store-api": "0.1.0",
     "vue": "^3.5.34",
     "vue-echarts": "^8.0.1",
     "vue-i18n": "^11.4.2",

@@ -20,6 +20,8 @@ import {
  * Reactive single source of truth for AI settings (provider, model, endpoint,
  * feature toggles, master enable). The actual API key is never held in state —
  * we only mirror a `hasApiKey` boolean so the UI can show a "configured" badge.
+ * `load()` does not read the OS keyring; call {@link refreshHasApiKey} when you
+ * need an accurate key-present flag (e.g. after clicking the AI assistant).
  *
  * Pages displaying AI-related buttons (`SubscriptionsPage`, `ExpensesPage`,
  * `DataManagementSection`) subscribe via `storeToRefs(useAiConfigStore())` so
@@ -94,9 +96,6 @@ export const useAiConfigStore = defineStore("aiConfig", () => {
         ...(savedFeatures || {}),
       };
 
-      const key = (await getSecureValue(aiApiKeyName(providerType.value))) || "";
-      hasApiKey.value = key.trim().length > 0;
-
       loaded.value = true;
     } finally {
       loading.value = false;
@@ -131,7 +130,8 @@ export const useAiConfigStore = defineStore("aiConfig", () => {
    * The function is the single canonical place that writes
    * `aiProvider` / `aiModel` / `aiCustomEndpoint` to config and the API key
    * to secure storage. A read-back self-test guards against keychain backends
-   * that silently swallow writes — see {@link load} for the symmetrical read.
+   * that silently swallow writes. For a key presence check without saving, use
+   * {@link refreshHasApiKey}.
    */
   async function setProvider(opts: {
     type: AiProviderType;

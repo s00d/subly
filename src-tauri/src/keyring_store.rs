@@ -1,125 +1,39 @@
-//! Persistent secret storage backed by the OS credential vault.
-//!
-//! On each supported platform a `keyring-core` 1.x backend crate is wired up
-//! as the default store; the rest of the application uses the same
-//! [`get`] / [`set`] / [`delete`] API regardless of platform.
-//!
-//! | Target     | Backend crate                            | Underlying store                          |
-//! |------------|------------------------------------------|-------------------------------------------|
-//! | macOS      | `apple-native-keyring-store` (keychain)  | Login keychain                            |
-//! | iOS        | `apple-native-keyring-store` (protected) | Data Protection keychain                  |
-//! | Windows    | `windows-native-keyring-store`           | Credential Manager                        |
-//! | Linux      | `dbus-secret-service-keyring-store`      | Secret Service (gnome-keyring / KWallet)  |
-//! | Android    | `android-native-keyring-store`           | Android Keystore + SharedPreferences      |
-//!
-//! The default store is registered exactly once on first use via
-//! [`ensure_init`]. After that, every entry is created with
-//! `keyring_core::Entry::new(SERVICE, account)`.
+//! OS credential storage via [`tauri_plugin_keyring_store::KeyringStore`].
+//! The service name must match the default in `tauri_plugin_keyring_store::init()`
+//! (bundle identifier from `tauri.conf.json`).
 
 use std::sync::OnceLock;
 
-use keyring_core::error::Error as KeyringError;
-use keyring_core::Entry;
+use tauri_plugin_keyring_store::KeyringStore;
 
 use crate::errors::AppError;
 
+/// Matches `identifier` in `tauri.conf.json` and the plugin default service.
 const SERVICE: &str = "com.s00d.subly";
 
-/// Holds the result of the one-time backend registration. We cache it so
-/// every subsequent call is a single atomic load.
-static INIT: OnceLock<Result<(), String>> = OnceLock::new();
+static STORE: OnceLock<KeyringStore> = OnceLock::new();
 
-fn ensure_init() -> Result<(), AppError> {
-    let stored = INIT.get_or_init(register_default_store);
-    match stored {
-        Ok(()) => Ok(()),
-        Err(msg) => Err(AppError::Message(msg.clone())),
-    }
+fn store() -> &'static KeyringStore {
+    STORE.get_or_init(|| KeyringStore::new(SERVICE))
 }
 
-#[cfg(target_os = "macos")]
-fn register_default_store() -> Result<(), String> {
-    let store = apple_native_keyring_store::keychain::Store::new()
-        .map_err(|e| format!("apple keychain init failed: {e}"))?;
-    keyring_core::set_default_store(store);
-    Ok(())
-}
-
-#[cfg(target_os = "ios")]
-fn register_default_store() -> Result<(), String> {
-    let store = apple_native_keyring_store::protected::Store::new()
-        .map_err(|e| format!("apple protected store init failed: {e}"))?;
-    keyring_core::set_default_store(store);
-    Ok(())
-}
-
-#[cfg(target_os = "windows")]
-fn register_default_store() -> Result<(), String> {
-    let store = windows_native_keyring_store::Store::new()
-        .map_err(|e| format!("windows credential store init failed: {e}"))?;
-    keyring_core::set_default_store(store);
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
-fn register_default_store() -> Result<(), String> {
-    let store = dbus_secret_service_keyring_store::Store::new()
-        .map_err(|e| format!("dbus secret service init failed: {e}"))?;
-    keyring_core::set_default_store(store);
-    Ok(())
-}
-
-#[cfg(target_os = "android")]
-fn register_default_store() -> Result<(), String> {
-    let store = android_native_keyring_store::Store::new()
-        .map_err(|e| format!("android keystore init failed: {e}"))?;
-    keyring_core::set_default_store(store);
-    Ok(())
-}
-
-#[cfg(not(any(
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "windows",
-    target_os = "linux",
-    target_os = "android",
-)))]
-fn register_default_store() -> Result<(), String> {
-    Err("no keyring backend compiled for this target".to_string())
-}
-
-fn entry(account: &str) -> Result<Entry, AppError> {
-    ensure_init()?;
-    Entry::new(SERVICE, account).map_err(|e| AppError::Message(e.to_string()))
+fn map_err(e: tauri_plugin_keyring_store::Error) -> AppError {
+    AppError::Message(e.to_string())
 }
 
 pub fn get(account: &str) -> Result<Option<String>, AppError> {
-    let entry = entry(account)?;
-    match entry.get_password() {
-        Ok(p) => Ok(Some(p)),
-        Err(KeyringError::NoEntry) => Ok(None),
-        Err(e) => Err(AppError::Message(e.to_string())),
-    }
+    store().get_password(account).map_err(map_err)
 }
 
-/// Returns `true` when an entry for `account` exists and stores a non-empty
-/// secret. Functionally equivalent to [`get`], but conveys intent ("is this
-/// configured?") at the call site and discards the secret immediately.
+/// Returns `true` when an entry exists with a non-empty secret.
 pub fn exists(account: &str) -> Result<bool, AppError> {
-    Ok(get(account)?.map(|v| !v.trim().is_empty()).unwrap_or(false))
+    store().exists_nonempty(account).map_err(map_err)
 }
 
 pub fn set(account: &str, password: &str) -> Result<(), AppError> {
-    let entry = entry(account)?;
-    entry
-        .set_password(password)
-        .map_err(|e| AppError::Message(e.to_string()))
+    store().set_password(account, password).map_err(map_err)
 }
 
 pub fn delete(account: &str) -> Result<(), AppError> {
-    let entry = entry(account)?;
-    match entry.delete_credential() {
-        Ok(()) | Err(KeyringError::NoEntry) => Ok(()),
-        Err(e) => Err(AppError::Message(e.to_string())),
-    }
+    store().delete(account).map_err(map_err)
 }

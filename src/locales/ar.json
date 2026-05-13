@@ -692,5 +692,6 @@
   "ai_smart_drop_here": "أفلت ملفًا أو صورة هنا",
   "ai_smart_drop_active": "أفلت للإرفاق",
   "ai_smart_image_preview_alt": "معاينة الصورة المرفقة",
-  "ai_smart_paste_hint": "نصيحة: الصق لقطة شاشة (Cmd/Ctrl + V) مباشرة في حقل النص."
+  "ai_smart_paste_hint": "نصيحة: الصق لقطة شاشة (Cmd/Ctrl + V) مباشرة في حقل النص.",
+  "ai_smart_touch_upload_sub": "المس لاختيار صورة أو ملف — إيصالات وPDF وجداول ولقطات (نفس الأنماط كما على سطح المكتب)."
 }

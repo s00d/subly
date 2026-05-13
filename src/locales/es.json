@@ -692,5 +692,6 @@
   "ai_smart_drop_here": "Suelta un archivo o imagen aquí",
   "ai_smart_drop_active": "Suelta para adjuntar",
   "ai_smart_image_preview_alt": "Vista previa de la imagen adjunta",
-  "ai_smart_paste_hint": "Consejo: pega una captura (Cmd/Ctrl + V) directamente en el campo de texto."
+  "ai_smart_paste_hint": "Consejo: pega una captura (Cmd/Ctrl + V) directamente en el campo de texto.",
+  "ai_smart_touch_upload_sub": "Toca para elegir foto o archivo: recibos, PDF, hojas, capturas (mismos formatos que en el ordenador)."
 }

@@ -692,5 +692,6 @@
   "ai_smart_drop_here": "Solte um arquivo ou imagem aqui",
   "ai_smart_drop_active": "Solte para anexar",
   "ai_smart_image_preview_alt": "Pré-visualização da imagem anexada",
-  "ai_smart_paste_hint": "Dica: cole uma captura (Cmd/Ctrl + V) direto no campo de texto."
+  "ai_smart_paste_hint": "Dica: cole uma captura (Cmd/Ctrl + V) direto no campo de texto.",
+  "ai_smart_touch_upload_sub": "Toque para escolher foto ou ficheiro — recibos, PDF, folhas, capturas (os mesmos formatos do desktop)."
 }

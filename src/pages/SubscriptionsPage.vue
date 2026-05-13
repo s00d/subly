@@ -93,20 +93,10 @@ const {
   activeProvider: aiActiveProvider,
   loaded: aiLoaded,
 } = storeToRefs(aiConfigStore);
-/**
- * Header AI button is in one of three states:
- *   - "ready":  AI is fully usable → opens the smart dialog.
- *   - "setup":  AI reachable but not configured (off / no key) → opens
- *               settings so the user can fix it in one tap.
- *   - "hidden": Store still loading or feature toggle off.
- */
-const aiHeaderState = computed<"ready" | "setup" | "hidden">(() => {
-  if (!aiLoaded.value) return "hidden";
-  if (!aiFeatures.value.subscriptionInput) return "hidden";
-  const requiresKey = !!aiActiveProvider.value?.requiresKey;
-  const keyOk = !requiresKey || aiHasApiKey.value;
-  if (aiEnabled.value && keyOk) return "ready";
-  return "setup";
+/** Sparkles in the header when config is loaded and the surface feature is on. Keyring is read only on click. */
+const showAiHeaderButton = computed(() => {
+  if (!aiLoaded.value) return false;
+  return !!aiFeatures.value.subscriptionInput;
 });
 
 function openAiSmart() {
@@ -115,6 +105,23 @@ function openAiSmart() {
 
 function openAiSettings() {
   vueRouter.push("/settings?section=ai");
+}
+
+async function onAiAssistantClick() {
+  if (!aiEnabled.value) {
+    openAiSettings();
+    return;
+  }
+  const requiresKey = !!aiActiveProvider.value?.requiresKey;
+  if (requiresKey) {
+    await aiConfigStore.refreshHasApiKey();
+  }
+  const keyOk = !requiresKey || aiHasApiKey.value;
+  if (keyOk) {
+    openAiSmart();
+  } else {
+    openAiSettings();
+  }
 }
 
 function onAiImported(_count: number) {
@@ -135,10 +142,16 @@ function updateHeaderActions() {
     { id: "cycle-sub-view", icon: viewIcon, title: `${currentViewTitle} → ${nextViewTitle}`, onClick: () => setViewMode(nextViewMode), style: "accent" },
     { id: "sub-selection-mode", icon: CheckSquare, title: selectionMode.value ? `${t("select")} ✓` : `${t("select")} ✕`, onClick: toggleSelectionMode, style: selectionMode.value ? "success" : "neutral" },
   ];
-  if (aiHeaderState.value === "ready") {
-    actions.push({ id: "ai-smart-sub", icon: Sparkles, title: t("ai_smart_open"), onClick: openAiSmart, style: "accent" });
-  } else if (aiHeaderState.value === "setup") {
-    actions.push({ id: "ai-setup-sub", icon: Sparkles, title: t("ai_setup_assistant"), onClick: openAiSettings, style: "neutral" });
+  if (showAiHeaderButton.value) {
+    actions.push({
+      id: "ai-smart-sub",
+      icon: Sparkles,
+      title: t("ai_smart_open"),
+      onClick: () => {
+        void onAiAssistantClick();
+      },
+      style: "accent",
+    });
   }
   actions.push({ id: "add-sub", icon: Plus, title: t("new_subscription"), onClick: openAdd, style: "primary" });
   setActions(actions);
@@ -154,7 +167,7 @@ onMounted(() => {
   aiConfigStore.load().then(() => updateHeaderActions());
 });
 
-watch(aiHeaderState, () => updateHeaderActions());
+watch(showAiHeaderButton, () => updateHeaderActions());
 onUnmounted(() => {
   clearActions();
 });

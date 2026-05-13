@@ -746,5 +746,6 @@
   "ai_smart_drop_here": "Drop a file or image here",
   "ai_smart_drop_active": "Release to attach",
   "ai_smart_image_preview_alt": "Attached image preview",
-  "ai_smart_paste_hint": "Tip: paste a screenshot (Cmd/Ctrl + V) right into the text field."
+  "ai_smart_paste_hint": "Tip: paste a screenshot (Cmd/Ctrl + V) right into the text field.",
+  "ai_smart_touch_upload_sub": "Tap to choose a photo or file — receipts, PDFs, spreadsheets, screenshots (same formats as on desktop)."
 }

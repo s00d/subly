@@ -692,5 +692,6 @@
   "ai_smart_drop_here": "Dosyayı veya resmi buraya bırakın",
   "ai_smart_drop_active": "Eklemek için bırakın",
   "ai_smart_image_preview_alt": "Eklenen resmin önizlemesi",
-  "ai_smart_paste_hint": "İpucu: ekran görüntüsünü (Cmd/Ctrl + V) metin alanına yapıştırın."
+  "ai_smart_paste_hint": "İpucu: ekran görüntüsünü (Cmd/Ctrl + V) metin alanına yapıştırın.",
+  "ai_smart_touch_upload_sub": "Dokunarak fotoğraf veya dosya seçin — fiş, PDF, tablo, ekran görüntüsü (masaüstüyle aynı türler)."
 }

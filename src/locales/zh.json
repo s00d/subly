@@ -692,5 +692,6 @@
   "ai_smart_drop_here": "将文件或图片拖到此处",
   "ai_smart_drop_active": "松开以附加",
   "ai_smart_image_preview_alt": "附加图片预览",
-  "ai_smart_paste_hint": "提示：使用 Cmd/Ctrl + V 将截图直接粘贴到文本框中。"
+  "ai_smart_paste_hint": "提示：使用 Cmd/Ctrl + V 将截图直接粘贴到文本框中。",
+  "ai_smart_touch_upload_sub": "点按从相册或文件选择；支持收据、PDF、表格、截图（与电脑端相同格式）。"
 }

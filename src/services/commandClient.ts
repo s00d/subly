@@ -1,4 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
+import type * as DashboardIpc from "@/types/dashboardIpc";
+import type { Expense } from "@/schemas/appData";
 
 /**
  * Карта IPC-команд для типобезопасного вызова (расширять по мере необходимости).
@@ -6,14 +8,38 @@ import { invoke } from "@tauri-apps/api/core";
  */
 export type CommandMap = {
   expenses_count: { args?: Record<string, never>; result: number };
-  expenses_get_by_id: { args: { id: string }; result: import("@/schemas/appData").Expense | null };
+  expenses_get_by_id: { args: { id: string }; result: Expense | null };
+  get_dashboard_summary: {
+    args?: Record<string, never>;
+    result: DashboardIpc.DashboardSummaryDto;
+  };
+  get_dashboard_charts: {
+    args?: Record<string, never>;
+    result: DashboardIpc.DashboardChartsDto;
+  };
+  get_dashboard_forecast: {
+    args?: Record<string, never>;
+    result: DashboardIpc.DashboardForecastDto;
+  };
+  get_dashboard_trends: {
+    args?: Record<string, never>;
+    result: DashboardIpc.DashboardTrendsDto;
+  };
+  get_rate_history_widget: {
+    args: { targetIds: string[]; days: number };
+    result: Record<string, DashboardIpc.RateHistoryPoint[]>;
+  };
+  app_ready: { args?: Record<string, never>; result: void };
 };
 
 export async function invokeCommand<K extends keyof CommandMap>(
   command: K,
-  args?: CommandMap[K]["args"],
+  ...args: CommandMap[K]["args"] extends Record<string, never> | undefined
+    ? [payload?: CommandMap[K]["args"]]
+    : [payload: CommandMap[K]["args"]]
 ): Promise<CommandMap[K]["result"]> {
-  return callCommand(command as string, args as Record<string, unknown> | undefined);
+  const payload = args[0];
+  return callCommand(command as string, payload as Record<string, unknown> | undefined);
 }
 
 export class CommandError extends Error {

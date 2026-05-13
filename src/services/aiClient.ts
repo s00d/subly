@@ -1,4 +1,4 @@
-import { Channel, invoke } from "@tauri-apps/api/core";
+import { Channel } from "@tauri-apps/api/core";
 import { callCommand } from "@/services/commandClient";
 
 /**
@@ -259,8 +259,8 @@ export interface AiSmartInputArgs {
  * file bytes (one of the two), routes to the right backend pipeline based
  * on `surface` + MIME, and returns the surface-tagged result envelope.
  *
- * Uses `invoke` directly (bypassing `callCommand`) because the Tauri
- * signature wires a `tauri::ipc::Channel` for streamed progress.
+ * Progress uses `tauri::ipc::Channel`; payload is passed through `callCommand`
+ * like other IPC so errors normalize to `CommandError`.
  */
 export async function aiSmartInput(
   args: AiSmartInputArgs,
@@ -276,7 +276,7 @@ export async function aiSmartInput(
       }
     };
   }
-  return invoke("ai_smart_input", {
+  return callCommand<AiSmartResult>("ai_smart_input", {
     surface: args.surface,
     text: args.text ?? "",
     bytes: args.bytes ? Array.from(args.bytes) : [],

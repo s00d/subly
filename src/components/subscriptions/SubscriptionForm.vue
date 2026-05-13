@@ -25,6 +25,7 @@ import {
 import { subscriptionFormFieldsSchema, coerceSubscriptionFormForValidation } from "@/schemas/zod/subscriptionForm";
 import { useZodLiveForm } from "@/composables/useZodLiveForm";
 import type { ZodFieldMeta } from "@/composables/useZodErrors";
+import { readClipboardText } from "@/composables/useClipboard";
 
 /**
  * Subset of `Subscription` fields that can be auto-filled by the AI quick-add
@@ -353,12 +354,12 @@ async function handleSubmit() {
 
 async function pasteOtpauthFromClipboard() {
   try {
-    const text = await navigator.clipboard.readText();
-    if (!text?.trim()) {
+    const text = await readClipboardText();
+    if (!text) {
       toast(t("otpauth_clipboard_empty"), "error");
       return;
     }
-    const imported = await subscriptionTotpImportOtpauth(text.trim());
+    const imported = await subscriptionTotpImportOtpauth(text);
     if (!form.value.credentials) form.value.credentials = emptyCreds();
     form.value.credentials.totpSecret = imported.totpSecret;
     markCredsTouched();

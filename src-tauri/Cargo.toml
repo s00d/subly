@@ -45,10 +45,6 @@ futures = { version = "0.3", default-features = false, features = ["alloc"] }
 time = { version = "0.3", features = ["formatting", "parsing"] }
 rand = "0.10"
 sha2 = "0.10"
-# Cross-platform credential storage. `keyring-core` is the API; per-platform
-# backend crates are added in target-specific blocks below and registered as
-# the default store in `crate::keyring_store::ensure_init`.
-keyring-core = "1"
 totp-rs = "5.7"
 url = "2"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
@@ -73,11 +69,7 @@ regex = "1.11"
 # AI receipt OCR: vision models aren't supported by aisdk 0.5, so we POST
 # directly to the OpenAI-compatible chat-completions endpoint.
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-# macOS non-sandboxed apps: use the legacy login keychain (compatible with
-# every keyring-3 deployment in the wild).
-apple-native-keyring-store = { version = "1", features = ["keychain"] }
+tauri-plugin-keyring-store = "0.1.0"
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 objc2 = { version = "0.6.3", default-features = false, features = ["std"] }
@@ -94,32 +86,10 @@ block2 = { version = "0.6.1", default-features = false, features = ["alloc", "st
 
 [target.'cfg(target_os = "ios")'.dependencies]
 ureq = { version = "3", default-features = true }
-# iOS apps are always sandboxed and code-signed, so they must use the
-# Protected Data store (Apple's Data Protection keychain).
-apple-native-keyring-store = { version = "1", features = ["protected"] }
-
-[target.'cfg(target_os = "windows")'.dependencies]
-# Windows Credential Manager backend.
-windows-native-keyring-store = "1"
-
-[target.'cfg(target_os = "linux")'.dependencies]
-# Linux Secret Service backend (gnome-keyring, KWallet via DBus). `crypto-rust`
-# uses RustCrypto for the DH session encryption so we don't need a system
-# libssl on the build host or in deployed builds.
-dbus-secret-service-keyring-store = { version = "1", default-features = false, features = ["crypto-rust"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
-# Android Keystore-backed credential store. Encrypts secrets with a key from
-# the device's hardware-backed Android Keystore and persists them via
-# SharedPreferences. Tauri Mobile initialises `ndk-context` automatically,
-# so no extra Kotlin glue is required.
-android-native-keyring-store = "1"
-# `aisdk` and `tauri-plugin-http` pull in `reqwest` with the default `native-tls`
-# feature, which expects a system OpenSSL via pkg-config. The Android NDK
-# sysroot doesn't ship one, so we vendor OpenSSL for cross-builds — Cargo
-# unions features across the dependency graph, so flipping `vendored` here
-# is enough to force a self-built libssl on `aarch64-linux-android` and the
-# other Android targets.
+# Some transitive deps still pull `native-tls` / OpenSSL; Android NDK has no system libssl.
+# Cargo unions features across the graph — `vendored` forces a self-built OpenSSL for Android ABIs.
 openssl-sys = { version = "0.9", features = ["vendored"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]

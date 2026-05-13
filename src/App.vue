@@ -20,7 +20,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { useAlerts } from "@/composables/useAlerts";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { invoke } from "@tauri-apps/api/core";
+import { invokeCommand } from "@/services/commandClient";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrent as getCurrentDeepLinks, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { useDashboardStore } from "@/stores/dashboardStore";
@@ -169,7 +169,7 @@ function parseOAuthUrl(url: string): { code: string; provider: "gdrive" | "dropb
 async function finishBoot() {
   isLoading.value = false;
   try {
-    await invoke("app_ready");
+    await invokeCommand("app_ready");
   } catch (e) {
     console.warn("app_ready failed:", e);
   }

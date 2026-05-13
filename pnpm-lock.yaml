@@ -50,6 +50,9 @@ importers:
       tailwindcss:
         specifier: ^4.3.0
         version: 4.3.0
+      tauri-plugin-keyring-store-api:
+        specifier: 0.1.0
+        version: 0.1.0
       vue:
         specifier: ^3.5.34
         version: 3.5.34(typescript@5.9.3)
@@ -798,6 +801,9 @@ packages:
   tapable@2.3.3:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
     engines: {node: '>=6'}
+
+  tauri-plugin-keyring-store-api@0.1.0:
+    resolution: {integrity: sha512-88XAf0VCtMlYr+vqynbfcDP+EV1344GTR6bpM0ZXDLQobJbvHDVDWJcvypPiAXIycJpLMa/UyBoZXx4yDeZ8aQ==}
 
   tinyglobby@0.2.16:
     resolution: {integrity: sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==}
@@ -1575,6 +1581,10 @@ snapshots:
   tailwindcss@4.3.0: {}
 
   tapable@2.3.3: {}
+
+  tauri-plugin-keyring-store-api@0.1.0:
+    dependencies:
+      '@tauri-apps/api': 2.11.0
 
   tinyglobby@0.2.16:
     dependencies:

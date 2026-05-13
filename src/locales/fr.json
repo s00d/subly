@@ -692,5 +692,6 @@
   "ai_smart_drop_here": "Déposez un fichier ou une image ici",
   "ai_smart_drop_active": "Relâchez pour joindre",
   "ai_smart_image_preview_alt": "Aperçu de l'image jointe",
-  "ai_smart_paste_hint": "Astuce : collez une capture (Cmd/Ctrl + V) directement dans le champ texte."
+  "ai_smart_paste_hint": "Astuce : collez une capture (Cmd/Ctrl + V) directement dans le champ texte.",
+  "ai_smart_touch_upload_sub": "Touchez pour choisir une photo ou un fichier — reçus, PDF, tableurs, captures (mêmes formats qu’au bureau)."
 }

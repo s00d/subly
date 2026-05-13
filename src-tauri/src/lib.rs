@@ -119,11 +119,6 @@ use commands::rates::{
     rate_history_prune,
     rate_history_save_snapshot,
 };
-use commands::secure_storage::{
-    secure_storage_delete,
-    secure_storage_get,
-    secure_storage_set,
-};
 use commands::subscription_credentials::{
     subscription_credentials_delete,
     subscription_credentials_get,
@@ -438,6 +433,7 @@ pub fn run() {
     }
 
     let builder = builder
+        .plugin(tauri_plugin_keyring_store::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_log::Builder::new().build())
         .plugin(tauri_plugin_os::init())
@@ -452,9 +448,6 @@ pub fn run() {
             icloud::icloud_container_url,
             icloud::icloud_write_file,
             icloud::icloud_read_file,
-            secure_storage_set,
-            secure_storage_get,
-            secure_storage_delete,
             subscription_credentials_get,
             subscription_credentials_set,
             subscription_credentials_delete,

@@ -692,5 +692,6 @@
   "ai_smart_drop_here": "Datei oder Bild hier ablegen",
   "ai_smart_drop_active": "Loslassen zum Anhängen",
   "ai_smart_image_preview_alt": "Vorschau des angehängten Bildes",
-  "ai_smart_paste_hint": "Tipp: Screenshot mit Cmd/Strg + V direkt einfügen."
+  "ai_smart_paste_hint": "Tipp: Screenshot mit Cmd/Strg + V direkt einfügen.",
+  "ai_smart_touch_upload_sub": "Tippen, um Foto oder Datei zu wählen — Belege, PDFs, Tabellen, Screenshots (gleiche Formate wie am PC)."
 }

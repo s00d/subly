@@ -18,6 +18,7 @@ import {
 } from "@lucide/vue";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { UnlistenFn } from "@tauri-apps/api/event";
+import { platform } from "@tauri-apps/plugin-os";
 
 import Modal from "@/components/ui/Modal.vue";
 import AiImportPreviewList from "@/components/ai/AiImportPreviewList.vue";
@@ -90,6 +91,23 @@ const cancelRequested = ref(false);
 
 let unlistenDragDrop: UnlistenFn | null = null;
 
+/**
+ * Finder/Explorer → WebView drag-drop is only meaningful on desktop OS builds.
+ * iOS/Android builds use the photo/file picker instead — same rule as
+ * `desktopAutostartAvailable()` in `BudgetNotificationsSection.vue`.
+ */
+function filesystemDragDropSupported(): boolean {
+  try {
+    const p = platform();
+    return p !== "ios" && p !== "android";
+  } catch {
+    return false;
+  }
+}
+
+/** Fixed for this WebView for the lifetime of the component (OS does not change). */
+const dragDropFromFilesystem = filesystemDragDropSupported();
+
 function revokePreview() {
   if (previewUrl.value) {
     URL.revokeObjectURL(previewUrl.value);
@@ -159,6 +177,7 @@ onBeforeUnmount(() => {
 });
 
 async function registerDragDropListener() {
+  if (!dragDropFromFilesystem) return;
   if (unlistenDragDrop) return;
   try {
     unlistenDragDrop = await getCurrentWebview().onDragDropEvent(
@@ -226,6 +245,13 @@ const placeholderText = computed(() =>
     ? t("ai_smart_expense_text_placeholder")
     : t("ai_smart_subscription_text_placeholder"),
 );
+
+const fileAttachHeadline = computed(() => {
+  if (!dragDropFromFilesystem) return t("ai_smart_pick_file");
+  return isDragOver.value
+    ? t("ai_smart_drop_active")
+    : t("ai_smart_drop_here");
+});
 
 const canSubmit = computed(
   () =>
@@ -609,10 +635,8 @@ function onTextareaKeydown(ev: KeyboardEvent) {
             @keydown="onTextareaKeydown"
             @paste="onTextareaPaste"
           />
-          <p
-            class="hidden sm:flex items-center gap-1 text-[10px] text-text-muted"
-          >
-            <ClipboardPaste :size="10" />
+          <p class="flex items-center gap-1 text-[10px] text-text-muted">
+            <ClipboardPaste :size="10" class="shrink-0" />
             {{ t("ai_smart_paste_hint") }}
           </p>
         </div>
@@ -632,25 +656,34 @@ function onTextareaKeydown(ev: KeyboardEvent) {
             {{ t("ai_smart_file_label") }}
           </label>
 
-          <!-- Empty dropzone -->
+          <!-- Desktop: dashed drop target. Touch: tap-to-choose (no drag copy). -->
           <button
             v-if="!attached"
             type="button"
             :disabled="isParsing"
-            class="w-full flex flex-col items-center justify-center gap-2 px-4 py-6 sm:py-8 rounded-xl border-2 border-dashed transition-colors text-center disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40"
+            class="w-full flex flex-col items-center justify-center gap-2 px-4 rounded-xl transition-colors text-center disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40"
             :class="
-              isDragOver
-                ? 'border-primary bg-primary-light/50 text-primary'
-                : 'border-border bg-surface-secondary/40 hover:border-primary hover:bg-primary-light/30 text-text-secondary hover:text-primary'
+              dragDropFromFilesystem
+                ? isDragOver
+                  ? 'py-6 sm:py-8 border-2 border-dashed border-primary bg-primary-light/50 text-primary'
+                  : 'py-6 sm:py-8 border-2 border-dashed border-border bg-surface-secondary/40 hover:border-primary hover:bg-primary-light/30 text-text-secondary hover:text-primary'
+                : 'py-5 sm:py-6 border border-border bg-surface-secondary/70 hover:bg-primary-light/25 hover:border-primary/60 text-text-primary active:scale-[0.99]'
             "
             @click="triggerPicker"
           >
-            <UploadCloud :size="28" class="opacity-80" />
+            <UploadCloud
+              :size="dragDropFromFilesystem ? 28 : 24"
+              class="opacity-80"
+            />
             <span class="text-sm font-medium">
-              {{ isDragOver ? t("ai_smart_drop_active") : t("ai_smart_drop_here") }}
+              {{ fileAttachHeadline }}
             </span>
-            <span class="text-[11px] text-text-muted max-w-md">
-              {{ t("ai_smart_supported_formats") }}
+            <span class="text-[11px] text-text-muted max-w-md leading-snug">
+              {{
+                dragDropFromFilesystem
+                  ? t("ai_smart_supported_formats")
+                  : t("ai_smart_touch_upload_sub")
+              }}
             </span>
           </button>
 
@@ -756,9 +789,9 @@ function onTextareaKeydown(ev: KeyboardEvent) {
           </div>
         </div>
 
-        <!-- Drag overlay (covers the whole input stage when dragging) -->
+        <!-- Drag overlay (desktop only — phones use tap-to-upload) -->
         <div
-          v-if="isDragOver && !isParsing"
+          v-if="dragDropFromFilesystem && isDragOver && !isParsing"
           class="pointer-events-none absolute inset-0 -m-2 rounded-2xl border-2 border-dashed border-primary bg-primary-light/70 backdrop-blur-sm flex items-center justify-center"
         >
           <div class="flex flex-col items-center gap-2 text-primary">

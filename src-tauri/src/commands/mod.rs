@@ -9,7 +9,6 @@ pub mod logo;
 pub mod notifications;
 pub mod rates;
 pub mod seed;
-pub mod secure_storage;
 pub mod subscription_credentials;
 pub mod subscriptions;
 pub mod sync;

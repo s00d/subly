@@ -101,23 +101,14 @@ const {
   activeProvider: aiActiveProvider,
   loaded: aiLoaded,
 } = storeToRefs(aiConfigStore);
-/**
- * Header AI button state. One button covers all expense-side AI features
- * (text, receipt, statement) — the dialog routes by file MIME at submit
- * time. We surface the button when at least one of the three features is
- * toggled on in config.
- */
-const aiHeaderState = computed<"ready" | "setup" | "hidden">(() => {
-  if (!aiLoaded.value) return "hidden";
-  const wantsAnyFeature =
-    aiFeatures.value.expenseInput ||
-    aiFeatures.value.receiptImport ||
-    aiFeatures.value.statementImport;
-  if (!wantsAnyFeature) return "hidden";
-  const requiresKey = !!aiActiveProvider.value?.requiresKey;
-  const keyOk = !requiresKey || aiHasApiKey.value;
-  if (aiEnabled.value && keyOk) return "ready";
-  return "setup";
+/** Sparkles when config is loaded and any expense AI feature is on. Keyring read only on click. */
+const showAiHeaderButton = computed(() => {
+  if (!aiLoaded.value) return false;
+  return (
+    !!aiFeatures.value.expenseInput ||
+    !!aiFeatures.value.receiptImport ||
+    !!aiFeatures.value.statementImport
+  );
 });
 
 const aiRouter = useRouter();
@@ -127,6 +118,23 @@ function openAiSettings() {
 
 function openAiSmart() {
   showAiSmart.value = true;
+}
+
+async function onAiAssistantClick() {
+  if (!aiEnabled.value) {
+    openAiSettings();
+    return;
+  }
+  const requiresKey = !!aiActiveProvider.value?.requiresKey;
+  if (requiresKey) {
+    await aiConfigStore.refreshHasApiKey();
+  }
+  const keyOk = !requiresKey || aiHasApiKey.value;
+  if (keyOk) {
+    openAiSmart();
+  } else {
+    openAiSettings();
+  }
 }
 
 function onAiImported() {
@@ -147,10 +155,16 @@ function updateHeaderActions() {
     { id: "cycle-expense-view", icon: viewIcon, title: `${currentViewTitle} → ${nextViewTitle}`, onClick: () => setViewMode(nextViewMode), style: "accent" },
     { id: "expense-selection-mode", icon: CheckSquare, title: selectionMode.value ? `${t("select")} ✓` : `${t("select")} ✕`, onClick: toggleSelectionMode, style: selectionMode.value ? "success" : "neutral" },
   ];
-  if (aiHeaderState.value === "ready") {
-    actions.push({ id: "ai-smart-expense", icon: Sparkles, title: t("ai_smart_open"), onClick: openAiSmart, style: "accent" });
-  } else if (aiHeaderState.value === "setup") {
-    actions.push({ id: "ai-setup-expense", icon: Sparkles, title: t("ai_setup_assistant"), onClick: openAiSettings, style: "neutral" });
+  if (showAiHeaderButton.value) {
+    actions.push({
+      id: "ai-smart-expense",
+      icon: Sparkles,
+      title: t("ai_smart_open"),
+      onClick: () => {
+        void onAiAssistantClick();
+      },
+      style: "accent",
+    });
   }
   actions.push({ id: "add-expense", icon: Plus, title: t("add_expense"), onClick: openAdd, style: "primary" });
   setActions(actions);
@@ -161,7 +175,7 @@ onMounted(() => {
   loadInitial().then(() => applyFilters());
   aiConfigStore.load().then(() => updateHeaderActions());
 });
-watch(aiHeaderState, () => updateHeaderActions());
+watch(showAiHeaderButton, () => updateHeaderActions());
 onUnmounted(() => clearActions());
 
 // ---- View mode ----

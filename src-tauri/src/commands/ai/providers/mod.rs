@@ -97,7 +97,7 @@ pub mod storage_keys {
     #[allow(dead_code)] // Consumed by Phases 2–5 (master enable flag).
     pub const CONFIG_ENABLED: &str = "config:aiEnabled";
 
-    /// `secure_storage_set` already prepends `secure_storage.`, so the raw key
+    /// Frontend uses `secure_storage.` prefix (same as [`crate::keyring_store`] accounts); raw key
     /// stored on the frontend is `aiApiKey.<provider>`.
     pub const SECURE_API_KEY_PREFIX: &str = "aiApiKey.";
 

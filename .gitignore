@@ -27,6 +27,8 @@ restore.sql
 src-tauri/profiles/
 APPSTORE_PUBLISH_RU.md
 PLAY_STORE_SETUP.md
+store-listings.txt
+store-listings.html
 
 # Android signing secrets — keep these on dev machines / CI secrets only.
 keystore.properties
