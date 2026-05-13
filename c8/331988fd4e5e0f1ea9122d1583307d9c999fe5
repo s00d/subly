@@ -1,0 +1,120 @@
+src/components/ai/AiSmartDialog.vue
+  s_760a8176b5063e::t_19957f35b6a62c 21
+  s_760a8176b5063e::t_6df1a036ecbb47 249,251-255
+  s_760a8176b5063e::t_2937b2507ff1f3 675
+  s_760a8176b5063e::t_1147d60cfb2c43 794
+  s_760a8176b5063e::t_7af792a795a37a 94-99,101-102,108-109
+  s_760a8176b5063e::t_0e2661dba9f5ac 100,103-107,110
+  s_760a8176b5063e::t_dd5a3d00525bfc 683
+  s_760a8176b5063e::t_676e4b19a0f256 792
+  s_760a8176b5063e::t_b894b69a1d5826 638-639
+  s_760a8176b5063e::t_158d32a2982a63 180
+  s_760a8176b5063e::t_d3a1c069d9c05c 659,664,667-670,674,676-677,679,681-682,684-686
+  s_760a8176b5063e::t_df88c3308b9016 250
+  s_760a8176b5063e::t_78c839ac26ab5b 666
+src-tauri/src/keyring_store.rs
+  s_760a8176b5063e::t_a74f4d8f137240 1-3,7,11,14,16-17,20-21,25,28,30,34,38
+src/locales/es.json
+  s_760a8176b5063e::t_70d57189f37b1d 695-696
+src/pages/ExpensesPage.vue
+  s_760a8176b5063e::t_e8a5d0d212bbbc 158-167
+  s_760a8176b5063e::t_347d44ee6d5c89 178
+  s_760a8176b5063e::t_b2d5f3ee366913 104-111,123-137
+src-tauri/src/commands/ai/providers/mod.rs
+  s_760a8176b5063e::t_19444fac028939 100
+src/locales/tr.json
+  s_760a8176b5063e::t_70d57189f37b1d 695-696
+src/stores/aiConfigStore.ts
+  s_760a8176b5063e::t_7bd34a456d8afe 133-134
+  s_760a8176b5063e::t_8c7bff59e26168 23-24
+src/composables/useClipboard.ts
+  s_760a8176b5063e::t_476fbd5f9a2ae3 1-30
+src/locales/en.json
+  s_760a8176b5063e::t_70d57189f37b1d 749-750
+src/types/dashboardIpc.ts
+  s_760a8176b5063e::t_86ddd6bed2aa3e 1-108
+src-tauri/src/lib.rs
+  s_760a8176b5063e::t_e8ba7e6a497f55 436
+src/locales/pt.json
+  s_760a8176b5063e::t_70d57189f37b1d 695-696
+src/locales/zh.json
+  s_760a8176b5063e::t_70d57189f37b1d 695-696
+src/locales/ko.json
+  s_760a8176b5063e::t_70d57189f37b1d 695-696
+src-tauri/Cargo.toml
+  s_760a8176b5063e::t_80afcdd3c3de14 72
+  s_760a8176b5063e::t_ef64f063ff3862 91-92
+.gitignore
+  h_ee6cac30a1b83a 30-31
+src/components/subscriptions/SubscriptionForm.vue
+  s_760a8176b5063e::t_432d718dbab09b 28
+  s_760a8176b5063e::t_9969d48f514280 357-358,362
+src/services/aiClient.ts
+  s_760a8176b5063e::t_c9af6c9d5c28b3 262-263,279
+  s_760a8176b5063e::t_ef8c1bd90cad23 1
+src-tauri/tauri.conf.json
+  s_760a8176b5063e::t_26187a24d10d22 60,63
+src/pages/SubscriptionsPage.vue
+  s_760a8176b5063e::t_4e377b6fd86649 145-154
+  s_760a8176b5063e::t_4cb87b516032ab 170
+  s_760a8176b5063e::t_f9de215ea7e7c1 96-99,110-124
+src-tauri/gen/apple/subly_iOS/Info.plist
+  s_760a8176b5063e::t_8af71ad1fe0d1c 18,20
+src/locales/ar.json
+  s_760a8176b5063e::t_70d57189f37b1d 695-696
+src/services/commandClient.ts
+  s_760a8176b5063e::t_55dba0bfdcc2af 2-3,11-32,37-39,41-42
+src/locales/hi.json
+  s_760a8176b5063e::t_70d57189f37b1d 695-696
+src/services/secureStorageClient.ts
+  s_760a8176b5063e::t_6d66291a8932ce 1-12,15,19-21,25
+src/App.vue
+  s_760a8176b5063e::t_611541893a21b0 172
+  s_760a8176b5063e::t_5bff6764aedad9 23
+src-tauri/capabilities/default.json
+  s_760a8176b5063e::t_bd6baaf28a83a0 20
+src-tauri/capabilities/desktop.json
+  s_760a8176b5063e::t_67bb04332eaa96 13
+src/locales/fr.json
+  s_760a8176b5063e::t_70d57189f37b1d 695-696
+src/locales/ja.json
+  s_760a8176b5063e::t_70d57189f37b1d 695-696
+src/services/dashboardClient.ts
+  s_760a8176b5063e::t_8fc986cde872a1 1-14,16-17,20-21,24-25,28-29,32-36
+package.json
+  s_760a8176b5063e::t_ad582b60948020 4
+  s_760a8176b5063e::t_9a6bcad15b22c9 32
+src/locales/de.json
+  s_760a8176b5063e::t_70d57189f37b1d 695-696
+src-tauri/ios-apple/SublyWidget/Info.plist
+  s_760a8176b5063e::t_00bafae28fdb30 22
+src-tauri/gen/apple/project.yml
+  s_760a8176b5063e::t_faf52b1caa7c89 61-62
+  s_760a8176b5063e::t_3df3b3ff70a3d4 127-128
+src-tauri/gen/apple/subly.xcodeproj/project.pbxproj
+  s_760a8176b5063e::t_721fe02521e5ee 565,776
+  s_760a8176b5063e::t_a72381994c0dcf 575,786
+src/locales/ru.json
+  s_760a8176b5063e::t_70d57189f37b1d 749-750
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "c8331988fd4e5e0f1ea9122d1583307d9c999fe5",
+  "prompts": {},
+  "humans": {
+    "h_ee6cac30a1b83a": {
+      "author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
