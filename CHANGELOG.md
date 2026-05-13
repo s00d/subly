@@ -5,6 +5,28 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.4] - 2026-05-13
+
+### Added
+
+- Shared **`dashboardIpc` TypeScript types** for dashboard command payloads so `commandClient` stays free of circular imports with `dashboardClient`.
+- **`readClipboardText()`** in `useClipboard`, backed by `@tauri-apps/plugin-clipboard-manager` with a **`navigator.clipboard.readText()`** fallback for paste flows (including the AI assist dialog).
+
+### Changed
+
+- **Dashboard client** refactored to use the shared IPC types and leaner invoke helpers.
+- **`commandClient` / `invokeCommand`** extended for dashboard payloads and **`app_ready`** lifecycle wiring in **`App.vue`**.
+- **Frontend secrets** now use **`tauri-plugin-keyring-store-api` only**; legacy **`secure_storage_*`** Tauri commands were removed from Rust while keeping the same logical key prefix, so existing keychain entries remain valid.
+- **`keyring_store`** Rust module simplified in line with dropping the redundant command layer.
+- **AI Smart dialog**, **subscriptions / expenses** pages, **`aiClient`**, **`aiConfigStore`**, and **`SubscriptionForm`** updated for the new IPC and clipboard behavior.
+- **Tauri capabilities** updated where clipboard read is required; **iOS and widget `Info.plist`** metadata aligned with the current app build.
+- **Locale files** refreshed for new or adjusted copy across all supported languages.
+- **`pnpm-lock.yaml`** and **`Cargo.lock`** updated with dependency refreshes tied to the release.
+
+### Removed
+
+- **`src-tauri/src/commands/secure_storage.rs`** — redundant now that the UI talks to the keyring plugin directly.
+
 ## [1.0.3] - 2026-05-12
 
 ### Added
@@ -195,6 +217,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.1] - 2026-02-11
 ## [0.1.0] - 2026-02-11
 
+[1.0.4]: https://github.com/s00d/subly/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/s00d/subly/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/s00d/subly/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/s00d/subly/compare/v1.0.0...v1.0.1
