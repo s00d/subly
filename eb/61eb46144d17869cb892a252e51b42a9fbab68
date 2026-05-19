@@ -1,0 +1,35 @@
+landing/src/content/site.en.ts
+  s_760a8176b5063e::t_8f654471bbdac7 248,251
+  s_760a8176b5063e::t_a877490c487e96 35
+  s_760a8176b5063e::t_b96f53decc1108 4
+  s_760a8176b5063e::t_b506a6fa5725fb 367-373
+  s_760a8176b5063e::t_9272aca1baabbc 57
+  s_760a8176b5063e::t_b7271a005d01fc 60-89,93-102
+landing/src/views/HomeView.vue
+  s_760a8176b5063e::t_f949a02c51d68b 24
+  s_760a8176b5063e::t_2a46d0cc615b81 14
+landing/src/mdi-icons.ts
+  s_760a8176b5063e::t_4820e65e69ffdc 41
+landing/src/components/sections/WhySection.vue
+  s_760a8176b5063e::t_17384dc1184ce0 8-12
+landing/src/components/sections/OpenValuesSection.vue
+  s_760a8176b5063e::t_80b2943907200b 1-21,32-56
+  s_760a8176b5063e::t_31ed792b018bd2 23-30
+  s_760a8176b5063e::t_ec5b96e98bbaed 22,31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "eb61eb46144d17869cb892a252e51b42a9fbab68",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
