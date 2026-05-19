@@ -1,0 +1,40 @@
+landing/src/content/site.en.ts
+  s_760a8176b5063e::t_ec375a24d755e4 538-539
+  s_760a8176b5063e::t_020adce700dc60 41-42,45,50-52,58
+landing/src/composables/useSiteContent.ts
+  s_760a8176b5063e::t_f2653fbff24a85 32-35,43
+landing/src/composables/useActiveSection.ts
+  s_760a8176b5063e::t_22f3627b35655e 1-5,9-54
+landing/src/content/types.ts
+  s_760a8176b5063e::t_a9f9d06b567236 37-38,40-41
+landing/src/content/site.ru.ts
+  s_760a8176b5063e::t_8c698ca20649e1 537-538
+  s_760a8176b5063e::t_7d632fce12602f 41-42,45,50-52,58
+landing/src/mdi-icons.ts
+  s_760a8176b5063e::t_4973f6b93f4228 50
+landing/src/content/index.ts
+  s_760a8176b5063e::t_c04affb747a846 17-18
+landing/src/components/layout/SiteHeader.vue
+  s_760a8176b5063e::t_e36dd81a44bc57 2,23-24,27-40,45,47-51,58,63,65,68,70-71,73-97,100-106,108-110,113,145
+  s_760a8176b5063e::t_cba3b80f820d87 43
+  s_760a8176b5063e::t_bcd6b1ba5389c2 64,67,72
+  s_760a8176b5063e::t_81d830dff65a13 98-99,107
+  s_760a8176b5063e::t_20e3186081945e 140,143,150
+  s_760a8176b5063e::t_5ec0a656bfb821 12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "ddae259161f2e94a7ac018def219c55465ddc709",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
