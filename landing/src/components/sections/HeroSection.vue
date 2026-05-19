@@ -4,10 +4,11 @@ import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
 import ScreenshotFrame from "@/components/ui/ScreenshotFrame.vue";
 import UiIcon from "@/components/ui/UiIcon.vue";
 import { preferredDownloadUrl } from "@/composables/useReleaseDownloads";
-import { hero, siteMeta } from "@/content/site.en";
+import { useSiteContent } from "@/composables/useSiteContent";
 import { assetUrl, screenshotUrl } from "@/lib/assets";
 
-const downloadUrl = ref(siteMeta.releasesUrl);
+const { content } = useSiteContent();
+const downloadUrl = ref(content.value.siteMeta.releasesUrl);
 
 onMounted(() => {
   downloadUrl.value = preferredDownloadUrl();
@@ -26,10 +27,10 @@ onMounted(() => {
           class="mb-6 rounded-2xl"
         />
         <h1 class="text-4xl font-bold tracking-tight text-text md:text-5xl lg:text-[3.25rem] lg:leading-tight">
-          {{ hero.headline }}
+          {{ content.hero.headline }}
         </h1>
         <p class="mt-5 max-w-xl text-lg text-muted">
-          {{ hero.subline }}
+          {{ content.hero.subline }}
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
           <a
@@ -38,24 +39,24 @@ onMounted(() => {
             target="_blank"
             rel="noopener noreferrer"
           >
-            {{ hero.ctaPrimary }}
+            {{ content.hero.ctaPrimary }}
             <UiIcon name="arrow-right" size="sm" />
           </a>
           <a
-            :href="siteMeta.repoUrl"
+            :href="content.siteMeta.repoUrl"
             class="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-5 py-3 text-sm font-semibold text-text no-underline transition-colors hover:border-accent/60"
             target="_blank"
             rel="noopener noreferrer"
           >
             <UiIcon name="open-in-new" size="sm" />
-            {{ hero.ctaSecondary }}
+            {{ content.hero.ctaSecondary }}
           </a>
           <a
             href="#video"
             class="inline-flex items-center gap-2 rounded-xl border border-border bg-bg px-5 py-3 text-sm font-semibold text-muted no-underline transition-colors hover:border-accent/60 hover:text-text"
           >
             <UiIcon name="play-circle-outline" size="sm" />
-            Watch demo
+            {{ content.hero.watchDemo }}
           </a>
         </div>
       </RevealOnScroll>

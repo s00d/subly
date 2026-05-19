@@ -3,15 +3,18 @@ import { computed, ref, watch } from "vue";
 import SectionShell from "@/components/layout/SectionShell.vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
 import UiIcon from "@/components/ui/UiIcon.vue";
-import { videoSection } from "@/content/site.en";
+import { useSiteContent } from "@/composables/useSiteContent";
 import { screenshotUrl } from "@/lib/assets";
 import type { MdiIconName } from "@/mdi-icons";
 
-const activeId = ref(videoSection.demos[0]?.id ?? "desktop");
+const { content } = useSiteContent();
+const activeId = ref(content.value.videoSection.demos[0]?.id ?? "desktop");
 const videoKey = ref(0);
 
 const activeDemo = computed(
-  () => videoSection.demos.find((d) => d.id === activeId.value) ?? videoSection.demos[0],
+  () =>
+    content.value.videoSection.demos.find((d) => d.id === activeId.value) ??
+    content.value.videoSection.demos[0],
 );
 
 watch(activeId, () => {
@@ -22,15 +25,15 @@ watch(activeId, () => {
 <template>
   <SectionShell
     id="video"
-    :eyebrow="videoSection.eyebrow"
+    :eyebrow="content.videoSection.eyebrow"
     eyebrow-icon="play-circle-outline"
-    :title="videoSection.title"
-    :subtitle="videoSection.subtitle"
+    :title="content.videoSection.title"
+    :subtitle="content.videoSection.subtitle"
     muted
   >
     <div class="mb-8 flex flex-wrap justify-center gap-2">
       <button
-        v-for="tab in videoSection.demos"
+        v-for="tab in content.videoSection.demos"
         :key="tab.id"
         type="button"
         class="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors"
@@ -77,7 +80,7 @@ watch(activeId, () => {
           rel="noopener noreferrer"
         >
           <UiIcon name="open-in-new" size="sm" />
-          {{ videoSection.fallbackLabel }}
+          {{ content.videoSection.fallbackLabel }}
         </a>
       </p>
     </RevealOnScroll>

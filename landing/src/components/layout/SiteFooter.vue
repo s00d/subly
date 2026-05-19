@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { RouterLink } from "vue-router";
-import { footer } from "@/content/site.en";
+import { useSiteContent } from "@/composables/useSiteContent";
 import { assetUrl } from "@/lib/assets";
 import UiIcon from "@/components/ui/UiIcon.vue";
+import type { MdiIconName } from "@/mdi-icons";
+
+const { content } = useSiteContent();
 </script>
 
 <template>
@@ -11,18 +14,18 @@ import UiIcon from "@/components/ui/UiIcon.vue";
       <div class="flex items-center gap-3">
         <img :src="assetUrl('brand-logo.svg')" alt="" width="40" height="40" class="rounded-lg" />
         <div>
-          <p class="font-medium text-text">{{ footer.tagline }}</p>
-          <p class="text-sm text-muted">{{ footer.license }}</p>
+          <p class="font-medium text-text">{{ content.footer.tagline }}</p>
+          <p class="text-sm text-muted">{{ content.footer.license }}</p>
         </div>
       </div>
       <nav class="flex flex-wrap gap-x-6 gap-y-2" aria-label="Footer">
-        <template v-for="link in footer.links" :key="link.label">
+        <template v-for="link in content.footer.links" :key="link.label">
           <RouterLink
             v-if="!link.external && 'to' in link"
             :to="link.to"
             class="inline-flex items-center gap-1.5 text-sm text-muted no-underline transition-colors hover:text-accent"
           >
-            <UiIcon :name="link.icon" size="sm" />
+            <UiIcon :name="link.icon as MdiIconName" size="sm" />
             {{ link.label }}
           </RouterLink>
           <a
@@ -32,18 +35,18 @@ import UiIcon from "@/components/ui/UiIcon.vue";
             target="_blank"
             rel="noopener noreferrer"
           >
-            <UiIcon :name="link.icon" size="sm" />
+            <UiIcon :name="link.icon as MdiIconName" size="sm" />
             {{ link.label }}
           </a>
         </template>
         <a
-          href="https://www.donationalerts.com/r/s00d88"
+          :href="content.siteMeta.donateUrl"
           class="inline-flex items-center gap-1.5 text-sm text-muted no-underline transition-colors hover:text-accent"
           target="_blank"
           rel="noopener noreferrer"
         >
           <UiIcon name="heart-outline" size="sm" />
-          Donate
+          {{ content.footer.donateLabel }}
         </a>
       </nav>
     </div>

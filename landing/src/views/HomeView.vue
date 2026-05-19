@@ -7,13 +7,15 @@ import DownloadSection from "@/components/sections/DownloadSection.vue";
 import DeviceGallerySection from "@/components/sections/DeviceGallerySection.vue";
 import FaqSection from "@/components/sections/FaqSection.vue";
 import HeroSection from "@/components/sections/HeroSection.vue";
+import OpenValuesSection from "@/components/sections/OpenValuesSection.vue";
 import PlatformsStrip from "@/components/sections/PlatformsStrip.vue";
 import PrivacySection from "@/components/sections/PrivacySection.vue";
 import SyncSection from "@/components/sections/SyncSection.vue";
 import VideoSection from "@/components/sections/VideoSection.vue";
-import OpenValuesSection from "@/components/sections/OpenValuesSection.vue";
 import WhySection from "@/components/sections/WhySection.vue";
-import { featureSections } from "@/content/site.en";
+import { useSiteContent } from "@/composables/useSiteContent";
+
+const { content } = useSiteContent();
 </script>
 
 <template>
@@ -23,7 +25,7 @@ import { featureSections } from "@/content/site.en";
   <WhySection />
   <OpenValuesSection />
   <FeatureShowcase
-    v-for="(section, index) in featureSections"
+    v-for="(section, index) in content.featureSections"
     :key="section.id"
     :id="section.id"
     :eyebrow="section.eyebrow"

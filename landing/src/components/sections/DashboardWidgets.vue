@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
-import { dashboardWidgets } from "@/content/site.en";
+import { useSiteContent } from "@/composables/useSiteContent";
+
+const { content } = useSiteContent();
 </script>
 
 <template>
-  <RevealOnScroll tag="div" class="mt-6 flex flex-wrap gap-2">
-    <span
-      v-for="(label, i) in dashboardWidgets"
-      :key="label"
-      class="rounded-full border border-border bg-bg px-3 py-1 text-xs text-muted"
-      :style="{ transitionDelay: `${i * 40}ms` }"
+  <ul class="mt-6 flex flex-wrap gap-2">
+    <li
+      v-for="(label, i) in content.dashboardWidgets"
+      :key="i"
+      class="rounded-lg border border-border bg-bg px-3 py-1.5 text-xs text-muted"
     >
       {{ label }}
-    </span>
-  </RevealOnScroll>
+    </li>
+  </ul>
 </template>

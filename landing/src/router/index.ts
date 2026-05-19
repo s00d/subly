@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from "vue-router";
+import { pageTitles } from "@/content/site.en";
 import HomeView from "@/views/HomeView.vue";
 import PrivacyView from "@/views/PrivacyView.vue";
 import ChangelogView from "@/views/ChangelogView.vue";
@@ -6,18 +7,19 @@ import ChangelogView from "@/views/ChangelogView.vue";
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
-    { path: "/", name: "home", component: HomeView },
+    { path: "/", name: "home-en", component: HomeView, meta: { locale: "en", isHome: true } },
+    { path: "/ru", name: "home-ru", component: HomeView, meta: { locale: "ru", isHome: true } },
     {
       path: "/privacy",
       name: "privacy",
       component: PrivacyView,
-      meta: { title: "Privacy Policy — Subly" },
+      meta: { title: pageTitles.privacy },
     },
     {
       path: "/changelog",
       name: "changelog",
       component: ChangelogView,
-      meta: { title: "Changelog — Subly" },
+      meta: { title: pageTitles.changelog },
     },
   ],
   scrollBehavior(to) {

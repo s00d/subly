@@ -4,15 +4,21 @@ import { useRoute } from "vue-router";
 import SiteFooter from "@/components/layout/SiteFooter.vue";
 import SiteHeader from "@/components/layout/SiteHeader.vue";
 import JsonLd from "@/components/seo/JsonLd.vue";
-import { siteMeta } from "@/content/site.en";
+import { useSiteContent } from "@/composables/useSiteContent";
 import { RouterView } from "vue-router";
 
 const route = useRoute();
+const { content, locale } = useSiteContent();
 
 watch(
-  () => route.meta.title,
-  (title) => {
-    document.title = typeof title === "string" ? title : siteMeta.title;
+  [() => route.meta.title, content, locale],
+  () => {
+    const title =
+      typeof route.meta.title === "string"
+        ? route.meta.title
+        : content.value.siteMeta.title;
+    document.title = title;
+    document.documentElement.lang = locale.value === "ru" ? "ru" : "en";
   },
   { immediate: true },
 );

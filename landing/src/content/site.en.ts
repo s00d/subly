@@ -1,14 +1,6 @@
-export const siteMeta = {
-  title: "Subly — Subscription & Expense Tracker",
-  description:
-    "Open-source subscription and expense tracker. Local-first, no analytics or tracking, optional cloud sync.",
-  siteUrl: "https://s00d.github.io/subly/",
-  canonicalUrl: "https://s00d.github.io/subly/",
-  ogImage: "https://s00d.github.io/subly/screenshots/01_dashboard_overview.png",
-  locale: "en_US",
-  softwareVersion: "1.0.4",
-  applicationCategory: "FinanceApplication",
-  operatingSystems: ["macOS", "Windows", "Linux", "iOS", "Android"],
+import type { SiteContent } from "./types";
+
+const sharedUrls = {
   repoUrl: "https://github.com/s00d/subly",
   releasesUrl: "https://github.com/s00d/subly/releases/latest",
   privacyUrl: "https://s00d.github.io/subly/privacy",
@@ -19,6 +11,33 @@ export const siteMeta = {
     "https://github.com/s00d/subly/raw/main/store-assets/video/store-walkthrough-desktop-with-audio.mp4",
   videoMobileUrl:
     "https://github.com/s00d/subly/raw/main/store-assets/video/store-walkthrough-mobile-with-audio.mp4",
+  ogImage: "https://s00d.github.io/subly/screenshots/01_dashboard_overview.png",
+} as const;
+
+export const siteMeta = {
+  title: "Subly — Subscription & Expense Tracker",
+  description:
+    "Open-source subscription and expense tracker. Local-first, no analytics or tracking, optional cloud sync.",
+  siteUrl: "https://s00d.github.io/subly/",
+  canonicalUrl: "https://s00d.github.io/subly/",
+  locale: "en_US",
+  softwareVersion: "1.0.4",
+  applicationCategory: "FinanceApplication",
+  operatingSystems: ["macOS", "Windows", "Linux", "iOS", "Android"],
+  ...sharedUrls,
+} as const;
+
+export const localeSwitcher = {
+  ariaLabel: "Language",
+  options: [
+    { id: "en" as const, label: "English" },
+    { id: "ru" as const, label: "Русский" },
+  ],
+};
+
+export const headerNav = {
+  download: "Download",
+  menuToggle: "Toggle menu",
 } as const;
 
 export const navLinks = [
@@ -26,7 +45,7 @@ export const navLinks = [
   { id: "subscriptions", label: "Subscriptions", icon: "repeat" },
   { id: "dashboard", label: "Dashboard", icon: "view-dashboard-outline" },
   { id: "video", label: "Demo", icon: "play-circle-outline" },
-  { id: "ai", label: "AI assist", icon: "robot-outline" },
+  { id: "ai", label: "AI", icon: "robot-outline" },
   { id: "sync", label: "Sync", icon: "cloud-sync-outline" },
   { id: "faq", label: "FAQ", icon: "help-circle-outline" },
 ] as const;
@@ -37,6 +56,13 @@ export const hero = {
     "A fast subscription and expense tracker that stays on your device, ships as fully open MIT source, and never phones home with analytics or usage metrics.",
   ctaPrimary: "Download latest release",
   ctaSecondary: "View on GitHub",
+  watchDemo: "Watch demo",
+} as const;
+
+export const whySection = {
+  title: "Why people choose Subly",
+  subtitle:
+    "Clarity for recurring bills and everyday spending — open code, no tracking, and tools that respect your data.",
 } as const;
 
 export const videoSection = {
@@ -106,7 +132,7 @@ export const openValuesSection = {
   productHighlights: [
     "Subscriptions, expenses, dashboard, and renewal calendar in one place",
     "34+ currencies, 12 languages, CSV/JSON exports",
-    "Optional AI with your own API key — off until you enable it",
+    "Optional AI assist — four capabilities, seven providers, off until you enable it",
     "Works offline; no Subly account required",
   ],
   ctaLabel: "Explore the source on GitHub",
@@ -232,17 +258,81 @@ export const dashboardWidgets = [
 export const aiSection = {
   eyebrow: "AI assist",
   icon: "robot-outline",
-  title: "Optional help when you want speed",
-  body: "AI is off until you turn it on. Bring your own API key from a provider you trust — nothing is sent until you use the assist dialog.",
-  bullets: [
-    "Add a subscription or expense from a plain sentence",
-    "Drop a receipt photo for line items, totals, and merchant details",
-    "Import bank statements (CSV, XLSX, PDF, JSON) with per-row preview before saving",
-    "Supports OpenAI, OpenRouter, Gemini, Groq, DeepSeek, Mistral, and OpenAI-compatible endpoints (Ollama, LM Studio)",
-    "Reuses your categories, payment methods, and favorite tags to avoid duplicates",
+  title: "Optional AI — four ways to add data faster",
+  capabilitiesTitle: "Capabilities",
+  capabilitiesIntro:
+    "One assist entry point on subscriptions and expenses — enable each feature separately in Settings.",
+  inputMethodsTitle: "How you can send input",
+  lead:
+    "Subly’s AI layer is entirely opt-in: disabled until you flip the master switch in Settings. You choose the provider, store your API key in the OS keychain, and turn on only the capabilities you want. Nothing is sent to a model until you open the assist dialog and submit.",
+  principles: [
+    {
+      icon: "toggle-switch-off-outline",
+      title: "Off by default",
+      body: "No background calls, no silent uploads. Enable AI only when you need it.",
+    },
+    {
+      icon: "key",
+      title: "Bring your own key",
+      body: "Paid cloud APIs or a local Ollama / LM Studio endpoint — credentials never sit in the database.",
+    },
+    {
+      icon: "clipboard-check-outline",
+      title: "Preview before save",
+      body: "Every subscription, expense, or imported row is shown for review. Nothing lands in your ledger without confirmation.",
+    },
   ],
+  features: [
+    {
+      icon: "repeat",
+      title: "Quick-add subscriptions",
+      body: "Describe a service in plain language — price, cycle, category, payment method, and tags are prefilled using your existing catalog.",
+      example: "“Telegram Premium 300 ₽ monthly, card”",
+    },
+    {
+      icon: "cash-multiple",
+      title: "Quick-add expenses",
+      body: "Same dialog for one-off spending: amount, date, merchant, categories, and tags parsed from a short sentence.",
+      example: "“Coffee at Starbucks 5.40 EUR yesterday”",
+    },
+    {
+      icon: "receipt",
+      title: "Receipt & document scan",
+      body: "Point a vision-capable model at a photo or PDF. Line items, totals, currency, merchant, and date come back as a draft expense.",
+      example: "PNG, JPEG, WebP, HEIC, or PDF receipts",
+    },
+    {
+      icon: "file-document-multiple-outline",
+      title: "Bank statement import",
+      body: "Bulk-import CSV, XLSX, PDF, or JSON statements. Heuristic parsing plus AI fallback, with a per-row table before saving.",
+      example: "Card and bank exports in common formats",
+    },
+  ],
+  inputMethods: [
+    { icon: "keyboard-outline", label: "Type a description", detail: "⌘/Ctrl + Enter to send" },
+    { icon: "image-plus-outline", label: "Drop or pick files", detail: "Drag-and-drop on desktop" },
+    { icon: "content-paste", label: "Paste screenshots", detail: "Into the text field" },
+  ],
+  providersTitle: "Supported providers",
+  providers: [
+    "OpenAI",
+    "OpenRouter",
+    "Google Gemini",
+    "Groq",
+    "DeepSeek",
+    "Mistral",
+    "OpenAI-compatible (Ollama, LM Studio, vLLM)",
+  ],
+  settingsBullets: [
+    "Master toggle plus individual switches for each capability",
+    "Recommended model presets and custom model name",
+    "Test connection before you rely on it",
+    "Vision badge when the model supports receipt OCR",
+  ],
+  privacyNote:
+    "Requests go only to the provider you configured. Subly does not operate its own LLM or log your prompts on our servers.",
   screenshot: "06_settings_overview.png",
-  alt: "Subly settings overview",
+  alt: "Subly AI settings panel",
 } as const;
 
 export const syncSection = {
@@ -275,6 +365,7 @@ export const privacySection = {
     "API keys, sync passwords, and Telegram tokens live in the OS keychain — not in plain text in the database",
     "AI and cloud features are opt-in; read our Privacy Policy for full details",
   ],
+  policyLinkLabel: "Privacy Policy",
 } as const;
 
 export const customizeSection = {
@@ -355,6 +446,11 @@ export const appStore = {
   title: "Also on the App Store",
   body: "Subly is available on Mac and iPhone/iPad through the App Store. It is a paid download — your purchase helps support ongoing development. Desktop builds for macOS, Windows, and Linux remain free on GitHub Releases.",
   platforms: ["macOS", "iOS", "iPadOS"],
+  ctaLabel: "View on the App Store",
+} as const;
+
+export const faqSection = {
+  title: "FAQ",
 } as const;
 
 export const faqItems = [
@@ -368,7 +464,7 @@ export const faqItems = [
   },
   {
     q: "Do I need AI?",
-    a: "No. AI assist is optional and disabled until you add a provider and API key in Settings.",
+    a: "No. AI is optional and off by default. When enabled, you can quick-add subscriptions or expenses, scan receipts, or import statements — each capability has its own toggle, and you pick from seven supported providers with your own API key.",
   },
   {
     q: "Is cloud sync safe?",
@@ -408,11 +504,18 @@ export const downloadSection = {
   ctaSecondary: "Star on GitHub",
   ctaDonate: "Support development",
   ctaVideo: "Watch demo",
+  changelogLabel: "Changelog",
+} as const;
+
+export const pageTitles = {
+  privacy: "Privacy Policy — Subly",
+  changelog: "Changelog — Subly",
 } as const;
 
 export const footer = {
   tagline: "Subly — subscription & expense tracker",
   license: "MIT License",
+  donateLabel: "Donate",
   links: [
     { label: "GitHub", href: siteMeta.repoUrl, icon: "github", external: true },
     { label: "Releases", href: siteMeta.releasesUrl, icon: "download", external: true },
@@ -420,3 +523,30 @@ export const footer = {
     { label: "Changelog", to: "/changelog", icon: "history", external: false },
   ],
 } as const;
+
+export const enContent: SiteContent = {
+  siteMeta,
+  localeSwitcher,
+  headerNav,
+  navLinks,
+  hero,
+  videoSection,
+  platforms,
+  openValuesSection,
+  whySection,
+  whyCards,
+  featureSections,
+  dashboardWidgets,
+  aiSection,
+  syncSection,
+  privacySection,
+  customizeSection,
+  deviceGalleryMeta,
+  deviceGalleries,
+  appStore,
+  faqSection,
+  faqItems,
+  downloadSection,
+  footer,
+  pageTitles,
+};

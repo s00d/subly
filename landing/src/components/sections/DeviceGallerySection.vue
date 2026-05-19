@@ -3,27 +3,30 @@ import { computed, ref } from "vue";
 import SectionShell from "@/components/layout/SectionShell.vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
 import UiIcon from "@/components/ui/UiIcon.vue";
-import { deviceGalleries, deviceGalleryMeta } from "@/content/site.en";
+import { useSiteContent } from "@/composables/useSiteContent";
 import { screenshotUrl } from "@/lib/assets";
 import type { MdiIconName } from "@/mdi-icons";
 
-const activeId = ref(deviceGalleries[0]?.id ?? "desktop");
+const { content } = useSiteContent();
+const activeId = ref(content.value.deviceGalleries[0]?.id ?? "desktop");
 
 const activeGallery = computed(
-  () => deviceGalleries.find((g) => g.id === activeId.value) ?? deviceGalleries[0],
+  () =>
+    content.value.deviceGalleries.find((g) => g.id === activeId.value) ??
+    content.value.deviceGalleries[0],
 );
 </script>
 
 <template>
   <SectionShell
     id="screens"
-    :title="deviceGalleryMeta.title"
-    :subtitle="deviceGalleryMeta.subtitle"
+    :title="content.deviceGalleryMeta.title"
+    :subtitle="content.deviceGalleryMeta.subtitle"
     muted
   >
     <div class="mb-8 flex flex-wrap justify-center gap-2">
       <button
-        v-for="tab in deviceGalleries"
+        v-for="tab in content.deviceGalleries"
         :key="tab.id"
         type="button"
         class="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors"

@@ -3,22 +3,24 @@ import { RouterLink } from "vue-router";
 import SectionShell from "@/components/layout/SectionShell.vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
 import UiIcon from "@/components/ui/UiIcon.vue";
-import { privacySection } from "@/content/site.en";
+import { useSiteContent } from "@/composables/useSiteContent";
+
+const { content, docPaths } = useSiteContent();
 </script>
 
 <template>
   <SectionShell
     id="privacy"
-    :eyebrow="privacySection.eyebrow"
-    :eyebrow-icon="privacySection.icon"
-    :title="privacySection.title"
-    :subtitle="privacySection.body"
+    :eyebrow="content.privacySection.eyebrow"
+    :eyebrow-icon="content.privacySection.icon"
+    :title="content.privacySection.title"
+    :subtitle="content.privacySection.body"
     muted
   >
     <RevealOnScroll tag="div" class="grid gap-8 md:grid-cols-[1fr_auto] md:items-start">
       <ul class="space-y-4">
         <li
-          v-for="(item, i) in privacySection.bullets"
+          v-for="(item, i) in content.privacySection.bullets"
           :key="i"
           class="flex gap-3 text-sm text-muted md:text-base"
         >
@@ -31,10 +33,10 @@ import { privacySection } from "@/content/site.en";
         <div>
           <p class="font-medium text-text">Read the full policy</p>
           <RouterLink
-            to="/privacy"
+            :to="docPaths.privacy"
             class="mt-2 inline-flex items-center gap-1 text-sm text-accent no-underline hover:underline"
           >
-            Privacy Policy
+            {{ content.privacySection.policyLinkLabel }}
             <UiIcon name="arrow-right" size="sm" />
           </RouterLink>
         </div>
