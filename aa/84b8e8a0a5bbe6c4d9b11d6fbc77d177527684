@@ -1,0 +1,30 @@
+landing/src/mdi-icons.ts
+  s_760a8176b5063e::t_ec4c308ac8426a 1-41
+landing/src/components/ui/UiIcon.vue
+  s_760a8176b5063e::t_36c6c8d77d5aac 3,7
+landing/package.json
+  s_760a8176b5063e::t_3ccb1ccac56043 8-9
+  s_760a8176b5063e::t_1b703330a2fc0a 11
+landing/tailwind.config.ts
+  s_760a8176b5063e::t_46c5ba605b22ca 4
+landing/scripts/generate-icon-safelist.mjs
+  s_760a8176b5063e::t_8573979c1c0f0c 1-19
+landing/.gitignore
+  s_760a8176b5063e::t_1508093f9a937f 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "aa84b8e8a0a5bbe6c4d9b11d6fbc77d177527684",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
