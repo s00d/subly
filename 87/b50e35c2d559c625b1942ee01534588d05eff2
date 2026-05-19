@@ -1,0 +1,120 @@
+.github/workflows/pages.yml
+  s_760a8176b5063e::t_9da710cbb459ca 1-58
+landing/src/components/layout/SectionShell.vue
+  s_760a8176b5063e::t_5ec397cc77b96a 1-16,19-33,35-36
+  s_760a8176b5063e::t_1faaea7d2cc1c1 34
+  s_760a8176b5063e::t_3891e8544d7bba 17-18
+landing/tsconfig.node.json
+  s_760a8176b5063e::t_e6a6692ab286d2 1-11
+landing/src/components/sections/CustomizeSection.vue
+  s_760a8176b5063e::t_6b8614e27ede9f 1-34,36-37
+  s_760a8176b5063e::t_91c81cab09438c 35
+landing/src/lib/assets.ts
+  s_760a8176b5063e::t_a8d8c26a23a017 1-14
+landing/src/components/layout/SiteHeader.vue
+  s_760a8176b5063e::t_007b669bff20b7 45
+  s_760a8176b5063e::t_ea5587029cd365 62-63
+  s_760a8176b5063e::t_784dadd492b58c 1-44,46-61,64-88
+landing/src/App.vue
+  s_760a8176b5063e::t_998cc62fa90d4d 1-15
+landing/src/main.ts
+  s_760a8176b5063e::t_587e12f41299cb 1-6
+landing/src/components/sections/FeatureShowcase.vue
+  s_760a8176b5063e::t_230c9c2e7c2622 42
+  s_760a8176b5063e::t_4f63ca3887c996 1-41,43-44
+landing/src/styles/main.css
+  s_760a8176b5063e::t_b32170dc842586 1-66
+landing/tsconfig.app.json
+  s_760a8176b5063e::t_4d2fe821fc994d 1-24
+landing/src/components/ui/ScreenshotFrame.vue
+  s_760a8176b5063e::t_453e34a4d7aafe 12
+  s_760a8176b5063e::t_290fa12a219f78 1-11,13-22
+landing/src/components/sections/SyncSection.vue
+  s_760a8176b5063e::t_e76e9944a71152 1-47
+landing/src/components/sections/AiSection.vue
+  s_760a8176b5063e::t_c32de1d3a7ab5e 1-17,20-36,38-39
+  s_760a8176b5063e::t_978e1a00995d23 37
+  s_760a8176b5063e::t_9d3c26d0792f84 19
+  s_760a8176b5063e::t_964bbb3dbb8afc 18
+landing/src/views/HomeView.vue
+  s_760a8176b5063e::t_0f2178f46c4992 1-45
+landing/.gitignore
+  s_760a8176b5063e::t_da71a0f905387b 1-6
+landing/src/components/layout/SiteFooter.vue
+  s_760a8176b5063e::t_8e32ed679cebb1 11,14
+  s_760a8176b5063e::t_c175e08fd85d83 1-10,12-13,15-38
+landing/scripts/copy-assets.mjs
+  s_760a8176b5063e::t_8a6847430cd4c0 1-66
+landing/src/components/sections/HeroSection.vue
+  s_760a8176b5063e::t_6d653f6b90e0af 1,3-39,41-44,46-51,53-54
+  s_760a8176b5063e::t_aa71280c44f2ae 45,52
+  s_760a8176b5063e::t_bf284cd0e32f5a 2
+landing/src/components/sections/FaqSection.vue
+  s_760a8176b5063e::t_bb112f0c7e8536 1-16,18-19
+  s_760a8176b5063e::t_23c4764b565b79 17
+landing/src/router/index.ts
+  s_760a8176b5063e::t_79d68052ff8b52 1-13
+landing/src/components/ui/FaqItem.vue
+  s_760a8176b5063e::t_71b5de890eac10 1-28
+landing/src/components/sections/WhySection.vue
+  s_760a8176b5063e::t_fa707f0f972bf8 17-18
+  s_760a8176b5063e::t_8e226ed369b3e7 1-16,19
+landing/src/composables/useReducedMotion.ts
+  s_760a8176b5063e::t_c68934eedbee75 1-7
+landing/env.d.ts
+  s_760a8176b5063e::t_83aad06b07ec9d 1-7
+landing/src/components/sections/DashboardWidgets.vue
+  s_760a8176b5063e::t_aa8f32e385a056 1-17
+landing/src/components/ui/FeatureCard.vue
+  s_760a8176b5063e::t_19c3db4fb78ea6 1-20
+README.md
+  s_760a8176b5063e::t_5158b3c9cf9de4 20-24
+landing/src/components/sections/PlatformsStrip.vue
+  s_760a8176b5063e::t_6b2d5514106c4e 1-28
+landing/src/content/site.en.ts
+  s_760a8176b5063e::t_d091e2c262f0ff 1-258
+landing/vite.config.ts
+  s_760a8176b5063e::t_e6e93723b712c1 1-17
+landing/tsconfig.json
+  s_760a8176b5063e::t_41bc543580861c 1-7
+landing/src/composables/useActiveSection.ts
+  s_760a8176b5063e::t_79a4ff5e5dd6bf 1-4,6-13,15-26,29-31
+  s_760a8176b5063e::t_2558d9ea56cb35 5,14,27-28
+landing/package.json
+  s_760a8176b5063e::t_cfacce68cd68ec 1-29
+landing/src/components/sections/PrivacySection.vue
+  ai_agent 39-40
+  s_760a8176b5063e::t_f6e970249dc821 1-38,41-43
+landing/src/components/sections/DownloadSection.vue
+  s_760a8176b5063e::t_feaecf54b6c40c 1-51,53-55
+  s_760a8176b5063e::t_665d7f1fb5a508 52
+landing/pnpm-lock.yaml
+  ai_agent 1-1326
+package.json
+  s_760a8176b5063e::t_7f53b9d9543c35 15-18
+landing/src/components/ui/RevealOnScroll.vue
+  s_760a8176b5063e::t_d2147acc76cdba 1-10,12-43
+  s_760a8176b5063e::t_ad375bff277377 11
+landing/index.html
+  s_760a8176b5063e::t_ab3a968ad42659 1-21,23-25
+  s_760a8176b5063e::t_1e39f3e8cd6921 22
+landing/src/components/sections/GallerySection.vue
+  s_760a8176b5063e::t_3fd036504b6459 28
+  s_760a8176b5063e::t_1117780b0bacd4 1-27,29-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "87b50e35c2d559c625b1942ee01534588d05eff2",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
