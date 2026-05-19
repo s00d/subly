@@ -75,7 +75,7 @@ export const whySection = {
 export const videoSection = {
   eyebrow: "Product demo",
   title: "See Subly in action",
-  subtitle: "Walkthrough videos with audio — switch between desktop and phone.",
+  subtitle: "Switch between desktop and phone recordings.",
   fallbackLabel: "Open video in a new tab if playback does not start",
   demos: [
     {
@@ -83,7 +83,7 @@ export const videoSection = {
       label: "Desktop",
       icon: "microsoft-windows",
       description:
-        "Subscriptions, expenses, dashboard, and settings on macOS — narrated walkthrough with sound.",
+        "Subscriptions, expenses, dashboard, and settings on macOS.",
       url: siteMeta.videoDesktopUrl,
       poster: "01_dashboard_overview.png",
       aspect: "video" as const,
@@ -93,7 +93,7 @@ export const videoSection = {
       label: "Phone",
       icon: "cellphone",
       description:
-        "The same flows on iPhone — lists, calendar, and settings in a mobile walkthrough with audio.",
+        "The same flows on iPhone — lists, calendar, and settings.",
       url: siteMeta.videoMobileUrl,
       poster: "phone/01_dashboard_overview.png",
       aspect: "portrait" as const,
@@ -499,7 +499,7 @@ export const faqItems = [
   },
   {
     q: "Can I try it before installing?",
-    a: "Watch the desktop or phone walkthrough videos on this page (with audio), or browse the screenshot gallery below.",
+    a: "Watch the desktop or phone demo videos on this page, or browse the screenshot gallery below.",
   },
 ] as const;
 

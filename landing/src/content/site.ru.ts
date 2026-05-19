@@ -69,15 +69,14 @@ const hero = {
 const videoSection = {
   eyebrow: "Демо продукта",
   title: "Subly в деле",
-  subtitle: "Видео со звуком — переключайтесь между десктопом и телефоном.",
+  subtitle: "Переключайтесь между десктопом и телефоном.",
   fallbackLabel: "Открыть видео в новой вкладке, если воспроизведение не началось",
   demos: [
     {
       id: "desktop",
       label: "Десктоп",
       icon: "microsoft-windows",
-      description:
-        "Подписки, расходы, дашборд и настройки на macOS — озвученный обзор.",
+      description: "Подписки, расходы, дашборд и настройки на macOS.",
       url: sharedUrls.videoDesktopUrl,
       poster: "01_dashboard_overview.png",
       aspect: "video" as const,
@@ -86,8 +85,7 @@ const videoSection = {
       id: "phone",
       label: "Телефон",
       icon: "cellphone",
-      description:
-        "Те же сценарии на iPhone — списки, календарь и настройки в мобильном обзоре со звуком.",
+      description: "Те же сценарии на iPhone — списки, календарь и настройки.",
       url: sharedUrls.videoMobileUrl,
       poster: "phone/01_dashboard_overview.png",
       aspect: "portrait" as const,
@@ -498,7 +496,7 @@ const faqItems = [
   },
   {
     q: "Можно попробовать до установки?",
-    a: "На этой странице — видео десктопа и телефона со звуком и галерея скриншотов.",
+    a: "На этой странице — видео для десктопа и телефона и галерея скриншотов.",
   },
 ] as const;
 
