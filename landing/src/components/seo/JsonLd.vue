@@ -1,10 +1,22 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from "vue";
 import {
+  appStore,
   faqItems,
   siteMeta,
   videoSection,
 } from "@/content/site.en";
+import releases from "@/generated/releases.json";
+import type { ReleasesManifest } from "@/types/releases";
+
+const manifest = releases as ReleasesManifest;
+
+const downloadUrls = [
+  manifest.platforms.macos?.url,
+  manifest.platforms.windows?.url,
+  manifest.platforms.linux?.url,
+  manifest.fallbackUrl,
+].filter((url): url is string => Boolean(url));
 
 const graph = {
   "@context": "https://schema.org",
@@ -24,14 +36,18 @@ const graph = {
       applicationCategory: siteMeta.applicationCategory,
       operatingSystem: siteMeta.operatingSystems.join(", "),
       description: siteMeta.description,
-      softwareVersion: siteMeta.softwareVersion,
-      offers: {
-        "@type": "Offer",
-        price: "0",
-        priceCurrency: "USD",
-      },
-      downloadUrl: siteMeta.releasesUrl,
+      softwareVersion: manifest.version || siteMeta.softwareVersion,
+      offers: [
+        {
+          "@type": "Offer",
+          price: "0",
+          priceCurrency: "USD",
+          url: manifest.fallbackUrl,
+        },
+      ],
+      downloadUrl: downloadUrls.length ? downloadUrls : siteMeta.releasesUrl,
       url: siteMeta.siteUrl,
+      sameAs: [siteMeta.repoUrl, appStore.url],
     },
     {
       "@type": "VideoObject",

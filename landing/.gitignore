@@ -1,6 +1,7 @@
 node_modules
 dist
 icon-safelist.html
+src/generated/
 public/screenshots
 public/providers
 public/brand-logo.svg

@@ -11,8 +11,9 @@ export const siteMeta = {
   operatingSystems: ["macOS", "Windows", "Linux", "iOS", "Android"],
   repoUrl: "https://github.com/s00d/subly",
   releasesUrl: "https://github.com/s00d/subly/releases/latest",
-  privacyUrl: "https://github.com/s00d/subly/blob/main/PRIVACY.md",
-  changelogUrl: "https://github.com/s00d/subly/blob/main/CHANGELOG.md",
+  privacyUrl: "https://s00d.github.io/subly/privacy",
+  changelogUrl: "https://s00d.github.io/subly/changelog",
+  appStoreUrl: "https://apps.apple.com/app/subly-money-tracker/id6767137924",
   donateUrl: "https://www.donationalerts.com/r/s00d88",
   videoUrl:
     "https://github.com/s00d/subly/raw/main/store-assets/video/store-walkthrough-desktop-with-audio.mp4",
@@ -224,17 +225,70 @@ export const customizeSection = {
   alt: "Subly appearance and settings",
 } as const;
 
-export const gallery = {
+export const deviceGalleryMeta = {
   title: "Inside the app",
-  subtitle: "Desktop screenshots from the macOS build.",
-  shots: [
-    { file: "01_dashboard_overview.png", label: "Dashboard" },
-    { file: "02_subscriptions_list.png", label: "Subscriptions" },
-    { file: "03_expenses_list.png", label: "Expenses" },
-    { file: "04_calendar_month.png", label: "Calendar" },
-    { file: "05_rates_screen.png", label: "Currencies" },
-    { file: "06_settings_overview.png", label: "Settings" },
-  ],
+  subtitle: "The same core flows on desktop, phone, and tablet.",
+} as const;
+
+const desktopShots = [
+  { file: "01_dashboard_overview.png", label: "Dashboard" },
+  { file: "02_subscriptions_list.png", label: "Subscriptions" },
+  { file: "03_expenses_list.png", label: "Expenses" },
+  { file: "04_calendar_month.png", label: "Calendar" },
+  { file: "05_rates_screen.png", label: "Currencies" },
+  { file: "06_settings_overview.png", label: "Settings" },
+] as const;
+
+const mobileShots = [
+  { file: "phone/01_dashboard_overview.png", label: "Dashboard" },
+  { file: "phone/02_subscriptions_list.png", label: "Subscriptions" },
+  { file: "phone/03_expenses_list.png", label: "Expenses" },
+  { file: "phone/04_calendar_month.png", label: "Calendar" },
+  { file: "phone/05_rates_screen.png", label: "Currencies" },
+  { file: "phone/06_settings_overview.png", label: "Settings" },
+] as const;
+
+const tabletShots = [
+  { file: "tablet/01_dashboard_overview.png", label: "Dashboard" },
+  { file: "tablet/02_subscriptions_list.png", label: "Subscriptions" },
+  { file: "tablet/03_expenses_list.png", label: "Expenses" },
+  { file: "tablet/04_calendar_month.png", label: "Calendar" },
+  { file: "tablet/05_rates_screen.png", label: "Currencies" },
+  { file: "tablet/06_settings_overview.png", label: "Settings" },
+] as const;
+
+export const deviceGalleries = [
+  {
+    id: "desktop",
+    label: "macOS",
+    icon: "apple",
+    description:
+      "Full desktop experience with dashboard widgets, system tray shortcuts, and exports — built for macOS, Windows, and Linux.",
+    shots: desktopShots,
+  },
+  {
+    id: "phone",
+    label: "iPhone",
+    icon: "cellphone",
+    description:
+      "Track subscriptions and expenses on the go with the same categories, tags, and renewal calendar.",
+    shots: mobileShots,
+  },
+  {
+    id: "tablet",
+    label: "Tablet",
+    icon: "tablet",
+    description:
+      "More room for lists and the monthly calendar on iPad and Android tablets without losing local-first privacy.",
+    shots: tabletShots,
+  },
+] as const;
+
+export const appStore = {
+  url: siteMeta.appStoreUrl,
+  title: "Also on the App Store",
+  body: "Subly is available on Mac and iPhone/iPad through the App Store. It is a paid download — your purchase helps support ongoing development. Desktop builds for macOS, Windows, and Linux remain free on GitHub Releases.",
+  platforms: ["macOS", "iOS", "iPadOS"],
 } as const;
 
 export const faqItems = [
@@ -274,8 +328,9 @@ export const faqItems = [
 
 export const downloadSection = {
   title: "Ready to take control?",
-  body: "Grab the latest release for your platform, star the repo, or read the changelog to see what shipped recently.",
-  ctaPrimary: "Download from GitHub",
+  body: "Free desktop builds from GitHub Releases — pick your platform below. Prefer the App Store on Apple devices? That option supports development.",
+  ctaPrimary: "Download latest release",
+  githubHeading: "Free on GitHub",
   ctaSecondary: "Star on GitHub",
   ctaDonate: "Support development",
   ctaVideo: "Watch demo",
@@ -285,9 +340,9 @@ export const footer = {
   tagline: "Subly — subscription & expense tracker",
   license: "MIT License",
   links: [
-    { label: "GitHub", href: siteMeta.repoUrl, icon: "github" },
-    { label: "Releases", href: siteMeta.releasesUrl, icon: "download" },
-    { label: "Privacy", href: siteMeta.privacyUrl, icon: "shield-check-outline" },
-    { label: "Changelog", href: siteMeta.changelogUrl, icon: "history" },
+    { label: "GitHub", href: siteMeta.repoUrl, icon: "github", external: true },
+    { label: "Releases", href: siteMeta.releasesUrl, icon: "download", external: true },
+    { label: "Privacy", to: "/privacy", icon: "shield-check-outline", external: false },
+    { label: "Changelog", to: "/changelog", icon: "history", external: false },
   ],
 } as const;

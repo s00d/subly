@@ -36,6 +36,8 @@ export const mdiIconNames = [
   "github",
   "history",
   "help-circle-outline",
+  "cellphone",
+  "tablet",
 ] as const;
 
 export type MdiIconName = (typeof mdiIconNames)[number];

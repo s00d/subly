@@ -1,9 +1,17 @@
 <script setup lang="ts">
+import { onMounted, ref } from "vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
 import ScreenshotFrame from "@/components/ui/ScreenshotFrame.vue";
 import UiIcon from "@/components/ui/UiIcon.vue";
+import { preferredDownloadUrl } from "@/composables/useReleaseDownloads";
 import { hero, siteMeta } from "@/content/site.en";
 import { assetUrl, screenshotUrl } from "@/lib/assets";
+
+const downloadUrl = ref(siteMeta.releasesUrl);
+
+onMounted(() => {
+  downloadUrl.value = preferredDownloadUrl();
+});
 </script>
 
 <template>
@@ -25,8 +33,10 @@ import { assetUrl, screenshotUrl } from "@/lib/assets";
         </p>
         <div class="mt-8 flex flex-wrap gap-3">
           <a
-            :href="siteMeta.releasesUrl"
+            :href="downloadUrl"
             class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white no-underline transition-colors hover:bg-accent-hover"
+            target="_blank"
+            rel="noopener noreferrer"
           >
             {{ hero.ctaPrimary }}
             <UiIcon name="arrow-right" size="sm" />

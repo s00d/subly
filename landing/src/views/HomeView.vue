@@ -4,8 +4,8 @@ import AiSection from "@/components/sections/AiSection.vue";
 import CustomizeSection from "@/components/sections/CustomizeSection.vue";
 import DashboardWidgets from "@/components/sections/DashboardWidgets.vue";
 import DownloadSection from "@/components/sections/DownloadSection.vue";
+import DeviceGallerySection from "@/components/sections/DeviceGallerySection.vue";
 import FaqSection from "@/components/sections/FaqSection.vue";
-import GallerySection from "@/components/sections/GallerySection.vue";
 import HeroSection from "@/components/sections/HeroSection.vue";
 import PlatformsStrip from "@/components/sections/PlatformsStrip.vue";
 import PrivacySection from "@/components/sections/PrivacySection.vue";
@@ -42,7 +42,7 @@ import { featureSections } from "@/content/site.en";
   <SyncSection />
   <PrivacySection />
   <CustomizeSection />
-  <GallerySection />
+  <DeviceGallerySection />
   <FaqSection />
   <DownloadSection />
 </template>

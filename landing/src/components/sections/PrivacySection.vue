@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { RouterLink } from "vue-router";
 import SectionShell from "@/components/layout/SectionShell.vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
 import UiIcon from "@/components/ui/UiIcon.vue";
-import { privacySection, siteMeta } from "@/content/site.en";
+import { privacySection } from "@/content/site.en";
 </script>
 
 <template>
@@ -29,15 +30,13 @@ import { privacySection, siteMeta } from "@/content/site.en";
         <UiIcon name="lock-outline" size="lg" class="text-accent" />
         <div>
           <p class="font-medium text-text">Read the full policy</p>
-          <a
-            :href="siteMeta.privacyUrl"
+          <RouterLink
+            to="/privacy"
             class="mt-2 inline-flex items-center gap-1 text-sm text-accent no-underline hover:underline"
-            target="_blank"
-            rel="noopener noreferrer"
           >
-            Privacy Policy on GitHub
-            <UiIcon name="open-in-new" size="sm" />
-          </a>
+            Privacy Policy
+            <UiIcon name="arrow-right" size="sm" />
+          </RouterLink>
         </div>
       </div>
     </RevealOnScroll>

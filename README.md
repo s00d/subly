@@ -22,6 +22,12 @@
   — marketing landing with features, screenshots, and download links
 </p>
 
+## Download
+
+- **Website:** https://s00d.github.io/subly/
+- **GitHub Releases** — free builds for macOS, Windows, and Linux
+- **[App Store](https://apps.apple.com/app/subly-money-tracker/id6767137924)** — paid download on Mac, iPhone, and iPad; supports development
+
 ## macOS Preview
 
 <p align="center">

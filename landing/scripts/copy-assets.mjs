@@ -22,14 +22,24 @@ function copyFile(src, dest) {
   console.log(`copied ${path.basename(dest)}`);
 }
 
+function copyDir(srcDir, destDir) {
+  if (!fs.existsSync(srcDir)) {
+    console.warn(`skip dir (missing): ${path.relative(repoRoot, srcDir)}`);
+    return;
+  }
+  ensureDir(destDir);
+  for (const name of fs.readdirSync(srcDir)) {
+    if (name.endsWith(".png")) {
+      copyFile(path.join(srcDir, name), path.join(destDir, name));
+    }
+  }
+}
+
 ensureDir(publicDir);
 ensureDir(path.join(publicDir, "screenshots"));
 ensureDir(path.join(publicDir, "providers"));
 
-const macShots = path.join(
-  repoRoot,
-  "store-assets/mac_app_store/mac_1280x800",
-);
+const macShots = path.join(repoRoot, "store-assets/mac_app_store/mac_1280x800");
 const shotNames = [
   "01_dashboard_overview.png",
   "02_subscriptions_list.png",
@@ -40,10 +50,7 @@ const shotNames = [
 ];
 
 for (const name of shotNames) {
-  copyFile(
-    path.join(macShots, name),
-    path.join(publicDir, "screenshots", name),
-  );
+  copyFile(path.join(macShots, name), path.join(publicDir, "screenshots", name));
 }
 
 copyFile(path.join(repoRoot, "public/brand-logo.svg"), path.join(publicDir, "brand-logo.svg"));
@@ -57,10 +64,13 @@ for (const name of providerSvgs) {
   );
 }
 
-const phoneShots = path.join(repoRoot, "store-assets/google_play/phone_1080x1920");
-const phoneNames = ["01_dashboard_overview.png", "02_subscriptions_list.png"];
-for (const name of phoneNames) {
-  copyFile(path.join(phoneShots, name), path.join(publicDir, "screenshots", `phone_${name}`));
-}
+copyDir(
+  path.join(repoRoot, "store-assets/google_play/phone_1080x1920"),
+  path.join(publicDir, "screenshots/phone"),
+);
+copyDir(
+  path.join(repoRoot, "store-assets/google_play/tablet_10in"),
+  path.join(publicDir, "screenshots/tablet"),
+);
 
 console.log("Assets ready in landing/public/");

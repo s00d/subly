@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { RouterLink } from "vue-router";
 import { footer } from "@/content/site.en";
 import { assetUrl } from "@/lib/assets";
 import UiIcon from "@/components/ui/UiIcon.vue";
@@ -15,17 +16,26 @@ import UiIcon from "@/components/ui/UiIcon.vue";
         </div>
       </div>
       <nav class="flex flex-wrap gap-x-6 gap-y-2" aria-label="Footer">
-        <a
-          v-for="link in footer.links"
-          :key="link.href"
-          :href="link.href"
-          class="inline-flex items-center gap-1.5 text-sm text-muted no-underline transition-colors hover:text-accent"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <UiIcon :name="link.icon" size="sm" />
-          {{ link.label }}
-        </a>
+        <template v-for="link in footer.links" :key="link.label">
+          <RouterLink
+            v-if="!link.external && 'to' in link"
+            :to="link.to"
+            class="inline-flex items-center gap-1.5 text-sm text-muted no-underline transition-colors hover:text-accent"
+          >
+            <UiIcon :name="link.icon" size="sm" />
+            {{ link.label }}
+          </RouterLink>
+          <a
+            v-else
+            :href="link.href"
+            class="inline-flex items-center gap-1.5 text-sm text-muted no-underline transition-colors hover:text-accent"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <UiIcon :name="link.icon" size="sm" />
+            {{ link.label }}
+          </a>
+        </template>
         <a
           href="https://www.donationalerts.com/r/s00d88"
           class="inline-flex items-center gap-1.5 text-sm text-muted no-underline transition-colors hover:text-accent"

@@ -1,5 +1,12 @@
 @import "tailwindcss";
-@config "../../tailwind.config.ts";
+
+@plugin "@egoist/tailwindcss-icons" {
+  scale: 1.15;
+}
+
+@source "../../index.html";
+@source "../../icon-safelist.html";
+@source "../**/*.{vue,ts}";
 
 @utility icon-sm {
   display: inline-block;
@@ -68,6 +75,92 @@ body {
 ::selection {
   background-color: color-mix(in srgb, var(--color-accent) 35%, transparent);
   color: var(--color-text);
+}
+
+.md-content {
+  max-width: 48rem;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+}
+
+.md-content h1 {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0 0 1rem;
+  color: var(--color-text);
+}
+
+.md-content h2 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin: 2rem 0 0.75rem;
+  color: var(--color-text);
+}
+
+.md-content h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1.5rem 0 0.5rem;
+  color: var(--color-text);
+}
+
+.md-content p,
+.md-content li {
+  color: var(--color-muted);
+  line-height: 1.65;
+}
+
+.md-content p {
+  margin: 0 0 1rem;
+}
+
+.md-content ul,
+.md-content ol {
+  margin: 0 0 1rem;
+  padding-left: 1.35rem;
+}
+
+.md-content li {
+  margin-bottom: 0.35rem;
+}
+
+.md-content a {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.md-content a:hover {
+  color: var(--color-accent-hover);
+}
+
+.md-content hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 2rem 0;
+}
+
+.md-content code {
+  font-size: 0.9em;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.25rem;
+  padding: 0.1em 0.35em;
+}
+
+.md-content pre {
+  overflow-x: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin: 0 0 1rem;
+}
+
+.md-content pre code {
+  border: none;
+  padding: 0;
+  background: transparent;
 }
 
 @keyframes hero-float {
