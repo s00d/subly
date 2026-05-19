@@ -1,0 +1,25 @@
+landing/src/content/site.en.ts
+  s_760a8176b5063e::t_71985a8d03d847 399
+  s_760a8176b5063e::t_9394408176da82 18,20-21
+  s_760a8176b5063e::t_31bcaadf755eaf 45,47-68
+landing/src/components/sections/VideoSection.vue
+  s_760a8176b5063e::t_abc3440f7869c8 2,6,8-19,31-57,60-62,66,68,74
+landing/src/components/seo/JsonLd.vue
+  s_760a8176b5063e::t_d652b09878092e 52,54-57,60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "589a5626f0595cc84fd54a2d7fb390067981d38f",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
