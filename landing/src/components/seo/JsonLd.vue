@@ -49,15 +49,15 @@ const graph = {
       url: siteMeta.siteUrl,
       sameAs: [siteMeta.repoUrl, appStore.url],
     },
-    {
+    ...videoSection.demos.map((demo) => ({
       "@type": "VideoObject",
-      "@id": `${siteMeta.siteUrl}#demo-video`,
-      name: videoSection.title,
-      description: videoSection.subtitle,
-      contentUrl: siteMeta.videoUrl,
+      "@id": `${siteMeta.siteUrl}#demo-video-${demo.id}`,
+      name: `${videoSection.title} — ${demo.label}`,
+      description: demo.description,
+      contentUrl: demo.url,
       thumbnailUrl: siteMeta.ogImage,
       uploadDate: "2026-05-07",
-    },
+    })),
     {
       "@type": "FAQPage",
       "@id": `${siteMeta.siteUrl}#faq`,

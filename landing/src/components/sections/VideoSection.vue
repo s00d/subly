@@ -1,9 +1,22 @@
 <script setup lang="ts">
+import { computed, ref, watch } from "vue";
 import SectionShell from "@/components/layout/SectionShell.vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
 import UiIcon from "@/components/ui/UiIcon.vue";
-import { siteMeta, videoSection } from "@/content/site.en";
+import { videoSection } from "@/content/site.en";
 import { screenshotUrl } from "@/lib/assets";
+import type { MdiIconName } from "@/mdi-icons";
+
+const activeId = ref(videoSection.demos[0]?.id ?? "desktop");
+const videoKey = ref(0);
+
+const activeDemo = computed(
+  () => videoSection.demos.find((d) => d.id === activeId.value) ?? videoSection.demos[0],
+);
+
+watch(activeId, () => {
+  videoKey.value += 1;
+});
 </script>
 
 <template>
@@ -15,22 +28,50 @@ import { screenshotUrl } from "@/lib/assets";
     :subtitle="videoSection.subtitle"
     muted
   >
-    <RevealOnScroll tag="div" class="mx-auto max-w-4xl">
+    <div class="mb-8 flex flex-wrap justify-center gap-2">
+      <button
+        v-for="tab in videoSection.demos"
+        :key="tab.id"
+        type="button"
+        class="inline-flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors"
+        :class="
+          activeId === tab.id
+            ? 'border-accent bg-accent/15 text-text'
+            : 'border-border bg-surface text-muted hover:text-text'
+        "
+        @click="activeId = tab.id"
+      >
+        <UiIcon :name="tab.icon as MdiIconName" size="sm" />
+        {{ tab.label }}
+      </button>
+    </div>
+
+    <p class="mb-8 text-center text-muted">
+      {{ activeDemo.description }}
+    </p>
+
+    <RevealOnScroll
+      tag="div"
+      class="mx-auto max-w-4xl"
+      :class="activeDemo.aspect === 'portrait' ? 'max-w-sm' : ''"
+    >
       <div class="overflow-hidden rounded-xl border border-border bg-black shadow-xl shadow-black/30">
         <video
-          class="aspect-video w-full"
+          :key="videoKey"
+          class="w-full"
+          :class="activeDemo.aspect === 'portrait' ? 'aspect-[9/16]' : 'aspect-video'"
           controls
           playsinline
           preload="metadata"
-          :poster="screenshotUrl('01_dashboard_overview.png')"
+          :poster="screenshotUrl(activeDemo.poster)"
         >
-          <source :src="siteMeta.videoUrl" type="video/mp4" />
+          <source :src="activeDemo.url" type="video/mp4" />
           Your browser does not support embedded video.
         </video>
       </div>
       <p class="mt-4 text-center text-sm text-muted">
         <a
-          :href="siteMeta.videoUrl"
+          :href="activeDemo.url"
           class="inline-flex items-center gap-1 text-accent no-underline hover:underline"
           target="_blank"
           rel="noopener noreferrer"

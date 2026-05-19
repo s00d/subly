@@ -15,8 +15,10 @@ export const siteMeta = {
   changelogUrl: "https://s00d.github.io/subly/changelog",
   appStoreUrl: "https://apps.apple.com/app/subly-money-tracker/id6767137924",
   donateUrl: "https://www.donationalerts.com/r/s00d88",
-  videoUrl:
+  videoDesktopUrl:
     "https://github.com/s00d/subly/raw/main/store-assets/video/store-walkthrough-desktop-with-audio.mp4",
+  videoMobileUrl:
+    "https://github.com/s00d/subly/raw/main/store-assets/video/store-walkthrough-mobile-with-audio.mp4",
 } as const;
 
 export const navLinks = [
@@ -40,9 +42,30 @@ export const hero = {
 export const videoSection = {
   eyebrow: "Product demo",
   title: "See Subly in action",
-  subtitle:
-    "A quick walkthrough of subscriptions, expenses, dashboard, and settings on desktop — with audio.",
+  subtitle: "Walkthrough videos with audio — switch between desktop and phone.",
   fallbackLabel: "Open video in a new tab if playback does not start",
+  demos: [
+    {
+      id: "desktop",
+      label: "Desktop",
+      icon: "microsoft-windows",
+      description:
+        "Subscriptions, expenses, dashboard, and settings on macOS — narrated walkthrough with sound.",
+      url: siteMeta.videoDesktopUrl,
+      poster: "01_dashboard_overview.png",
+      aspect: "video" as const,
+    },
+    {
+      id: "phone",
+      label: "Phone",
+      icon: "cellphone",
+      description:
+        "The same flows on iPhone — lists, calendar, and settings in a mobile walkthrough with audio.",
+      url: siteMeta.videoMobileUrl,
+      poster: "phone/01_dashboard_overview.png",
+      aspect: "portrait" as const,
+    },
+  ],
 } as const;
 
 export const platforms = {
@@ -373,7 +396,7 @@ export const faqItems = [
   },
   {
     q: "Can I try it before installing?",
-    a: "Watch the desktop walkthrough video on this page, or browse the screenshot gallery below.",
+    a: "Watch the desktop or phone walkthrough videos on this page (with audio), or browse the screenshot gallery below.",
   },
 ] as const;
 
