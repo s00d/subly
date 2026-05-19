@@ -1,0 +1,77 @@
+landing/src/components/sections/CustomizeSection.vue
+  s_760a8176b5063e::t_72827968b36ab3 5,14,26
+landing/src/content/site.en.ts
+  s_760a8176b5063e::t_3ecdd068ee0a1a 5-11,22-28,39-46,49-55,61,66,71,76,86,100,114,128,142,168,184,188-192,203,215,271,281,288-291
+landing/src/components/sections/VideoSection.vue
+  s_760a8176b5063e::t_eefacdb7bbe2f8 30
+  s_760a8176b5063e::t_1cb2b9f7de6d56 1-29,31-44
+landing/src/components/sections/WhySection.vue
+  s_760a8176b5063e::t_c8879bab19dbfa 15
+landing/src/components/sections/HeroSection.vue
+  s_760a8176b5063e::t_65cf5d61cd9a2c 4,32,40,43-49
+landing/index.html
+  s_760a8176b5063e::t_0d3384f535cf13 10-11,18-20,22-28,30
+landing/src/components/ui/FeatureCard.vue
+  s_760a8176b5063e::t_3992ffdec33be1 3,8,19-23,25
+  s_760a8176b5063e::t_6626b1dbaf51ac 24
+landing/src/components/layout/SectionShell.vue
+  s_760a8176b5063e::t_6b98fce8c57c81 2-3,7
+  s_760a8176b5063e::t_3538e798287c24 20
+  s_760a8176b5063e::t_d8c6959aa6b636 22-26
+landing/public/sitemap.xml
+  s_760a8176b5063e::t_854a7a8f3e2f42 1-8
+landing/src/components/layout/SiteHeader.vue
+  s_760a8176b5063e::t_37114eef8b7851 5-6,8,33,38,41,49,55,60,67,74,77,82
+landing/src/components/seo/JsonLd.vue
+  s_760a8176b5063e::t_7980e59ff370d5 1,3-8,10-57,73-74
+  s_760a8176b5063e::t_e2bd5cf45b33cf 2,9,58-72,75
+landing/src/styles/main.css
+  s_760a8176b5063e::t_514860c1253e20 2-26
+landing/public/robots.txt
+  s_760a8176b5063e::t_1b602b599ddf51 1-4
+landing/src/App.vue
+  s_760a8176b5063e::t_47410080f81c8d 4,10
+landing/src/components/sections/FeatureShowcase.vue
+  s_760a8176b5063e::t_187a883aa6f7b8 5,11
+  s_760a8176b5063e::t_927ff06f39362e 23-30,42
+landing/pnpm-lock.yaml
+  ai_agent 21-26,48-50,89-93,103-111,477-479,586-588,641-644,753-757,793-797,814-825,1150-1151,1232-1233,1295
+landing/src/components/ui/FaqItem.vue
+  s_760a8176b5063e::t_8bc06b7fac196f 3,13-17,19,21-26
+landing/src/views/HomeView.vue
+  s_760a8176b5063e::t_77ba85ba5d4ad8 13,21,28
+landing/tailwind.config.ts
+  s_760a8176b5063e::t_ee16ab85b321ce 1-11
+landing/src/components/ui/UiIcon.vue
+  s_760a8176b5063e::t_f7cd9651e9b82c 1-29
+landing/package.json
+  s_760a8176b5063e::t_b5d2e11da323ec 20-21
+landing/src/components/sections/DownloadSection.vue
+  s_760a8176b5063e::t_41f6987e107932 3,22,31,35,38,47
+landing/src/components/layout/SiteFooter.vue
+  s_760a8176b5063e::t_eca14c28408a3a 2,4,22,26,30-31,35
+landing/src/components/sections/PrivacySection.vue
+  s_760a8176b5063e::t_c09685566c1154 4,12,24,29,34,38-39
+landing/src/components/sections/AiSection.vue
+  s_760a8176b5063e::t_4291562fda4e01 5,14,27
+landing/src/components/sections/PlatformsStrip.vue
+  s_760a8176b5063e::t_0d83c7d4861eab 3,15-16,19-20
+landing/src/components/sections/SyncSection.vue
+  s_760a8176b5063e::t_f2141e54aa4625 4,13,25-26,32,42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "148b07ce92c887be207e93db3a11073d85149b67",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
