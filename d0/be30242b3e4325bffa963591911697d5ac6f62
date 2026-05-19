@@ -1,0 +1,113 @@
+landing/src/components/sections/CustomizeSection.vue
+  s_760a8176b5063e::t_d513d36e2638ba 6,8-9,15-18,22,24,26,35-36
+landing/src/composables/useSiteContent.ts
+  s_760a8176b5063e::t_8432f6a45720cb 1-40
+landing/src/router/index.ts
+  s_760a8176b5063e::t_d1981ba2a55be9 2,10-11,16,22
+landing/pnpm-lock.yaml
+  ai_agent 11-13,109-111,828
+landing/src/content/site.ru.ts
+  s_760a8176b5063e::t_079bd00b17e323 546
+  s_760a8176b5063e::t_8f8ebdd9c1cb1f 451-454
+  s_760a8176b5063e::t_adc953c3880dba 38-42
+  s_760a8176b5063e::t_d10de105a1ef67 529
+  s_760a8176b5063e::t_e17e4033b5adb9 1-37,43-450,455-523,525-528,530-545,547-551
+  s_760a8176b5063e::t_7779c96c6cf1f2 524
+landing/src/components/sections/HeroSection.vue
+  s_760a8176b5063e::t_a840a55daffe2f 7,10-11,30,33,42,46,52,59
+landing/src/components/sections/SyncSection.vue
+  s_760a8176b5063e::t_e0b1f22956190f 5,7-9,15-18,23,35,41
+landing/src/components/sections/AiSection.vue
+  s_760a8176b5063e::t_3ec777e5e4e1d1 49
+  s_760a8176b5063e::t_ac1a4832b5757f 8,22,24-28,30,32-43,45-46,48,50,52-56,58-63,65-69,71-74,77-78,82,84,90-92,94-95,98-103,106-107,109,111-113,115-129,131-132
+  s_760a8176b5063e::t_822b55da71593c 6,9-10,16-18,23,29,44,47,51,75-76,80,93,97,110,114,130
+  s_760a8176b5063e::t_597e641c518488 70
+  s_760a8176b5063e::t_747932e92cc82e 31
+  s_760a8176b5063e::t_95e55c50fb4f95 57,64,96
+  s_760a8176b5063e::t_8a9a710d392319 104-105
+  s_760a8176b5063e::t_319b4f979e182b 108
+  s_760a8176b5063e::t_677ef7501f4876 21
+landing/src/components/sections/FaqSection.vue
+  s_760a8176b5063e::t_98a1fe77502de9 13-14
+  s_760a8176b5063e::t_75d72249e4fff1 4-6,11
+  s_760a8176b5063e::t_86472771d3222a 10
+landing/package.json
+  s_760a8176b5063e::t_cb818702282015 17
+landing/src/components/layout/SiteHeader.vue
+  s_760a8176b5063e::t_c08d6268896c10 4,7,10,12,23,29-32,39,41-42,48,50,54,58,62,67,74,80,94,96,100,110
+  s_760a8176b5063e::t_a1138df37d7aae 13-21
+landing/src/mdi-icons.ts
+  s_760a8176b5063e::t_fd5d6f5cffe904 42-49
+landing/src/components/sections/DashboardWidgets.vue
+  s_760a8176b5063e::t_69951f1dac6abe 2-4,8-12,15-16
+landing/src/components/sections/DeviceGallerySection.vue
+  s_760a8176b5063e::t_a1d2ec936c395b 6,10-11,14-16,23-24,29
+landing/src/views/HomeView.vue
+  s_760a8176b5063e::t_f9a0029cc5f1d5 10,16-18,28
+landing/public/sitemap.xml
+  s_760a8176b5063e::t_f6833e829be732 9-12
+landing/src/components/sections/PrivacySection.vue
+  s_760a8176b5063e::t_f2b8210e3a00db 6-8,14-17,23,36,39
+landing/src/components/seo/JsonLd.vue
+  s_760a8176b5063e::t_3ebd5074282df3 2-3,7,10-17,19-57,59-73,77-78,81,83-86
+landing/src/components/sections/WhySection.vue
+  s_760a8176b5063e::t_4b6aa1c2deaca8 4-6,12-13,17
+landing/src/components/ui/LocaleSwitcher.vue
+  s_760a8176b5063e::t_b6f14dd1183994 30,40-45,63
+  s_760a8176b5063e::t_83875364af12f8 1-29,31-39,46-62,64
+landing/scripts/copy-spa-fallback.mjs
+  s_760a8176b5063e::t_b532f557efbd4d 15-32
+landing/src/components/sections/DownloadSection.vue
+  s_760a8176b5063e::t_102f37a99b606f 9,11-12,26,28,31,45,48,54,57,61,68,71,77
+landing/src/components/sections/OpenValuesSection.vue
+  s_760a8176b5063e::t_89c67ba685b0b3 6-8,14-16,20,26,38,47,53
+landing/src/components/sections/VideoSection.vue
+  s_760a8176b5063e::t_1a39e53579df25 6,10-11,15-17,28,30-31,36,83
+landing/src/content/index.ts
+  s_760a8176b5063e::t_df7aa15bdbb37d 1-28
+landing/src/content/types.ts
+  s_760a8176b5063e::t_2c8c489da76088 1-33,38-158,160-186
+  s_760a8176b5063e::t_b14c651dea2d44 34-37
+  s_760a8176b5063e::t_930356c20e2aeb 159
+landing/src/components/sections/AppStoreSection.vue
+  s_760a8176b5063e::t_c811e5a962c2c2 4-6,15-16,18,21,27
+landing/src/components/sections/PlatformsStrip.vue
+  s_760a8176b5063e::t_c3859b13746df0 3-6,10-13,15,17-19,21-22,25-26
+landing/src/content/site.en.ts
+  s_760a8176b5063e::t_0ce62998e1b4f8 262-265
+  s_760a8176b5063e::t_7f99d1f556d6c7 530
+  s_760a8176b5063e::t_6cfbebd6a906c8 507-512,518
+  s_760a8176b5063e::t_d2a0f226f4ac7a 135
+  s_760a8176b5063e::t_1b30fade277bcd 1-3,14-16
+  s_760a8176b5063e::t_2cba26d3bb641a 368
+  s_760a8176b5063e::t_0133da4b4211cc 449
+  s_760a8176b5063e::t_947b9b8e6a40b8 526-529,531-546,548-552
+  s_760a8176b5063e::t_97adf8765a3a93 59-65
+  s_760a8176b5063e::t_451db92ee5d8e1 452-453
+  s_760a8176b5063e::t_fd972e204be7ce 261,266-330,332-333,335
+  s_760a8176b5063e::t_e520bbf7499c14 467
+  s_760a8176b5063e::t_272530575e24aa 38-40
+  s_760a8176b5063e::t_de14208ce0936b 547
+  s_760a8176b5063e::t_675d8ac36680f5 27-36
+  s_760a8176b5063e::t_a5bb63cf9bc26b 48
+landing/src/components/layout/SiteFooter.vue
+  s_760a8176b5063e::t_769dbf2c21dac9 3,6-8,17-18,22,28,38,43,49
+landing/src/App.vue
+  s_760a8176b5063e::t_29d3acfb5f5654 7,11,14-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.10",
+  "base_commit_sha": "d0be30242b3e4325bffa963591911697d5ac6f62",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
