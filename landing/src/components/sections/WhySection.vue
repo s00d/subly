@@ -5,7 +5,11 @@ import { whyCards } from "@/content/site.en";
 </script>
 
 <template>
-  <SectionShell id="why" title="Why people choose Subly" subtitle="Clarity for recurring bills and daily spending — without trading away privacy.">
+  <SectionShell
+    id="why"
+    title="Why people choose Subly"
+    subtitle="Clarity for recurring bills and everyday spending — open code, no tracking, and tools that respect your data."
+  >
     <div class="grid gap-5 sm:grid-cols-2">
       <FeatureCard
         v-for="(card, i) in whyCards"

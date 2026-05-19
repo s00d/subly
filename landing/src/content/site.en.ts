@@ -1,7 +1,7 @@
 export const siteMeta = {
   title: "Subly — Subscription & Expense Tracker",
   description:
-    "Track subscriptions and everyday spending in one fast, private app. Local-first with optional cloud sync.",
+    "Open-source subscription and expense tracker. Local-first, no analytics or tracking, optional cloud sync.",
   siteUrl: "https://s00d.github.io/subly/",
   canonicalUrl: "https://s00d.github.io/subly/",
   ogImage: "https://s00d.github.io/subly/screenshots/01_dashboard_overview.png",
@@ -32,7 +32,7 @@ export const navLinks = [
 export const hero = {
   headline: "Know what you pay — before it renews.",
   subline:
-    "Subly tracks subscriptions and everyday spending in one fast, private app. Your data stays on your device by default; turn on sync only when you want it.",
+    "A fast subscription and expense tracker that stays on your device, ships as fully open MIT source, and never phones home with analytics or usage metrics.",
   ctaPrimary: "Download latest release",
   ctaSecondary: "View on GitHub",
 } as const;
@@ -54,10 +54,52 @@ export const platforms = {
     { name: "iOS", icon: "apple-ios" },
     { name: "Android", icon: "android" },
   ] as const,
-  tagline: "Local-first by design — no forced cloud account to use the app.",
+  tagline: "Local-first, fully open source, and free of analytics — no forced cloud account.",
+} as const;
+
+export const openValuesSection = {
+  eyebrow: "Open & honest",
+  icon: "github",
+  title: "Powerful app. Open code. Zero surveillance.",
+  lead:
+    "Most finance apps want your data on their servers — and a quiet stream of analytics on the side. Subly is the opposite: MIT-licensed source you can read and build yourself, local-first by default, and no tracking stack of any kind. Not “privacy mode.” Not “we aggregate anonymously.” Just no metrics, no ads, no hidden pixels.",
+  pillars: [
+    {
+      icon: "github",
+      title: "Fully open source",
+      body: "Desktop, mobile, sync, and optional AI — the whole product is on GitHub under the MIT license. Audit it, fork it, ship your own build, or contribute a fix. Transparency is a feature.",
+    },
+    {
+      icon: "eye-off-outline",
+      title: "No analytics. Ever.",
+      body: "No Google Analytics, Firebase, Mixpanel, Amplitude, Sentry session replay, or ad SDKs. Subly does not collect usage statistics or crash telemetry to our servers. How you use the app is your business alone.",
+    },
+    {
+      icon: "shield-check-outline",
+      title: "Trust you can verify",
+      body: "Data lives on your device. Sync uses your cloud if you turn it on. API keys sit in the OS keychain. When the README says “no tracking,” you can grep the repo and see it.",
+    },
+  ],
+  productHighlights: [
+    "Subscriptions, expenses, dashboard, and renewal calendar in one place",
+    "34+ currencies, 12 languages, CSV/JSON exports",
+    "Optional AI with your own API key — off until you enable it",
+    "Works offline; no Subly account required",
+  ],
+  ctaLabel: "Explore the source on GitHub",
 } as const;
 
 export const whyCards = [
+  {
+    icon: "github",
+    title: "Open source, MIT license",
+    body: "Every feature is in a public repository. No black box around your finances — inspect, build, and share on your terms.",
+  },
+  {
+    icon: "eye-off-outline",
+    title: "No metrics or tracking",
+    body: "We do not measure screens, clicks, or crashes for ourselves. Your spending patterns never become someone else's dashboard.",
+  },
   {
     icon: "cellphone-link-off",
     title: "Your data, your device",
@@ -203,9 +245,10 @@ export const privacySection = {
   eyebrow: "Privacy",
   icon: "shield-lock-outline",
   title: "Private by default",
-  body: "Subly is built for people who want clarity without giving up ownership of their finances.",
+  body: "No analytics, no ad SDKs, no “anonymous usage” pipelines — and an open codebase so you do not have to take our word for it.",
   bullets: [
     "Core data stored locally on each device",
+    "No in-app metrics, crash reporters, or third-party tracking to Subly servers",
     "API keys, sync passwords, and Telegram tokens live in the OS keychain — not in plain text in the database",
     "AI and cloud features are opt-in; read our Privacy Policy for full details",
   ],
@@ -319,6 +362,14 @@ export const faqItems = [
   {
     q: "Where is my data stored?",
     a: "On your device by default. We do not run a central Subly cloud that holds your subscriptions.",
+  },
+  {
+    q: "Does Subly use analytics or tracking?",
+    a: "No. The app includes no analytics SDKs, ad networks, or usage metrics sent to us. Optional features (sync, AI, Telegram, rate updates) only talk to services you configure.",
+  },
+  {
+    q: "Can I read the source code?",
+    a: "Yes. Subly is fully open source on GitHub under the MIT license — frontend, backend, and mobile builds. You can verify privacy claims yourself.",
   },
   {
     q: "Can I try it before installing?",

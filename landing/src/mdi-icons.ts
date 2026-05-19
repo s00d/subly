@@ -38,6 +38,7 @@ export const mdiIconNames = [
   "help-circle-outline",
   "cellphone",
   "tablet",
+  "eye-off-outline",
 ] as const;
 
 export type MdiIconName = (typeof mdiIconNames)[number];

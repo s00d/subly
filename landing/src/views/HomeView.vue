@@ -11,6 +11,7 @@ import PlatformsStrip from "@/components/sections/PlatformsStrip.vue";
 import PrivacySection from "@/components/sections/PrivacySection.vue";
 import SyncSection from "@/components/sections/SyncSection.vue";
 import VideoSection from "@/components/sections/VideoSection.vue";
+import OpenValuesSection from "@/components/sections/OpenValuesSection.vue";
 import WhySection from "@/components/sections/WhySection.vue";
 import { featureSections } from "@/content/site.en";
 </script>
@@ -20,6 +21,7 @@ import { featureSections } from "@/content/site.en";
   <PlatformsStrip />
   <VideoSection />
   <WhySection />
+  <OpenValuesSection />
   <FeatureShowcase
     v-for="(section, index) in featureSections"
     :key="section.id"
