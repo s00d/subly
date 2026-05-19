@@ -1,4 +1,29 @@
 @import "tailwindcss";
+@config "../../tailwind.config.ts";
+
+@utility icon-sm {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+@utility icon-md {
+  display: inline-block;
+  width: 1.25rem;
+  height: 1.25rem;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+@utility icon-lg {
+  display: inline-block;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
 
 @theme {
   --color-bg: #0f1419;

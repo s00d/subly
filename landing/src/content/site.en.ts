@@ -2,6 +2,13 @@ export const siteMeta = {
   title: "Subly — Subscription & Expense Tracker",
   description:
     "Track subscriptions and everyday spending in one fast, private app. Local-first with optional cloud sync.",
+  siteUrl: "https://s00d.github.io/subly/",
+  canonicalUrl: "https://s00d.github.io/subly/",
+  ogImage: "https://s00d.github.io/subly/screenshots/01_dashboard_overview.png",
+  locale: "en_US",
+  softwareVersion: "1.0.4",
+  applicationCategory: "FinanceApplication",
+  operatingSystems: ["macOS", "Windows", "Linux", "iOS", "Android"],
   repoUrl: "https://github.com/s00d/subly",
   releasesUrl: "https://github.com/s00d/subly/releases/latest",
   privacyUrl: "https://github.com/s00d/subly/blob/main/PRIVACY.md",
@@ -12,12 +19,13 @@ export const siteMeta = {
 } as const;
 
 export const navLinks = [
-  { id: "why", label: "Why Subly" },
-  { id: "subscriptions", label: "Subscriptions" },
-  { id: "dashboard", label: "Dashboard" },
-  { id: "ai", label: "AI assist" },
-  { id: "sync", label: "Sync" },
-  { id: "faq", label: "FAQ" },
+  { id: "why", label: "Why Subly", icon: "heart-outline" },
+  { id: "subscriptions", label: "Subscriptions", icon: "repeat" },
+  { id: "dashboard", label: "Dashboard", icon: "view-dashboard-outline" },
+  { id: "video", label: "Demo", icon: "play-circle-outline" },
+  { id: "ai", label: "AI assist", icon: "robot-outline" },
+  { id: "sync", label: "Sync", icon: "cloud-sync-outline" },
+  { id: "faq", label: "FAQ", icon: "help-circle-outline" },
 ] as const;
 
 export const hero = {
@@ -28,26 +36,44 @@ export const hero = {
   ctaSecondary: "View on GitHub",
 } as const;
 
+export const videoSection = {
+  eyebrow: "Product demo",
+  title: "See Subly in action",
+  subtitle:
+    "A quick walkthrough of subscriptions, expenses, dashboard, and settings on desktop — with audio.",
+  fallbackLabel: "Open video in a new tab if playback does not start",
+} as const;
+
 export const platforms = {
   title: "Available everywhere you work",
-  items: ["macOS", "Windows", "Linux", "iOS", "Android"] as const,
+  items: [
+    { name: "macOS", icon: "apple" },
+    { name: "Windows", icon: "microsoft-windows" },
+    { name: "Linux", icon: "linux" },
+    { name: "iOS", icon: "apple-ios" },
+    { name: "Android", icon: "android" },
+  ] as const,
   tagline: "Local-first by design — no forced cloud account to use the app.",
 } as const;
 
 export const whyCards = [
   {
+    icon: "cellphone-link-off",
     title: "Your data, your device",
     body: "Subscriptions, expenses, and settings live on your machine or phone. You stay in control without signing up for our servers.",
   },
   {
+    icon: "cloud-sync-outline",
     title: "Sync when you choose",
     body: "Optional backup through iCloud, Google Drive, Dropbox, OneDrive, or WebDAV — only if you enable it in Settings.",
   },
   {
+    icon: "translate",
     title: "12 languages",
     body: "English, Russian, Chinese, Spanish, French, German, Portuguese, Japanese, Korean, Arabic, Hindi, and Turkish.",
   },
   {
+    icon: "view-dashboard-outline",
     title: "Built for real life",
     body: "Dashboards, a renewal calendar, multi-currency support, reminders, and exports — everything in one calm interface.",
   },
@@ -57,6 +83,7 @@ export const featureSections = [
   {
     id: "subscriptions",
     eyebrow: "Subscriptions",
+    icon: "repeat",
     title: "Every recurring charge in one place",
     body: "Add streaming, software, utilities, or any service. Use daily, weekly, monthly, or yearly billing — plus custom cycles where supported.",
     bullets: [
@@ -70,6 +97,7 @@ export const featureSections = [
   {
     id: "expenses",
     eyebrow: "Expenses",
+    icon: "cash-multiple",
     title: "One-off spending without the spreadsheet",
     body: "Record purchases with amounts, categories, tags, notes, and optional links. Filter by period, category, or tags when you need the full picture.",
     bullets: [
@@ -83,6 +111,7 @@ export const featureSections = [
   {
     id: "dashboard",
     eyebrow: "Dashboard",
+    icon: "view-dashboard-outline",
     title: "See the big picture at a glance",
     body: "Pick which blocks appear and how they are ordered. From overdue alerts to forecasts and lifetime subscription cost — your home screen adapts to you.",
     bullets: [
@@ -96,6 +125,7 @@ export const featureSections = [
   {
     id: "calendar",
     eyebrow: "Calendar",
+    icon: "calendar-month-outline",
     title: "Plan around paydays and bills",
     body: "Upcoming charges appear on a calendar grid. Review monthly totals and jump from a date straight into the related subscription.",
     bullets: [
@@ -109,6 +139,7 @@ export const featureSections = [
   {
     id: "currencies",
     eyebrow: "Money & alerts",
+    icon: "currency-usd",
     title: "Currencies and reminders that keep up",
     body: "Track spending in many currencies, refresh exchange rates on a schedule, and get notified before money leaves your account.",
     bullets: [
@@ -134,6 +165,7 @@ export const dashboardWidgets = [
 
 export const aiSection = {
   eyebrow: "AI assist",
+  icon: "robot-outline",
   title: "Optional help when you want speed",
   body: "AI is off until you turn it on. Bring your own API key from a provider you trust — nothing is sent until you use the assist dialog.",
   bullets: [
@@ -149,14 +181,15 @@ export const aiSection = {
 
 export const syncSection = {
   eyebrow: "Sync & backup",
+  icon: "backup-restore",
   title: "Your backup, your cloud",
   body: "When you need multiple devices, enable the provider you already use. Export and import full backups anytime.",
   providers: [
-    { id: "icloud", label: "iCloud", icon: null },
-    { id: "google-drive", label: "Google Drive", icon: "google-drive.svg" },
-    { id: "dropbox", label: "Dropbox", icon: "dropbox.svg" },
-    { id: "onedrive", label: "OneDrive", icon: "onedrive.svg" },
-    { id: "webdav", label: "WebDAV", icon: null },
+    { id: "icloud", label: "iCloud", icon: "apple-icloud", brandIcon: null },
+    { id: "google-drive", label: "Google Drive", icon: "google-drive", brandIcon: "google-drive.svg" },
+    { id: "dropbox", label: "Dropbox", icon: "dropbox", brandIcon: "dropbox.svg" },
+    { id: "onedrive", label: "OneDrive", icon: "microsoft-onedrive", brandIcon: "onedrive.svg" },
+    { id: "webdav", label: "WebDAV", icon: "web", brandIcon: null },
   ],
   bullets: [
     "Encrypted sync payloads between your devices",
@@ -167,6 +200,7 @@ export const syncSection = {
 
 export const privacySection = {
   eyebrow: "Privacy",
+  icon: "shield-lock-outline",
   title: "Private by default",
   body: "Subly is built for people who want clarity without giving up ownership of their finances.",
   bullets: [
@@ -178,6 +212,7 @@ export const privacySection = {
 
 export const customizeSection = {
   eyebrow: "Make it yours",
+  icon: "palette-outline",
   title: "Themes, tags, and household",
   body: "Fifteen-plus color themes, custom category icons, payment methods, tags, monthly budget progress, and system tray shortcuts on desktop.",
   bullets: [
@@ -233,7 +268,7 @@ export const faqItems = [
   },
   {
     q: "Can I try it before installing?",
-    a: "Watch the desktop walkthrough video linked below, or browse the screenshot gallery on this page.",
+    a: "Watch the desktop walkthrough video on this page, or browse the screenshot gallery below.",
   },
 ] as const;
 
@@ -243,16 +278,16 @@ export const downloadSection = {
   ctaPrimary: "Download from GitHub",
   ctaSecondary: "Star on GitHub",
   ctaDonate: "Support development",
-  ctaVideo: "Watch walkthrough",
+  ctaVideo: "Watch demo",
 } as const;
 
 export const footer = {
   tagline: "Subly — subscription & expense tracker",
   license: "MIT License",
   links: [
-    { label: "GitHub", href: siteMeta.repoUrl },
-    { label: "Releases", href: siteMeta.releasesUrl },
-    { label: "Privacy", href: siteMeta.privacyUrl },
-    { label: "Changelog", href: siteMeta.changelogUrl },
+    { label: "GitHub", href: siteMeta.repoUrl, icon: "github" },
+    { label: "Releases", href: siteMeta.releasesUrl, icon: "download" },
+    { label: "Privacy", href: siteMeta.privacyUrl, icon: "shield-check-outline" },
+    { label: "Changelog", href: siteMeta.changelogUrl, icon: "history" },
   ],
 } as const;

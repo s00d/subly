@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { Sparkles } from "@lucide/vue";
 import SectionShell from "@/components/layout/SectionShell.vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
 import ScreenshotFrame from "@/components/ui/ScreenshotFrame.vue";
+import UiIcon from "@/components/ui/UiIcon.vue";
 import { aiSection } from "@/content/site.en";
 import { screenshotUrl } from "@/lib/assets";
 </script>
@@ -11,6 +11,7 @@ import { screenshotUrl } from "@/lib/assets";
   <SectionShell
     id="ai"
     :eyebrow="aiSection.eyebrow"
+    :eyebrow-icon="aiSection.icon"
     :title="aiSection.title"
     :subtitle="aiSection.body"
     muted
@@ -23,7 +24,7 @@ import { screenshotUrl } from "@/lib/assets";
             :key="i"
             class="flex gap-3 text-sm text-muted md:text-base"
           >
-            <Sparkles :size="18" class="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+            <UiIcon name="creation" size="sm" class="mt-0.5 shrink-0 text-accent" />
             {{ item }}
           </li>
         </ul>

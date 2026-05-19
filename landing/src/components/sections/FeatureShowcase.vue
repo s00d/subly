@@ -2,11 +2,13 @@
 import SectionShell from "@/components/layout/SectionShell.vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
 import ScreenshotFrame from "@/components/ui/ScreenshotFrame.vue";
+import UiIcon from "@/components/ui/UiIcon.vue";
 import { screenshotUrl } from "@/lib/assets";
 
 defineProps<{
   id: string;
   eyebrow: string;
+  icon: string;
   title: string;
   body: string;
   bullets: readonly string[];
@@ -18,7 +20,14 @@ defineProps<{
 </script>
 
 <template>
-  <SectionShell :id="id" :eyebrow="eyebrow" :title="title" :subtitle="body" :muted="muted">
+  <SectionShell
+    :id="id"
+    :eyebrow="eyebrow"
+    :eyebrow-icon="icon"
+    :title="title"
+    :subtitle="body"
+    :muted="muted"
+  >
     <div
       class="grid items-center gap-10 md:grid-cols-2 md:gap-14"
       :class="reverse ? 'md:[&>*:first-child]:order-2' : ''"
@@ -30,7 +39,7 @@ defineProps<{
             :key="i"
             class="flex gap-3 text-sm leading-relaxed md:text-base"
           >
-            <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+            <UiIcon name="check-circle-outline" size="sm" class="mt-0.5 shrink-0 text-accent" />
             {{ item }}
           </li>
         </ul>

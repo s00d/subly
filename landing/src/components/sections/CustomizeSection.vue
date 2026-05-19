@@ -2,6 +2,7 @@
 import SectionShell from "@/components/layout/SectionShell.vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
 import ScreenshotFrame from "@/components/ui/ScreenshotFrame.vue";
+import UiIcon from "@/components/ui/UiIcon.vue";
 import { customizeSection } from "@/content/site.en";
 import { screenshotUrl } from "@/lib/assets";
 </script>
@@ -10,6 +11,7 @@ import { screenshotUrl } from "@/lib/assets";
   <SectionShell
     id="customize"
     :eyebrow="customizeSection.eyebrow"
+    :eyebrow-icon="customizeSection.icon"
     :title="customizeSection.title"
     :subtitle="customizeSection.body"
   >
@@ -21,7 +23,7 @@ import { screenshotUrl } from "@/lib/assets";
             :key="i"
             class="flex gap-3 text-sm md:text-base"
           >
-            <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+            <UiIcon name="check-circle-outline" size="sm" class="mt-0.5 shrink-0 text-accent" />
             {{ item }}
           </li>
         </ul>

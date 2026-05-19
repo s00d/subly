@@ -1,9 +1,7 @@
 <script setup lang="ts">
-import { Laptop, Monitor, Smartphone, Tablet } from "@lucide/vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
+import UiIcon from "@/components/ui/UiIcon.vue";
 import { platforms } from "@/content/site.en";
-
-const icons = [Monitor, Laptop, Tablet, Smartphone, Smartphone] as const;
 </script>
 
 <template>
@@ -14,12 +12,12 @@ const icons = [Monitor, Laptop, Tablet, Smartphone, Smartphone] as const;
       </p>
       <ul class="mt-6 flex flex-wrap items-center justify-center gap-4 md:gap-8">
         <li
-          v-for="(name, i) in platforms.items"
-          :key="name"
+          v-for="item in platforms.items"
+          :key="item.name"
           class="flex items-center gap-2 rounded-full border border-border bg-bg px-4 py-2 text-sm font-medium text-text"
         >
-          <component :is="icons[i] ?? Monitor" :size="16" class="text-accent" aria-hidden="true" />
-          {{ name }}
+          <UiIcon :name="item.icon" size="sm" class="text-accent" />
+          {{ item.name }}
         </li>
       </ul>
       <p class="mt-6 text-base text-muted">{{ platforms.tagline }}</p>

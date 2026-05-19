@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { footer, siteMeta } from "@/content/site.en";
+import { footer } from "@/content/site.en";
 import { assetUrl } from "@/lib/assets";
+import UiIcon from "@/components/ui/UiIcon.vue";
 </script>
 
 <template>
@@ -18,18 +19,20 @@ import { assetUrl } from "@/lib/assets";
           v-for="link in footer.links"
           :key="link.href"
           :href="link.href"
-          class="text-sm text-muted no-underline transition-colors hover:text-accent"
+          class="inline-flex items-center gap-1.5 text-sm text-muted no-underline transition-colors hover:text-accent"
           target="_blank"
           rel="noopener noreferrer"
         >
+          <UiIcon :name="link.icon" size="sm" />
           {{ link.label }}
         </a>
         <a
-          :href="siteMeta.donateUrl"
-          class="text-sm text-muted no-underline transition-colors hover:text-accent"
+          href="https://www.donationalerts.com/r/s00d88"
+          class="inline-flex items-center gap-1.5 text-sm text-muted no-underline transition-colors hover:text-accent"
           target="_blank"
           rel="noopener noreferrer"
         >
+          <UiIcon name="heart-outline" size="sm" />
           Donate
         </a>
       </nav>

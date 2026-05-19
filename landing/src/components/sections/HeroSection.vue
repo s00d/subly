@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ArrowRight, ExternalLink } from "@lucide/vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
 import ScreenshotFrame from "@/components/ui/ScreenshotFrame.vue";
+import UiIcon from "@/components/ui/UiIcon.vue";
 import { hero, siteMeta } from "@/content/site.en";
 import { assetUrl, screenshotUrl } from "@/lib/assets";
 </script>
@@ -29,7 +29,7 @@ import { assetUrl, screenshotUrl } from "@/lib/assets";
             class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white no-underline transition-colors hover:bg-accent-hover"
           >
             {{ hero.ctaPrimary }}
-            <ArrowRight :size="18" aria-hidden="true" />
+            <UiIcon name="arrow-right" size="sm" />
           </a>
           <a
             :href="siteMeta.repoUrl"
@@ -37,8 +37,15 @@ import { assetUrl, screenshotUrl } from "@/lib/assets";
             target="_blank"
             rel="noopener noreferrer"
           >
-            <ExternalLink :size="18" aria-hidden="true" />
+            <UiIcon name="open-in-new" size="sm" />
             {{ hero.ctaSecondary }}
+          </a>
+          <a
+            href="#video"
+            class="inline-flex items-center gap-2 rounded-xl border border-border bg-bg px-5 py-3 text-sm font-semibold text-muted no-underline transition-colors hover:border-accent/60 hover:text-text"
+          >
+            <UiIcon name="play-circle-outline" size="sm" />
+            Watch demo
           </a>
         </div>
       </RevealOnScroll>

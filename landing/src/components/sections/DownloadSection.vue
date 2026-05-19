@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Download, Heart, Play, Star } from "@lucide/vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
+import UiIcon from "@/components/ui/UiIcon.vue";
 import { downloadSection, siteMeta } from "@/content/site.en";
 </script>
 
@@ -19,7 +19,7 @@ import { downloadSection, siteMeta } from "@/content/site.en";
           :href="siteMeta.releasesUrl"
           class="inline-flex items-center gap-2 rounded-xl bg-accent px-5 py-3 text-sm font-semibold text-white no-underline transition-colors hover:bg-accent-hover"
         >
-          <Download :size="18" aria-hidden="true" />
+          <UiIcon name="download" size="sm" />
           {{ downloadSection.ctaPrimary }}
         </a>
         <a
@@ -28,16 +28,14 @@ import { downloadSection, siteMeta } from "@/content/site.en";
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Star :size="18" aria-hidden="true" />
+          <UiIcon name="star-outline" size="sm" />
           {{ downloadSection.ctaSecondary }}
         </a>
         <a
-          :href="siteMeta.videoUrl"
+          href="#video"
           class="inline-flex items-center gap-2 rounded-xl border border-border bg-surface px-5 py-3 text-sm font-semibold text-text no-underline hover:border-accent/60"
-          target="_blank"
-          rel="noopener noreferrer"
         >
-          <Play :size="18" aria-hidden="true" />
+          <UiIcon name="play-circle-outline" size="sm" />
           {{ downloadSection.ctaVideo }}
         </a>
         <a
@@ -46,7 +44,7 @@ import { downloadSection, siteMeta } from "@/content/site.en";
           target="_blank"
           rel="noopener noreferrer"
         >
-          <Heart :size="18" aria-hidden="true" />
+          <UiIcon name="heart-outline" size="sm" />
           {{ downloadSection.ctaDonate }}
         </a>
       </div>

@@ -12,6 +12,7 @@ import { whyCards } from "@/content/site.en";
         :key="card.title"
         :title="card.title"
         :body="card.body"
+        :icon="card.icon"
         :stagger-index="i"
       />
     </div>

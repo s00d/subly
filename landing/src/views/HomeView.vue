@@ -10,6 +10,7 @@ import HeroSection from "@/components/sections/HeroSection.vue";
 import PlatformsStrip from "@/components/sections/PlatformsStrip.vue";
 import PrivacySection from "@/components/sections/PrivacySection.vue";
 import SyncSection from "@/components/sections/SyncSection.vue";
+import VideoSection from "@/components/sections/VideoSection.vue";
 import WhySection from "@/components/sections/WhySection.vue";
 import { featureSections } from "@/content/site.en";
 </script>
@@ -17,12 +18,14 @@ import { featureSections } from "@/content/site.en";
 <template>
   <HeroSection />
   <PlatformsStrip />
+  <VideoSection />
   <WhySection />
   <FeatureShowcase
     v-for="(section, index) in featureSections"
     :key="section.id"
     :id="section.id"
     :eyebrow="section.eyebrow"
+    :icon="section.icon"
     :title="section.title"
     :body="section.body"
     :bullets="section.bullets"

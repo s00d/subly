@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Cloud } from "@lucide/vue";
 import SectionShell from "@/components/layout/SectionShell.vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
+import UiIcon from "@/components/ui/UiIcon.vue";
 import { syncSection } from "@/content/site.en";
 import { providerIconUrl } from "@/lib/assets";
 </script>
@@ -10,6 +10,7 @@ import { providerIconUrl } from "@/lib/assets";
   <SectionShell
     id="sync"
     :eyebrow="syncSection.eyebrow"
+    :eyebrow-icon="syncSection.icon"
     :title="syncSection.title"
     :subtitle="syncSection.body"
   >
@@ -21,14 +22,14 @@ import { providerIconUrl } from "@/lib/assets";
           class="flex items-center gap-2 rounded-xl border border-border bg-surface px-4 py-3 text-sm font-medium text-text"
         >
           <img
-            v-if="p.icon"
-            :src="providerIconUrl(p.icon)"
+            v-if="p.brandIcon"
+            :src="providerIconUrl(p.brandIcon)"
             :alt="p.label"
             width="22"
             height="22"
             class="opacity-90"
           />
-          <Cloud v-else :size="20" class="text-accent" aria-hidden="true" />
+          <UiIcon v-else :name="p.icon" size="md" />
           {{ p.label }}
         </li>
       </ul>
@@ -38,7 +39,7 @@ import { providerIconUrl } from "@/lib/assets";
           :key="i"
           class="flex gap-3 text-sm md:text-base"
         >
-          <span class="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden="true" />
+          <UiIcon name="check-circle-outline" size="sm" class="mt-0.5 shrink-0 text-accent" />
           {{ item }}
         </li>
       </ul>

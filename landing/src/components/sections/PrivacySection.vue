@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Lock, Shield } from "@lucide/vue";
 import SectionShell from "@/components/layout/SectionShell.vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
+import UiIcon from "@/components/ui/UiIcon.vue";
 import { privacySection, siteMeta } from "@/content/site.en";
 </script>
 
@@ -9,6 +9,7 @@ import { privacySection, siteMeta } from "@/content/site.en";
   <SectionShell
     id="privacy"
     :eyebrow="privacySection.eyebrow"
+    :eyebrow-icon="privacySection.icon"
     :title="privacySection.title"
     :subtitle="privacySection.body"
     muted
@@ -20,21 +21,22 @@ import { privacySection, siteMeta } from "@/content/site.en";
           :key="i"
           class="flex gap-3 text-sm text-muted md:text-base"
         >
-          <Shield :size="20" class="mt-0.5 shrink-0 text-accent" aria-hidden="true" />
+          <UiIcon name="shield-check-outline" size="md" class="mt-0.5 shrink-0 text-accent" />
           {{ item }}
         </li>
       </ul>
       <div class="flex gap-4 rounded-xl border border-border bg-surface p-6">
-        <Lock :size="32" class="text-accent" aria-hidden="true" />
+        <UiIcon name="lock-outline" size="lg" class="text-accent" />
         <div>
           <p class="font-medium text-text">Read the full policy</p>
           <a
             :href="siteMeta.privacyUrl"
-            class="mt-2 inline-block text-sm text-accent no-underline hover:underline"
+            class="mt-2 inline-flex items-center gap-1 text-sm text-accent no-underline hover:underline"
             target="_blank"
             rel="noopener noreferrer"
           >
-            Privacy Policy on GitHub →
+            Privacy Policy on GitHub
+            <UiIcon name="open-in-new" size="sm" />
           </a>
         </div>
       </div>
