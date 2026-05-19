@@ -17,6 +17,11 @@
   Tauri v2 · Vue 3 · TypeScript · Tailwind CSS v4
 </p>
 
+<p align="center">
+  <a href="https://s00d.github.io/subly/"><strong>Live site</strong></a>
+  — marketing landing with features, screenshots, and download links
+</p>
+
 ## macOS Preview
 
 <p align="center">

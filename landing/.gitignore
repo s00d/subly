@@ -1,0 +1,6 @@
+node_modules
+dist
+public/screenshots
+public/providers
+public/brand-logo.svg
+public/app-icon.svg
