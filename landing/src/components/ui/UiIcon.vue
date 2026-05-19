@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import type { MdiIconName } from "@/mdi-icons";
 
 const props = withDefaults(
   defineProps<{
-    name: string;
+    name: MdiIconName | (string & {});
     size?: "sm" | "md" | "lg";
     label?: string;
   }>(),

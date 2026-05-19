@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "copy-assets": "node scripts/copy-assets.mjs",
-    "predev": "pnpm copy-assets",
+    "generate-icon-safelist": "node scripts/generate-icon-safelist.mjs",
+    "predev": "pnpm copy-assets && pnpm generate-icon-safelist",
     "dev": "vite",
-    "prebuild": "pnpm copy-assets",
+    "prebuild": "pnpm copy-assets && pnpm generate-icon-safelist",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview"
   },
