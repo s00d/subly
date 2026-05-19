@@ -38,17 +38,24 @@ export const localeSwitcher = {
 export const headerNav = {
   download: "Download",
   menuToggle: "Toggle menu",
+  moreLabel: "More",
+  moreMenuAria: "More sections",
 } as const;
 
-export const navLinks = [
+export const navPrimaryLinks = [
   { id: "why", label: "Why Subly", icon: "heart-outline" },
   { id: "subscriptions", label: "Subscriptions", icon: "repeat" },
   { id: "dashboard", label: "Dashboard", icon: "view-dashboard-outline" },
   { id: "video", label: "Demo", icon: "play-circle-outline" },
+] as const;
+
+export const navMoreLinks = [
   { id: "ai", label: "AI", icon: "robot-outline" },
   { id: "sync", label: "Sync", icon: "cloud-sync-outline" },
   { id: "faq", label: "FAQ", icon: "help-circle-outline" },
 ] as const;
+
+export const navLinks = [...navPrimaryLinks, ...navMoreLinks] as const;
 
 export const hero = {
   headline: "Know what you pay — before it renews.",
@@ -528,6 +535,8 @@ export const enContent: SiteContent = {
   siteMeta,
   localeSwitcher,
   headerNav,
+  navPrimaryLinks,
+  navMoreLinks,
   navLinks,
   hero,
   videoSection,

@@ -38,17 +38,24 @@ const localeSwitcher = {
 const headerNav = {
   download: "Скачать",
   menuToggle: "Меню",
+  moreLabel: "Ещё",
+  moreMenuAria: "Другие разделы",
 };
 
-const navLinks = [
+const navPrimaryLinks = [
   { id: "why", label: "Зачем Subly", icon: "heart-outline" },
   { id: "subscriptions", label: "Подписки", icon: "repeat" },
   { id: "dashboard", label: "Дашборд", icon: "view-dashboard-outline" },
   { id: "video", label: "Демо", icon: "play-circle-outline" },
+] as const;
+
+const navMoreLinks = [
   { id: "ai", label: "ИИ", icon: "robot-outline" },
   { id: "sync", label: "Синхронизация", icon: "cloud-sync-outline" },
   { id: "faq", label: "FAQ", icon: "help-circle-outline" },
 ] as const;
+
+const navLinks = [...navPrimaryLinks, ...navMoreLinks] as const;
 
 const hero = {
   headline: "Знайте, за что платите — до автопродления.",
@@ -527,6 +534,8 @@ export const ruContent: SiteContent = {
   siteMeta,
   localeSwitcher,
   headerNav,
+  navPrimaryLinks,
+  navMoreLinks,
   navLinks,
   hero,
   videoSection,

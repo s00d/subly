@@ -47,6 +47,7 @@ export const mdiIconNames = [
   "keyboard-outline",
   "image-plus-outline",
   "content-paste",
+  "dots-horizontal",
 ] as const;
 
 export type MdiIconName = (typeof mdiIconNames)[number];

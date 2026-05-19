@@ -29,6 +29,10 @@ export function useSiteContent() {
     void router.push({ path: homePathFor(target), hash });
   }
 
+  function sectionLink(sectionId: string) {
+    return { path: homePath.value, hash: `#${sectionId}` };
+  }
+
   return {
     locale,
     content,
@@ -36,5 +40,6 @@ export function useSiteContent() {
     isHome,
     docPaths,
     switchLocale,
+    sectionLink,
   };
 }

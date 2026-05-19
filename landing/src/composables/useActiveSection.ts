@@ -1,31 +1,57 @@
-import { onMounted, onUnmounted, ref, type Ref } from "vue";
+import { nextTick, onMounted, onUnmounted, ref, watch, type Ref } from "vue";
+import { useRoute } from "vue-router";
+
+/** Sticky header + scroll-margin — section counts as reached when its top crosses this line */
+const SCROLL_TRIGGER_PX = 96;
 
 export function useActiveSection(sectionIds: readonly string[]): Ref<string> {
   const active = ref(sectionIds[0] ?? "");
-  let observer: IntersectionObserver | null = null;
+  const route = useRoute();
+  let listening = false;
 
-  onMounted(() => {
-    const elements = sectionIds
-      .map((id) => document.getElementById(id))
-      .filter((el): el is HTMLElement => el != null);
+  function updateActive() {
+    let current = sectionIds[0] ?? "";
+    for (const id of sectionIds) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+      if (el.getBoundingClientRect().top <= SCROLL_TRIGGER_PX) {
+        current = id;
+      }
+    }
+    active.value = current;
+  }
 
-    if (elements.length === 0) return;
+  function bind() {
+    const hasSections = sectionIds.some((id) => document.getElementById(id) != null);
+    if (!hasSections || listening) return false;
 
-    observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
-        const top = visible[0]?.target;
-        if (top?.id) active.value = top.id;
-      },
-      { rootMargin: "-40% 0px -45% 0px", threshold: [0, 0.15, 0.4] },
-    );
+    listening = true;
+    updateActive();
+    window.addEventListener("scroll", updateActive, { passive: true });
+    window.addEventListener("resize", updateActive, { passive: true });
+    return true;
+  }
 
-    for (const el of elements) observer.observe(el);
-  });
+  function unbind() {
+    if (!listening) return;
+    listening = false;
+    window.removeEventListener("scroll", updateActive);
+    window.removeEventListener("resize", updateActive);
+  }
 
-  onUnmounted(() => observer?.disconnect());
+  async function setup() {
+    await nextTick();
+    unbind();
+    if (bind()) return;
+    requestAnimationFrame(() => {
+      unbind();
+      bind();
+    });
+  }
+
+  onMounted(setup);
+  watch(() => route.path, setup);
+  onUnmounted(unbind);
 
   return active;
 }

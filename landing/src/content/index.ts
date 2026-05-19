@@ -14,7 +14,8 @@ export function getSiteContent(locale: LocaleId): SiteContent {
 }
 
 export function localeFromPath(path: string): LocaleId {
-  return path === "/ru" || path.startsWith("/ru/") ? "ru" : "en";
+  const normalized = path.replace(/\/+$/, "") || "/";
+  return normalized === "/ru" || normalized.startsWith("/ru/") ? "ru" : "en";
 }
 
 export function homePathFor(locale: LocaleId): string {

@@ -34,7 +34,11 @@ export interface SiteContent {
   headerNav: {
     download: string;
     menuToggle: string;
+    moreLabel: string;
+    moreMenuAria: string;
   };
+  navPrimaryLinks: readonly { id: string; label: string; icon: string }[];
+  navMoreLinks: readonly { id: string; label: string; icon: string }[];
   navLinks: readonly { id: string; label: string; icon: string }[];
   hero: {
     headline: string;
