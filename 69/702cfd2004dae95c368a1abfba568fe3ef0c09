@@ -1,0 +1,88 @@
+landing/src/components/sections/HeroSection.vue
+  s_760a8176b5063e::t_a0c5edbe081663 2,6,9-14,36,38-39
+landing/src/router/index.ts
+  s_760a8176b5063e::t_c333db6944c5cb 3-4,8-22
+landing/scripts/fetch-github-release.mjs
+  s_760a8176b5063e::t_bb0deeaea0cc7f 1-13,46,60,64-112
+  s_760a8176b5063e::t_943a071e534865 14-45,47-59,61-63
+landing/src/mdi-icons.ts
+  s_760a8176b5063e::t_183ab66aeab082 39-40
+landing/.gitignore
+  s_760a8176b5063e::t_906594b91c2644 4
+landing/src/styles/main.css
+  s_760a8176b5063e::t_0bc50e2ed683cc 3-9,80-163
+landing/env.d.ts
+  s_760a8176b5063e::t_285bbad1b69efd 3-7
+README.md
+  s_760a8176b5063e::t_2634af612ee05f 25-30
+landing/src/views/ChangelogView.vue
+  s_760a8176b5063e::t_cc60b4a757df46 1-6,8
+  s_760a8176b5063e::t_998c2edf45373b 7
+landing/src/components/layout/MarkdownPage.vue
+  s_760a8176b5063e::t_b7700ce198e63b 1-17
+landing/scripts/copy-spa-fallback.mjs
+  s_760a8176b5063e::t_c7b3a04b10d7a7 1-17
+landing/src/composables/useReleaseDownloads.ts
+  s_760a8176b5063e::t_5af26608203eb0 1-23
+landing/src/components/layout/SiteFooter.vue
+  s_760a8176b5063e::t_2ecff0f72a2973 2,19-38
+landing/src/components/layout/SiteHeader.vue
+  s_760a8176b5063e::t_f985c6c6284baf 3
+  s_760a8176b5063e::t_ced5e73fce716c 2,6,13-17,29,38,51-57,62,64-65,97,99-100
+landing/package.json
+  s_760a8176b5063e::t_f3953fecc65ba9 9-10,12-13,18
+landing/src/content/site.en.ts
+  s_760a8176b5063e::t_4cfb6fda2dff46 228,230-291
+  s_760a8176b5063e::t_52b0546621bc9a 14-16
+  s_760a8176b5063e::t_12aab874377388 331-333
+  s_760a8176b5063e::t_1f4a56fb9ffad0 343-346
+landing/src/views/PrivacyView.vue
+  s_760a8176b5063e::t_e2055dc832fb4b 7
+  s_760a8176b5063e::t_0e62f5d6da421a 1-6,8
+landing/src/components/sections/DeviceGallerySection.vue
+  s_760a8176b5063e::t_f6dd1a2f252d97 24,40
+  s_760a8176b5063e::t_0882c09096494b 1,3-5,7-11,15-23,25-39,41-42,44-45,47,49-63,65-66
+  s_760a8176b5063e::t_9c50bae8c5ee1b 2,6,12-14,43,46,48,64
+landing/pnpm-lock.yaml
+  ai_agent 14-16,578-582,1229
+landing/src/App.vue
+  s_760a8176b5063e::t_306c1de465a115 2-3,7,9-18
+landing/src/types/releases.ts
+  s_760a8176b5063e::t_6a790eb59cfef1 1-15
+landing/src/components/sections/AppStoreSection.vue
+  s_760a8176b5063e::t_21d2319d7713b9 1-29
+landing/src/views/HomeView.vue
+  s_760a8176b5063e::t_1b72a3835f1237 7,45
+landing/public/sitemap.xml
+  s_760a8176b5063e::t_9dc8ac6bc38faf 8-17
+landing/src/components/seo/JsonLd.vue
+  s_760a8176b5063e::t_1e8df54b79269f 4,9-19,39-48,50
+landing/src/components/sections/PrivacySection.vue
+  s_760a8176b5063e::t_4c0fa473a31c07 2,6,33-34,37-39
+landing/src/components/sections/PlatformDownloads.vue
+  s_760a8176b5063e::t_0387af79367c3b 1-21,23-24,30,50,52
+  s_760a8176b5063e::t_63d824a0fc2078 22,25-29,31-49
+  s_760a8176b5063e::t_0f750cc355e470 51
+landing/scripts/copy-assets.mjs
+  s_760a8176b5063e::t_331012abc38134 25-37,42,53,67-74
+landing/src/components/sections/DownloadSection.vue
+  s_760a8176b5063e::t_d9d6317e568acf 2-3,32
+  s_760a8176b5063e::t_8046785969e9ff 4-5,8,10-15,22,28-31,33-35,38,40-41,55-61
+  s_760a8176b5063e::t_57e9f74615ed99 36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "69702cfd2004dae95c368a1abfba568fe3ef0c09",
+  "prompts": {},
+  "sessions": {
+    "s_760a8176b5063e": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "6692d145-fd20-4ecf-8b63-3cef51d42ee6",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
