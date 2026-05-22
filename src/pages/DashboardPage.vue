@@ -22,6 +22,7 @@ import "@/lib/echarts";
 import { Wallet, ArrowRight, Settings2, Eye, EyeOff, ChevronUp, ChevronDown } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import { ui, typo, statValue } from "@/lib/tv";
+import { moneyFromDecimal, parseMoney, toDisplayNumber, moneyGt, mul, type MoneyString } from "@/lib/money";
 
 import OverdueAlert from "@/components/dashboard/OverdueAlert.vue";
 import UpcomingPayments from "@/components/dashboard/UpcomingPayments.vue";
@@ -159,17 +160,17 @@ async function loadDashboardSubscriptions() {
 
 const activeCount = computed(() => summary.value?.activeCount ?? 0);
 const inactiveCount = computed(() => summary.value?.inactiveCount ?? 0);
-const totalMonthly = computed(() => summary.value?.totalMonthly ?? 0);
-const totalYearly = computed(() => summary.value?.totalYearly ?? 0);
-const avgMonthly = computed(() => summary.value?.avgMonthly ?? 0);
+const totalMonthly = computed(() => summary.value?.totalMonthly ?? "0");
+const totalYearly = computed(() => summary.value?.totalYearly ?? "0");
+const avgMonthly = computed(() => summary.value?.avgMonthly ?? "0");
 const mostExpensive = computed(() => summary.value?.mostExpensive ?? null);
-const amountDueThisMonth = computed(() => summary.value?.amountDueThisMonth ?? 0);
-const budget = computed(() => summary.value?.budget ?? 0);
+const amountDueThisMonth = computed(() => summary.value?.amountDueThisMonth ?? "0");
+const budget = computed(() => summary.value?.budget ?? "0");
 
 const budgetUsed = computed(() => summary.value?.budgetUsed ?? null);
 const budgetLeft = computed(() => summary.value?.budgetLeft ?? null);
 const overBudget = computed(() => summary.value?.overBudget ?? null);
-const totalSavingsMonthly = computed(() => summary.value?.totalSavingsMonthly ?? 0);
+const totalSavingsMonthly = computed(() => summary.value?.totalSavingsMonthly ?? "0");
 
 // Charts
 const chartColors = ["#3b82f6", "#22c55e", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899", "#f97316", "#14b8a6", "#6366f1"];
@@ -178,7 +179,7 @@ const categoryCosts = computed(() => charts.value?.categoryCosts ?? []);
 const pmCounts = computed(() => charts.value?.pmCounts ?? []);
 const memberCosts = computed(() => charts.value?.memberCosts ?? []);
 
-function splitPieOption(items: { name: string; cost?: number; count?: number }[]): EChartsCoreOption {
+function splitPieOption(items: { name: string; cost?: MoneyString; count?: number }[]): EChartsCoreOption {
   return {
     animationDuration: 420,
     tooltip: {
@@ -213,7 +214,11 @@ function splitPieOption(items: { name: string; cost?: number; count?: number }[]
         },
         data: items.map((c, i) => ({
           name: c.name,
-          value: Math.round((c.cost ?? c.count ?? 0) * 100) / 100,
+          value: toDisplayNumber(
+            parseMoney(
+              c.cost ?? (c.count != null ? String(c.count) : "0"),
+            ),
+          ),
           itemStyle: { color: chartColors[i % chartColors.length] },
         })),
       },
@@ -222,7 +227,9 @@ function splitPieOption(items: { name: string; cost?: number; count?: number }[]
 }
 
 const categoryChartOption = computed(() => splitPieOption(categoryCosts.value));
-const pmChartOption = computed(() => splitPieOption(pmCounts.value.map((p) => ({ name: p.name, cost: p.count }))));
+const pmChartOption = computed(() =>
+  splitPieOption(pmCounts.value.map((p) => ({ name: p.name, count: p.count }))),
+);
 const memberChartOption = computed(() => splitPieOption(memberCosts.value));
 
 const hasCharts = computed(() => categoryCosts.value.length > 1 || pmCounts.value.length > 1 || memberCosts.value.length > 1);
@@ -236,8 +243,8 @@ const categoryAverages = computed(() => trends.value?.categoryAverages ?? []);
 const expenseAggregation = computed(
   () =>
     summary.value?.expenseAggregation ?? {
-      monthTotal: 0,
-      yearTotal: 0,
+      monthTotal: "0",
+      yearTotal: "0",
       recentExpenses: [],
     },
 );
@@ -247,6 +254,13 @@ const dayOfWeekStats = computed(() => trends.value?.dayOfWeekStats ?? []);
 const monthComparisonData = computed(() => trends.value?.monthComparisonData ?? null);
 const tagExpenseStats = computed(() => trends.value?.tagExpenseStats ?? []);
 const hasAnalytics = computed(() => activeCount.value > 0);
+
+const mostExpensiveForCards = computed(() =>
+  mostExpensive.value
+    ? { name: mostExpensive.value.name, price: mostExpensive.value.price }
+    : null,
+);
+
 </script>
 
 <template>
@@ -334,22 +348,28 @@ const hasAnalytics = computed(() => activeCount.value > 0);
 
         <!-- stats -->
         <StatsCards v-if="w.id === 'stats' && w.visible"
-          :activeCount="activeCount" :totalMonthly="totalMonthly" :totalYearly="totalYearly"
-          :amountDue="amountDueThisMonth" :avgMonthly="avgMonthly" :mostExpensive="mostExpensive"
-          :budgetUsed="budgetUsed" :totalSavings="totalSavingsMonthly" :fmt="fmt"
+          :activeCount="activeCount"
+          :totalMonthly="totalMonthly"
+          :totalYearly="totalYearly"
+          :amountDue="amountDueThisMonth"
+          :avgMonthly="avgMonthly"
+          :mostExpensive="mostExpensiveForCards"
+          :budgetUsed="budgetUsed"
+          :totalSavings="totalSavingsMonthly"
+          :fmt="fmt"
         />
 
         <!-- budget -->
-        <div v-if="w.id === 'budget' && w.visible && budget > 0" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
+        <div v-if="w.id === 'budget' && w.visible && moneyGt(budget, '0')" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
           <h2 :class="[ui.sectionTitle(), 'mb-2.5 sm:mb-3']">{{ t('your_budget') }}</h2>
           <div class="space-y-3">
             <div class="w-full bg-surface-hover rounded-full h-2.5 sm:h-3">
-              <div class="h-full rounded-full transition-all duration-500" :class="(budgetUsed || 0) > 100 ? 'bg-red-500' : 'bg-primary'" :style="{ width: Math.min(budgetUsed || 0, 100) + '%' }" />
+              <div class="h-full rounded-full transition-all duration-500" :class="moneyGt(budgetUsed ?? '0', '100') ? 'bg-red-500' : 'bg-primary'" :style="{ width: Math.min(toDisplayNumber(parseMoney(budgetUsed ?? '0')), 100) + '%' }" />
             </div>
             <div class="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-4 text-xs sm:text-sm">
               <div><p class="text-text-muted">{{ t('budget') }}</p><p class="font-semibold text-text-primary">{{ fmt(budget) }}</p></div>
-              <div><p class="text-text-muted">{{ t('budget_used') }}</p><p class="font-semibold text-text-primary">{{ fmtPercent(budgetUsed || 0) }}</p></div>
-              <div><p class="text-text-muted">{{ t('budget_remaining') }}</p><p class="font-semibold text-text-primary">{{ fmt(budgetLeft || 0) }}</p></div>
+              <div><p class="text-text-muted">{{ t('budget_used') }}</p><p class="font-semibold text-text-primary">{{ fmtPercent(toDisplayNumber(parseMoney(budgetUsed ?? '0'))) }}</p></div>
+              <div><p class="text-text-muted">{{ t('budget_remaining') }}</p><p class="font-semibold text-text-primary">{{ fmt(budgetLeft ?? '0') }}</p></div>
               <div v-if="overBudget"><p class="text-red-500">{{ t('over_budget') }}</p><p class="font-semibold text-red-500">{{ fmt(overBudget) }}</p></div>
             </div>
           </div>
@@ -361,7 +381,7 @@ const hasAnalytics = computed(() => activeCount.value > 0);
           <div class="grid grid-cols-3 gap-2 sm:gap-4">
             <div><p :class="typo.statLabel()">{{ t('inactive_subscriptions') }}</p><p :class="statValue()">{{ inactiveCount }}</p></div>
             <div><p :class="typo.statLabel()">{{ t('monthly_savings') }}</p><p :class="statValue({ tone: 'green' })">{{ fmt(totalSavingsMonthly) }}</p></div>
-            <div><p :class="typo.statLabel()">{{ t('yearly_savings') }}</p><p :class="statValue({ tone: 'green' })">{{ fmt(totalSavingsMonthly * 12) }}</p></div>
+            <div><p :class="typo.statLabel()">{{ t('yearly_savings') }}</p><p :class="statValue({ tone: 'green' })">{{ fmt(moneyFromDecimal(mul(totalSavingsMonthly, '12'))) }}</p></div>
           </div>
         </div>
 

@@ -1,4 +1,5 @@
 use chrono::Datelike;
+use rust_decimal::Decimal;
 use tauri::State;
 use crate::AppState;
 
@@ -94,11 +95,11 @@ fn is_last_day_of_month(d: chrono::NaiveDate) -> bool {
 
 fn month_expense_totals(
     expenses: &[crate::models::ExpenseDoc],
-    rates: &std::collections::HashMap<String, f64>,
+    rates: &std::collections::HashMap<String, Decimal>,
     year: i32,
     month: u32,
-) -> (f64, usize) {
-    let total: f64 = expenses
+) -> (Decimal, usize) {
+    let total: Decimal = expenses
         .iter()
         .filter(|e| expense_in_calendar_month(e, year, month))
         .map(|e| crate::convert_to_main(e.amount, &e.currency_id, rates))
@@ -120,8 +121,8 @@ enum MonthComparisonStyle {
 }
 
 struct ResolvedMonthComparison {
-    current_total: f64,
-    previous_total: f64,
+    current_total: Decimal,
+    previous_total: Decimal,
     current_count: usize,
     previous_count: usize,
     style: MonthComparisonStyle,
@@ -140,15 +141,15 @@ fn comparison_style_str(s: MonthComparisonStyle) -> &'static str {
 /// Month-to-date totals vs same calendar span in the previous month.
 fn mtd_comparison_totals(
     expenses: &[crate::models::ExpenseDoc],
-    rates: &std::collections::HashMap<String, f64>,
+    rates: &std::collections::HashMap<String, Decimal>,
     today: chrono::NaiveDate,
-) -> (f64, f64) {
-    let current: f64 = expenses
+) -> (Decimal, Decimal) {
+    let current: Decimal = expenses
         .iter()
         .filter(|e| is_expense_mtd_current_doc(e, today))
         .map(|e| crate::convert_to_main(e.amount, &e.currency_id, rates))
         .sum();
-    let previous: f64 = expenses
+    let previous: Decimal = expenses
         .iter()
         .filter(|e| is_expense_mtd_previous_doc(e, today))
         .map(|e| crate::convert_to_main(e.amount, &e.currency_id, rates))
@@ -165,16 +166,16 @@ fn mtd_comparison_counts(expenses: &[crate::models::ExpenseDoc], today: chrono::
 /// Full calendar months: current month vs previous month (all recorded days in each).
 fn full_month_comparison_totals(
     expenses: &[crate::models::ExpenseDoc],
-    rates: &std::collections::HashMap<String, f64>,
+    rates: &std::collections::HashMap<String, Decimal>,
     today: chrono::NaiveDate,
-) -> (f64, f64) {
+) -> (Decimal, Decimal) {
     let (py, pm) = calendar_previous_ym(today);
-    let current: f64 = expenses
+    let current: Decimal = expenses
         .iter()
         .filter(|e| expense_in_calendar_month(e, today.year(), today.month()))
         .map(|e| crate::convert_to_main(e.amount, &e.currency_id, rates))
         .sum();
-    let previous: f64 = expenses
+    let previous: Decimal = expenses
         .iter()
         .filter(|e| expense_in_calendar_month(e, py, pm))
         .map(|e| crate::convert_to_main(e.amount, &e.currency_id, rates))
@@ -199,7 +200,7 @@ fn full_month_comparison_counts(expenses: &[crate::models::ExpenseDoc], today: c
 /// Otherwise fall back to full calendar months (current vs previous), then zeros with MTD labels.
 fn resolve_month_comparison(
     expenses: &[crate::models::ExpenseDoc],
-    rates: &std::collections::HashMap<String, f64>,
+    rates: &std::collections::HashMap<String, Decimal>,
     today: chrono::NaiveDate,
 ) -> ResolvedMonthComparison {
     let (mtd_c, mtd_p) = mtd_comparison_totals(expenses, rates, today);
@@ -209,7 +210,7 @@ fn resolve_month_comparison(
     let (py0, pm0) = calendar_previous_ym(today);
     let prev_label = ym_label(py0, pm0);
 
-    if mtd_c != 0.0 || mtd_p != 0.0 {
+    if mtd_c != Decimal::ZERO || mtd_p != Decimal::ZERO {
         return ResolvedMonthComparison {
             current_total: mtd_c,
             previous_total: mtd_p,
@@ -227,7 +228,7 @@ fn resolve_month_comparison(
     let (pair_c, pair_cc) = month_expense_totals(expenses, rates, y_m1, m_m1);
     let (pair_p, pair_pc) = month_expense_totals(expenses, rates, y_m2, m_m2);
 
-    if !is_last_day_of_month(today) && (pair_c > 0.0 || pair_p > 0.0) {
+    if !is_last_day_of_month(today) && (pair_c > Decimal::ZERO || pair_p > Decimal::ZERO) {
         return ResolvedMonthComparison {
             current_total: pair_c,
             previous_total: pair_p,
@@ -241,7 +242,7 @@ fn resolve_month_comparison(
 
     let (full_c, full_p) = full_month_comparison_totals(expenses, rates, today);
     let (fc_c, fc_p) = full_month_comparison_counts(expenses, today);
-    if full_c > 0.0 || full_p > 0.0 {
+    if full_c > Decimal::ZERO || full_p > Decimal::ZERO {
         return ResolvedMonthComparison {
             current_total: full_c,
             previous_total: full_p,
@@ -254,8 +255,8 @@ fn resolve_month_comparison(
     }
 
     ResolvedMonthComparison {
-        current_total: 0.0,
-        previous_total: 0.0,
+        current_total: Decimal::ZERO,
+        previous_total: Decimal::ZERO,
         current_count: 0,
         previous_count: 0,
         style: MonthComparisonStyle::Mtd,
@@ -268,14 +269,17 @@ fn resolve_month_comparison(
 #[serde(rename_all = "camelCase")]
 pub struct DashboardMostExpensiveDto {
     pub name: String,
-    pub price: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub price: Decimal,
 }
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardExpenseAggregationDto {
-    pub month_total: f64,
-    pub year_total: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub month_total: Decimal,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub year_total: Decimal,
     pub recent_expenses: Vec<crate::models::ExpenseDoc>,
 }
 
@@ -285,17 +289,27 @@ pub struct DashboardSummaryDto {
     pub has_subscriptions: bool,
     pub active_count: usize,
     pub inactive_count: usize,
-    pub total_monthly: f64,
-    pub total_yearly: f64,
-    pub avg_monthly: f64,
-    pub amount_due_this_month: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub total_monthly: Decimal,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub total_yearly: Decimal,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub avg_monthly: Decimal,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub amount_due_this_month: Decimal,
     pub most_expensive: Option<DashboardMostExpensiveDto>,
-    pub budget: f64,
-    pub budget_used: Option<f64>,
-    pub budget_left: Option<f64>,
-    pub over_budget: Option<f64>,
-    pub total_savings_monthly: f64,
-    pub monthly_expenses_total: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub budget: Decimal,
+    #[serde(with = "crate::money::serde_ipc_option")]
+    pub budget_used: Option<Decimal>,
+    #[serde(with = "crate::money::serde_ipc_option")]
+    pub budget_left: Option<Decimal>,
+    #[serde(with = "crate::money::serde_ipc_option")]
+    pub over_budget: Option<Decimal>,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub total_savings_monthly: Decimal,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub monthly_expenses_total: Decimal,
     pub overdue_subscriptions: Vec<crate::models::SubscriptionDoc>,
     pub upcoming_subscriptions: Vec<crate::models::SubscriptionDoc>,
     pub expense_aggregation: DashboardExpenseAggregationDto,
@@ -306,7 +320,8 @@ pub struct DashboardSummaryDto {
 pub struct DashboardCostByIdDto {
     pub id: String,
     pub name: String,
-    pub cost: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub cost: Decimal,
 }
 
 #[derive(serde::Serialize)]
@@ -328,8 +343,10 @@ pub struct DashboardChartsDto {
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardForecastInnerDto {
-    pub next_month: f64,
-    pub next_quarter: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub next_month: Decimal,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub next_quarter: Decimal,
     pub next_month_label: String,
     pub quarter_labels: Vec<String>,
 }
@@ -339,10 +356,14 @@ pub struct DashboardForecastInnerDto {
 pub struct DashboardMonthComparisonDto {
     pub current_month: String,
     pub previous_month: String,
-    pub current: f64,
-    pub previous: f64,
-    pub diff: f64,
-    pub diff_percent: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub current: Decimal,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub previous: Decimal,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub diff: Decimal,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub diff_percent: Decimal,
     /// True when comparison is not MTD (`completedPair` or `fullMonths`).
     pub used_full_month_fallback: bool,
     /// `mtd` | `completedPair` | `fullMonths`
@@ -360,7 +381,8 @@ pub struct DashboardForecastDto {
 #[serde(rename_all = "camelCase")]
 pub struct DashboardDayOfWeekStatDto {
     pub day_of_week: usize,
-    pub total: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub total: Decimal,
     pub count: i64,
 }
 
@@ -368,7 +390,8 @@ pub struct DashboardDayOfWeekStatDto {
 #[serde(rename_all = "camelCase")]
 pub struct DashboardTagExpenseStatDto {
     pub tag: String,
-    pub total: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub total: Decimal,
 }
 
 #[derive(serde::Serialize)]
@@ -377,7 +400,8 @@ pub struct DashboardSpendingHistoryDto {
     pub label: String,
     pub year: i32,
     pub month: u32,
-    pub amount: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub amount: Decimal,
 }
 
 #[derive(serde::Serialize)]
@@ -388,8 +412,10 @@ pub struct DashboardLifetimeCostDto {
     pub logo: String,
     pub start_date: String,
     pub months_active: i64,
-    pub total_paid: f64,
-    pub monthly_equivalent: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub total_paid: Decimal,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub monthly_equivalent: Decimal,
 }
 
 #[derive(serde::Serialize)]
@@ -397,25 +423,31 @@ pub struct DashboardLifetimeCostDto {
 pub struct DashboardCategoryAverageDto {
     pub category_id: String,
     pub category_name: String,
-    pub total_monthly: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub total_monthly: Decimal,
     pub subscription_count: i64,
-    pub average_monthly: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub average_monthly: Decimal,
 }
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardAvgExpenseStatsDto {
-    pub avg_amount: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub avg_amount: Decimal,
     pub count: usize,
-    pub total: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub total: Decimal,
 }
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DashboardMonthComparisonDataDto {
-    pub current_total: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub current_total: Decimal,
     pub current_count: usize,
-    pub previous_total: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub previous_total: Decimal,
     pub previous_count: usize,
     pub used_full_month_fallback: bool,
     pub comparison_style: String,
@@ -445,14 +477,18 @@ pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSumm
     let active = data.subscriptions.iter().filter(|s| !s.inactive).collect::<Vec<_>>();
     let inactive_count = data.subscriptions.iter().filter(|s| s.inactive).count();
 
-    let total_monthly: f64 = active
+    let total_monthly: Decimal = active
         .iter()
         .map(|s| crate::price_per_month(s.cycle, s.frequency, crate::convert_to_main(s.price, &s.currency_id, &rates)))
         .sum();
-    let total_yearly = total_monthly * 12.0;
-    let avg_monthly = if active.is_empty() { 0.0 } else { total_monthly / active.len() as f64 };
+    let total_yearly = total_monthly * Decimal::from(12);
+    let avg_monthly = if active.is_empty() {
+        Decimal::ZERO
+    } else {
+        total_monthly / Decimal::from(active.len())
+    };
 
-    let amount_due_this_month: f64 = active
+    let amount_due_this_month: Decimal = active
         .iter()
         .filter_map(|s| chrono::NaiveDate::parse_from_str(&s.next_payment, "%Y-%m-%d").ok().map(|d| (s, d)))
         .filter(|(_, d)| d.year() == today.year() && d.month() == today.month() && *d >= today)
@@ -468,9 +504,9 @@ pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSumm
                 price: m,
             }
         })
-        .max_by(|a, b| a.price.partial_cmp(&b.price).unwrap_or(std::cmp::Ordering::Equal));
+        .max_by(|a, b| a.price.cmp(&b.price));
 
-    let monthly_expenses_total: f64 = data
+    let monthly_expenses_total: Decimal = data
         .expenses
         .iter()
         .filter(|e| expense_in_calendar_month(e, today.year(), today.month()))
@@ -478,11 +514,24 @@ pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSumm
         .sum();
     let total_spending = total_monthly + monthly_expenses_total;
     let budget = data.settings.budget;
-    let budget_used = if budget > 0.0 { Some((total_spending / budget * 100.0).min(100.0)) } else { None };
-    let budget_left = if budget > 0.0 { Some((budget - total_spending).max(0.0)) } else { None };
-    let over_budget = if budget > 0.0 && total_spending > budget { Some(total_spending - budget) } else { None };
+    let hundred = Decimal::from(100);
+    let budget_used = if budget > Decimal::ZERO {
+        Some((total_spending / budget * hundred).min(hundred))
+    } else {
+        None
+    };
+    let budget_left = if budget > Decimal::ZERO {
+        Some((budget - total_spending).max(Decimal::ZERO))
+    } else {
+        None
+    };
+    let over_budget = if budget > Decimal::ZERO && total_spending > budget {
+        Some(total_spending - budget)
+    } else {
+        None
+    };
 
-    let total_savings_monthly: f64 = data
+    let total_savings_monthly: Decimal = data
         .subscriptions
         .iter()
         .filter(|s| s.inactive)
@@ -503,13 +552,13 @@ pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSumm
         .take(5)
         .collect::<Vec<_>>();
 
-    let month_total: f64 = data
+    let month_total: Decimal = data
         .expenses
         .iter()
         .filter(|e| expense_in_calendar_month(e, today.year(), today.month()))
         .map(|e| e.amount)
         .sum();
-    let year_total: f64 = data
+    let year_total: Decimal = data
         .expenses
         .iter()
         .filter(|e| expense_in_year(e, today.year()))
@@ -563,14 +612,14 @@ pub fn get_dashboard_charts(state: State<'_, AppState>) -> Result<DashboardChart
     let payment_name = data.payment_methods.iter().map(|p| (p.id.clone(), p.name.clone())).collect::<std::collections::HashMap<_, _>>();
     let member_name = data.household.iter().map(|h| (h.id.clone(), h.name.clone())).collect::<std::collections::HashMap<_, _>>();
 
-    let mut category_costs: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    let mut category_costs: std::collections::HashMap<String, Decimal> = std::collections::HashMap::new();
     let mut pm_counts: std::collections::HashMap<String, i64> = std::collections::HashMap::new();
-    let mut member_costs: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    let mut member_costs: std::collections::HashMap<String, Decimal> = std::collections::HashMap::new();
     for s in active {
         let monthly = crate::price_per_month(s.cycle, s.frequency, crate::convert_to_main(s.price, &s.currency_id, &rates));
-        *category_costs.entry(s.category_id.clone()).or_insert(0.0) += monthly;
+        *category_costs.entry(s.category_id.clone()).or_insert(Decimal::ZERO) += monthly;
         *pm_counts.entry(s.payment_method_id.clone()).or_insert(0) += 1;
-        *member_costs.entry(s.payer_user_id.clone()).or_insert(0.0) += monthly;
+        *member_costs.entry(s.payer_user_id.clone()).or_insert(Decimal::ZERO) += monthly;
     }
 
     let category_costs = category_costs
@@ -610,20 +659,21 @@ pub fn get_dashboard_forecast(state: State<'_, AppState>) -> Result<DashboardFor
     let data = { let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?; guard.doc()? };
     let rates = crate::rate_map(&data);
     let active = data.subscriptions.iter().filter(|s| !s.inactive).collect::<Vec<_>>();
-    let next_month: f64 = active
+    let next_month: Decimal = active
         .iter()
         .map(|s| crate::price_per_month(s.cycle, s.frequency, crate::convert_to_main(s.price, &s.currency_id, &rates)))
         .sum();
-    let next_quarter = next_month * 3.0;
+    let next_quarter = next_month * Decimal::from(3);
     let now = chrono::Local::now().date_naive();
     let resolved = resolve_month_comparison(&data.expenses, &rates, now);
     let diff = resolved.current_total - resolved.previous_total;
-    let diff_percent = if resolved.previous_total > 0.0 {
-        diff / resolved.previous_total * 100.0
-    } else if resolved.current_total > 0.0 {
-        100.0
+    let hundred = Decimal::from(100);
+    let diff_percent = if resolved.previous_total > Decimal::ZERO {
+        diff / resolved.previous_total * hundred
+    } else if resolved.current_total > Decimal::ZERO {
+        hundred
     } else {
-        0.0
+        Decimal::ZERO
     };
     Ok(DashboardForecastDto {
         forecast: DashboardForecastInnerDto {
@@ -653,7 +703,7 @@ pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrend
 
     let mut top = data.expenses.clone();
     top.retain(|e| expense_in_calendar_month(e, now.year(), now.month()));
-    top.sort_by(|a, b| b.amount.partial_cmp(&a.amount).unwrap_or(std::cmp::Ordering::Equal));
+    top.sort_by(|a, b| b.amount.cmp(&a.amount));
     top.truncate(5);
 
     let month_expenses = data
@@ -661,11 +711,18 @@ pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrend
         .iter()
         .filter(|e| expense_in_calendar_month(e, now.year(), now.month()))
         .collect::<Vec<_>>();
-    let total: f64 = month_expenses.iter().map(|e| crate::convert_to_main(e.amount, &e.currency_id, &rates)).sum();
-    let count = month_expenses.len() as f64;
-    let avg = if count > 0.0 { total / count } else { 0.0 };
+    let total: Decimal = month_expenses
+        .iter()
+        .map(|e| crate::convert_to_main(e.amount, &e.currency_id, &rates))
+        .sum();
+    let count = month_expenses.len();
+    let avg = if count > 0 {
+        total / Decimal::from(count)
+    } else {
+        Decimal::ZERO
+    };
 
-    let mut day_map = [0.0_f64; 7];
+    let mut day_map = [Decimal::ZERO; 7];
     let mut day_count = [0_i64; 7];
     for e in &month_expenses {
         if let Some(d) = e.naive_date() {
@@ -685,10 +742,10 @@ pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrend
     let cmp_res = resolve_month_comparison(&data.expenses, &rates, now);
     let month_expense_count = month_expenses.len();
 
-    let mut tag_map: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    let mut tag_map: std::collections::HashMap<String, Decimal> = std::collections::HashMap::new();
     for e in month_expenses {
         for tag in &e.tags {
-            *tag_map.entry(tag.clone()).or_insert(0.0) += e.amount;
+            *tag_map.entry(tag.clone()).or_insert(Decimal::ZERO) += e.amount;
         }
     }
     let mut tags = tag_map
@@ -696,18 +753,19 @@ pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrend
         .map(|(tag, total)| DashboardTagExpenseStatDto { tag, total })
         .collect::<Vec<_>>();
     tags.sort_by(|a, b| {
-        b.total
-            .partial_cmp(&a.total)
-            .unwrap_or(std::cmp::Ordering::Equal)
+        b.total.cmp(&a.total)
     });
 
     let active_subs = data.subscriptions.iter().filter(|s| !s.inactive).collect::<Vec<_>>();
-    let monthly_subs_total: f64 = active_subs.iter().map(|s| crate::price_per_month(s.cycle, s.frequency, crate::convert_to_main(s.price, &s.currency_id, &rates))).sum();
+    let monthly_subs_total: Decimal = active_subs
+        .iter()
+        .map(|s| crate::price_per_month(s.cycle, s.frequency, crate::convert_to_main(s.price, &s.currency_id, &rates)))
+        .sum();
     let mut spending_history = Vec::new();
     for back in (0..6).rev() {
         let (y, m) = shift_calendar_month(now.year(), now.month(), -(back as i32));
         let anchor = chrono::NaiveDate::from_ymd_opt(y, m, 1).unwrap();
-        let expenses_total: f64 = data
+        let expenses_total: Decimal = data
             .expenses
             .iter()
             .filter(|e| expense_in_calendar_month(e, y, m))
@@ -736,15 +794,15 @@ pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrend
             logo: s.logo.clone(),
             start_date: s.start_date.clone(),
             months_active,
-            total_paid: monthly * months_active as f64,
+            total_paid: monthly * Decimal::from(months_active),
             monthly_equivalent: monthly,
         }
     }).collect::<Vec<_>>();
 
-    let mut cat_map: std::collections::HashMap<String, (f64, i64)> = std::collections::HashMap::new();
+    let mut cat_map: std::collections::HashMap<String, (Decimal, i64)> = std::collections::HashMap::new();
     for s in &active_subs {
         let monthly = crate::price_per_month(s.cycle, s.frequency, crate::convert_to_main(s.price, &s.currency_id, &rates));
-        let item = cat_map.entry(s.category_id.clone()).or_insert((0.0, 0));
+        let item = cat_map.entry(s.category_id.clone()).or_insert((Decimal::ZERO, 0));
         item.0 += monthly;
         item.1 += 1;
     }
@@ -757,9 +815,9 @@ pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrend
             total_monthly,
             subscription_count: count,
             average_monthly: if count > 0 {
-                total_monthly / count as f64
+                total_monthly / Decimal::from(count)
             } else {
-                0.0
+                Decimal::ZERO
             },
         })
         .collect::<Vec<_>>();
@@ -794,7 +852,7 @@ mod comparison_tests {
     use super::*;
     use crate::models::ExpenseDoc;
 
-    fn expense_row(y: i32, m: u32, d: u32, amount: f64, currency_id: &str) -> ExpenseDoc {
+    fn expense_row(y: i32, m: u32, d: u32, amount: Decimal, currency_id: &str) -> ExpenseDoc {
         ExpenseDoc {
             id: format!("id-{y}-{m}-{d}"),
             updated_at: 1,
@@ -815,32 +873,32 @@ mod comparison_tests {
 
     #[test]
     fn resolve_comparison_prefers_mtd_when_any_bucket_nonzero() {
-        let rates = std::collections::HashMap::from([("USD".into(), 1.0)]);
+        let rates = std::collections::HashMap::from([("USD".into(), Decimal::ONE)]);
         let today = chrono::NaiveDate::from_ymd_opt(2026, 5, 5).unwrap();
         let expenses = vec![
-            expense_row(2026, 5, 3, 10.0, "USD"),
-            expense_row(2026, 4, 3, 20.0, "USD"),
+            expense_row(2026, 5, 3, Decimal::from(10), "USD"),
+            expense_row(2026, 4, 3, Decimal::from(20), "USD"),
         ];
         let r = resolve_month_comparison(&expenses, &rates, today);
         assert_eq!(r.style, MonthComparisonStyle::Mtd, "MTD should win");
-        assert_eq!(r.current_total, 10.0);
-        assert_eq!(r.previous_total, 20.0);
+        assert_eq!(r.current_total, Decimal::from(10));
+        assert_eq!(r.previous_total, Decimal::from(20));
         assert_eq!(r.current_count, 1);
         assert_eq!(r.previous_count, 1);
     }
 
     #[test]
     fn resolve_comparison_uses_completed_pair_when_mtd_empty_early_in_month() {
-        let rates = std::collections::HashMap::from([("USD".into(), 1.0)]);
+        let rates = std::collections::HashMap::from([("USD".into(), Decimal::ONE)]);
         let today = chrono::NaiveDate::from_ymd_opt(2026, 5, 5).unwrap();
         let expenses = vec![
-            expense_row(2026, 5, 15, 100.0, "USD"),
-            expense_row(2026, 4, 20, 200.0, "USD"),
+            expense_row(2026, 5, 15, Decimal::from(100), "USD"),
+            expense_row(2026, 4, 20, Decimal::from(200), "USD"),
         ];
         let r = resolve_month_comparison(&expenses, &rates, today);
         assert_eq!(r.style, MonthComparisonStyle::CompletedPair);
-        assert_eq!(r.current_total, 200.0, "April M-1");
-        assert_eq!(r.previous_total, 0.0, "March M-2");
+        assert_eq!(r.current_total, Decimal::from(200), "April M-1");
+        assert_eq!(r.previous_total, Decimal::ZERO, "March M-2");
         assert_eq!(r.current_month_label, "2026-04");
         assert_eq!(r.previous_month_label, "2026-03");
         assert_eq!(r.current_count, 1);

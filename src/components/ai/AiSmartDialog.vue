@@ -38,6 +38,11 @@ import {
   type StatementDraftRow,
 } from "@/services/aiClient";
 import { fsReadDroppedFile } from "@/services/fsClient";
+import { moneyFromNumber, moneyGt } from "@/lib/money";
+import {
+  ensureCategoryId,
+  ensurePaymentMethodId,
+} from "@/utils/catalogDefaults";
 
 interface ExpenseRowState {
   row: StatementDraftRow;
@@ -389,14 +394,16 @@ async function submit() {
     if (res.surface === "expense") {
       expenseRows.splice(0, expenseRows.length);
       for (const row of res.rows) {
+        fillCatalogDraftDefaults(row.draft);
         expenseRows.push({
           row,
-          selected: row.draft.amount > 0 && !!row.draft.name,
+          selected: moneyGt(moneyFromNumber(row.draft.amount), "0") && !!row.draft.name,
         });
       }
     } else {
       subscriptionRows.splice(0, subscriptionRows.length);
       for (const row of res.rows) {
+        fillCatalogDraftDefaults(row.draft);
         subscriptionRows.push({
           row,
           selected: !!row.draft.name && row.draft.price > 0,
@@ -503,6 +510,47 @@ const sourceLabel = computed(() => {
   return result.value.format.toUpperCase();
 });
 
+/** Fallback when the model omits hints (receipts often have no card on slip). */
+function fillCatalogDraftDefaults(draft: {
+  categoryId?: string;
+  paymentMethodId?: string;
+}) {
+  const categories = metaRefs.categories.value ?? [];
+  const paymentMethods = metaRefs.paymentMethods.value ?? [];
+  const s = metaRefs.settings.value;
+  draft.categoryId = ensureCategoryId(
+    draft.categoryId,
+    s?.defaultCategoryId,
+    categories,
+  );
+  draft.paymentMethodId = ensurePaymentMethodId(
+    draft.paymentMethodId,
+    s?.defaultPaymentMethodId,
+    paymentMethods,
+  );
+}
+
+function catalogIdsForSave(draft: {
+  categoryId?: string;
+  paymentMethodId?: string;
+}) {
+  const categories = metaRefs.categories.value ?? [];
+  const paymentMethods = metaRefs.paymentMethods.value ?? [];
+  const s = metaRefs.settings.value;
+  return {
+    categoryId: ensureCategoryId(
+      draft.categoryId,
+      s?.defaultCategoryId,
+      categories,
+    ),
+    paymentMethodId: ensurePaymentMethodId(
+      draft.paymentMethodId,
+      s?.defaultPaymentMethodId,
+      paymentMethods,
+    ),
+  };
+}
+
 async function confirmImport() {
   if (selectedCount.value === 0) {
     toast(t("ai_import_select_at_least_one"), "error");
@@ -516,19 +564,20 @@ async function confirmImport() {
       for (const state of expenseRows) {
         if (!state.selected) continue;
         const draft = state.row.draft;
-        if (!draft.name || draft.amount <= 0 || !draft.date || !draft.currencyId) {
+        if (!draft.name || !moneyGt(moneyFromNumber(draft.amount), "0") || !draft.date || !draft.currencyId) {
           failed += 1;
           continue;
         }
         try {
+          const { categoryId, paymentMethodId } = catalogIdsForSave(draft);
           await upsertExpense({
             id: crypto.randomUUID(),
             name: draft.name,
-            amount: draft.amount,
+            amount: moneyFromNumber(draft.amount),
             currencyId: draft.currencyId,
             createdAt: new Date(draft.date).toISOString(),
-            categoryId: draft.categoryId || "cat-1",
-            paymentMethodId: draft.paymentMethodId || "",
+            categoryId,
+            paymentMethodId,
             tags: draft.tags ?? [],
             notes: draft.notes ?? "",
             url: draft.url ?? "",
@@ -550,20 +599,21 @@ async function confirmImport() {
           continue;
         }
         try {
+          const { categoryId, paymentMethodId } = catalogIdsForSave(draft);
           await upsertSubscription({
             id: crypto.randomUUID(),
             name: draft.name,
             logo: "",
-            price: Number(draft.price) || 0,
+            price: moneyFromNumber(Number(draft.price) || 0),
             currencyId: draft.currencyId,
             nextPayment: draft.nextPayment || today,
             startDate: draft.startDate || today,
             cycle: Number(draft.cycle) || 3,
             frequency: Number(draft.frequency) || 1,
             notes: draft.notes ?? "",
-            paymentMethodId: draft.paymentMethodId || "",
+            paymentMethodId,
             payerUserId: householdId,
-            categoryId: draft.categoryId || "cat-1",
+            categoryId,
             notify: true,
             notifyDaysBefore: -1,
             lastNotifiedDate: "",
@@ -829,12 +879,7 @@ function onTextareaKeydown(ev: KeyboardEvent) {
             {{ fileName || sourceLabel }}
           </span>
           <span
-            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border"
-            :class="
-              isReceiptKind || isSingleSubscriptionKind
-                ? 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800'
-                : 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-200 dark:border-blue-800'
-            "
+            class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium border bg-surface-secondary text-text-secondary border-border"
           >
             <ReceiptIcon v-if="isReceiptKind" :size="10" />
             <CreditCard v-else-if="isSingleSubscriptionKind" :size="10" />
@@ -883,7 +928,7 @@ function onTextareaKeydown(ev: KeyboardEvent) {
             isReceiptKind &&
             (result.metadata.merchantName || result.metadata.lineItems.length > 0)
           "
-          class="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/10 p-2.5 space-y-1.5"
+          class="rounded-lg border border-border bg-surface-secondary p-2.5 space-y-1.5"
         >
           <div
             v-if="result.metadata.merchantName"
@@ -896,7 +941,7 @@ function onTextareaKeydown(ev: KeyboardEvent) {
           </div>
           <div
             v-if="result.metadata.lineItems.length > 0"
-            class="space-y-0.5 pt-1 border-t border-amber-200/50 dark:border-amber-800/50"
+            class="space-y-0.5 pt-1 border-t border-border"
           >
             <div
               v-for="(li, i) in result.metadata.lineItems"

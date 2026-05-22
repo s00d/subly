@@ -1,4 +1,4 @@
-import type { Expense, Subscription } from "@/schemas/appData";
+import type { Expense, MoneyString, Subscription } from "@/schemas/appData";
 
 /** IPC DTOs for dashboard commands — neutral module so `commandClient` avoids importing `dashboardClient` (cycle). */
 
@@ -6,7 +6,7 @@ export interface MonthlySpending {
   label: string;
   year: number;
   month: number;
-  amount: number;
+  amount: MoneyString;
 }
 
 export type MonthComparisonStyle = "mtd" | "completedPair" | "fullMonths";
@@ -14,17 +14,17 @@ export type MonthComparisonStyle = "mtd" | "completedPair" | "fullMonths";
 export interface MonthComparison {
   currentMonth: string;
   previousMonth: string;
-  current: number;
-  previous: number;
-  diff: number;
-  diffPercent: number;
+  current: MoneyString;
+  previous: MoneyString;
+  diff: MoneyString;
+  diffPercent: MoneyString;
   usedFullMonthFallback?: boolean;
   comparisonStyle?: MonthComparisonStyle;
 }
 
 export interface ForecastResult {
-  nextMonth: number;
-  nextQuarter: number;
+  nextMonth: MoneyString;
+  nextQuarter: MoneyString;
   nextMonthLabel: string;
   quarterLabels: string[];
 }
@@ -35,46 +35,46 @@ export interface LifetimeCost {
   logo: string;
   startDate: string;
   monthsActive: number;
-  totalPaid: number;
-  monthlyEquivalent: number;
+  totalPaid: MoneyString;
+  monthlyEquivalent: MoneyString;
 }
 
 export interface CategoryAverage {
   categoryId: string;
   categoryName: string;
-  totalMonthly: number;
+  totalMonthly: MoneyString;
   subscriptionCount: number;
-  averageMonthly: number;
+  averageMonthly: MoneyString;
 }
 
 export interface DashboardSummaryDto {
   hasSubscriptions: boolean;
   activeCount: number;
   inactiveCount: number;
-  totalMonthly: number;
-  totalYearly: number;
-  avgMonthly: number;
-  amountDueThisMonth: number;
-  mostExpensive: { name: string; price: number } | null;
-  budget: number;
-  budgetUsed: number | null;
-  budgetLeft: number | null;
-  overBudget: number | null;
-  totalSavingsMonthly: number;
-  monthlyExpensesTotal: number;
+  totalMonthly: MoneyString;
+  totalYearly: MoneyString;
+  avgMonthly: MoneyString;
+  amountDueThisMonth: MoneyString;
+  mostExpensive: { name: string; price: MoneyString } | null;
+  budget: MoneyString;
+  budgetUsed: MoneyString | null;
+  budgetLeft: MoneyString | null;
+  overBudget: MoneyString | null;
+  totalSavingsMonthly: MoneyString;
+  monthlyExpensesTotal: MoneyString;
   overdueSubscriptions: Subscription[];
   upcomingSubscriptions: Subscription[];
   expenseAggregation: {
-    monthTotal: number;
-    yearTotal: number;
+    monthTotal: MoneyString;
+    yearTotal: MoneyString;
     recentExpenses: Expense[];
   };
 }
 
 export interface DashboardChartsDto {
-  categoryCosts: Array<{ id: string; name: string; cost: number }>;
+  categoryCosts: Array<{ id: string; name: string; cost: MoneyString }>;
   pmCounts: Array<{ id: string; name: string; count: number }>;
-  memberCosts: Array<{ id: string; name: string; cost: number }>;
+  memberCosts: Array<{ id: string; name: string; cost: MoneyString }>;
 }
 
 export interface DashboardForecastDto {
@@ -87,22 +87,22 @@ export interface DashboardTrendsDto {
   lifetimeCosts?: LifetimeCost[];
   categoryAverages?: CategoryAverage[];
   topExpenses: Expense[];
-  avgExpenseStats: { avgAmount: number; count: number; total: number };
-  dayOfWeekStats: Array<{ dayOfWeek: number; total: number; count: number }>;
+  avgExpenseStats: { avgAmount: MoneyString; count: number; total: MoneyString };
+  dayOfWeekStats: Array<{ dayOfWeek: number; total: MoneyString; count: number }>;
   monthComparisonData: {
-    currentTotal: number;
+    currentTotal: MoneyString;
     currentCount: number;
-    previousTotal: number;
+    previousTotal: MoneyString;
     previousCount: number;
     usedFullMonthFallback?: boolean;
     comparisonStyle?: MonthComparisonStyle;
     currentMonthLabel?: string;
     previousMonthLabel?: string;
   };
-  tagExpenseStats: Array<{ tag: string; total: number }>;
+  tagExpenseStats: Array<{ tag: string; total: MoneyString }>;
 }
 
 export interface RateHistoryPoint {
-  rate: number;
+  rate: MoneyString;
   recordedAt: string;
 }

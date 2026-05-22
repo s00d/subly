@@ -7,8 +7,8 @@ use redb::MultimapTableDefinition;
 use serde::{de::DeserializeOwned, Serialize};
 use crate::errors::{AppError, AppResult};
 use crate::models::{
-    AppConfigDoc, AppDataDoc, CategoryDoc, CurrencyDoc, DeletionTombstone, ExpenseDoc, HouseholdMemberDoc,
-    PaymentMethodDoc, SettingsDoc, SubscriptionDoc, TagDoc, TombstoneEntityKind,
+    AppConfigDoc, AppDataDoc, CategoryDoc, DeletionTombstone, ExpenseDoc, HouseholdMemberDoc,
+    PaymentMethodDoc, SettingsDoc, TagDoc, TombstoneEntityKind,
 };
 
 pub struct AppStateInner {
@@ -18,7 +18,7 @@ pub struct AppStateInner {
 
 pub type AppState = Mutex<AppStateInner>;
 
-const KEY_DATA: &str = "data";
+pub(crate) const KEY_DATA: &str = "data";
 
 pub(crate) const T2_SUBSCRIPTIONS: TableDefinition<&str, &[u8]> = TableDefinition::new("subscriptions_v2");
 pub(crate) const T2_EXPENSES: TableDefinition<&str, &[u8]> = TableDefinition::new("expenses_v2");
@@ -223,9 +223,9 @@ pub(crate) fn replace_deletion_tombstones(db: &Database, rows: &[DeletionTombsto
     tx.commit().map_err(AppError::from)
 }
 
-fn default_settings_doc() -> SettingsDoc {
+pub(crate) fn default_settings_doc() -> SettingsDoc {
     SettingsDoc {
-        budget: 0.0,
+        budget: rust_decimal::Decimal::ZERO,
         main_currency_id: String::new(),
         currency_update_targets: Vec::new(),
         rate_history_days: 90,
@@ -383,14 +383,14 @@ where
 }
 
 pub fn load_app_data_typed(db: &Database) -> AppResult<(AppDataDoc, AppConfigDoc)> {
-    let subscriptions: Vec<SubscriptionDoc> = read_entity_table_bin_typed(db, T2_SUBSCRIPTIONS)?;
-    let expenses: Vec<ExpenseDoc> = read_entity_table_bin_typed(db, T2_EXPENSES)?;
+    let subscriptions = crate::money_migration::load_subscriptions_migrated(db)?;
+    let expenses = crate::money_migration::load_expenses_migrated(db)?;
     let categories: Vec<CategoryDoc> = read_entity_table_bin_typed(db, T2_CATEGORIES)?;
-    let currencies: Vec<CurrencyDoc> = read_entity_table_bin_typed(db, T2_CURRENCIES)?;
+    let currencies = crate::money_migration::load_currencies_migrated(db)?;
     let household: Vec<HouseholdMemberDoc> = read_entity_table_bin_typed(db, T2_HOUSEHOLD)?;
     let payment_methods: Vec<PaymentMethodDoc> = read_entity_table_bin_typed(db, T2_PAYMENT_METHODS)?;
     let tags: Vec<TagDoc> = read_entity_table_bin_typed(db, T2_TAGS)?;
-    let settings: SettingsDoc = read_singleton_bin_typed(db, T2_SETTINGS, default_settings_doc())?;
+    let settings = crate::money_migration::load_settings_migrated(db)?;
     let config: AppConfigDoc = read_singleton_bin_typed(db, T2_CONFIG, AppConfigDoc::default())?;
     Ok((
         AppDataDoc {
@@ -446,8 +446,7 @@ pub fn clear_all_typed_data(db: &Database) -> AppResult<()> {
 }
 
 pub fn load_rate_history(db: &Database) -> AppResult<String> {
-    let v: std::collections::HashMap<String, Vec<crate::RatePoint>> =
-        read_singleton_bin_typed(db, T2_RATE_HISTORY, std::collections::HashMap::new())?;
+    let v = crate::money_migration::load_rate_history_migrated(db)?;
     serde_json::to_string(&v).map_err(AppError::from)
 }
 

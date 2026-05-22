@@ -2,12 +2,13 @@
 import { ref, computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { LifetimeCost } from "@/services/dashboardClient";
+import { moneyFromDecimal, sumMoney, type MoneyString } from "@/lib/money";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import { Clock, ChevronDown, ChevronUp } from "@lucide/vue";
 
 const props = defineProps<{
   costs: LifetimeCost[];
-  fmt: (n: number) => string;
+  fmt: (n: MoneyString) => string;
 }>();
 
 const { t } = useI18n();
@@ -18,9 +19,7 @@ const visibleCosts = computed(() =>
   expanded.value ? props.costs : props.costs.slice(0, 5),
 );
 
-const totalLifetime = computed(() =>
-  props.costs.reduce((s, c) => s + c.totalPaid, 0),
-);
+const totalLifetime = computed(() => sumMoney(props.costs.map((c) => c.totalPaid)));
 </script>
 
 <template>
@@ -30,7 +29,7 @@ const totalLifetime = computed(() =>
         <Clock :size="14" class="text-primary shrink-0" />
         <h3 class="text-xs sm:text-sm font-semibold text-text-primary">{{ t('lifetime_costs') }}</h3>
       </div>
-      <span class="text-[10px] sm:text-xs font-medium text-primary">{{ t('total') }}: {{ fmt(totalLifetime) }}</span>
+      <span class="text-[10px] sm:text-xs font-medium text-primary">{{ t('total') }}: {{ fmt(moneyFromDecimal(totalLifetime)) }}</span>
     </div>
 
     <div class="rounded-lg border border-border bg-surface-secondary overflow-hidden divide-y divide-border">

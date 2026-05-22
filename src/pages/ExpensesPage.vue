@@ -11,6 +11,7 @@ import {
 import { storeToRefs } from "pinia";
 import type { Currency, Expense, Subscription, Category, PaymentMethod, Tag, Settings, HouseholdMember } from "@/schemas/appData";
 import { expenseToIsoDate, parseExpense } from "@/schemas/appData";
+import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useHeaderActions, type HeaderAction } from "@/composables/useHeaderActions";
 import { useToast } from "@/composables/useToast";
@@ -28,6 +29,11 @@ import ContextActionMenu, {
 } from "@/components/ui/ContextActionMenu.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import Toast from "@/components/ui/Toast.vue";
+import {
+  convertAmountToCurrency,
+  moneyGt,
+  type MoneyString,
+} from "@/lib/money";
 import {
   Plus,
   Search,
@@ -78,6 +84,7 @@ const totalFiltered = expensesRefs.totalFiltered;
 const { t } = useI18n();
 const { setActions, clearActions } = useHeaderActions();
 const { fmtDateMedium, fmtCurrency } = useLocaleFormat();
+const { fmt } = useCurrencyFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 const { copyToClipboard } = useClipboard();
 const pageLogPrefix = "[ExpensesPage]";
@@ -371,9 +378,8 @@ function getExpenseIcon(exp: Expense): string {
 }
 function formatDate(d: string) { return fmtDateMedium(d); }
 function formatExpenseDate(e: Expense) { return fmtDateMedium(expenseToIsoDate(e)); }
-function formatAmount(amount: number, currencyId: string) {
-  const cur = getCurrency(currencyId);
-  return fmtCurrency(amount, cur?.code || "USD");
+function formatAmount(amount: MoneyString, currencyId: string) {
+  return fmt(amount, currencyId);
 }
 
 const targetCurrencies = computed(() => {
@@ -383,7 +389,7 @@ const targetCurrencies = computed(() => {
   if (mainId) ids.add(mainId);
   return [...ids]
     .map((id) => currencies.value.find((c) => c.id === id))
-    .filter((c): c is Currency => !!c && c.rate > 0);
+    .filter((c): c is Currency => !!c && moneyGt(c.rate, "0"));
 });
 const expenseLookupData = computed(() => {
   if (!settings.value) return null;
@@ -412,17 +418,21 @@ const mainCurrencyCode = computed(() => {
   return currencies.value.find((c) => c.id === mainId)?.code || "USD";
 });
 
-function convertAmount(amount: number, fromCurId: string, toCurrency: Currency): number {
-  const fromCur = currencies.value.find((c) => c.id === fromCurId);
-  if (!fromCur || fromCur.rate <= 0) return 0;
-  return (amount / fromCur.rate) * toCurrency.rate;
+function ratesRecord(): Record<string, MoneyString> {
+  const m: Record<string, MoneyString> = {};
+  for (const c of currencies.value) m[c.id] = c.rate;
+  return m;
 }
 
-function fmtCur(amount: number, currency: Currency): string {
-  return fmtCurrency(amount, currency.code);
+function convertAmount(amount: MoneyString, fromCurId: string, toCurrency: Currency): MoneyString {
+  return convertAmountToCurrency(amount, fromCurId, toCurrency, ratesRecord()).toFixed();
 }
 
-function getConvertedAmounts(amount: number, currencyId: string) {
+function fmtInCurrency(amount: MoneyString, currency: Currency): string {
+  return fmt(amount, currency.id);
+}
+
+function getConvertedAmounts(amount: MoneyString, currencyId: string) {
   return targetCurrencies.value
     .filter((tc) => tc.id !== currencyId)
     .map((tc) => ({
@@ -734,7 +744,7 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
               <p class="text-xs sm:text-sm font-semibold text-text-primary tabular-nums">{{ formatAmount(exp.amount, exp.currencyId) }}</p>
               <div v-if="getConvertedAmounts(exp.amount, exp.currencyId).length > 0" class="mt-0.5 space-y-0">
                 <p v-for="cv in getConvertedAmounts(exp.amount, exp.currencyId)" :key="cv.currency.id"
-                  class="text-[10px] text-text-muted tabular-nums">≈ {{ fmtCur(cv.amount, cv.currency) }}</p>
+                  class="text-[10px] text-text-muted tabular-nums">≈ {{ fmtInCurrency(cv.amount, cv.currency) }}</p>
               </div>
             </div>
           </template>
@@ -767,7 +777,7 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
                 <p class="text-lg font-bold text-text-primary">{{ formatAmount(exp.amount, exp.currencyId) }}</p>
                 <div v-if="getConvertedAmounts(exp.amount, exp.currencyId).length > 0" class="mt-0.5 space-y-0">
                   <p v-for="cv in getConvertedAmounts(exp.amount, exp.currencyId)" :key="cv.currency.id"
-                    class="text-[10px] text-text-muted tabular-nums">≈ {{ fmtCur(cv.amount, cv.currency) }}</p>
+                    class="text-[10px] text-text-muted tabular-nums">≈ {{ fmtInCurrency(cv.amount, cv.currency) }}</p>
                 </div>
               </div>
               <div class="text-right">

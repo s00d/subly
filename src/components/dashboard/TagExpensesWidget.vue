@@ -5,6 +5,7 @@ import { useChartTheme } from "@/composables/useChartTheme";
 import VChart from "@/components/ui/LazyVChart.vue";
 import type { EChartsCoreOption } from "echarts/core";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
+import { moneyFromNumber, parseMoney, toDisplayNumber, type MoneyString } from "@/lib/money";
 import { Hash } from "@lucide/vue";
 
 /**
@@ -44,7 +45,7 @@ const { t } = useI18n();
 const { fmt } = useCurrencyFormat();
 const chartTheme = useChartTheme();
 const props = defineProps<{
-  stats?: Array<{ tag: string; total: number }>;
+  stats?: Array<{ tag: string; total: MoneyString }>;
 }>();
 const stats = computed(() => props.stats ?? []);
 
@@ -57,7 +58,7 @@ const chartOption = computed((): EChartsCoreOption => ({
       const name = p.name ?? "";
       const val = typeof p.value === "number" ? p.value : 0;
       const pct = typeof p.percent === "number" ? p.percent.toFixed(1) : "";
-      return `#${name}<br/>${fmt(val)} (${pct}%)`;
+      return `#${name}<br/>${fmt(moneyFromNumber(val))} (${pct}%)`;
     },
   },
   legend: {
@@ -85,7 +86,7 @@ const chartOption = computed((): EChartsCoreOption => ({
       label: { show: false },
       data: stats.value.map((s, i) => ({
         name: s.tag,
-        value: Math.round(s.total * 100) / 100,
+        value: toDisplayNumber(parseMoney(s.total)),
         itemStyle: { color: COLORS[i % COLORS.length] },
       })),
     },

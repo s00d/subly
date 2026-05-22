@@ -191,6 +191,30 @@ fn read_string_config(key: &str) -> Result<Option<String>, AppError> {
 pub async fn run_text_with_usage(system: &str, prompt: &str) -> Result<RunTextResult, AppError> {
     let active = load_active_provider()?;
     let model_name = active.model.clone();
+
+    if crate::commands::ai::extract::chat_completions::provider_supports_json_object(
+        &active.provider_type,
+    ) {
+        match crate::commands::ai::extract::chat_completions::call_text_chat(
+            &active, system, prompt, true,
+        )
+        .await
+        {
+            Ok(result) => return Ok(result),
+            Err(e)
+                if crate::commands::ai::extract::chat_completions::is_json_object_mode_error(
+                    &e.to_string(),
+                ) =>
+            {
+                eprintln!(
+                    "[subly][ai] json_object mode unsupported for {}, falling back to plain text",
+                    active.provider_type
+                );
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
     let provider = build_provider(&active)?;
     let resp = LanguageModelRequest::builder()
         .model(provider)

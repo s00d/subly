@@ -19,6 +19,7 @@ import { upsertExpense } from "@/services/expensesClient";
 import { expenseFormFieldsSchema, coerceExpenseFormForValidation } from "@/schemas/zod/expenseForm";
 import { useZodLiveForm } from "@/composables/useZodLiveForm";
 import type { ZodFieldMeta } from "@/composables/useZodErrors";
+import { moneyFromNumber, parseMoney, toDisplayNumber } from "@/lib/money";
 
 /**
  * Subset of `Expense` fields the form can pre-fill. Used by the AI quick-add
@@ -119,7 +120,7 @@ function localYmd(d = new Date()): string {
 function resetForm() {
   form.value = {
     name: `${t("expenses")} #${nextExpenseNumber()}`,
-    amount: 0,
+    amount: "0",
     currencyId: settings.value?.mainCurrencyId || "cur-2",
     date: localYmd(),
     categoryId: settings.value?.defaultCategoryId || "cat-1",
@@ -143,7 +144,7 @@ watch(() => props.show, (val) => {
       if (props.prefill) {
         const p = props.prefill;
         if (p.name) form.value.name = p.name;
-        if (p.amount != null && Number.isFinite(p.amount)) form.value.amount = p.amount;
+        if (p.amount != null && Number.isFinite(p.amount)) form.value.amount = moneyFromNumber(p.amount);
         if (p.currencyId) form.value.currencyId = p.currencyId;
         if (p.date) form.value.date = p.date;
         if (p.categoryId) form.value.categoryId = p.categoryId;
@@ -223,7 +224,7 @@ async function handleSave() {
   const payload: Record<string, unknown> = {
     id: base.id,
     name: String(base.name).trim(),
-    amount: rawAmount,
+    amount: moneyFromNumber(rawAmount),
     currencyId: String(base.currencyId),
     categoryId: String(base.categoryId ?? ""),
     paymentMethodId: String(base.paymentMethodId ?? ""),
@@ -276,8 +277,8 @@ function loadLookupData() {
         <div class="flex-1">
           <AppInput
             :label="t('expense_amount')"
-            :modelValue="form.amount ?? 0"
-            @update:modelValue="(v) => form.amount = Number(v)"
+            :modelValue="toDisplayNumber(parseMoney(form.amount ?? '0'))"
+            @update:modelValue="(v) => form.amount = moneyFromNumber(Number(v))"
             type="number"
             step="0.01"
             min="0"

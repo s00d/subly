@@ -2,13 +2,14 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
+import type { MoneyString } from "@/lib/money";
 import { Calculator } from "@lucide/vue";
 import { ui, iconSize, statValue } from "@/lib/tv";
 
 const { t } = useI18n();
 const { fmt } = useCurrencyFormat();
 const props = defineProps<{
-  stats?: { avgAmount: number; count: number; total: number } | null;
+  stats?: { avgAmount: MoneyString; count: number; total: MoneyString } | null;
 }>();
 
 const stats = computed(() => props.stats ?? null);

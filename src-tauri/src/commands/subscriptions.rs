@@ -170,17 +170,6 @@ fn normalize_date_ymd(raw: &str) -> Result<String, crate::errors::AppError> {
     Err(crate::errors::AppError::from("field_invalid_date:nextPayment"))
 }
 
-fn monthly_price(cycle: u64, frequency: u64, price: f64) -> f64 {
-    let freq = frequency.max(1) as f64;
-    match cycle {
-        1 => price * (30.0 / freq),
-        2 => price * ((52.0 / 12.0) / freq),
-        3 => price * (1.0 / freq),
-        4 => price / (12.0 * freq),
-        _ => price,
-    }
-}
-
 fn last_day_of_month(year: i32, month: u32) -> u32 {
     for d in (28..=31).rev() {
         if NaiveDate::from_ymd_opt(year, month, d).is_some() {
@@ -312,7 +301,7 @@ pub fn list_subscriptions_page(
             true
         })
         .map(|item| {
-            let monthly = monthly_price(item.cycle as u64, item.frequency as u64, item.price);
+            let monthly = crate::price_per_month(item.cycle, item.frequency, item.price);
             let (days_left, overdue) = NaiveDate::parse_from_str(&item.next_payment, "%Y-%m-%d")
             .map(|next| {
                 let diff = (next - today).num_days();
@@ -498,7 +487,7 @@ pub fn get_overdue_subscriptions(state: State<'_, AppState>) -> Result<Vec<Subsc
                 tags: s.tags,
                 favorite: s.favorite,
                 payment_history: s.payment_history,
-                monthly_price: 0.0,
+                monthly_price: rust_decimal::Decimal::ZERO,
                 days_left: 0,
                 overdue: true,
                 credentials_meta: SubscriptionCredentialsMetaDto::default(),
@@ -570,7 +559,7 @@ pub fn get_upcoming_subscriptions(state: State<'_, AppState>, days: i64, limit: 
                 tags: s.tags,
                 favorite: s.favorite,
                 payment_history: s.payment_history,
-                monthly_price: 0.0,
+                monthly_price: rust_decimal::Decimal::ZERO,
                 days_left: 0,
                 overdue: false,
                 credentials_meta: SubscriptionCredentialsMetaDto::default(),
@@ -800,14 +789,14 @@ mod tests {
             crate::models::PaymentRecordDto {
                 id: "pr-a".to_string(),
                 date: "2026-01-01".to_string(),
-                amount: 1.0,
+                amount: crate::money::from_f64_legacy(1.0),
                 currency_id: "cur-2".to_string(),
                 note: String::new(),
             },
             crate::models::PaymentRecordDto {
                 id: "pr-b".to_string(),
                 date: "2026-01-02".to_string(),
-                amount: 2.0,
+                amount: crate::money::from_f64_legacy(2.0),
                 currency_id: "cur-2".to_string(),
                 note: String::new(),
             },

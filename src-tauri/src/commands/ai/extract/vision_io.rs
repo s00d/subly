@@ -4,10 +4,7 @@
 //! ([`super::import_subscription`]) call into these helpers so the wire
 //! format, retries, HEIC handling, and error codes stay in lockstep.
 
-use base64::engine::general_purpose::STANDARD as B64;
-use base64::Engine;
-use serde_json::{json, Value};
-
+use crate::commands::ai::extract::chat_completions;
 use crate::commands::ai::providers::ActiveProvider;
 use crate::errors::AppError;
 
@@ -72,63 +69,18 @@ pub async fn call_vision_chat(
     max_tokens: u32,
     err_prefix: &'static str,
 ) -> Result<String, AppError> {
-    let url = format!("{}/chat/completions", active.base_url.trim_end_matches('/'));
-    let data_url = format!("data:{};base64,{}", mime, B64.encode(bytes));
-
-    let body = json!({
-        "model": active.model,
-        "temperature": 0,
-        "max_tokens": max_tokens,
-        "messages": [
-            { "role": "system", "content": system },
-            {
-                "role": "user",
-                "content": [
-                    { "type": "text", "text": user_instruction },
-                    { "type": "image_url", "image_url": { "url": data_url } }
-                ]
-            }
-        ]
-    });
-
-    let mut req = reqwest::Client::new().post(&url);
-    if !active.api_key.trim().is_empty() {
-        req = req.bearer_auth(active.api_key.trim());
-    }
-    if active.provider_type == "openrouter" {
-        req = req
-            .header("HTTP-Referer", "https://github.com/subly")
-            .header("X-Title", "Subly");
-    }
-    let resp = req
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| AppError::from(format!("{err_prefix}_request:{e}")))?;
-    let status = resp.status();
-    let raw_text = resp.text().await.unwrap_or_default();
-    if !status.is_success() {
-        return Err(AppError::from(format!(
-            "{err_prefix}_http_{}:{}",
-            status.as_u16(),
-            truncate(&raw_text, 240)
-        )));
-    }
-
-    let value: Value = serde_json::from_str(&raw_text)
-        .map_err(|e| AppError::from(format!("{err_prefix}_response_parse:{e}")))?;
-    let content = value
-        .get("choices")
-        .and_then(|v| v.as_array())
-        .and_then(|arr| arr.first())
-        .and_then(|c| c.get("message"))
-        .and_then(|m| m.get("content"))
-        .and_then(|c| c.as_str())
-        .unwrap_or_default();
-    if content.is_empty() {
-        return Err(AppError::from(format!("{err_prefix}_empty_response")));
-    }
-    Ok(content.to_string())
+    let json_object = chat_completions::provider_supports_json_object(&active.provider_type);
+    chat_completions::call_vision_chat(
+        active,
+        system,
+        user_instruction,
+        bytes,
+        mime,
+        max_tokens,
+        err_prefix,
+        json_object,
+    )
+    .await
 }
 
 #[cfg(test)]

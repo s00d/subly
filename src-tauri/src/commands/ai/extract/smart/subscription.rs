@@ -165,7 +165,7 @@ fn finalise(
     let mut rows = Vec::<AiSubscriptionDraftRow>::new();
     for row in envelope.subscriptions {
         let draft = row_to_draft(row, ctx);
-        if draft.name.is_empty() && draft.price <= 0.0 {
+        if draft.name.is_empty() && draft.price <= rust_decimal::Decimal::ZERO {
             stats.failed += 1;
             continue;
         }
@@ -249,7 +249,7 @@ fn row_to_draft(raw: AiSubscriptionRow, ctx: &ExtractContext) -> SubscriptionDra
         next_payment,
         notes: resolved.notes,
         url: raw.url.unwrap_or_default(),
-        tags: raw.tags.unwrap_or_default(),
+        tags: ctx.catalogs.resolve_tags(raw.tags),
         warnings: resolved.warnings,
         confidence,
         usage: None,

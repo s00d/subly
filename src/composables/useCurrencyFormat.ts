@@ -2,6 +2,12 @@ import { computed } from "vue";
 import { storeToRefs } from "pinia";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useAppMetaStore } from "@/stores/appMetaStore";
+import {
+  convertToMain,
+  parseMoney,
+  toDisplayNumber,
+  type MoneyString,
+} from "@/lib/money";
 
 let ensureRequested = false;
 
@@ -19,23 +25,30 @@ export function useCurrencyFormat() {
     return currencies.value.find((c) => c.id === mainId) || null;
   });
 
-  function fmt(amount: number, currencyId?: string): string {
+  const ratesMap = computed(() => {
+    const m: Record<string, MoneyString> = {};
+    for (const c of currencies.value) {
+      m[c.id] = c.rate;
+    }
+    return m;
+  });
+
+  function fmt(amount: MoneyString, currencyId?: string): string {
+    const n = toDisplayNumber(parseMoney(amount));
     if (currencyId) {
       const c = currencies.value.find((cur) => cur.id === currencyId);
-      return fmtCurrency(amount, c?.code || "USD");
+      return fmtCurrency(n, c?.code || "USD");
     }
-    return fmtCurrency(amount, mainCurrency.value?.code || "USD");
+    return fmtCurrency(n, mainCurrency.value?.code || "USD");
   }
 
-  function getCurrencyRate(currencyId: string): number {
-    return currencies.value.find((c) => c.id === currencyId)?.rate || 1;
+  function getCurrencyRate(currencyId: string): MoneyString {
+    return currencies.value.find((c) => c.id === currencyId)?.rate || "1";
   }
 
-  function toMainCurrency(price: number, currencyId: string): number {
-    const rate = getCurrencyRate(currencyId);
-    if (rate <= 0) return price;
-    return price / rate;
+  function toMainCurrency(price: MoneyString, currencyId: string) {
+    return convertToMain(price, currencyId, ratesMap.value);
   }
 
-  return { mainCurrency, fmt, getCurrencyRate, toMainCurrency };
+  return { mainCurrency, fmt, getCurrencyRate, toMainCurrency, ratesMap };
 }

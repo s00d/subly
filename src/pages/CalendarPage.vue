@@ -27,6 +27,7 @@ import { useCalendarStore } from "@/stores/calendarStore";
 import { useNowStore } from "@/stores/nowStore";
 import { ui } from "@/lib/tv";
 import { formatErrorForToast } from "@/utils/formatError";
+import Decimal from "decimal.js";
 
 const { t } = useI18n();
 const { setActions, clearActions } = useHeaderActions();
@@ -212,7 +213,7 @@ const calendarGrid = computed<CalendarCell[]>(() => {
     }
   }
 
-  const expByDay: Record<number, { id: string; name: string; amount: number; currencyId: string; icon?: string }[]> = {};
+  const expByDay: Record<number, NonNullable<CalendarCell["expenses"]>> = {};
   for (const exp of monthExpenses.value) {
     const d = parseInt(String(exp.createdAt).slice(8, 10), 10) || 0;
     if (!expByDay[d]) expByDay[d] = [];
@@ -237,7 +238,7 @@ const calendarGrid = computed<CalendarCell[]>(() => {
   while (cells.length % 7 !== 0) {
     cells.push({ day: 0, isEmpty: true, isToday: false, subs: [], expenses: [] });
   }
-  return cells;
+  return cells as CalendarCell[];
 });
 const monthWeeks = computed<CalendarCell[][]>(() => {
   const weeks: CalendarCell[][] = [];
@@ -276,8 +277,8 @@ watch([currentYear, currentMonth], () => {
 
 // --- Stats ---
 const monthStats = computed(() => {
-  let totalCost = 0;
-  let totalDue = 0;
+  let totalCost = new Decimal(0);
+  let totalDue = new Decimal(0);
   let count = 0;
   const today = reactiveNow.value;
 
@@ -285,20 +286,20 @@ const monthStats = computed(() => {
     if (cell.isEmpty) continue;
     for (const sub of cell.subs) {
       const converted = toMainCurrency(sub.price, sub.currencyId);
-      totalCost += converted;
+      totalCost = totalCost.plus(converted);
       count++;
       const cellDate = new Date(currentYear.value, currentMonth.value, cell.day);
       if (cellDate > today) {
-        totalDue += converted;
+        totalDue = totalDue.plus(converted);
       }
     }
     for (const exp of (cell.expenses || [])) {
       const converted = toMainCurrency(exp.amount, exp.currencyId);
-      totalCost += converted;
+      totalCost = totalCost.plus(converted);
       count++;
     }
   }
-  return { totalCost, totalDue, count };
+  return { totalCost: totalCost.toFixed(), totalDue: totalDue.toFixed(), count };
 });
 
 // --- Day detail modal ---

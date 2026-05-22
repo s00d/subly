@@ -4,6 +4,7 @@
 //! corresponding Subscription / Expense forms on the frontend so they can be
 //! consumed as `Partial<Subscription>` / `Partial<Expense>` prefills.
 
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use crate::models::{CategoryDoc, CurrencyDoc, PaymentMethodDoc, TagDoc};
@@ -67,7 +68,8 @@ pub struct CatalogSnapshot {
 #[serde(rename_all = "camelCase")]
 pub struct SubscriptionDraftDto {
     pub name: String,
-    pub price: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub price: Decimal,
     /// Empty if the LLM-supplied code did not match any existing currency.
     #[serde(default)]
     pub currency_id: String,
@@ -118,7 +120,8 @@ fn default_frequency() -> u32 {
 #[serde(rename_all = "camelCase")]
 pub struct ExpenseDraftDto {
     pub name: String,
-    pub amount: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub amount: Decimal,
     #[serde(default)]
     pub currency_id: String,
     #[serde(default)]
@@ -154,7 +157,8 @@ pub struct ExpenseDraftDto {
 #[serde(rename_all = "camelCase")]
 pub struct ExpenseLineItem {
     pub name: String,
-    pub amount: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub amount: Decimal,
 }
 
 /// What the AI thought it was looking at. Drives the metadata payload and
@@ -181,8 +185,8 @@ pub struct AiImportMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merchant_name: Option<String>,
     /// Receipt: grand total (echoed from the row for convenience).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub total_amount: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none", with = "crate::money::serde_ipc_option")]
+    pub total_amount: Option<Decimal>,
     /// Receipt: itemised lines from the bill. Always present (possibly
     /// empty) so the UI can render `lineItems.length > 0` conditionals
     /// without a `?? []` dance.

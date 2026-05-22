@@ -5,10 +5,11 @@ import { useChartTheme } from "@/composables/useChartTheme";
 import VChart from "@/components/ui/LazyVChart.vue";
 import type { EChartsCoreOption } from "echarts/core";
 import type { MonthlySpending } from "@/services/dashboardClient";
+import { moneyFromDecimal, moneyFromNumber, parseMoney, sumMoney, toDisplayNumber, type MoneyString } from "@/lib/money";
 
 const props = defineProps<{
   data: MonthlySpending[];
-  fmt: (n: number) => string;
+  fmt: (n: MoneyString) => string;
 }>();
 
 const { t } = useI18n();
@@ -16,7 +17,7 @@ const chartTheme = useChartTheme();
 
 const chartOption = computed((): EChartsCoreOption => {
   const labels = props.data.map((d) => d.label);
-  const values = props.data.map((d) => d.amount);
+  const values = props.data.map((d) => toDisplayNumber(parseMoney(d.amount)));
   const n = values.length;
   return {
     animationDuration: 420,
@@ -28,7 +29,7 @@ const chartOption = computed((): EChartsCoreOption => {
         const arr = Array.isArray(params) ? params : [params];
         const p = arr[0] as { axisValue?: string; value?: number | number[] };
         const v = typeof p.value === "number" ? p.value : Number((p.value as number[])?.[0] ?? 0);
-        return `${p.axisValue ?? ""}<br/><span style="font-weight:600">${props.fmt(v)}</span>`;
+        return `${p.axisValue ?? ""}<br/><span style="font-weight:600">${props.fmt(moneyFromNumber(v))}</span>`;
       },
     },
     xAxis: {
@@ -44,7 +45,7 @@ const chartOption = computed((): EChartsCoreOption => {
       axisLabel: {
         color: "rgba(127,127,127,0.85)",
         fontSize: 10,
-        formatter: (val: number) => props.fmt(val),
+        formatter: (val: number) => props.fmt(moneyFromNumber(val)),
       },
     },
     series: [
@@ -70,8 +71,9 @@ const chartOption = computed((): EChartsCoreOption => {
 });
 
 const avg = computed(() => {
-  if (props.data.length === 0) return 0;
-  return props.data.reduce((s, d) => s + d.amount, 0) / props.data.length;
+  if (props.data.length === 0) return "0";
+  const total = sumMoney(props.data.map((d) => d.amount));
+  return moneyFromDecimal(total.dividedBy(props.data.length));
 });
 </script>
 

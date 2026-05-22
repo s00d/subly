@@ -20,7 +20,7 @@ export interface RateHistoryPoint {
   recordedAt: string;
 }
 
-export async function saveRateSnapshot(currencyId: string, rate: number): Promise<void> {
+export async function saveRateSnapshot(currencyId: string, rate: string): Promise<void> {
   return callCommand("rate_history_save_snapshot", { currencyId, rate });
 }
 

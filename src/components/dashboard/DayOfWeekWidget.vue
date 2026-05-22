@@ -5,13 +5,14 @@ import { useChartTheme } from "@/composables/useChartTheme";
 import VChart from "@/components/ui/LazyVChart.vue";
 import type { EChartsCoreOption } from "echarts/core";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
+import { moneyFromNumber, moneyGt, parseMoney, toDisplayNumber, type MoneyString } from "@/lib/money";
 import { CalendarDays } from "@lucide/vue";
 
 const { t } = useI18n();
 const { fmt } = useCurrencyFormat();
 const chartTheme = useChartTheme();
 const props = defineProps<{
-  rawStats?: Array<{ dayOfWeek: number; total: number; count: number }>;
+  rawStats?: Array<{ dayOfWeek: number; total: MoneyString; count: number }>;
 }>();
 const rawStats = computed(() => props.rawStats ?? []);
 
@@ -23,7 +24,7 @@ const dayLabels = computed(() => [
 const chartOption = computed((): EChartsCoreOption => {
   const totals = Array(7).fill(0);
   for (const s of rawStats.value) {
-    totals[s.dayOfWeek] = s.total;
+    totals[s.dayOfWeek] = toDisplayNumber(parseMoney(s.total));
   }
   const maxVal = Math.max(...totals);
   return {
@@ -36,7 +37,7 @@ const chartOption = computed((): EChartsCoreOption => {
         const arr = Array.isArray(params) ? params : [params];
         const p = arr[0] as { axisValue?: string; value?: number | number[] };
         const v = typeof p.value === "number" ? p.value : Number((p.value as number[])?.[0] ?? 0);
-        return `${p.axisValue ?? ""}<br/><span style="font-weight:600">${fmt(v)}</span>`;
+        return `${p.axisValue ?? ""}<br/><span style="font-weight:600">${fmt(moneyFromNumber(v))}</span>`;
       },
     },
     xAxis: {
@@ -52,7 +53,7 @@ const chartOption = computed((): EChartsCoreOption => {
       axisLabel: {
         color: "rgba(127,127,127,0.85)",
         fontSize: 10,
-        formatter: (val: number) => fmt(val),
+        formatter: (val: number) => fmt(moneyFromNumber(val)),
       },
     },
     series: [
@@ -75,7 +76,9 @@ const chartOption = computed((): EChartsCoreOption => {
 const hasData = computed(() => rawStats.value.length > 0);
 const peakDay = computed(() => {
   if (!hasData.value) return "";
-  const max = rawStats.value.reduce((a, b) => (b.total > a.total ? b : a), rawStats.value[0]);
+  const max = rawStats.value.reduce((a, b) =>
+    moneyGt(b.total, a.total) ? b : a,
+  rawStats.value[0]);
   return `${dayLabels.value[max.dayOfWeek]} — ${fmt(max.total)}`;
 });
 </script>

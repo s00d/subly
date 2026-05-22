@@ -5,6 +5,8 @@ import { useToast } from "@/composables/useToast";
 import { upsertCategory, deleteCategory as deleteCategoryApi, maxSortOrder } from "@/services/catalogClient";
 import type { Category, Settings } from "@/schemas/appData";
 import { useAppMetaStore } from "@/stores/appMetaStore";
+import { useCatalogsUsageStore } from "@/stores/catalogsUsageStore";
+import { formatErrorForToast } from "@/utils/formatError";
 import AppInput from "@/components/ui/AppInput.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import IconPickerModal from "@/components/ui/IconPickerModal.vue";
@@ -22,6 +24,7 @@ const props = defineProps<{
 const { t } = useI18n();
 const { toast } = useToast();
 const metaStore = useAppMetaStore();
+const catalogsUsageStore = useCatalogsUsageStore();
 const categories = ref<Category[]>([]);
 const settings = ref<Settings | null>(null);
 const categoryUsage = ref<Record<string, number>>({});
@@ -100,13 +103,18 @@ async function updateCategory(id: string, name: string, icon?: string) {
 }
 async function saveCat(id: string, name: string) { await updateCategory(id, name); toast(t("success")); }
 async function removeCat(id: string) {
-  if (isUsedCategory(id) || id === "cat-1") {
+  if (id === "cat-1") {
     toast(t("category_cannot_delete"), "error");
     return;
   }
-  await deleteCategoryApi(id);
-  categories.value = categories.value.filter((c) => c.id !== id);
-  toast(t("success"));
+  try {
+    await deleteCategoryApi(id);
+    categories.value = categories.value.filter((c) => c.id !== id);
+    await catalogsUsageStore.refresh();
+    toast(t("success"));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  }
 }
 
 async function moveCatUp(id: string) {
@@ -195,7 +203,7 @@ async function setDefaultCategory(id: string) {
 
         <!-- Delete (not for cat-1) -->
         <Tooltip v-if="c.id !== 'cat-1'" :text="t('delete')">
-          <button @click="removeCat(c.id)" :disabled="isUsedCategory(c.id)" class="p-1.5 rounded-lg transition-colors shrink-0" :class="isUsedCategory(c.id) ? 'text-text-muted cursor-not-allowed' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'"><Trash2 :size="14" /></button>
+          <button @click="removeCat(c.id)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"><Trash2 :size="14" /></button>
         </Tooltip>
         <div v-else class="w-[34px] shrink-0" />
       </div>

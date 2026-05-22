@@ -2,8 +2,9 @@ use chrono::{Local, LocalResult, NaiveDate, TimeZone, Timelike};
 use tauri::State;
 use tauri::Emitter;
 use tauri_plugin_notification::{NotificationExt, Schedule};
+use crate::models::AppConfigDoc;
 use crate::AppState;
-use crate::state::EntityTable;
+use crate::state::{AppStateInner, EntityTable};
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,8 +13,8 @@ pub struct NotificationScheduleItemDto {
     pub name: String,
     pub notify_date: String,
     pub next_payment: String,
-    #[serde(default)]
-    pub price: f64,
+    #[serde(default, with = "crate::money::serde_ipc")]
+    pub price: rust_decimal::Decimal,
     #[serde(default)]
     pub currency_id: String,
     pub notification_id: i32,
@@ -43,7 +44,8 @@ pub struct InAppAlertDto {
     pub subscription_name: String,
     pub r#type: String,
     pub days_until: i64,
-    pub price: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub price: rust_decimal::Decimal,
     pub currency_id: String,
 }
 
@@ -161,22 +163,56 @@ const FALLBACK_TITLE_DUE: &str = "Subly - {name}";
 const FALLBACK_TITLE_OVERDUE: &str = "Subly - Overdue: {name}";
 const FALLBACK_SCHEDULE_TITLE: &str = "Subly - {name}";
 const FALLBACK_SCHEDULE_BODY: &str = "Payment date: {due_date}";
+const CONFIG_SETTINGS_KEY: &str = "config:settings";
+
+fn unwrap_config_settings_value(raw: &str) -> Result<serde_json::Value, crate::errors::AppError> {
+    match serde_json::from_str::<serde_json::Value>(raw) {
+        Ok(serde_json::Value::String(inner)) => match serde_json::from_str::<serde_json::Value>(&inner) {
+            Ok(v) => Ok(v),
+            Err(_) => Ok(serde_json::Value::String(inner)),
+        },
+        Ok(v) => Ok(v),
+        Err(e) => Err(crate::errors::AppError::Message(e.to_string())),
+    }
+}
+
+/// UI notification prefs live in KV `config:settings` (JSON), not in Redb `settings_v2` (`SettingsDoc`).
+fn load_notification_settings(
+    guard: &AppStateInner,
+) -> Result<NotificationSettingsDto, crate::errors::AppError> {
+    let Some(raw) = guard.redb_get(CONFIG_SETTINGS_KEY)? else {
+        return Ok(NotificationSettingsDto::default());
+    };
+    let value = unwrap_config_settings_value(&raw)?;
+    serde_json::from_value(value).map_err(|e| crate::errors::AppError::Message(e.to_string()))
+}
+
+fn load_notification_config(
+    guard: &AppStateInner,
+) -> Result<NotificationConfigDto, crate::errors::AppError> {
+    let cfg: AppConfigDoc = guard.config_typed()?;
+    Ok(NotificationConfigDto {
+        telegram_enabled: cfg.telegram_enabled,
+        telegram_bot_token: cfg.telegram_bot_token,
+        telegram_chat_id: cfg.telegram_chat_id,
+        telegram_proxy_url: if cfg.telegram_proxy_url.trim().is_empty() {
+            None
+        } else {
+            Some(cfg.telegram_proxy_url)
+        },
+    })
+}
 
 struct NotificationTemplateContext<'a> {
     name: &'a str,
     days: i64,
-    price: f64,
+    price: rust_decimal::Decimal,
     currency_id: &'a str,
     due_date: &'a str,
 }
 
-fn notification_template_price_string(price: f64) -> String {
-    let rounded = (price * 100.0).round() / 100.0;
-    if rounded.fract().abs() < f64::EPSILON {
-        format!("{}", rounded as i64)
-    } else {
-        format!("{:.2}", rounded)
-    }
+fn notification_template_price_string(price: rust_decimal::Decimal) -> String {
+    crate::money::to_ipc_string(&price)
 }
 
 fn render_notification_placeholders(template: &str, ctx: &NotificationTemplateContext<'_>) -> String {
@@ -266,7 +302,7 @@ fn schedule_hour_for_settings(settings: &NotificationSettingsDto) -> u8 {
 
 fn build_schedule_preview(state: &State<'_, AppState>) -> Result<Vec<NotificationScheduleItemDto>, crate::errors::AppError> {
     let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
-    let settings: NotificationSettingsDto = guard.settings_typed()?;
+    let settings: NotificationSettingsDto = load_notification_settings(&guard)?;
     let subscriptions: Vec<crate::models::SubscriptionDoc> =
         guard.table_list_typed(EntityTable::Subscriptions)?;
     let default_days_before = settings.notify_days_before;
@@ -315,7 +351,7 @@ pub(crate) fn notifications_reschedule_with_state(
     let schedule = build_schedule_preview(state)?;
     let settings: NotificationSettingsDto = {
         let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
-        guard.settings_typed()?
+        load_notification_settings(&guard)?
     };
     let previous_ids = {
         let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
@@ -455,8 +491,8 @@ async fn notifications_run_check(
     let today_str = today.format("%Y-%m-%d").to_string();
     let (sent_count, alerts, telegram_jobs) = {
         let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
-        let settings: NotificationSettingsDto = guard.settings_typed()?;
-        let config: NotificationConfigDto = guard.config_typed()?;
+        let settings: NotificationSettingsDto = load_notification_settings(&guard)?;
+        let config: NotificationConfigDto = load_notification_config(&guard)?;
         let mut subscriptions: Vec<crate::models::SubscriptionDoc> =
             guard.table_list_typed(EntityTable::Subscriptions)?;
         let within_schedule = notification_schedule_allows_now(&settings);
@@ -633,7 +669,7 @@ async fn notifications_dispatch(
     let telegram_ok = if do_telegram {
         let fallback = {
             let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
-            let data: NotificationConfigDto = guard.config_typed()?;
+            let data: NotificationConfigDto = load_notification_config(&guard)?;
             (
                 data.telegram_bot_token,
                 data.telegram_chat_id,

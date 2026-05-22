@@ -66,7 +66,7 @@ fn annotate_saved_secrets(mut info: ProviderInfo) -> ProviderInfo {
             continue;
         }
         let saved = keyring_account_for_field(&field.key)
-            .map(|account| keyring_store::exists(account).unwrap_or(false))
+            .map(|account| keyring_store::exists_for_background(account).unwrap_or(false))
             .unwrap_or(false);
         field.has_saved_value = Some(saved);
     }

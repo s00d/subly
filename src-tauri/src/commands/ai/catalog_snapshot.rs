@@ -113,6 +113,69 @@ impl CatalogSnapshot {
         String::new()
     }
 
+    /// Preferred category from settings if it exists in the snapshot, else `cat-1`
+    /// when present, else the first category.
+    pub fn resolve_default_category_id(&self, preferred: &str) -> String {
+        let preferred = preferred.trim();
+        if !preferred.is_empty()
+            && self.categories.iter().any(|c| c.id == preferred)
+        {
+            return preferred.to_string();
+        }
+        if self
+            .categories
+            .iter()
+            .any(|c| c.id == "cat-1")
+        {
+            return "cat-1".to_string();
+        }
+        self.categories
+            .first()
+            .map(|c| c.id.clone())
+            .unwrap_or_default()
+    }
+
+    /// Preferred payment method from settings when it exists and is enabled;
+    /// otherwise the first enabled method, then any method.
+    pub fn resolve_default_payment_method_id(&self, preferred: &str) -> String {
+        let preferred = preferred.trim();
+        if !preferred.is_empty() {
+            if let Some(p) = self.payment_methods.iter().find(|p| p.id == preferred) {
+                if p.enabled {
+                    return preferred.to_string();
+                }
+            }
+        }
+        self.payment_methods
+            .iter()
+            .find(|p| p.enabled)
+            .map(|p| p.id.clone())
+            .or_else(|| self.payment_methods.first().map(|p| p.id.clone()))
+            .unwrap_or_default()
+    }
+
+    /// Keep `id` when it references an existing category; otherwise use `fallback`.
+    pub fn ensure_category_id(&self, id: &str, fallback: &str) -> String {
+        let id = id.trim();
+        if !id.is_empty() && self.categories.iter().any(|c| c.id == id) {
+            return id.to_string();
+        }
+        self.resolve_default_category_id(fallback)
+    }
+
+    /// Keep `id` when it references an enabled payment method; otherwise use `fallback`.
+    pub fn ensure_payment_method_id(&self, id: &str, fallback: &str) -> String {
+        let id = id.trim();
+        if !id.is_empty() {
+            if let Some(p) = self.payment_methods.iter().find(|p| p.id == id) {
+                if p.enabled {
+                    return id.to_string();
+                }
+            }
+        }
+        self.resolve_default_payment_method_id(fallback)
+    }
+
     /// Format category list for inclusion in a system prompt.
     pub fn render_category_names(&self) -> String {
         let mut names: Vec<&str> = self
@@ -186,6 +249,47 @@ impl CatalogSnapshot {
         }
         names.join(", ")
     }
+
+    /// Map LLM tag strings to existing catalog tag names (fuzzy). Unknown
+    /// names are kept so the user can create them on save.
+    pub fn resolve_tags(&self, raw: Option<Vec<String>>) -> Vec<String> {
+        let Some(tags) = raw else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        let mut seen = std::collections::HashSet::<String>::new();
+        for t in tags {
+            let name = self.resolve_tag_name(&t);
+            if name.is_empty() {
+                continue;
+            }
+            let key = name.to_lowercase();
+            if seen.insert(key) {
+                out.push(name);
+            }
+        }
+        out
+    }
+
+    fn resolve_tag_name(&self, hint: &str) -> String {
+        let h = hint.trim();
+        if h.is_empty() {
+            return String::new();
+        }
+        for tag in &self.tags {
+            if tag.name.eq_ignore_ascii_case(h) {
+                return tag.name.clone();
+            }
+        }
+        let h_lower = h.to_lowercase();
+        for tag in &self.tags {
+            let name_lc = tag.name.to_lowercase();
+            if name_lc.contains(&h_lower) || h_lower.contains(&name_lc) {
+                return tag.name.clone();
+            }
+        }
+        h.to_string()
+    }
 }
 
 #[cfg(test)]
@@ -199,7 +303,7 @@ mod tests {
             name: name.to_string(),
             symbol: symbol.to_string(),
             code: code.to_string(),
-            rate: 1.0,
+            rate: rust_decimal::Decimal::ONE,
             sort_order: 0,
             i18n_key: String::new(),
         }
@@ -326,6 +430,21 @@ mod tests {
     }
 
     #[test]
+    fn resolve_tags_maps_to_catalog_names() {
+        let mut s = snapshot();
+        s.tags = vec![
+            tag("t-1", "Work", true, 0),
+            tag("t-2", "Coffee", false, 1),
+        ];
+        let tags = s.resolve_tags(Some(vec![
+            "work".to_string(),
+            "COFFEE".to_string(),
+            "novel".to_string(),
+        ]));
+        assert_eq!(tags, vec!["Work", "Coffee", "novel"]);
+    }
+
+    #[test]
     fn render_tag_names_favorites_first_then_sort_order() {
         let mut s = snapshot();
         s.tags = vec![
@@ -361,5 +480,62 @@ mod tests {
             tag("t-3", "", false, 3),
         ];
         assert_eq!(s.render_tag_names(), "Important");
+    }
+
+    #[test]
+    fn resolve_default_category_prefers_valid_settings_id() {
+        let mut s = snapshot();
+        s.categories.insert(
+            0,
+            category("cat-1", "No category", "category.none"),
+        );
+        assert_eq!(s.resolve_default_category_id("c-trans"), "c-trans");
+        assert_eq!(s.resolve_default_category_id("cat-missing"), "cat-1");
+        assert_eq!(s.resolve_default_category_id(""), "cat-1");
+    }
+
+    #[test]
+    fn resolve_default_category_without_cat1_uses_first() {
+        let s = snapshot();
+        assert_eq!(s.resolve_default_category_id("cat-missing"), "c-food");
+    }
+
+    #[test]
+    fn resolve_default_payment_prefers_enabled_settings_id() {
+        let s = snapshot();
+        assert_eq!(s.resolve_default_payment_method_id("pm-cash"), "pm-cash");
+        assert_eq!(
+            s.resolve_default_payment_method_id("pm-disabled"),
+            "pm-card"
+        );
+        assert_eq!(s.resolve_default_payment_method_id(""), "pm-card");
+    }
+
+    #[test]
+    fn ensure_category_id_rejects_unknown_llm_id() {
+        let mut s = snapshot();
+        s.categories.insert(
+            0,
+            category("cat-1", "No category", "category.none"),
+        );
+        assert_eq!(
+            s.ensure_category_id("cat-ghost", "c-trans"),
+            "c-trans"
+        );
+        assert_eq!(s.ensure_category_id("c-food", "c-trans"), "c-food");
+    }
+
+    #[test]
+    fn ensure_payment_method_id_rejects_disabled_and_unknown() {
+        let s = snapshot();
+        assert_eq!(
+            s.ensure_payment_method_id("pm-disabled", "pm-cash"),
+            "pm-cash"
+        );
+        assert_eq!(
+            s.ensure_payment_method_id("pm-ghost", "pm-cash"),
+            "pm-cash"
+        );
+        assert_eq!(s.ensure_payment_method_id("pm-card", "pm-cash"), "pm-card");
     }
 }

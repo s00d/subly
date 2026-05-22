@@ -5,7 +5,7 @@ use crate::errors::{AppError, AppResult};
 use crate::models::{ExpenseDoc, SubscriptionDoc, TombstoneEntityKind};
 use crate::state::{
     decode_bin, encode_bin, read_singleton_bin_typed, upsert_deletion_tombstone, AppStateInner, T2_CATEGORIES,
-    T2_CONFIG, T2_CURRENCIES, T2_EXPENSES, T2_HOUSEHOLD, T2_PAYMENT_METHODS, T2_SETTINGS, T2_SUBSCRIPTIONS, T2_TAGS,
+    T2_CONFIG, T2_CURRENCIES, T2_EXPENSES, T2_HOUSEHOLD, T2_PAYMENT_METHODS, T2_SUBSCRIPTIONS, T2_TAGS,
 };
 
 /// Touch `updatedAt` on subscriptions and expenses (same as per-table replace) for a full snapshot apply.
@@ -156,13 +156,6 @@ impl AppStateInner {
             },
         )?;
         Ok(())
-    }
-
-    pub fn settings_typed<T>(&self) -> AppResult<T>
-    where
-        T: Default + DeserializeOwned,
-    {
-        read_singleton_bin_typed(self.db.as_ref(), T2_SETTINGS, T::default())
     }
 
     pub fn config_typed<T>(&self) -> AppResult<T>

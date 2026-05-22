@@ -3,10 +3,11 @@ import type { Subscription } from "@/schemas/appData";
 import { AlertTriangle } from "@lucide/vue";
 import { useI18n } from "vue-i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
+import type { MoneyString } from "@/lib/money";
 
 defineProps<{
   subscriptions: Subscription[];
-  fmt: (amount: number, currencyId?: string) => string;
+  fmt: (amount: MoneyString, currencyId?: string) => string;
 }>();
 
 const { t } = useI18n();

@@ -1,12 +1,14 @@
 import { callCommand } from "@/services/commandClient";
 
+import type { MoneyString } from "@/schemas/appData";
+
 export interface InAppAlert {
   id: string;
   subscriptionId: string;
   subscriptionName: string;
   type: "upcoming" | "due_today" | "overdue";
   daysUntil: number;
-  price: number;
+  price: MoneyString;
   currencyId: string;
 }
 

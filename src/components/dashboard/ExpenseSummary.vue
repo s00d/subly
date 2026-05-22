@@ -3,6 +3,7 @@ import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import type { Category, Currency, Expense } from "@/schemas/appData";
+import { parseMoney, toDisplayNumber, type MoneyString } from "@/lib/money";
 import { expenseToIsoDate } from "@/schemas/appData";
 import { Wallet, ArrowRight } from "@lucide/vue";
 import { useRouter } from "vue-router";
@@ -11,7 +12,7 @@ const props = defineProps<{
   categories?: Category[];
   currencies?: Currency[];
   mainCurrencyId?: string;
-  agg?: { monthTotal: number; yearTotal: number; recentExpenses: Array<Pick<Expense, "id" | "name" | "categoryId" | "amount" | "currencyId" | "createdAt">> };
+  agg?: { monthTotal: MoneyString; yearTotal: MoneyString; recentExpenses: Array<Pick<Expense, "id" | "name" | "categoryId" | "amount" | "currencyId" | "createdAt">> };
 }>();
 const categories = computed(() => props.categories ?? []);
 const currencies = computed(() => props.currencies ?? []);
@@ -23,8 +24,8 @@ const router = useRouter();
 const agg = computed(
   () =>
     props.agg ?? {
-      monthTotal: 0,
-      yearTotal: 0,
+      monthTotal: "0",
+      yearTotal: "0",
       recentExpenses: [] as Array<Pick<Expense, "id" | "name" | "categoryId" | "amount" | "currencyId" | "createdAt">>,
     },
 );
@@ -52,11 +53,11 @@ function getCategoryName(id: string) {
     <div class="grid grid-cols-2 gap-2.5 mb-3">
       <div class="p-2.5 rounded-lg border border-border bg-surface-secondary">
         <p class="text-xs text-text-muted">{{ t('this_month') }}</p>
-        <p class="text-base sm:text-lg font-bold text-text-primary tabular-nums">{{ fmtCurrency(agg.monthTotal, mainCode()) }}</p>
+        <p class="text-base sm:text-lg font-bold text-text-primary tabular-nums">{{ fmtCurrency(toDisplayNumber(parseMoney(agg.monthTotal)), mainCode()) }}</p>
       </div>
       <div class="p-2.5 rounded-lg border border-border bg-surface-secondary">
         <p class="text-xs text-text-muted">{{ t('this_year') }}</p>
-        <p class="text-base sm:text-lg font-bold text-text-primary tabular-nums">{{ fmtCurrency(agg.yearTotal, mainCode()) }}</p>
+        <p class="text-base sm:text-lg font-bold text-text-primary tabular-nums">{{ fmtCurrency(toDisplayNumber(parseMoney(agg.yearTotal)), mainCode()) }}</p>
       </div>
     </div>
 
@@ -73,7 +74,7 @@ function getCategoryName(id: string) {
             <span class="text-xs text-text-muted">{{ fmtDateShort(expenseToIsoDate(exp)) }} · {{ getCategoryName(exp.categoryId) }}</span>
           </div>
           <span class="shrink-0 font-semibold text-text-primary tabular-nums ml-3">
-            {{ fmtCurrency(exp.amount, currencies.find(c => c.id === exp.currencyId)?.code || 'USD') }}
+            {{ fmtCurrency(toDisplayNumber(parseMoney(exp.amount)), currencies.find(c => c.id === exp.currencyId)?.code || 'USD') }}
           </span>
         </div>
       </div>

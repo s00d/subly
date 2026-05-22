@@ -365,8 +365,8 @@ async fn perform_rates_update(
         let mut touched_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
         for (id, rate) in &rate_by_id {
             if let Some(cur) = currencies.iter_mut().find(|c| c.id == *id) {
-                if !cur.rate.is_finite() || (cur.rate - *rate).abs() > f64::EPSILON {
-                    cur.rate = *rate;
+                if crate::money::rates_differ_stored(cur.rate, *rate) {
+                    cur.rate = crate::money::decimal_from_api_rate(*rate);
                     updated += 1;
                     let _ = history_enabled;
                     touched_ids.insert(cur.id.clone());
@@ -374,8 +374,8 @@ async fn perform_rates_update(
             }
         }
         if let Some(main) = currencies.iter_mut().find(|c| c.id == main_id) {
-            if !main.rate.is_finite() || (main.rate - 1.0).abs() > f64::EPSILON {
-                main.rate = 1.0;
+            if main.rate != rust_decimal::Decimal::ONE {
+                main.rate = rust_decimal::Decimal::ONE;
                 let _ = history_days;
                 touched_ids.insert(main.id.clone());
             }

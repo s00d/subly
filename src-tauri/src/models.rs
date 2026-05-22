@@ -1,5 +1,14 @@
 use chrono::Datelike;
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+
+pub(crate) fn default_money_zero() -> Decimal {
+    Decimal::ZERO
+}
+
+pub(crate) fn default_rate() -> Decimal {
+    Decimal::ONE
+}
 
 /// Subset of preferences persisted inside the Redb app snapshot (`AppDataDoc.settings`).
 /// Full UI settings (themes, view modes, notifications text, etc.) live in the separate config store
@@ -7,8 +16,8 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SettingsDoc {
-    #[serde(default)]
-    pub(crate) budget: f64,
+    #[serde(default = "default_money_zero", with = "rust_decimal::serde::str")]
+    pub(crate) budget: Decimal,
     #[serde(default)]
     pub(crate) main_currency_id: String,
     #[serde(default)]
@@ -68,8 +77,8 @@ pub(crate) struct SubscriptionDoc {
     pub(crate) name: String,
     #[serde(default)]
     pub(crate) logo: String,
-    #[serde(default)]
-    pub(crate) price: f64,
+    #[serde(default = "default_money_zero", with = "rust_decimal::serde::str")]
+    pub(crate) price: Decimal,
     #[serde(default)]
     pub(crate) currency_id: String,
     #[serde(default)]
@@ -201,8 +210,8 @@ pub(crate) struct ExpenseDoc {
     #[serde(default = "default_legacy_updated_at")]
     pub(crate) updated_at: i64,
     pub(crate) name: String,
-    #[serde(default)]
-    pub(crate) amount: f64,
+    #[serde(default = "default_money_zero", with = "rust_decimal::serde::str")]
+    pub(crate) amount: Decimal,
     #[serde(default)]
     pub(crate) currency_id: String,
     pub(crate) created_at: String,
@@ -242,16 +251,12 @@ pub(crate) struct CurrencyDoc {
     pub(crate) symbol: String,
     #[serde(default)]
     pub(crate) code: String,
-    #[serde(default = "default_rate")]
-    pub(crate) rate: f64,
+    #[serde(default = "default_rate", with = "rust_decimal::serde::str")]
+    pub(crate) rate: Decimal,
     #[serde(default)]
     pub(crate) sort_order: i64,
     #[serde(default)]
     pub(crate) i18n_key: String,
-}
-
-fn default_rate() -> f64 {
-    1.0
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -399,7 +404,8 @@ impl Default for AppConfigDoc {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RatePoint {
-    pub(crate) rate: f64,
+    #[serde(with = "rust_decimal::serde::str")]
+    pub(crate) rate: Decimal,
     pub(crate) recorded_at: String,
 }
 
@@ -429,8 +435,8 @@ pub(crate) struct SubscriptionListItemDto {
     pub(crate) name: String,
     #[serde(default)]
     pub(crate) logo: String,
-    #[serde(default)]
-    pub(crate) price: f64,
+    #[serde(default = "default_money_zero", with = "crate::money::serde_ipc")]
+    pub(crate) price: Decimal,
     #[serde(default)]
     pub(crate) currency_id: String,
     #[serde(default)]
@@ -475,8 +481,8 @@ pub(crate) struct SubscriptionListItemDto {
     pub(crate) favorite: bool,
     #[serde(default)]
     pub(crate) payment_history: Vec<PaymentRecordDto>,
-    #[serde(default)]
-    pub(crate) monthly_price: f64,
+    #[serde(default = "default_money_zero", with = "crate::money::serde_ipc")]
+    pub(crate) monthly_price: Decimal,
     #[serde(default)]
     pub(crate) days_left: u64,
     #[serde(default)]
@@ -494,8 +500,8 @@ pub(crate) struct SubscriptionInputDto {
     #[serde(default)]
     pub(crate) id: String,
     pub(crate) name: String,
-    #[serde(default)]
-    pub(crate) price: f64,
+    #[serde(default = "default_money_zero", with = "crate::money::serde_ipc")]
+    pub(crate) price: Decimal,
     pub(crate) currency_id: String,
     pub(crate) next_payment: String,
     pub(crate) start_date: String,
@@ -549,7 +555,7 @@ impl SubscriptionInputDto {
         if self.name.trim().is_empty() {
             return Err(crate::errors::AppError::from("field_required:name"));
         }
-        if !self.price.is_finite() || self.price < 0.0 {
+        if !crate::money::is_valid_non_negative(&self.price) {
             return Err(crate::errors::AppError::from("field_invalid_number:price"));
         }
         if self.currency_id.trim().is_empty() {
@@ -572,8 +578,8 @@ pub(crate) struct ExpenseInputDto {
     #[serde(default)]
     pub(crate) id: String,
     pub(crate) name: String,
-    #[serde(default)]
-    pub(crate) amount: f64,
+    #[serde(default = "default_money_zero", with = "rust_decimal::serde::str")]
+    pub(crate) amount: Decimal,
     pub(crate) currency_id: String,
     pub(crate) created_at: String,
     #[serde(default)]
@@ -599,7 +605,7 @@ impl ExpenseInputDto {
         if self.name.trim().is_empty() {
             return Err(crate::errors::AppError::from("field_required:name"));
         }
-        if !self.amount.is_finite() || self.amount < 0.0 {
+        if !crate::money::is_valid_non_negative(&self.amount) {
             return Err(crate::errors::AppError::from("field_invalid_number:amount"));
         }
         if self.currency_id.trim().is_empty() {
@@ -618,7 +624,8 @@ impl ExpenseInputDto {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CurrencyRateUpdateDto {
     pub(crate) id: String,
-    pub(crate) rate: f64,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub(crate) rate: Decimal,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -627,8 +634,8 @@ pub(crate) struct PaymentRecordDto {
     pub(crate) id: String,
     #[serde(default)]
     pub(crate) date: String,
-    #[serde(default)]
-    pub(crate) amount: f64,
+    #[serde(default = "default_money_zero", with = "rust_decimal::serde::str")]
+    pub(crate) amount: Decimal,
     #[serde(default)]
     pub(crate) currency_id: String,
     #[serde(default)]

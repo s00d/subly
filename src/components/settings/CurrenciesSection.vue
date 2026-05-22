@@ -5,6 +5,8 @@ import { useToast } from "@/composables/useToast";
 import { upsertCurrency, deleteCurrency as deleteCurrencyApi, maxSortOrder } from "@/services/catalogClient";
 import type { Currency, Settings } from "@/schemas/appData";
 import { useAppMetaStore } from "@/stores/appMetaStore";
+import { useCatalogsUsageStore } from "@/stores/catalogsUsageStore";
+import { formatErrorForToast } from "@/utils/formatError";
 import AppInput from "@/components/ui/AppInput.vue";
 import { Trash2, Plus, ChevronUp, ChevronDown, Star, Search } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
@@ -20,6 +22,7 @@ const props = defineProps<{
 const { t } = useI18n();
 const { toast } = useToast();
 const metaStore = useAppMetaStore();
+const catalogsUsageStore = useCatalogsUsageStore();
 const currencies = ref<Currency[]>([]);
 const settings = ref<Settings | null>(null);
 const currencyUsage = ref<Record<string, number>>({});
@@ -84,7 +87,7 @@ async function reorderCurrencies(ids: string[]) {
 }
 async function addCur() {
   const order = await maxSortOrder("currencies");
-  const cur: Currency = { id: crypto.randomUUID(), name: "Currency", symbol: "$", code: "CODE", rate: 1, sortOrder: order + 1, i18nKey: "" };
+  const cur: Currency = { id: crypto.randomUUID(), name: "Currency", symbol: "$", code: "CODE", rate: "1", sortOrder: order + 1, i18nKey: "" };
   await upsertCurrency(cur);
   currencies.value.push(cur);
 }
@@ -94,13 +97,18 @@ async function saveCur(id: string, name: string, symbol: string, code: string) {
   toast(t("success"));
 }
 async function removeCur(id: string) {
-  if (id === settings.value?.mainCurrencyId || isUsedCurrency(id)) {
+  if (id === settings.value?.mainCurrencyId) {
     toast(t("currency_cannot_delete"), "error");
     return;
   }
-  await deleteCurrencyApi(id);
-  currencies.value = currencies.value.filter((c) => c.id !== id);
-  toast(t("success"));
+  try {
+    await deleteCurrencyApi(id);
+    currencies.value = currencies.value.filter((c) => c.id !== id);
+    await catalogsUsageStore.refresh();
+    toast(t("success"));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  }
 }
 function moveCurUp(id: string) {
   const ids = sortedCurrencies.value.map((c) => c.id);
@@ -151,7 +159,7 @@ function moveCurDown(id: string) {
           <div class="w-14 shrink-0"><AppInput :modelValue="c.code" @update:modelValue="(v: string | number) => saveCur(c.id, c.name, c.symbol, String(v))" size="sm" :disabled="c.id === settings?.mainCurrencyId || isUsedCurrency(c.id)" /></div>
         </template>
         <Tooltip :text="t('delete')">
-          <button @click="removeCur(c.id)" :disabled="c.id === settings?.mainCurrencyId || isUsedCurrency(c.id)" class="p-1.5 rounded-lg transition-colors shrink-0" :class="(c.id === settings?.mainCurrencyId || isUsedCurrency(c.id)) ? 'text-text-muted cursor-not-allowed' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'"><Trash2 :size="14" /></button>
+          <button @click="removeCur(c.id)" :disabled="c.id === settings?.mainCurrencyId" class="p-1.5 rounded-lg transition-colors shrink-0" :class="c.id === settings?.mainCurrencyId ? 'text-text-muted cursor-not-allowed' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'"><Trash2 :size="14" /></button>
         </Tooltip>
       </div>
     </div>

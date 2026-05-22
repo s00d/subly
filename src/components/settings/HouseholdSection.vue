@@ -4,6 +4,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { upsertHouseholdMember, deleteHouseholdMember as deleteHouseholdMemberApi, maxSortOrder } from "@/services/catalogClient";
 import type { HouseholdMember } from "@/schemas/appData";
+import { formatErrorForToast } from "@/utils/formatError";
 import AppInput from "@/components/ui/AppInput.vue";
 import { Trash2, Plus } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
@@ -46,9 +47,13 @@ async function removeMember(id: string) {
     toast(t("household_keep_one_member"), "error");
     return;
   }
-  await deleteHouseholdMemberApi(id);
-  household.value = household.value.filter((m) => m.id !== id);
-  toast(t("success"));
+  try {
+    await deleteHouseholdMemberApi(id);
+    household.value = household.value.filter((m) => m.id !== id);
+    toast(t("success"));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  }
 }
 </script>
 

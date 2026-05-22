@@ -10,7 +10,7 @@ use tauri::State;
 
 use crate::commands::ai::catalog_snapshot::snapshot_catalogs;
 use crate::commands::ai::dto::CatalogSnapshot;
-use crate::commands::ai::shared::read_main_currency_id;
+use crate::commands::ai::shared::{read_main_currency_id, read_ui_catalog_defaults};
 use crate::errors::AppError;
 use crate::AppState;
 
@@ -27,6 +27,9 @@ pub struct ExtractContext {
     /// `YYYY-MM-DD` in the user's local timezone. Used as the canonical
     /// "today" anchor for relative dates ("yesterday", "вчера", "heute").
     pub today: String,
+    /// Mirrors `defaultCategoryId` / `defaultPaymentMethodId` from `config:settings`.
+    pub default_category_id: String,
+    pub default_payment_method_id: String,
 }
 
 impl ExtractContext {
@@ -39,6 +42,8 @@ impl ExtractContext {
     ) -> Result<Self, AppError> {
         let catalogs = snapshot_catalogs(state)?;
         let main_currency_id = read_main_currency_id().unwrap_or_default();
+        let (default_category_id, default_payment_method_id) =
+            read_ui_catalog_defaults(&catalogs);
         let today = chrono::Local::now()
             .date_naive()
             .format("%Y-%m-%d")
@@ -48,6 +53,8 @@ impl ExtractContext {
             main_currency_id,
             locale,
             today,
+            default_category_id,
+            default_payment_method_id,
         })
     }
 

@@ -5,19 +5,58 @@ use serde::Deserialize;
 use crate::commands::ai::providers::storage_keys;
 use crate::errors::AppError;
 
+const CONFIG_SETTINGS_KEY: &str = "config:settings";
+
+fn parse_config_settings(raw: &str) -> Option<serde_json::Value> {
+    let parsed = serde_json::from_str::<serde_json::Value>(raw).ok()?;
+    match parsed {
+        serde_json::Value::String(inner) => serde_json::from_str(&inner).ok(),
+        other => Some(other),
+    }
+}
+
+fn json_string_field(value: &serde_json::Value, key: &str) -> Option<String> {
+    value
+        .get(key)
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
 /// Reads `mainCurrencyId` from the persisted UI settings blob, returning
 /// `None` if the setting is missing or empty.
 pub fn read_main_currency_id() -> Option<String> {
-    let raw = crate::redb_get_internal("config:settings".to_string())
+    let raw = crate::redb_get_internal(CONFIG_SETTINGS_KEY.to_string())
         .ok()
         .flatten()?;
-    let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
-    let id = value.get("mainCurrencyId")?.as_str()?.to_string();
-    if id.is_empty() {
-        None
-    } else {
-        Some(id)
+    let settings = parse_config_settings(&raw)?;
+    json_string_field(&settings, "mainCurrencyId")
+}
+
+/// Default category / payment method from UI settings (same keys as the expense form).
+pub fn read_ui_catalog_defaults(
+    catalogs: &crate::commands::ai::dto::CatalogSnapshot,
+) -> (String, String) {
+    let mut preferred_category = String::new();
+    let mut preferred_payment = String::new();
+
+    if let Some(raw) = crate::redb_get_internal(CONFIG_SETTINGS_KEY.to_string())
+        .ok()
+        .flatten()
+    {
+        if let Some(settings) = parse_config_settings(&raw) {
+            preferred_category =
+                json_string_field(&settings, "defaultCategoryId").unwrap_or_default();
+            preferred_payment =
+                json_string_field(&settings, "defaultPaymentMethodId").unwrap_or_default();
+        }
     }
+
+    let default_category_id = catalogs.resolve_default_category_id(&preferred_category);
+    let default_payment_method_id =
+        catalogs.resolve_default_payment_method_id(&preferred_payment);
+
+    (default_category_id, default_payment_method_id)
 }
 
 /// Read a boolean config value. Mirrors `read_string_config` semantics — the

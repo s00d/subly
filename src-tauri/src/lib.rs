@@ -7,6 +7,8 @@ use std::sync::{Arc, OnceLock};
 mod commands;
 pub mod errors;
 pub(crate) mod keyring_store;
+mod money;
+mod money_migration;
 mod models;
 mod state;
 mod state_tables;
@@ -228,51 +230,45 @@ pub(crate) fn redb_set_internal(key: String, value: String) -> Result<(), crate:
     Ok(())
 }
 
-pub(crate) fn rate_map(data: &AppDataDoc) -> std::collections::HashMap<String, f64> {
-    data.currencies
-        .iter()
-        .map(|c| (c.id.clone(), if c.rate <= 0.0 { 1.0 } else { c.rate }))
-        .collect()
+pub(crate) fn rate_map(data: &AppDataDoc) -> std::collections::HashMap<String, rust_decimal::Decimal> {
+    money::rate_map_from_currencies(&data.currencies)
 }
 
-
-pub(crate) fn convert_to_main(amount: f64, currency_id: &str, rates: &std::collections::HashMap<String, f64>) -> f64 {
-    let rate = *rates.get(currency_id).unwrap_or(&1.0);
-    if rate <= 0.0 { amount } else { amount / rate }
+pub(crate) fn convert_to_main(
+    amount: rust_decimal::Decimal,
+    currency_id: &str,
+    rates: &std::collections::HashMap<String, rust_decimal::Decimal>,
+) -> rust_decimal::Decimal {
+    money::convert_to_main(amount, currency_id, rates)
 }
 
-pub(crate) fn price_per_month(cycle: u8, frequency: u32, price: f64) -> f64 {
-    let freq = if frequency == 0 { 1.0 } else { frequency as f64 };
-    match cycle {
-        // Billing every `freq` days → normalize via payments/year ÷ 12.
-        1 => price * (365.25 / freq) / 12.0,
-        // Every `freq` weeks (ISO-style 52 weeks/year).
-        2 => price * (52.0 / freq) / 12.0,
-        3 => price * (1.0 / freq),
-        4 => price / (12.0 * freq),
-        _ => price,
-    }
+pub(crate) fn price_per_month(
+    cycle: u8,
+    frequency: u32,
+    price: rust_decimal::Decimal,
+) -> rust_decimal::Decimal {
+    money::price_per_month(cycle, frequency, price)
 }
 
 #[cfg(test)]
 mod price_tests {
+    use rust_decimal::Decimal;
+    use std::str::FromStr;
+
     use super::price_per_month;
 
     #[test]
     fn weekly_once_per_week_matches_annual_over_12() {
-        let monthly = price_per_month(2, 1, 12.0);
-        let expected = 12.0 * (52.0_f64 / 12.0);
-        assert!(
-            (monthly - expected).abs() < 1e-9,
-            "weekly 12/year should equal 52/12*price, got {monthly}"
-        );
+        let monthly = price_per_month(2, 1, Decimal::from(12));
+        let expected = Decimal::from_str("52").unwrap();
+        assert_eq!(monthly, expected);
     }
 
     #[test]
     fn biweekly_normalization() {
-        let monthly = price_per_month(2, 2, 30.0);
-        let expected = 30.0 * (26.0_f64 / 12.0);
-        assert!((monthly - expected).abs() < 1e-6);
+        let monthly = price_per_month(2, 2, Decimal::from(30));
+        let expected = Decimal::from_str("65").unwrap();
+        assert_eq!(monthly, expected);
     }
 }
 
@@ -353,6 +349,9 @@ fn load_initial_state_for_startup(db: &Database) -> Result<(AppDataDoc, models::
         }
         initial_config.initialized = true;
         state::save_app_data_typed(db, &initial_data, &initial_config)?;
+    }
+    if let Err(err) = money_migration::finalize_money_migration_if_needed(db, &initial_data, &initial_config) {
+        eprintln!("[subly][warn] money migration finalize failed: {}", err);
     }
     Ok((initial_data, initial_config))
 }
@@ -675,7 +674,7 @@ mod tests {
             name: "Custom".to_string(),
             symbol: "C".to_string(),
             code: "CUS".to_string(),
-            rate: 1.0,
+            rate: rust_decimal::Decimal::ONE,
             sort_order: 0,
             i18n_key: String::new(),
         }];

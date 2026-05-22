@@ -8,6 +8,8 @@ import AppInput from "@/components/ui/AppInput.vue";
 import Toast from "@/components/ui/Toast.vue";
 import { Trash2, Plus, ChevronUp, ChevronDown, Star, Search, Hash } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
+import { useCatalogsUsageStore } from "@/stores/catalogsUsageStore";
+import { formatErrorForToast } from "@/utils/formatError";
 import { ui } from "@/lib/tv";
 
 const props = defineProps<{
@@ -18,6 +20,7 @@ const props = defineProps<{
 }>();
 const { t } = useI18n();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
+const catalogsUsageStore = useCatalogsUsageStore();
 const tags = ref<Tag[]>([]);
 const tagUsage = ref<Record<string, number>>({});
 watch(
@@ -71,9 +74,14 @@ async function addTag() {
 }
 function saveTagName(id: string, name: string) { void updateTag(id, { name }); }
 async function removeTag(id: string) {
-  await deleteTagApi(id);
-  tags.value = tags.value.filter((t) => t.id !== id);
-  toast(t("success"));
+  try {
+    await deleteTagApi(id);
+    tags.value = tags.value.filter((t) => t.id !== id);
+    await catalogsUsageStore.refresh();
+    toast(t("success"));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  }
 }
 function toggleFavorite(id: string) {
   const tag = tags.value.find((t) => t.id === id);

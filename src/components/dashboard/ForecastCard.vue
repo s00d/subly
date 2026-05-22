@@ -2,14 +2,20 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { ForecastResult, MonthComparison } from "@/services/dashboardClient";
+import { moneyGt, moneyLt, moneySign, parseMoney, toDisplayNumber, type MoneyString } from "@/lib/money";
 import { TrendingUp, TrendingDown, Minus, Calendar, ArrowRight } from "@lucide/vue";
 import { ui, typo, iconSize, statValue } from "@/lib/tv";
 
 const props = defineProps<{
   forecast: ForecastResult;
   comparison: MonthComparison;
-  fmt: (n: number) => string;
+  fmt: (n: MoneyString) => string;
 }>();
+
+const diffSign = computed(() => moneySign(props.comparison.diff));
+const diffPctLabel = computed(() =>
+  toDisplayNumber(parseMoney(props.comparison.diffPercent), 1).toFixed(1),
+);
 
 const { t } = useI18n();
 
@@ -64,12 +70,12 @@ const comparisonHintKey = computed(() => {
       </div>
       <div
         class="flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-semibold"
-        :class="comparison.diff > 0 ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400' : comparison.diff < 0 ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400'"
+        :class="moneyGt(comparison.diff, '0') ? 'bg-red-50 text-red-600 dark:bg-red-900/20 dark:text-red-400' : moneyLt(comparison.diff, '0') ? 'bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400' : 'bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400'"
       >
-        <TrendingUp v-if="comparison.diff > 0" :size="iconSize.sm" />
-        <TrendingDown v-else-if="comparison.diff < 0" :size="iconSize.sm" />
+        <TrendingUp v-if="diffSign > 0" :size="iconSize.sm" />
+        <TrendingDown v-else-if="diffSign < 0" :size="iconSize.sm" />
         <Minus v-else :size="iconSize.sm" />
-        <span>{{ comparison.diff > 0 ? '+' : '' }}{{ fmt(comparison.diff) }} ({{ comparison.diff > 0 ? '+' : '' }}{{ comparison.diffPercent.toFixed(1) }}%)</span>
+        <span>{{ diffSign > 0 ? '+' : '' }}{{ fmt(comparison.diff) }} ({{ diffSign > 0 ? '+' : '' }}{{ diffPctLabel }}%)</span>
       </div>
     </div>
   </div>

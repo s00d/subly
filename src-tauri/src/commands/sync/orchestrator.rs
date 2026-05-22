@@ -3,7 +3,6 @@ use super::{
     provider_auth_url,
     provider_download, provider_upload, providers_list, save_oauth_tokens, save_sync_config,
     set_dropbox_app_secret, set_webdav_password,
-    sync_redb_write_begin, sync_redb_write_is_active,
     SyncEnableDto, SyncHasUpdateDto, SyncOkDto, SyncUiSchemaDto,
     sync_build_push_meta, sync_merge_with_tombstones, sync_payload_fits_limit, sync_push_revision_mismatch, sync_runtime,
     sync_should_pull, sync_status_from_config, token_key, SyncCredentialsDto, SyncPayload, SyncProviderType,
@@ -11,6 +10,14 @@ use super::{
 };
 use std::sync::OnceLock;
 use tauri::Emitter;
+use tokio::sync::Mutex;
+
+/// Serializes network + merge + Redb sync work (IPC and background poll).
+static GLOBAL_SYNC_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+fn sync_lock() -> &'static Mutex<()> {
+    GLOBAL_SYNC_LOCK.get_or_init(|| Mutex::new(()))
+}
 
 fn persist_merged_snapshot(
     guard: &mut crate::state::AppStateInner,
@@ -102,6 +109,18 @@ impl SyncDispatchCommand {
             SyncDispatchCommand::DismissPending => "dismiss_pending",
         }
     }
+
+    /// Remote I/O and snapshot merge/push must not overlap (scheduler or UI).
+    fn needs_sync_lock(&self) -> bool {
+        matches!(
+            self,
+            SyncDispatchCommand::CheckRemote
+                | SyncDispatchCommand::PullRemote
+                | SyncDispatchCommand::PushLocal { .. }
+                | SyncDispatchCommand::SyncNow
+                | SyncDispatchCommand::FlushBeforeExit { .. }
+        )
+    }
 }
 
 pub fn ensure_sync_scheduler_started(app: tauri::AppHandle) {
@@ -111,10 +130,9 @@ pub fn ensure_sync_scheduler_started(app: tauri::AppHandle) {
             loop {
                 if let Ok(cfg) = load_sync_config() {
                     if cfg.enabled {
-                        if sync_redb_write_is_active() {
-                            tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                        let Ok(_guard) = sync_lock().try_lock() else {
                             continue;
-                        }
+                        };
                         if let Some(provider) = cfg.provider.clone() {
                             let token = match provider_access_token(&provider, &cfg).await {
                                 Ok(v) => v,
@@ -165,6 +183,12 @@ pub async fn sync_dispatch_internal(
         let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
         rt.status = sync_status_from_config(&cfg);
         rt.status.clone()
+    };
+
+    let _sync_guard = if command.needs_sync_lock() {
+        Some(sync_lock().lock().await)
+    } else {
+        None
     };
 
     let data = match command {
@@ -328,7 +352,6 @@ pub async fn sync_dispatch_internal(
                     sync_merge_with_tombstones(local, remote.data, local_ts, remote.tombstones)?
                 };
                 {
-                    let _redb_write = sync_redb_write_begin();
                     let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
                     persist_merged_snapshot(&mut guard, &merged, &remote.app_config)?;
                     crate::state::replace_deletion_tombstones(guard.db.as_ref(), &merged_tombstones)?;

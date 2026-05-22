@@ -5,13 +5,14 @@ import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useI18n } from "vue-i18n";
 import { useScrollLock } from "@/composables/useScrollLock";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
+import type { MoneyString } from "@/lib/money";
 import { ui, iconSize } from "@/lib/tv";
 
 const props = defineProps<{
   show: boolean;
   title: string;
-  subs: { id: string; name: string; price: number; currencyId: string; logo?: string }[];
-  expenses?: { id: string; name: string; amount: number; currencyId: string; icon?: string }[];
+  subs: { id: string; name: string; price: MoneyString; currencyId: string; logo?: string }[];
+  expenses?: { id: string; name: string; amount: MoneyString; currencyId: string; icon?: string }[];
 }>();
 
 const emit = defineEmits<{

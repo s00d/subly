@@ -58,7 +58,10 @@ pub fn save_sync_config(cfg: &SyncConfig) -> Result<(), crate::errors::AppError>
 }
 
 pub(crate) fn dropbox_app_secret() -> Result<String, crate::errors::AppError> {
-    Ok(crate::keyring_store::get(KR_SYNC_DROPBOX_APP_SECRET)?.unwrap_or_default())
+    Ok(
+        crate::keyring_store::get_for_background(KR_SYNC_DROPBOX_APP_SECRET)?
+            .unwrap_or_default(),
+    )
 }
 
 pub(crate) fn set_dropbox_app_secret(secret: &str) -> Result<(), crate::errors::AppError> {
@@ -70,7 +73,10 @@ pub(crate) fn set_dropbox_app_secret(secret: &str) -> Result<(), crate::errors::
 }
 
 pub(crate) fn webdav_password() -> Result<String, crate::errors::AppError> {
-    Ok(crate::keyring_store::get(KR_SYNC_WEBDAV_PASSWORD)?.unwrap_or_default())
+    Ok(
+        crate::keyring_store::get_for_background(KR_SYNC_WEBDAV_PASSWORD)?
+            .unwrap_or_default(),
+    )
 }
 
 pub(crate) fn set_webdav_password(password: &str) -> Result<(), crate::errors::AppError> {
@@ -82,7 +88,7 @@ pub(crate) fn set_webdav_password(password: &str) -> Result<(), crate::errors::A
 }
 
 pub fn load_oauth_tokens(key: &str) -> Result<Option<OAuthTokens>, crate::errors::AppError> {
-    let raw = crate::keyring_store::get(key)?;
+    let raw = crate::keyring_store::get_for_background(key)?;
     match raw {
         Some(ref s) => Ok(Some(parse_json_or_err(key, s)?)),
         None => Ok(None),

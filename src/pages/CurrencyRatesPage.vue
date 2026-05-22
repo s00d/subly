@@ -13,6 +13,13 @@ import Toast from "@/components/ui/Toast.vue";
 import { typo } from "@/lib/tv";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import { formatErrorForToast } from "@/utils/formatError";
+import {
+  moneyFromNumber,
+  moneyGt,
+  parseMoney,
+  toDisplayNumber,
+  type MoneyString,
+} from "@/lib/money";
 import AppSlider from "@/components/ui/AppSlider.vue";
 import ExpenseForm from "@/components/expenses/ExpenseForm.vue";
 import {
@@ -145,7 +152,7 @@ interface ConverterCurrency {
   code: string;
   name: string;
   symbol: string;
-  rate: number;
+  rate: MoneyString;
   isBase: boolean;
 }
 
@@ -158,7 +165,7 @@ const allConverterIds = computed(() => {
 
   for (const id of selectedTargetIds.value) {
     const c = currencies.value.find((cur) => cur.id === id);
-    if (!c || c.rate <= 0) continue;
+    if (!c || !moneyGt(c.rate, "0")) continue;
     const code = normalizedCode(c.code);
     if (!code || seenCodes.has(code)) continue;
     seenCodes.add(code);
@@ -214,7 +221,9 @@ function resetConverter() {
 }
 
 function getRawValue(cur: ConverterCurrency): number {
-  return cur.isBase ? baseAmount.value : baseAmount.value * cur.rate;
+  const base = baseAmount.value;
+  const rate = toDisplayNumber(parseMoney(cur.rate), 8);
+  return cur.isBase ? base : base * rate;
 }
 
 function openExpenseForm(cur: ConverterCurrency) {
@@ -242,7 +251,7 @@ function onInput(cur: ConverterCurrency, raw: string) {
   if (cur.isBase) {
     baseAmount.value = val;
   } else {
-    baseAmount.value = cur.rate > 0 ? val / cur.rate : 0;
+    baseAmount.value = moneyGt(cur.rate, "0") ? val / toDisplayNumber(parseMoney(cur.rate), 8) : 0;
   }
 }
 
@@ -268,12 +277,22 @@ function onSlider(cur: ConverterCurrency, val: number) {
   if (cur.isBase) {
     baseAmount.value = val;
   } else {
-    baseAmount.value = cur.rate > 0 ? val / cur.rate : 0;
+    baseAmount.value = moneyGt(cur.rate, "0") ? val / toDisplayNumber(parseMoney(cur.rate), 8) : 0;
   }
 }
 
 function onBlur() {
   editingId.value = null;
+}
+
+function formatRateLine(rate: MoneyString): string {
+  const n = toDisplayNumber(parseMoney(rate), 4);
+  return n ? n.toFixed(4).replace(/\.?0+$/, "") : "0";
+}
+
+function formatInverseRateLine(rate: MoneyString): string {
+  const n = toDisplayNumber(parseMoney(rate), 8);
+  return n ? (1 / n).toFixed(4).replace(/\.?0+$/, "") : "0";
 }
 
 // Rates table
@@ -286,12 +305,15 @@ const filteredCurrencies = computed(() => {
 });
 
 const allRates = computed(() => {
-  const items = filteredCurrencies.value.map((c) => ({
-    ...c,
-    rateFormatted: c.rate?.toFixed(4) ?? "—",
-    inverse: c.rate ? (1 / c.rate).toFixed(4) : "—",
-    enabled: selectedTargetIds.value.includes(c.id),
-  }));
+  const items = filteredCurrencies.value.map((c) => {
+    const rateNum = toDisplayNumber(parseMoney(c.rate), 8);
+    return {
+      ...c,
+      rateFormatted: rateNum ? rateNum.toFixed(4) : "—",
+      inverse: rateNum ? (1 / rateNum).toFixed(4) : "—",
+      enabled: selectedTargetIds.value.includes(c.id),
+    };
+  });
   const key = rateSortBy.value;
   return items.sort((a, b) => {
     if (key === "enabled") {
@@ -300,7 +322,7 @@ const allRates = computed(() => {
     }
     if (key === "code") return a.code.localeCompare(b.code);
     if (key === "name") return a.name.localeCompare(b.name);
-    return (a.rate ?? 0) - (b.rate ?? 0);
+    return toDisplayNumber(parseMoney(a.rate), 8) - toDisplayNumber(parseMoney(b.rate), 8);
   });
 });
 
@@ -349,9 +371,9 @@ async function handleUpdate() {
   }
 }
 
-function startRateEdit(rate: { id: string; rate: number }) {
+function startRateEdit(rate: { id: string; rate: MoneyString }) {
   editingRateId.value = rate.id;
-  editingRateValue.value = Number.isFinite(rate.rate) ? String(rate.rate) : "";
+  editingRateValue.value = rate.rate ?? "";
 }
 
 function cancelRateEdit() {
@@ -368,7 +390,7 @@ async function saveRateEdit(rate: { id: string; code: string }) {
   }
 
   try {
-    await updateCurrencyRates([{ id: rate.id, rate: nextRate }]);
+    await updateCurrencyRates([{ id: rate.id, rate: moneyFromNumber(nextRate) }]);
     await metaStore.refresh();
     await refreshCurrencyFlags();
     toast(`${rate.code} ${t("save").toLowerCase()}`);
@@ -534,9 +556,9 @@ watch(
             :step="sliderParams(cur).step"
           />
           <div v-if="!cur.isBase" class="text-[10px] text-text-muted tabular-nums mt-1">
-            1 {{ mainCurrency?.code }} = {{ cur.rate.toFixed(4).replace(/\.?0+$/, '') }} {{ cur.code }}
+            1 {{ mainCurrency?.code }} = {{ formatRateLine(cur.rate) }} {{ cur.code }}
             <span class="opacity-60 mx-1">·</span>
-            1 {{ cur.code }} = {{ (1 / cur.rate).toFixed(4).replace(/\.?0+$/, '') }} {{ mainCurrency?.code }}
+            1 {{ cur.code }} = {{ formatInverseRateLine(cur.rate) }} {{ mainCurrency?.code }}
           </div>
 
           <div class="flex items-center justify-end gap-1 mt-2">
@@ -615,9 +637,9 @@ watch(
               :step="sliderParams(cur).step"
             />
             <div v-if="!cur.isBase" class="text-[10px] text-text-muted tabular-nums mt-0.5 pl-1">
-              1 {{ mainCurrency?.code }} = {{ cur.rate.toFixed(4).replace(/\.?0+$/, '') }} {{ cur.code }}
+              1 {{ mainCurrency?.code }} = {{ formatRateLine(cur.rate) }} {{ cur.code }}
               <span class="opacity-60 mx-1">·</span>
-              1 {{ cur.code }} = {{ (1 / cur.rate).toFixed(4).replace(/\.?0+$/, '') }} {{ mainCurrency?.code }}
+              1 {{ cur.code }} = {{ formatInverseRateLine(cur.rate) }} {{ mainCurrency?.code }}
             </div>
           </div>
           <div v-if="!isCompactView" class="flex flex-row shrink-0 gap-0.5">

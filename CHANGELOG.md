@@ -5,27 +5,39 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.4] - 2026-05-13
+## [1.0.4] - 2026-05-22
 
 ### Added
 
 - Shared **`dashboardIpc` TypeScript types** for dashboard command payloads so `commandClient` stays free of circular imports with `dashboardClient`.
 - **`readClipboardText()`** in `useClipboard`, backed by `@tauri-apps/plugin-clipboard-manager` with a **`navigator.clipboard.readText()`** fallback for paste flows (including the AI assist dialog).
+- **`MoneyString`** (`src/lib/money.ts`) and **`decimal.js`** on the frontend; Rust uses **`rust_decimal`** with amounts serialized as decimal strings over IPC.
+- One-time **money migration** (`migration:money_decimal_v1`) converts legacy `f64` postcard snapshots to precise decimals on startup.
 
 ### Changed
 
 - **Dashboard client** refactored to use the shared IPC types and leaner invoke helpers.
 - **`commandClient` / `invokeCommand`** extended for dashboard payloads and **`app_ready`** lifecycle wiring in **`App.vue`**.
+- **All money-bearing IPC** (subscriptions, expenses, dashboard, rates, notifications, AI DTOs, iOS widget snapshot) now uses decimal strings end-to-end; Zod schemas, **`useCurrencyFormat`**, and dashboard / form components updated accordingly.
 - **Frontend secrets** now use **`tauri-plugin-keyring-store-api` only**; legacy **`secure_storage_*`** Tauri commands were removed from Rust while keeping the same logical key prefix, so existing keychain entries remain valid.
-- **`keyring_store`** Rust module simplified in line with dropping the redundant command layer.
+- **`tauri-plugin-keyring-store` 0.2** — **`keyring_store`** maps **`KeychainLocked`** to **`keyring_locked`**; iOS background sync credential reads use the plugin’s background-safe API when the keychain is unavailable.
+- **Cloud sync** — global **`tokio::sync::Mutex`** serializes **`CheckRemote`**, **`PullRemote`**, **`PushLocal`**, **`SyncNow`**, and **`FlushBeforeExit`**; the background scheduler uses **`try_lock`** and skips a tick while sync is already running (replaces **`redb_write_flag`** polling).
+- **AI extraction** — balanced-brace JSON parser prefers the last valid object/array; OpenAI-compatible providers request **`response_format: json_object`** with automatic fallback when unsupported; vision shares the same chat-completions path.
+- **Catalog delete** — removing a category, currency, payment method, household member, or tag reassigns or blocks defaults safely and emits **`app:data-changed`** so open screens refresh.
 - **AI Smart dialog**, **subscriptions / expenses** pages, **`aiClient`**, **`aiConfigStore`**, and **`SubscriptionForm`** updated for the new IPC and clipboard behavior.
 - **Tauri capabilities** updated where clipboard read is required; **iOS and widget `Info.plist`** metadata aligned with the current app build.
 - **Locale files** refreshed for new or adjusted copy across all supported languages.
 - **`pnpm-lock.yaml`** and **`Cargo.lock`** updated with dependency refreshes tied to the release.
 
+### Fixed
+
+- **iOS widget** — **`upcoming.json`** is written atomically (**`.tmp`** + **`rename`**) so the extension never reads a truncated file.
+- **Calendar** — when the calendar day rolls over while the app stays open, stores refetch so **`daysLeft`**, overdue flags, and payment dates stay correct without leaving the page.
+
 ### Removed
 
 - **`src-tauri/src/commands/secure_storage.rs`** — redundant now that the UI talks to the keyring plugin directly.
+- **`src-tauri/src/commands/sync/redb_write_flag.rs`** — superseded by the global sync mutex.
 
 ## [1.0.3] - 2026-05-12
 

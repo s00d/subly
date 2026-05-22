@@ -3,6 +3,11 @@
 //! LLMs frequently wrap JSON in markdown fences or add surrounding prose
 //! despite explicit instructions. We strip those wrappers before handing the
 //! text to `serde_json`.
+//!
+//! When multiple JSON values appear in one reply (e.g. an example in the
+//! preamble and the real payload at the end), we extract every balanced
+//! `{…}` / `[…]` chunk (respecting string literals) and deserialize
+//! **last successful** match first — the final object is usually the answer.
 
 use serde::de::DeserializeOwned;
 
@@ -27,20 +32,31 @@ pub fn parse_llm_json<T: DeserializeOwned>(raw: &str) -> Result<T, AppError> {
         }
     }
 
-    // Final fallback: take the substring from the first `{`/`[` to the
-    // matching closing bracket, trimming prose around it.
-    if let Some(json_chunk) = extract_outer_json(trimmed) {
-        return serde_json::from_str::<T>(&json_chunk).map_err(|e| {
-            AppError::from(format!(
-                "ai_response_invalid_json:{}",
-                truncate_message(&e.to_string())
-            ))
-        });
+    // Try every balanced JSON value in the text; prefer the last one that parses.
+    let candidates = collect_json_candidates(trimmed);
+    let mut last_err: Option<String> = None;
+    for chunk in candidates.iter().rev() {
+        match serde_json::from_str::<T>(chunk) {
+            Ok(value) => return Ok(value),
+            Err(e) => last_err = Some(truncate_message(&e.to_string())),
+        }
+    }
+
+    // First balanced chunk only (forward order) for odd edge cases.
+    if let Some(start) = trimmed.find(|c: char| c == '{' || c == '[') {
+        if let Some(json_chunk) = extract_balanced_json(trimmed, start) {
+            return serde_json::from_str::<T>(&json_chunk).map_err(|e| {
+                AppError::from(format!(
+                    "ai_response_invalid_json:{}",
+                    truncate_message(&e.to_string())
+                ))
+            });
+        }
     }
 
     Err(AppError::from(format!(
         "ai_response_invalid_json:{}",
-        truncate_message(trimmed)
+        last_err.unwrap_or_else(|| truncate_message(trimmed))
     )))
 }
 
@@ -50,7 +66,6 @@ fn strip_code_fence(raw: &str) -> Option<&str> {
         return None;
     }
     let after_open = trimmed.trim_start_matches('`').trim_start();
-    // Skip optional language tag (e.g. `json` / `JSON`).
     let after_tag = match after_open.find('\n') {
         Some(idx) => &after_open[idx + 1..],
         None => after_open,
@@ -59,30 +74,57 @@ fn strip_code_fence(raw: &str) -> Option<&str> {
     Some(after_tag[..end].trim())
 }
 
-fn extract_outer_json(raw: &str) -> Option<String> {
-    let start = raw.find(|c: char| c == '{' || c == '[')?;
-    let open = raw.as_bytes()[start] as char;
-    let close = if open == '{' { '}' } else { ']' };
-    let mut depth: i32 = 0;
+/// All top-level JSON object/array spans found in `raw`, in left-to-right order.
+fn collect_json_candidates(raw: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    for (idx, ch) in raw.char_indices() {
+        if ch == '{' || ch == '[' {
+            if let Some(chunk) = extract_balanced_json(raw, idx) {
+                out.push(chunk);
+            }
+        }
+    }
+    out
+}
+
+/// Extract one balanced JSON value starting at byte index `start` (`{` or `[`).
+fn extract_balanced_json(raw: &str, start: usize) -> Option<String> {
+    let first = *raw.as_bytes().get(start)?;
+    if first != b'{' && first != b'[' {
+        return None;
+    }
+
+    let mut depth_obj: i32 = 0;
+    let mut depth_arr: i32 = 0;
     let mut in_string = false;
-    let mut prev_escape = false;
+    let mut escape = false;
+
     for (i, c) in raw[start..].char_indices() {
         if in_string {
-            if prev_escape {
-                prev_escape = false;
+            if escape {
+                escape = false;
             } else if c == '\\' {
-                prev_escape = true;
+                escape = true;
             } else if c == '"' {
                 in_string = false;
             }
             continue;
         }
+
         match c {
             '"' => in_string = true,
-            ch if ch == open => depth += 1,
-            ch if ch == close => {
-                depth -= 1;
-                if depth == 0 {
+            '{' => depth_obj += 1,
+            '}' => {
+                depth_obj -= 1;
+                if depth_obj == 0 && depth_arr == 0 {
+                    let end = start + i + c.len_utf8();
+                    return Some(raw[start..end].to_string());
+                }
+            }
+            '[' => depth_arr += 1,
+            ']' => {
+                depth_arr -= 1;
+                if depth_obj == 0 && depth_arr == 0 {
                     let end = start + i + c.len_utf8();
                     return Some(raw[start..end].to_string());
                 }
@@ -149,8 +191,6 @@ mod tests {
 
     #[test]
     fn handles_braces_inside_string_literal() {
-        // The outer-extractor must skip the `{` inside the `notes` string
-        // and find the actual closing brace.
         let raw = r#"Reply: {"name":"with {braces}","amount":1.0}"#;
         let result: Sample = parse_llm_json(raw).unwrap();
         assert_eq!(result.name, "with {braces}");
@@ -161,6 +201,23 @@ mod tests {
         let raw = r#"{"name":"she said \"hi\"","amount":5.0}"#;
         let result: Sample = parse_llm_json(raw).unwrap();
         assert_eq!(result.name, "she said \"hi\"");
+    }
+
+    #[test]
+    fn prefers_last_valid_object_when_prose_contains_example() {
+        let raw = r#"Example: {"name":"wrong","amount":0}
+Here is the extracted row:
+{"name":"right","amount":42}"#;
+        let result: Sample = parse_llm_json(raw).unwrap();
+        assert_eq!(result.name, "right");
+        assert_eq!(result.amount, 42.0);
+    }
+
+    #[test]
+    fn parses_nested_array_inside_object() {
+        let raw = r#"{"name":"nested","amount":1,"tags":["a","b"]}"#;
+        let result: Sample = parse_llm_json(raw).unwrap();
+        assert_eq!(result.name, "nested");
     }
 
     #[test]
@@ -179,5 +236,13 @@ mod tests {
     fn parses_array_outer_type() {
         let result: Vec<u32> = parse_llm_json("garbage before [1, 2, 3] garbage after").unwrap();
         assert_eq!(result, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn notes_field_with_embedded_json_does_not_break_outer_object() {
+        let raw = r#"{"name":"ok","amount":9,"notes":"user pasted {\"foo\": 1} here"}"#;
+        let result: Sample = parse_llm_json(raw).unwrap();
+        assert_eq!(result.name, "ok");
+        assert_eq!(result.amount, 9.0);
     }
 }

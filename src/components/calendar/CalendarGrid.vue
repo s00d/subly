@@ -2,12 +2,14 @@
 import { useI18n } from "vue-i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 
+import type { MoneyString } from "@/lib/money";
+
 export interface CalendarCell {
   day: number;
   isEmpty: boolean;
   isToday: boolean;
-  subs: { id: string; name: string; price: number; currencyId: string; logo?: string }[];
-  expenses?: { id: string; name: string; amount: number; currencyId: string; icon?: string }[];
+  subs: { id: string; name: string; price: MoneyString; currencyId: string; logo?: string }[];
+  expenses?: { id: string; name: string; amount: MoneyString; currencyId: string; icon?: string }[];
 }
 
 defineProps<{

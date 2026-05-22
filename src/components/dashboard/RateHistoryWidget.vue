@@ -9,6 +9,7 @@ import { useRouter } from "vue-router";
 import VChart from "@/components/ui/LazyVChart.vue";
 import type { EChartsCoreOption } from "echarts/core";
 import { useChartTheme } from "@/composables/useChartTheme";
+import { moneyGt, parseMoney, toDisplayNumber } from "@/lib/money";
 
 const LINE_COLORS = [
   "#3b82f6", "#ef4444", "#22c55e", "#f59e0b", "#8b5cf6",
@@ -37,7 +38,7 @@ const mainCurrency = computed(() =>
 const currencies = computed(() =>
   targetIds.value
     .map((id) => allCurrencies.value.find((c) => c.id === id))
-    .filter((c): c is NonNullable<typeof c> => !!c && c.rate > 0),
+    .filter((c): c is NonNullable<typeof c> => !!c && moneyGt(c.rate, "0")),
 );
 
 const hasHistory = computed(() => Object.values(history.value).some((h) => h.length >= 1));
@@ -132,7 +133,10 @@ const rateChartOption = computed((): EChartsCoreOption => {
     .map((cur, i) => {
       const points = history.value[cur.id] ?? [];
       const rateMap = new Map(points.map((p) => [p.recordedAt, p.rate]));
-      const data = allDates.value.map((d) => rateMap.get(d) ?? null);
+      const data = allDates.value.map((d) => {
+        const r = rateMap.get(d);
+        return r != null ? toDisplayNumber(parseMoney(r), 4) : null;
+      });
       const color = LINE_COLORS[i % LINE_COLORS.length];
       const flag = flagFor(cur.code);
       return {
@@ -225,10 +229,10 @@ const rateChartOption = computed((): EChartsCoreOption => {
           <span v-if="flagFor(cur.code)" class="text-sm">{{ flagFor(cur.code) }}</span>
           <span class="text-xs font-bold text-text-primary">{{ cur.code }}</span>
           <span
-            v-if="pctChange((history[cur.id] ?? []).map(p => p.rate))"
+            v-if="pctChange((history[cur.id] ?? []).map(p => toDisplayNumber(parseMoney(p.rate), 4)))"
             class="ml-auto text-[10px] font-semibold tabular-nums"
-            :class="trendDir((history[cur.id] ?? []).map(p => p.rate)) >= 0 ? 'text-green-500' : 'text-red-500'"
-          >{{ pctChange((history[cur.id] ?? []).map(p => p.rate)) }}</span>
+            :class="trendDir((history[cur.id] ?? []).map(p => toDisplayNumber(parseMoney(p.rate), 4))) >= 0 ? 'text-green-500' : 'text-red-500'"
+          >{{ pctChange((history[cur.id] ?? []).map(p => toDisplayNumber(parseMoney(p.rate), 4))) }}</span>
         </div>
 
         <div class="flex items-end justify-between gap-1">
@@ -240,9 +244,9 @@ const rateChartOption = computed((): EChartsCoreOption => {
             class="flex-1"
           >
             <path
-              :d="sparkPath((history[cur.id] ?? []).map(p => p.rate), 80, 28)"
+              :d="sparkPath((history[cur.id] ?? []).map(p => toDisplayNumber(parseMoney(p.rate), 4)), 80, 28)"
               fill="none"
-              :stroke="trendDir((history[cur.id] ?? []).map(p => p.rate)) >= 0 ? '#22c55e' : '#ef4444'"
+              :stroke="trendDir((history[cur.id] ?? []).map(p => toDisplayNumber(parseMoney(p.rate), 4))) >= 0 ? '#22c55e' : '#ef4444'"
               stroke-width="1.5"
               stroke-linecap="round"
               stroke-linejoin="round"
@@ -250,12 +254,12 @@ const rateChartOption = computed((): EChartsCoreOption => {
           </svg>
           <span v-else class="text-[10px] text-text-muted flex-1">—</span>
           <span class="text-[11px] font-mono font-semibold text-text-primary tabular-nums shrink-0">
-            {{ cur.rate.toFixed(2) }}
+            {{ toDisplayNumber(parseMoney(cur.rate), 2).toFixed(2) }}
           </span>
         </div>
 
         <div class="text-[10px] text-text-muted mt-1 truncate">
-          1 {{ mainCurrency?.code }} = {{ cur.rate.toFixed(4).replace(/\.?0+$/, '') }} {{ cur.code }}
+          1 {{ mainCurrency?.code }} = {{ toDisplayNumber(parseMoney(cur.rate), 4).toFixed(4).replace(/\.?0+$/, '') }} {{ cur.code }}
         </div>
       </div>
     </div>

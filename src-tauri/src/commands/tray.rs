@@ -40,7 +40,7 @@ fn refresh_tray_menu(app: &tauri::AppHandle) -> Result<(), crate::errors::AppErr
             let in_main = crate::convert_to_main(s.price, &s.currency_id, &rates);
             crate::price_per_month(s.cycle, s.frequency, in_main)
         })
-        .sum::<f64>();
+        .sum::<rust_decimal::Decimal>();
 
     let mut overdue = data
         .subscriptions
@@ -72,12 +72,8 @@ fn refresh_tray_menu(app: &tauri::AppHandle) -> Result<(), crate::errors::AppErr
     upcoming.sort_by(|a, b| a.next_payment.cmp(&b.next_payment));
     upcoming.truncate(8);
 
-    let fmt = |amount: f64, currency_code: &str| -> String {
-        let mut value = amount;
-        if !value.is_finite() {
-            value = 0.0;
-        }
-        format!("{value:.2} {currency_code}")
+    let fmt = |amount: rust_decimal::Decimal, currency_code: &str| -> String {
+        format!("{} {currency_code}", crate::money::to_ipc_string(&amount))
     };
 
     let mut items: Vec<tauri::menu::MenuItem<_>> = Vec::new();

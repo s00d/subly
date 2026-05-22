@@ -19,6 +19,7 @@ import {
   NOTIFICATION_TAGS_TOOLTIP,
   NOTIFICATION_TEMPLATE_DEFAULTS,
 } from "@/constants/notificationTemplateDefaults";
+import { moneyFromNumber, parseMoney, toDisplayNumber } from "@/lib/money";
 
 const props = defineProps<{ lookupSettings: Settings | null }>();
 const { t } = useI18n();
@@ -58,7 +59,7 @@ watch(
   (s) => {
     if (!s) return;
     settings.value = s;
-    budgetInput.value = s.budget;
+    budgetInput.value = toDisplayNumber(parseMoney(s.budget));
     notifyDaysBefore.value = s.notifyDaysBefore;
     recurringNotifications.value = s.recurringNotifications !== false;
     notificationSound.value = s.notificationSound !== false;
@@ -96,7 +97,7 @@ async function updateSettings(updates: Partial<Settings>) {
 }
 
 function saveBudget() {
-  updateSettings({ budget: budgetInput.value });
+  updateSettings({ budget: moneyFromNumber(budgetInput.value) });
   toast(t("success"));
 }
 

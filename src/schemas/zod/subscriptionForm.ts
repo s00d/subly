@@ -3,7 +3,7 @@ import {
   cycleFieldSchema,
   isoDateYmdSchema,
   nonEmptyTrimmedStringSchema,
-  nonNegativeFiniteCoerced,
+  moneyStringSchema,
   notifyDaysBeforeFieldSchema,
   positiveIntCoerced,
 } from "./common";
@@ -14,7 +14,7 @@ import {
  */
 export const subscriptionFormFieldsSchema = z.object({
   name: nonEmptyTrimmedStringSchema,
-  price: nonNegativeFiniteCoerced,
+  price: moneyStringSchema,
   currencyId: nonEmptyTrimmedStringSchema,
   nextPayment: isoDateYmdSchema,
   startDate: isoDateYmdSchema,
@@ -33,7 +33,7 @@ export function coerceSubscriptionFormForValidation(
 ): Record<string, unknown> {
   return {
     name: String(base.name ?? ""),
-    price: Number(base.price) || 0,
+    price: typeof base.price === "string" ? base.price : String(Number(base.price) || 0),
     frequency: Number(base.frequency) || 1,
     notifyDaysBefore: Number(base.notifyDaysBefore ?? 1),
     cycle: Number(base.cycle) || 3,

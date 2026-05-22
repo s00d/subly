@@ -2,13 +2,14 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { CategoryAverage } from "@/services/dashboardClient";
+import { parseMoney, type MoneyString } from "@/lib/money";
 import type { Category } from "@/schemas/appData";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import { Tag } from "@lucide/vue";
 
 const props = defineProps<{
   averages: CategoryAverage[];
-  fmt: (n: number) => string;
+  fmt: (n: MoneyString) => string;
   categories?: Category[];
 }>();
 
@@ -48,7 +49,16 @@ function getCatIcon(id: string): string {
           <div class="w-full bg-surface-hover rounded-full h-1.5 mb-1">
             <div
               class="h-1.5 rounded-full bg-primary transition-all"
-              :style="{ width: Math.min(100, (cat.totalMonthly / (averages[0]?.totalMonthly || 1)) * 100) + '%' }"
+              :style="{
+                width:
+                  Math.min(
+                    100,
+                    (parseMoney(cat.totalMonthly)
+                      .dividedBy(parseMoney(averages[0]?.totalMonthly || '1'))
+                      .toNumber()) *
+                      100,
+                  ) + '%',
+              }"
             />
           </div>
 

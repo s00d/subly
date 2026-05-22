@@ -35,6 +35,9 @@ importers:
       '@tauri-apps/plugin-os':
         specifier: ^2.3.2
         version: 2.3.2
+      decimal.js:
+        specifier: ^10.6.0
+        version: 10.6.0
       echarts:
         specifier: ^6.0.0
         version: 6.0.0
@@ -51,8 +54,8 @@ importers:
         specifier: ^4.3.0
         version: 4.3.0
       tauri-plugin-keyring-store-api:
-        specifier: 0.1.0
-        version: 0.1.0
+        specifier: 0.2.0
+        version: 0.2.0
       vue:
         specifier: ^3.5.34
         version: 3.5.34(typescript@5.9.3)
@@ -560,6 +563,9 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
+  decimal.js@10.6.0:
+    resolution: {integrity: sha512-YpgQiITW3JXGntzdUmyUR1V812Hn8T1YVXhCu+wO3OpS4eU9l4YdD3qjyiKdV6mvV29zapkMeD390UVEf2lkUg==}
+
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
@@ -802,8 +808,8 @@ packages:
     resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
     engines: {node: '>=6'}
 
-  tauri-plugin-keyring-store-api@0.1.0:
-    resolution: {integrity: sha512-88XAf0VCtMlYr+vqynbfcDP+EV1344GTR6bpM0ZXDLQobJbvHDVDWJcvypPiAXIycJpLMa/UyBoZXx4yDeZ8aQ==}
+  tauri-plugin-keyring-store-api@0.2.0:
+    resolution: {integrity: sha512-ZQYb6Xj75AD+YFBNDr4Zjc751TlVCQqvcB3GXx9Q85dRkss2FKrfU1Bu3kATQAzMQcvPYT3Ww+Fi+3I+OlMVZA==}
 
   tinyglobby@0.2.16:
     resolution: {integrity: sha512-pn99VhoACYR8nFHhxqix+uvsbXineAasWm5ojXoN8xEwK5Kd3/TrhNn1wByuD52UxWRLy8pu+kRMniEi6Eq9Zg==}
@@ -1383,6 +1389,8 @@ snapshots:
 
   csstype@3.2.3: {}
 
+  decimal.js@10.6.0: {}
+
   detect-libc@2.1.2: {}
 
   echarts@6.0.0:
@@ -1582,7 +1590,7 @@ snapshots:
 
   tapable@2.3.3: {}
 
-  tauri-plugin-keyring-store-api@0.1.0:
+  tauri-plugin-keyring-store-api@0.2.0:
     dependencies:
       '@tauri-apps/api': 2.11.0
 

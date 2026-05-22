@@ -5,6 +5,9 @@
 //! thread so the UI/main thread never blocks waiting for slow `ureq` calls. A simple
 //! `IN_PROGRESS` + `PENDING_REFRESH` pair coalesces bursts of subscription mutations
 //! into at most one extra refresh after the running job completes.
+//!
+//! `upcoming.json` is written via `upcoming.json.tmp` + `rename` so iOS suspend during
+//! I/O cannot leave the widget with a truncated JSON file.
 
 #[cfg(target_os = "ios")]
 mod ios_impl {
@@ -30,6 +33,8 @@ mod ios_impl {
     /// Raster PNGs keyed by SHA256(trimmed URL); kept until URL changes or user clears app data.
     const HTTP_LOGO_CACHE_SUBDIR: &str = "logo_cache";
     const UPCOMING_FILE: &str = "upcoming.json";
+    /// Written first, then renamed over `upcoming.json` so the widget never reads a partial file.
+    const UPCOMING_FILE_TMP: &str = "upcoming.json.tmp";
 
     /// Per-request budget for logo HTTP fetches. Kept tight because the snapshot blocks
     /// the next widget timeline reload; a slow CDN should not stall app shutdown either.
@@ -48,7 +53,8 @@ mod ios_impl {
         name: String,
         #[serde(rename = "nextPayment")]
         next_payment: String,
-        price: f64,
+        #[serde(with = "crate::money::serde_ipc")]
+        price: rust_decimal::Decimal,
         #[serde(rename = "currencyId")]
         currency_id: String,
         /// ISO 4217 for locale-aware currency formatting (matches web Intl / fmtCurrency).
@@ -189,6 +195,21 @@ mod ios_impl {
         Some(out)
     }
 
+    /// Replace `path` atomically: write full payload to a sibling `.tmp`, then `rename`.
+    /// If the process is suspended mid-write, the previous file at `path` stays intact.
+    fn atomic_write_file(path: &Path, contents: &[u8]) -> Result<(), String> {
+        let parent = path
+            .parent()
+            .ok_or_else(|| "atomic_write_file: missing parent directory".to_string())?;
+        let tmp_path = parent.join(UPCOMING_FILE_TMP);
+        fs::write(&tmp_path, contents).map_err(|e| e.to_string())?;
+        if let Err(e) = fs::rename(&tmp_path, path) {
+            let _ = fs::remove_file(&tmp_path);
+            return Err(e.to_string());
+        }
+        Ok(())
+    }
+
     fn safe_icon_filename(id: &str) -> String {
         let s: String = id
             .chars()
@@ -295,7 +316,7 @@ mod ios_impl {
 
         let path = dir.join(UPCOMING_FILE);
         let json = serde_json::to_string_pretty(&snapshot).map_err(|e| e.to_string())?;
-        fs::write(&path, json).map_err(|e| e.to_string())?;
+        atomic_write_file(&path, json.as_bytes())?;
 
         reload_widget_timelines_if_swift_linked();
         Ok(())

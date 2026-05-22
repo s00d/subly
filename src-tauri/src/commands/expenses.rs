@@ -229,16 +229,20 @@ pub fn list_expenses_page(
 pub fn expenses_total_filtered(
     state: State<'_, AppState>,
     filter: ExpensesPageRequestDto,
-) -> Result<f64, crate::errors::AppError> {
-    (|| -> AppResult<f64> {
+) -> Result<String, crate::errors::AppError> {
+    (|| -> AppResult<String> {
         let guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
         let list_filter = ExpenseListFilter::from_request(&filter);
         let items: Vec<ExpenseDoc> =
             candidate_expenses_for_date_filter(&guard, list_filter.date_from_nd, list_filter.date_to_nd)?;
         drop(guard);
 
-        let total: f64 = items.iter().filter(|e| list_filter.matches(e)).map(|e| e.amount).sum();
-        Ok(total)
+        let total: rust_decimal::Decimal = items
+            .iter()
+            .filter(|e| list_filter.matches(e))
+            .map(|e| e.amount)
+            .sum();
+        Ok(crate::money::to_ipc_string(&total))
     })()
 }
 
@@ -464,7 +468,7 @@ mod tests {
             id: "exp-index-test".to_string(),
             updated_at: 1,
             name: "idx".to_string(),
-            amount: 1.0,
+            amount: crate::money::from_f64_legacy(1.0),
             currency_id: "cur-2".to_string(),
             created_at: "2026-01-01T12:00:00.000Z".to_string(),
             category_id: "cat-1".to_string(),

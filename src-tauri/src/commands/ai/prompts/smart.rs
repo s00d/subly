@@ -196,7 +196,10 @@ fn narration_block(surface: Surface, input_kind: InputKind) -> &'static str {
              * a TRANSACTION LIST screenshot (mobile banking app, history view,\n\
              notification log, in-app statement).\n\
              Decide which kind it is and return the envelope. Skip UI chrome\n\
-             (balance widgets, search bars, navigation tabs)."
+             (balance widgets, search bars, navigation tabs).\n\
+             For each transaction set `categoryHint` from merchant/context when\n\
+             reasonable; set `paymentMethodHint` only when the slip or screen\n\
+             shows it (card brand, cash, wallet). Add `tags` only when obvious."
         }
         (Surface::Subscription, InputKind::Text) => {
             "You receive FREE-FORM TEXT describing one or more recurring services.\n\
@@ -233,6 +236,8 @@ mod tests {
             locale: locale.map(str::to_string),
             today: "2026-05-12".to_string(),
             main_currency_id: "cur-1".to_string(),
+            default_category_id: "cat-1".to_string(),
+            default_payment_method_id: "pm-1".to_string(),
         }
     }
 
@@ -250,7 +255,7 @@ mod tests {
                 name: "US Dollar".to_string(),
                 symbol: "$".to_string(),
                 code: "USD".to_string(),
-                rate: 1.0,
+                rate: rust_decimal::Decimal::ONE,
                 sort_order: 0,
                 i18n_key: String::new(),
             }],
@@ -294,6 +299,8 @@ mod tests {
             locale: locale.map(str::to_string),
             today: "2026-05-12".to_string(),
             main_currency_id: "usd".to_string(),
+            default_category_id: "c-food".to_string(),
+            default_payment_method_id: "pm-card".to_string(),
         }
     }
 

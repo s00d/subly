@@ -61,13 +61,23 @@ pub fn apply_common(raw: &AiCommonFields, ctx: &ExtractContext) -> ResolvedCommo
     }
 
     let category_hint = raw.category_hint.clone().unwrap_or_default();
-    let category_id = ctx.catalogs.resolve_category_id(&category_hint);
+    let mut category_id = ctx.catalogs.resolve_category_id(&category_hint);
     if !category_hint.trim().is_empty() && category_id.is_empty() {
         warnings.push("ai_warning_category_unresolved".to_string());
     }
+    if category_id.is_empty() {
+        category_id = ctx.default_category_id.clone();
+    }
+    category_id = ctx.catalogs.ensure_category_id(&category_id, &ctx.default_category_id);
 
     let payment_method_hint = raw.payment_method_hint.clone().unwrap_or_default();
-    let payment_method_id = ctx.catalogs.resolve_payment_method_id(&payment_method_hint);
+    let mut payment_method_id = ctx.catalogs.resolve_payment_method_id(&payment_method_hint);
+    if payment_method_id.is_empty() {
+        payment_method_id = ctx.default_payment_method_id.clone();
+    }
+    payment_method_id = ctx
+        .catalogs
+        .ensure_payment_method_id(&payment_method_id, &ctx.default_payment_method_id);
 
     ResolvedCommon {
         name,
@@ -85,10 +95,10 @@ pub fn apply_common(raw: &AiCommonFields, ctx: &ExtractContext) -> ResolvedCommo
 /// Normalise an LLM-supplied amount. Negative values are made positive (banks
 /// often render expenses as negative numbers); zero / missing surfaces a
 /// warning instead of failing the request.
-pub fn resolve_amount(opt: Option<f64>) -> (f64, Vec<String>) {
+pub fn resolve_amount(opt: Option<f64>) -> (rust_decimal::Decimal, Vec<String>) {
     let mut warnings = Vec::new();
-    let amount = opt.unwrap_or(0.0).abs();
-    if amount <= 0.0 {
+    let amount = crate::money::from_f64_legacy(opt.unwrap_or(0.0)).abs();
+    if amount <= rust_decimal::Decimal::ZERO {
         warnings.push("ai_warning_amount_missing".to_string());
     }
     (amount, warnings)
@@ -96,10 +106,10 @@ pub fn resolve_amount(opt: Option<f64>) -> (f64, Vec<String>) {
 
 /// Same as [`resolve_amount`] but tailored to subscriptions ("price" can be a
 /// rounded integer; never negative).
-pub fn resolve_price(opt: Option<f64>) -> (f64, Vec<String>) {
+pub fn resolve_price(opt: Option<f64>) -> (rust_decimal::Decimal, Vec<String>) {
     let mut warnings = Vec::new();
-    let price = opt.unwrap_or(0.0).max(0.0);
-    if price <= 0.0 {
+    let price = crate::money::from_f64_legacy(opt.unwrap_or(0.0).max(0.0));
+    if price <= rust_decimal::Decimal::ZERO {
         warnings.push("ai_warning_price_missing".to_string());
     }
     (price, warnings)
@@ -150,25 +160,25 @@ mod tests {
     #[test]
     fn amount_positive_passes_through() {
         let (a, w) = resolve_amount(Some(12.50));
-        assert!((a - 12.50).abs() < 1e-9);
+        assert_eq!(a, crate::money::from_f64_legacy(12.50));
         assert!(w.is_empty());
     }
 
     #[test]
     fn amount_negative_is_flipped() {
         let (a, w) = resolve_amount(Some(-50.0));
-        assert!((a - 50.0).abs() < 1e-9);
+        assert_eq!(a, crate::money::from_f64_legacy(50.0));
         assert!(w.is_empty());
     }
 
     #[test]
     fn amount_missing_warns() {
         let (a, w) = resolve_amount(None);
-        assert_eq!(a, 0.0);
+        assert_eq!(a, rust_decimal::Decimal::ZERO);
         assert_eq!(w, vec!["ai_warning_amount_missing".to_string()]);
 
         let (a, w) = resolve_amount(Some(0.0));
-        assert_eq!(a, 0.0);
+        assert_eq!(a, rust_decimal::Decimal::ZERO);
         assert_eq!(w, vec!["ai_warning_amount_missing".to_string()]);
     }
 

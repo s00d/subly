@@ -38,6 +38,7 @@
 //!   both surfaces.
 //! * [`smart`] — the single `ai_smart_input` command with 4-way dispatch.
 
+pub mod chat_completions;
 pub mod context;
 pub mod mapping;
 pub mod raw;

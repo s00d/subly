@@ -1,7 +1,6 @@
 mod config;
 pub(crate) mod oauth;
 mod orchestrator;
-mod redb_write_flag;
 pub(crate) mod providers;
 mod state;
 mod types;
@@ -25,7 +24,6 @@ pub(crate) use config::{
 pub(crate) use wire::{decode_sync_payload, encode_sync_payload};
 pub(crate) use oauth::{exchange_oauth_code, provider_access_token};
 pub(crate) use orchestrator::{sync_dispatch_internal, SyncDispatchCommand, SyncDispatchResponse};
-pub(crate) use redb_write_flag::{sync_redb_write_begin, sync_redb_write_is_active};
 pub(crate) use providers::{provider_auth_url, provider_download, provider_upload, providers_list};
 pub(crate) use state::{sync_runtime, sync_status_from_config};
 pub(crate) use types::{OAuthTokens, SyncConfig, SyncMeta, SyncPayload};

@@ -1,4 +1,7 @@
 import { importJsonPayloadSchema } from "@/schemas/zod/importEnvelope";
+import { asMoneyString, type MoneyString } from "@/lib/money";
+
+export type { MoneyString };
 
 export type CycleType = 1 | 2 | 3 | 4;
 
@@ -23,7 +26,7 @@ export interface SubscriptionCredentialsMeta {
 export interface PaymentRecord {
   id: string;
   date: string;
-  amount: number;
+  amount: MoneyString;
   currencyId: string;
   note: string;
 }
@@ -32,7 +35,7 @@ export interface Subscription {
   id: string;
   name: string;
   logo: string;
-  price: number;
+  price: MoneyString;
   currencyId: string;
   nextPayment: string;
   startDate: string;
@@ -60,7 +63,7 @@ export interface Subscription {
 
 /** Row from list/detail IPC (`SubscriptionListItemDto`): base subscription plus computed list fields. */
 export interface SubscriptionListItem extends Subscription {
-  monthlyPrice: number;
+  monthlyPrice: MoneyString;
   daysLeft: number;
   overdue: boolean;
   /** Non-secret bitmap: which credential fields the user has saved. */
@@ -70,7 +73,7 @@ export interface SubscriptionListItem extends Subscription {
 export interface Expense {
   id: string;
   name: string;
-  amount: number;
+  amount: MoneyString;
   currencyId: string;
   createdAt: string;
   categoryId: string;
@@ -133,7 +136,7 @@ export interface Currency {
   name: string;
   symbol: string;
   code: string;
-  rate: number;
+  rate: MoneyString;
   sortOrder: number;
   i18nKey: string;
 }
@@ -185,7 +188,7 @@ export interface Settings {
   mainCurrencyId: string;
   defaultCategoryId: string;
   defaultPaymentMethodId: string;
-  budget: number;
+  budget: MoneyString;
   notifyDaysBefore: number;
   notificationTitle: string;
   notificationBodyDueToday: string;
@@ -228,9 +231,9 @@ export interface StatsData {
   mostExpensive: { name: string; price: number; logo: string } | null;
   amountDueThisMonth: number;
   totalSavingsPerMonth: number;
-  budget: number;
-  budgetUsed: number | null;
-  budgetLeft: number | null;
+  budget: MoneyString;
+  budgetUsed: MoneyString | null;
+  budgetLeft: MoneyString | null;
   overBudgetAmount: number | null;
   categoryCosts: Array<{ label: string; value: number }>;
   memberCosts: Array<{ label: string; value: number }>;
@@ -295,7 +298,7 @@ export function parseSubscription(raw: unknown): Subscription {
     id: asString(r.id),
     name: asString(r.name),
     logo: asString(r.logo),
-    price: asNumber(r.price, 0),
+    price: asMoneyString(r.price),
     currencyId: asString(r.currencyId),
     nextPayment: asString(r.nextPayment),
     startDate: asString(r.startDate),
@@ -321,7 +324,7 @@ export function parseSubscription(raw: unknown): Subscription {
       return {
         id: asString(p.id),
         date: asString(p.date),
-        amount: asNumber(p.amount),
+        amount: asMoneyString(p.amount),
         currencyId: asString(p.currencyId),
         note: asString(p.note),
       };
@@ -345,7 +348,7 @@ export function parseSubscriptionListItem(raw: unknown): SubscriptionListItem {
   const base = parseSubscription(raw);
   return {
     ...base,
-    monthlyPrice: asNumber(r.monthlyPrice, 0),
+    monthlyPrice: asMoneyString(r.monthlyPrice),
     daysLeft: asNumber(r.daysLeft, 0),
     overdue: asBool(r.overdue, false),
     credentialsMeta: parseCredentialsMeta(r.credentialsMeta),
@@ -365,7 +368,7 @@ export function parseExpense(raw: unknown): Expense {
   return {
     id: asString(r.id),
     name: asString(r.name),
-    amount: asNumber(r.amount),
+    amount: asMoneyString(r.amount),
     currencyId: asString(r.currencyId),
     categoryId: asString(r.categoryId, "cat-1"),
     paymentMethodId: asString(r.paymentMethodId),

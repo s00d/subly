@@ -5,6 +5,8 @@ import { useToast } from "@/composables/useToast";
 import { upsertPaymentMethod, deletePaymentMethod as deletePaymentMethodApi, maxSortOrder } from "@/services/catalogClient";
 import type { PaymentMethod, Settings } from "@/schemas/appData";
 import { useAppMetaStore } from "@/stores/appMetaStore";
+import { useCatalogsUsageStore } from "@/stores/catalogsUsageStore";
+import { formatErrorForToast } from "@/utils/formatError";
 import AppInput from "@/components/ui/AppInput.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import IconPickerModal from "@/components/ui/IconPickerModal.vue";
@@ -22,6 +24,7 @@ const props = defineProps<{
 const { t } = useI18n();
 const { toast } = useToast();
 const metaStore = useAppMetaStore();
+const catalogsUsageStore = useCatalogsUsageStore();
 const paymentMethods = ref<PaymentMethod[]>([]);
 const settings = ref<Settings | null>(null);
 const paymentMethodUsage = ref<Record<string, number>>({});
@@ -89,13 +92,14 @@ async function addPm() {
 }
 function savePmName(id: string, name: string) { void updatePaymentMethod(id, { name }); }
 async function removePm(id: string) {
-  if (isUsedPayment(id)) {
-    toast(t("payment_method_cannot_delete"), "error");
-    return;
+  try {
+    await deletePaymentMethodApi(id);
+    paymentMethods.value = paymentMethods.value.filter((p) => p.id !== id);
+    await catalogsUsageStore.refresh();
+    toast(t("success"));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   }
-  await deletePaymentMethodApi(id);
-  paymentMethods.value = paymentMethods.value.filter((p) => p.id !== id);
-  toast(t("success"));
 }
 function togglePm(id: string) {
   const pm = paymentMethods.value.find((p) => p.id === id);
@@ -168,7 +172,7 @@ function movePmDown(id: string) {
         </Tooltip>
         <!-- Delete -->
         <Tooltip :text="t('delete')">
-          <button @click="removePm(pm.id)" :disabled="isUsedPayment(pm.id)" class="p-1.5 rounded-lg transition-colors shrink-0" :class="isUsedPayment(pm.id) ? 'text-text-muted cursor-not-allowed' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'"><Trash2 :size="14" /></button>
+          <button @click="removePm(pm.id)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"><Trash2 :size="14" /></button>
         </Tooltip>
       </div>
     </div>

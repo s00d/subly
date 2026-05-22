@@ -37,6 +37,7 @@ libc = "0.2"
 redb = "4"
 tauri-plugin-persisted-scope = "2.3.7"
 chrono = { version = "0.4", default-features = true }
+rust_decimal = { version = "1.36", features = ["serde", "serde-with-str", "maths"] }
 zip = "8"
 base64 = "0.22"
 postcard = { version = "1.1", features = ["use-std"] }
@@ -69,7 +70,7 @@ regex = "1.11"
 # AI receipt OCR: vision models aren't supported by aisdk 0.5, so we POST
 # directly to the OpenAI-compatible chat-completions endpoint.
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-tauri-plugin-keyring-store = "0.1.0"
+tauri-plugin-keyring-store = "0.2.0"
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 objc2 = { version = "0.6.3", default-features = false, features = ["std"] }

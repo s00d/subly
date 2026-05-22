@@ -96,7 +96,11 @@ function rowWarning(row: AiSubscriptionDraftRow): string | null {
         v-for="(state, idx) in rows"
         :key="idx"
         class="rounded-lg border p-2.5 transition-colors"
-        :class="state.selected ? 'border-primary bg-primary-light/30' : 'border-border bg-surface'"
+        :class="
+          state.selected
+            ? 'border-primary ring-1 ring-primary/30 bg-surface'
+            : 'border-border bg-surface'
+        "
       >
         <div class="flex items-start gap-2.5">
           <button
@@ -146,7 +150,7 @@ function rowWarning(row: AiSubscriptionDraftRow): string | null {
                 "
                 type="text"
                 class="w-full px-2 py-1.5 rounded-md border border-border bg-surface text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
-                :placeholder="t('name')"
+                :placeholder="t('subscription_name')"
               />
             </div>
             <div class="col-span-6 sm:col-span-2">

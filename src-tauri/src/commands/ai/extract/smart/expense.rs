@@ -161,7 +161,7 @@ pub(super) async fn run_tabular(
         if row_is_clean(row) {
             rows.push(StatementDraftRow {
                 source: "heuristic",
-                draft: heuristic_to_draft(row, &ctx.catalogs, &ctx.main_currency_id),
+                draft: heuristic_to_draft(row, ctx),
             });
             stats.matched_by_heuristic += 1;
         }
@@ -190,7 +190,7 @@ pub(super) async fn run_tabular(
                     }
                     for row in parsed.transactions {
                         let draft = row_to_draft(row, ctx);
-                        if draft.name.is_empty() && draft.amount <= 0.0 {
+                        if draft.name.is_empty() && draft.amount <= rust_decimal::Decimal::ZERO {
                             stats.failed += 1;
                             continue;
                         }
@@ -242,7 +242,7 @@ fn finalise(
     let mut rows = Vec::<StatementDraftRow>::new();
     for row in envelope.transactions {
         let draft = row_to_draft(row, ctx);
-        if draft.name.is_empty() && draft.amount <= 0.0 {
+        if draft.name.is_empty() && draft.amount <= rust_decimal::Decimal::ZERO {
             stats.failed += 1;
             continue;
         }
@@ -318,8 +318,8 @@ fn build_metadata(raw: &AiExpenseMetadataRaw) -> AiImportMetadata {
         .iter()
         .filter_map(|li| {
             let item_name = li.name.trim().to_string();
-            let item_amount = li.amount.unwrap_or(0.0).abs();
-            if item_name.is_empty() && item_amount <= 0.0 {
+            let item_amount = crate::money::from_f64_legacy(li.amount.unwrap_or(0.0)).abs();
+            if item_name.is_empty() && item_amount <= rust_decimal::Decimal::ZERO {
                 return None;
             }
             Some(ExpenseLineItem {
@@ -330,7 +330,7 @@ fn build_metadata(raw: &AiExpenseMetadataRaw) -> AiImportMetadata {
         .collect();
     AiImportMetadata {
         merchant_name: raw.merchant_name.clone().filter(|s| !s.trim().is_empty()),
-        total_amount: raw.total_amount,
+        total_amount: raw.total_amount.map(crate::money::from_f64_legacy),
         line_items,
     }
 }
@@ -361,7 +361,7 @@ fn row_to_draft(raw: AiExpenseRow, ctx: &ExtractContext) -> ExpenseDraftDto {
         category_id: resolved.category_id,
         category_hint: resolved.category_hint,
         payment_method_id: resolved.payment_method_id,
-        tags: raw.tags.unwrap_or_default(),
+        tags: ctx.catalogs.resolve_tags(raw.tags),
         notes: resolved.notes,
         url: raw.url.unwrap_or_default(),
         line_items: Vec::new(),
@@ -371,18 +371,17 @@ fn row_to_draft(raw: AiExpenseRow, ctx: &ExtractContext) -> ExpenseDraftDto {
     }
 }
 
-fn heuristic_to_draft(
-    row: &HeuristicRow,
-    catalogs: &CatalogSnapshot,
-    main_currency_id: &str,
-) -> ExpenseDraftDto {
+fn heuristic_to_draft(row: &HeuristicRow, ctx: &ExtractContext) -> ExpenseDraftDto {
     let mut warnings = row.warnings.clone();
 
-    let currency_id = catalogs.resolve_currency_id(&row.currency_code, main_currency_id);
+    let currency_id = ctx
+        .catalogs
+        .resolve_currency_id(&row.currency_code, &ctx.main_currency_id);
     if currency_id.is_empty() {
         warnings.push("ai_warning_currency_unresolved".to_string());
     } else if !row.currency_code.is_empty()
-        && !catalogs
+        && !ctx
+            .catalogs
             .currencies
             .iter()
             .any(|c| c.code.eq_ignore_ascii_case(&row.currency_code))
@@ -392,13 +391,13 @@ fn heuristic_to_draft(
 
     ExpenseDraftDto {
         name: row.name.clone(),
-        amount: row.amount,
+        amount: crate::money::from_f64_legacy(row.amount),
         currency_id,
         currency_code: row.currency_code.clone(),
         date: row.date.clone(),
-        category_id: String::new(),
+        category_id: ctx.default_category_id.clone(),
         category_hint: String::new(),
-        payment_method_id: String::new(),
+        payment_method_id: ctx.default_payment_method_id.clone(),
         tags: Vec::new(),
         notes: row.notes.clone(),
         url: String::new(),

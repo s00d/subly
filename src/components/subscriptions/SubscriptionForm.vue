@@ -26,6 +26,7 @@ import { subscriptionFormFieldsSchema, coerceSubscriptionFormForValidation } fro
 import { useZodLiveForm } from "@/composables/useZodLiveForm";
 import type { ZodFieldMeta } from "@/composables/useZodErrors";
 import { readClipboardText } from "@/composables/useClipboard";
+import { moneyFromNumber, parseMoney, toDisplayNumber } from "@/lib/money";
 
 /**
  * Subset of `Subscription` fields that can be auto-filled by the AI quick-add
@@ -88,7 +89,7 @@ function createDefaultForm(): Partial<Subscription> {
   return {
     name: "",
     logo: "",
-    price: 0,
+    price: "0",
     currencyId: settings.value?.mainCurrencyId || "cur-2",
     nextPayment: new Date().toISOString().split("T")[0],
     startDate: new Date().toISOString().split("T")[0],
@@ -322,7 +323,7 @@ async function handleSubmit() {
   const cred = form.value.credentials ?? emptyCreds();
   const raw: Record<string, unknown> = {
     ...base,
-    price: Number(base.price) || 0,
+    price: moneyFromNumber(Number(base.price) || 0),
     frequency: Number(base.frequency) || 1,
     notifyDaysBefore: Number(base.notifyDaysBefore ?? 1),
     cycle: Number(base.cycle) || 3,
@@ -428,7 +429,8 @@ function loadLookupData() {
       <div class="flex flex-col sm:flex-row gap-3">
         <div class="flex-1">
           <AppInput
-            v-model="form.price!"
+            :modelValue="toDisplayNumber(parseMoney(form.price ?? '0'))"
+            @update:modelValue="(v) => form.price = moneyFromNumber(Number(v))"
             type="number"
             :label="t('price') + ' *'"
             :error="subErrors.price"

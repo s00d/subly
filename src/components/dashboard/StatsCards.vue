@@ -3,17 +3,18 @@ import { useI18n } from "vue-i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { CreditCard, TrendingUp, TrendingDown, Wallet, BarChart3, Star } from "@lucide/vue";
 import { iconSize } from "@/lib/tv";
+import { moneyGt, parseMoney, toDisplayNumber, type MoneyString } from "@/lib/money";
 
 defineProps<{
   activeCount: number;
-  totalMonthly: number;
-  totalYearly: number;
-  amountDue: number;
-  avgMonthly: number;
-  mostExpensive: { name: string; price: number } | null;
-  budgetUsed: number | null;
-  totalSavings: number;
-  fmt: (amount: number) => string;
+  totalMonthly: MoneyString;
+  totalYearly: MoneyString;
+  amountDue: MoneyString;
+  avgMonthly: MoneyString;
+  mostExpensive: { name: string; price: MoneyString } | null;
+  budgetUsed: MoneyString | null;
+  totalSavings: MoneyString;
+  fmt: (amount: MoneyString) => string;
 }>();
 
 const { t } = useI18n();
@@ -98,10 +99,12 @@ const iconBox = (tone: string) =>
         </div>
         <span :class="tileLabel">{{ t("percentage_budget_used") }}</span>
       </div>
-      <p :class="[numBase, 'text-text-primary']">{{ fmtPercent(budgetUsed || 0) }}</p>
+      <p :class="[numBase, 'text-text-primary']">
+        {{ fmtPercent(toDisplayNumber(parseMoney(budgetUsed ?? "0"))) }}
+      </p>
     </div>
 
-    <div v-if="totalSavings > 0" :class="tileWrap">
+    <div v-if="moneyGt(totalSavings, '0')" :class="tileWrap">
       <div :class="tileHead">
         <div :class="iconBox('bg-teal-500/10 text-teal-600 dark:text-teal-400')">
           <TrendingDown :size="iconSize.md" stroke-width="2.25" />

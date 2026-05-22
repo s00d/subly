@@ -8,6 +8,7 @@ import {
 } from "@/services/subscriptionsClient";
 import { storeToRefs } from "pinia";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
+import { moneyFromDecimal, sumMoney } from "@/lib/money";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import { useToast } from "@/composables/useToast";
 import { useScrollLock } from "@/composables/useScrollLock";
@@ -452,10 +453,9 @@ const filteredSubscriptions = computed<SubscriptionListItem[]>(
   () => subscriptionsStore.items,
 );
 const totalSubscriptionsAmount = computed(() =>
-  filteredSubscriptions.value.reduce((sum, sub) => {
-    const value = Number(sub.monthlyPrice ?? sub.price ?? 0);
-    return sum + (Number.isFinite(value) ? value : 0);
-  }, 0),
+  moneyFromDecimal(
+    sumMoney(filteredSubscriptions.value.map((sub) => sub.monthlyPrice ?? sub.price ?? "0")),
+  ),
 );
 const subscriptionsSummaryCurrencyId = computed(() => settings.value?.mainCurrencyId || "cur-1");
 

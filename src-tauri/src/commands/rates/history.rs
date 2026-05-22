@@ -40,10 +40,21 @@ pub fn get_rate_history_widget(
 }
 
 #[tauri::command]
-pub fn rate_history_save_snapshot(state: State<'_, AppState>, currency_id: String, rate: f64) -> Result<(), crate::errors::AppError> {
+pub fn rate_history_save_snapshot(
+    state: State<'_, AppState>,
+    currency_id: String,
+    rate: String,
+) -> Result<(), crate::errors::AppError> {
+    let rate = crate::money::parse_money_str(&rate).map_err(crate::errors::AppError::from)?;
     let mut history = read_history(&state)?;
     let today = chrono::Local::now().date_naive().to_string();
-    history.entry(currency_id).or_default().push(RatePoint { rate, recorded_at: today });
+    history
+        .entry(currency_id)
+        .or_default()
+        .push(RatePoint {
+            rate,
+            recorded_at: today,
+        });
     save_history(&state, &history)
 }
 

@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
+import { moneyFromDecimal, moneyGt, parseMoney, sub, toDisplayNumber, type MoneyString } from "@/lib/money";
 import type { MonthComparisonStyle } from "@/services/dashboardClient";
 import { ArrowUpRight, ArrowDownRight, Equal } from "@lucide/vue";
 
@@ -9,9 +10,9 @@ const { t } = useI18n();
 const { fmt } = useCurrencyFormat();
 const props = defineProps<{
   data?: {
-    currentTotal: number;
+    currentTotal: MoneyString;
     currentCount: number;
-    previousTotal: number;
+    previousTotal: MoneyString;
     previousCount: number;
     usedFullMonthFallback?: boolean;
     comparisonStyle?: MonthComparisonStyle;
@@ -56,29 +57,40 @@ const olderMonthCaption = computed(() => {
 });
 
 const diff = computed(() => {
-  if (!data.value) return 0;
-  return data.value.currentTotal - data.value.previousTotal;
+  if (!data.value) return moneyFromDecimal(parseMoney("0"));
+  return moneyFromDecimal(sub(data.value.currentTotal, data.value.previousTotal));
 });
 
 const pctChange = computed(() => {
-  if (!data.value || data.value.previousTotal === 0) return null;
-  return ((diff.value / data.value.previousTotal) * 100);
+  if (!data.value) return null;
+  const prev = parseMoney(data.value.previousTotal);
+  if (prev.isZero()) return null;
+  const d = sub(data.value.currentTotal, data.value.previousTotal);
+  return toDisplayNumber(d.dividedBy(prev).times(100), 1);
 });
 
 const barMax = computed(() => {
   if (!data.value) return 1;
-  return Math.max(data.value.currentTotal, data.value.previousTotal, 1);
+  const cur = toDisplayNumber(parseMoney(data.value.currentTotal));
+  const prev = toDisplayNumber(parseMoney(data.value.previousTotal));
+  return Math.max(cur, prev, 1);
+});
+
+const hasData = computed(() => {
+  const d = data.value;
+  if (!d) return false;
+  return moneyGt(d.currentTotal, "0") || moneyGt(d.previousTotal, "0");
 });
 
 </script>
 
 <template>
-  <div v-if="data && (data.currentTotal > 0 || data.previousTotal > 0)" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
+  <div v-if="data && hasData" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
     <div class="flex items-center gap-2 mb-2.5">
       <component
-        :is="diff > 0 ? ArrowUpRight : diff < 0 ? ArrowDownRight : Equal"
+        :is="moneyGt(diff, '0') ? ArrowUpRight : moneyGt('0', diff) ? ArrowDownRight : Equal"
         :size="16"
-        :class="diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-text-muted'"
+        :class="moneyGt(diff, '0') ? 'text-red-500' : moneyGt('0', diff) ? 'text-green-500' : 'text-text-muted'"
       />
       <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_month_compare') }}</h2>
     </div>
@@ -96,7 +108,7 @@ const barMax = computed(() => {
         <div class="w-full h-3 bg-surface-hover rounded-full overflow-hidden">
           <div
             class="h-full rounded-full bg-primary transition-all duration-500"
-            :style="{ width: (data.currentTotal / barMax * 100) + '%' }"
+            :style="{ width: (toDisplayNumber(parseMoney(data.currentTotal)) / barMax * 100) + '%' }"
           />
         </div>
         <span class="text-[10px] text-text-muted">{{ data.currentCount }} {{ t('records') }}</span>
@@ -111,7 +123,7 @@ const barMax = computed(() => {
         <div class="w-full h-3 bg-surface-hover rounded-full overflow-hidden">
           <div
             class="h-full rounded-full bg-gray-400 transition-all duration-500"
-            :style="{ width: (data.previousTotal / barMax * 100) + '%' }"
+            :style="{ width: (toDisplayNumber(parseMoney(data.previousTotal)) / barMax * 100) + '%' }"
           />
         </div>
         <span class="text-[10px] text-text-muted">{{ data.previousCount }} {{ t('records') }}</span>
@@ -121,9 +133,9 @@ const barMax = computed(() => {
       <div class="flex items-center justify-center gap-2 pt-2 border-t border-border">
         <span
           class="text-sm font-bold tabular-nums"
-          :class="diff > 0 ? 'text-red-500' : diff < 0 ? 'text-green-500' : 'text-text-muted'"
+          :class="moneyGt(diff, '0') ? 'text-red-500' : moneyGt('0', diff) ? 'text-green-500' : 'text-text-muted'"
         >
-          {{ diff > 0 ? '+' : '' }}{{ fmt(diff) }}
+          {{ moneyGt(diff, '0') ? '+' : '' }}{{ fmt(diff) }}
         </span>
         <span
           v-if="pctChange !== null"

@@ -2,11 +2,12 @@
 import type { Subscription } from "@/schemas/appData";
 import { useI18n } from "vue-i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
+import type { MoneyString } from "@/lib/money";
 import { ArrowRight } from "@lucide/vue";
 
 defineProps<{
   subscriptions: Subscription[];
-  fmt: (amount: number, currencyId?: string) => string;
+  fmt: (amount: MoneyString, currencyId?: string) => string;
 }>();
 
 const emit = defineEmits<{ navigate: [] }>();

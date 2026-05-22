@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import type { Subscription, SubscriptionCredentials, SubscriptionListItem, Currency, Category, PaymentMethod, HouseholdMember, Settings } from "@/schemas/appData";
 import Modal from "@/components/ui/Modal.vue";
@@ -16,6 +17,11 @@ import {
 import { useClipboard } from "@/composables/useClipboard";
 import { useToast } from "@/composables/useToast";
 import { ui, statValue } from "@/lib/tv";
+import {
+  convertAmountToCurrency,
+  moneyGt,
+  type MoneyString,
+} from "@/lib/money";
 
 const props = defineProps<{
   show: boolean;
@@ -46,7 +52,8 @@ const household = ref<HouseholdMember[]>([]);
 const currencies = ref<Currency[]>([]);
 const settings = ref<Settings | null>(null);
 const { t } = useI18n();
-const { fmtDateFull, fmtDateMedium, fmtCurrency } = useLocaleFormat();
+const { fmtDateFull, fmtDateMedium } = useLocaleFormat();
+const { fmt } = useCurrencyFormat();
 const { copyToClipboard } = useClipboard();
 const { toast } = useToast();
 
@@ -200,13 +207,8 @@ watch(
   },
 );
 
-function fmt(price: number, currencyId: string): string {
-  const c = currencies.value.find((cur) => cur.id === currencyId);
-  return fmtCurrency(price, c?.code || "USD");
-}
-
-function fmtCur(amount: number, currency: Currency): string {
-  return fmtCurrency(amount, currency.code);
+function fmtInCurrency(amount: MoneyString, currency: Currency): string {
+  return fmt(amount, currency.id);
 }
 
 const targetCurrencies = computed(() => {
@@ -216,13 +218,17 @@ const targetCurrencies = computed(() => {
   if (mainId) ids.add(mainId);
   return [...ids]
     .map((id) => currencies.value.find((c) => c.id === id))
-    .filter((c): c is Currency => !!c && c.rate > 0);
+    .filter((c): c is Currency => !!c && moneyGt(c.rate, "0"));
 });
 
-function convertAmount(amount: number, fromCurId: string, toCurrency: Currency): number {
-  const fromCur = currencies.value.find((c) => c.id === fromCurId);
-  if (!fromCur || fromCur.rate <= 0) return 0;
-  return (amount / fromCur.rate) * toCurrency.rate;
+function ratesRecord(): Record<string, MoneyString> {
+  const m: Record<string, MoneyString> = {};
+  for (const c of currencies.value) m[c.id] = c.rate;
+  return m;
+}
+
+function convertAmount(amount: MoneyString, fromCurId: string, toCurrency: Currency): MoneyString {
+  return convertAmountToCurrency(amount, fromCurId, toCurrency, ratesRecord()).toFixed();
 }
 
 const convertedPrices = computed(() => {
@@ -262,7 +268,7 @@ const payerName = computed(() =>
 );
 
 const monthlyPrice = computed(() =>
-  sub.value ? Number(sub.value.monthlyPrice ?? 0) : 0
+  sub.value ? (sub.value.monthlyPrice ?? "0") : "0"
 );
 
 const daysLeft = computed(() =>
@@ -323,9 +329,9 @@ onUnmounted(() => clearOtpPoll());
           </p>
           <div v-if="convertedPrices.length > 0" class="mt-1 space-y-0.5">
             <p v-for="cp in convertedPrices" :key="cp.currency.id" class="text-[10px] sm:text-xs text-text-muted">
-              ≈ {{ fmtCur(cp.amount, cp.currency) }}
+              ≈ {{ fmtInCurrency(cp.amount, cp.currency) }}
               <span v-if="sub.cycle !== 3 || sub.frequency !== 1">
-                ({{ fmtCur(convertedMonthly.find(cm => cm.currency.id === cp.currency.id)?.amount || 0, cp.currency) }}/{{ t('monthly').toLowerCase().charAt(0) }})
+                ({{ fmtInCurrency(convertedMonthly.find(cm => cm.currency.id === cp.currency.id)?.amount ?? "0", cp.currency) }}/{{ t('monthly').toLowerCase().charAt(0) }})
               </span>
             </p>
           </div>

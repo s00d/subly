@@ -28,7 +28,7 @@ export async function upsertCategory(category: Category): Promise<void> { return
 export async function deleteCategory(id: string): Promise<void> { return callCommand("catalogs_delete_category", { id }); }
 export async function upsertCurrency(currency: Currency): Promise<void> { return callCommand("catalogs_upsert_currency", { currency }); }
 export async function deleteCurrency(id: string): Promise<void> { return callCommand("catalogs_delete_currency", { id }); }
-export async function updateCurrencyRates(updates: { id: string; rate: number }[]): Promise<void> { return callCommand("catalogs_update_currency_rates", { updates }); }
+export async function updateCurrencyRates(updates: { id: string; rate: string }[]): Promise<void> { return callCommand("catalogs_update_currency_rates", { updates }); }
 export async function upsertHouseholdMember(householdMember: HouseholdMember): Promise<void> { return callCommand("catalogs_upsert_household_member", { householdMember }); }
 export async function deleteHouseholdMember(id: string): Promise<void> { return callCommand("catalogs_delete_household_member", { id }); }
 export async function upsertPaymentMethod(paymentMethod: PaymentMethod): Promise<void> { return callCommand("catalogs_upsert_payment_method", { paymentMethod }); }

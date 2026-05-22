@@ -1,8 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
+import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
-import type { PaymentRecord, Currency } from "@/schemas/appData";
+import type { PaymentRecord, Currency, MoneyString } from "@/schemas/appData";
+import {
+  convertAmountToCurrency,
+  moneyFromNumber,
+  moneyGt,
+  parseMoney,
+  sumMoney,
+  toDisplayNumber,
+} from "@/lib/money";
 import { insertPaymentRecord, deletePaymentRecord } from "@/services/subscriptionsClient";
 import { History, Plus, Trash2, ChevronDown, ChevronUp, Receipt, RefreshCw } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
@@ -12,7 +21,7 @@ import AppInput from "@/components/ui/AppInput.vue";
 const props = defineProps<{
   subscriptionId: string;
   currencyId: string;
-  price: number;
+  price: MoneyString;
   history: PaymentRecord[];
   lookupData: {
     currencies: Currency[];
@@ -26,7 +35,8 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18n();
-const { fmtDateMedium, fmtCurrency } = useLocaleFormat();
+const { fmtDateMedium } = useLocaleFormat();
+const { fmt, ratesMap } = useCurrencyFormat();
 const currencies = ref<Currency[]>([]);
 const mainCurrencyId = ref("cur-2");
 const targetIds = ref<string[]>([]);
@@ -41,42 +51,30 @@ const addAmount = ref(props.price);
 const addNote = ref("");
 watch(() => props.history, (value) => { localHistory.value = [...value]; }, { immediate: true });
 
-function fmt(amount: number, curId: string): string {
-  const c = currencies.value.find((cur) => cur.id === curId);
-  return fmtCurrency(amount, c?.code || "USD");
-}
-
-function fmtCur(amount: number, currency: Currency): string {
-  return fmtCurrency(amount, currency.code);
-}
-
 const targetCurrencies = computed(() => {
   const ids = new Set(targetIds.value);
   const mainId = mainCurrencyId.value;
   if (mainId) ids.add(mainId);
   return [...ids]
     .map((id) => currencies.value.find((c) => c.id === id))
-    .filter((c): c is Currency => !!c && c.rate > 0);
+    .filter((c): c is Currency => !!c && moneyGt(c.rate, "0"));
 });
 
 function getConvertTargets(curId: string) {
   return targetCurrencies.value.filter((tc) => tc.id !== curId);
 }
 
-function convertAmount(amount: number, fromCurId: string, toCurrency: Currency): number {
-  const fromCur = currencies.value.find((c) => c.id === fromCurId);
-  if (!fromCur || fromCur.rate <= 0) return 0;
-  const inBase = amount / fromCur.rate;
-  return inBase * toCurrency.rate;
+function convertAmount(amount: MoneyString, fromCurId: string, toCurrency: Currency): number {
+  return toDisplayNumber(
+    convertAmountToCurrency(amount, fromCurId, toCurrency, ratesMap.value),
+  );
 }
 
 const visibleRecords = computed(() =>
   expanded.value ? localHistory.value : localHistory.value.slice(0, 5),
 );
 
-const totalPaid = computed(() =>
-  localHistory.value.reduce((sum, r) => sum + r.amount, 0),
-);
+const totalPaid = computed(() => sumMoney(localHistory.value.map((r) => r.amount)));
 
 async function addRecord() {
   if (!addDate.value) return;
@@ -124,14 +122,14 @@ watch(
       <div class="flex items-center gap-1">
         <div v-if="localHistory.length > 0" class="text-right mr-1">
           <span class="text-[10px] font-medium text-primary">
-            {{ t('total') }}: {{ fmt(totalPaid, currencyId) }}
+            {{ t('total') }}: {{ fmt(totalPaid.toFixed(), currencyId) }}
           </span>
           <div v-if="getConvertTargets(currencyId).length > 0" class="flex flex-wrap justify-end gap-x-1.5">
             <span
               v-for="tc in getConvertTargets(currencyId)"
               :key="tc.id"
               class="text-[9px] text-text-muted"
-            >≈ {{ fmtCur(convertAmount(totalPaid, currencyId, tc), tc) }}</span>
+            >≈ {{ fmt(convertAmount(totalPaid.toFixed(), currencyId, tc).toFixed(), tc.id) }}</span>
           </div>
         </div>
         <Tooltip :text="t('record_payment')" position="bottom">
@@ -169,7 +167,7 @@ watch(
           </div>
           <AppInput
             :modelValue="addAmount"
-            @update:modelValue="(v) => addAmount = Number(v)"
+            @update:modelValue="(v) => addAmount = moneyFromNumber(Number(v))"
             type="number"
             step="0.01"
             min="0"
@@ -210,7 +208,7 @@ watch(
               v-for="tc in getConvertTargets(record.currencyId)"
               :key="tc.id"
               class="text-[9px] text-text-muted"
-            >≈ {{ fmtCur(convertAmount(record.amount, record.currencyId, tc), tc) }}</span>
+            >≈ {{ fmt(moneyFromNumber(convertAmount(record.amount, record.currencyId, tc)), tc.id) }}</span>
           </div>
         </div>
         <span v-if="record.note" class="text-[10px] text-text-muted truncate flex-1 min-w-0">{{ record.note }}</span>
