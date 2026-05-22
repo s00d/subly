@@ -123,6 +123,8 @@ fn parse_sync_snapshot_archive(
         .get("appConfig")
         .ok_or("sync snapshot missing appConfig")?
         .clone();
+    let mut app_data_val = app_data_val;
+    crate::money::normalize_money_fields_in_app_data_json(&mut app_data_val);
     let mut app_data: crate::models::AppDataDoc =
         serde_json::from_value(app_data_val).map_err(|e| e.to_string())?;
     let mut app_config: crate::models::AppConfigDoc =

@@ -89,17 +89,23 @@ fn collect_json_candidates(raw: &str) -> Vec<String> {
 
 /// Extract one balanced JSON value starting at byte index `start` (`{` or `[`).
 fn extract_balanced_json(raw: &str, start: usize) -> Option<String> {
-    let first = *raw.as_bytes().get(start)?;
-    if first != b'{' && first != b'[' {
+    let mut chars = raw[start..].chars();
+    let root = chars.next()?;
+    let root_is_obj = root == '{';
+    let root_is_arr = root == '[';
+    if !root_is_obj && !root_is_arr {
         return None;
     }
 
-    let mut depth_obj: i32 = 0;
-    let mut depth_arr: i32 = 0;
+    // Count the opening bracket before the scan loop so we only close on the
+    // matching outer `}` / `]`, not when a nested structure finishes.
+    let mut depth_obj: i32 = i32::from(root_is_obj);
+    let mut depth_arr: i32 = i32::from(root_is_arr);
     let mut in_string = false;
     let mut escape = false;
+    let offset = start + root.len_utf8();
 
-    for (i, c) in raw[start..].char_indices() {
+    for (rel_i, c) in raw[offset..].char_indices() {
         if in_string {
             if escape {
                 escape = false;
@@ -116,16 +122,16 @@ fn extract_balanced_json(raw: &str, start: usize) -> Option<String> {
             '{' => depth_obj += 1,
             '}' => {
                 depth_obj -= 1;
-                if depth_obj == 0 && depth_arr == 0 {
-                    let end = start + i + c.len_utf8();
+                if root_is_obj && depth_obj == 0 && depth_arr == 0 {
+                    let end = offset + rel_i + c.len_utf8();
                     return Some(raw[start..end].to_string());
                 }
             }
             '[' => depth_arr += 1,
             ']' => {
                 depth_arr -= 1;
-                if depth_obj == 0 && depth_arr == 0 {
-                    let end = start + i + c.len_utf8();
+                if root_is_arr && depth_arr == 0 && depth_obj == 0 {
+                    let end = offset + rel_i + c.len_utf8();
                     return Some(raw[start..end].to_string());
                 }
             }
@@ -244,5 +250,21 @@ Here is the extracted row:
         let result: Sample = parse_llm_json(raw).unwrap();
         assert_eq!(result.name, "ok");
         assert_eq!(result.amount, 9.0);
+    }
+
+    #[test]
+    fn extract_balanced_json_top_level_array_with_inner_object() {
+        let raw = r#"[{"name":"x","amount":1},2]"#;
+        let chunk = extract_balanced_json(raw, 0).expect("full array span");
+        assert_eq!(chunk, raw);
+        let inner = extract_balanced_json(raw, 1).expect("inner object span");
+        assert_eq!(inner, r#"{"name":"x","amount":1}"#);
+    }
+
+    #[test]
+    fn extract_balanced_json_nested_array_does_not_close_early() {
+        let raw = "[[1,2],[3]]";
+        let chunk = extract_balanced_json(raw, 0).unwrap();
+        assert_eq!(chunk, raw);
     }
 }

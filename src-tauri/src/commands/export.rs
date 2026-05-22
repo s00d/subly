@@ -308,30 +308,6 @@ pub fn import_parse_subly_archive(bytes: Vec<u8>) -> Result<Option<AppDataDoc>, 
     Ok(parsed.map(|(data, _)| data))
 }
 
-fn json_money_value_to_string(v: &mut serde_json::Value) {
-    if v.is_number() {
-        let n = v.as_f64().unwrap_or(0.0);
-        *v = serde_json::Value::String(crate::money::from_f64_legacy(n).normalize().to_string());
-    }
-}
-
-fn normalize_money_fields_on_entity(obj: &mut serde_json::Map<String, serde_json::Value>) {
-    for key in ["price", "amount", "rate", "budget"] {
-        if let Some(v) = obj.get_mut(key) {
-            json_money_value_to_string(v);
-        }
-    }
-    if let Some(history) = obj.get_mut("paymentHistory").and_then(|h| h.as_array_mut()) {
-        for rec in history {
-            if let Some(o) = rec.as_object_mut() {
-                if let Some(a) = o.get_mut("amount") {
-                    json_money_value_to_string(a);
-                }
-            }
-        }
-    }
-}
-
 /// Only for **importing old backup JSON** (not runtime DB): map legacy `date` / Y-M-D fields → `createdAt`.
 fn normalize_legacy_expense_dates_in_import_json(value: &mut serde_json::Value) {
     let Some(obj) = value.as_object_mut() else {
@@ -371,36 +347,17 @@ fn normalize_legacy_expense_dates_in_import_json(value: &mut serde_json::Value) 
     }
 }
 
-fn normalize_money_fields_in_import_json(value: &mut serde_json::Value) {
-    let Some(root) = value.as_object_mut() else {
-        return;
-    };
-    for list_key in ["subscriptions", "expenses", "currencies"] {
-        let Some(items) = root.get_mut(list_key).and_then(|a| a.as_array_mut()) else {
-            continue;
-        };
-        for item in items {
-            if let Some(o) = item.as_object_mut() {
-                normalize_money_fields_on_entity(o);
-            }
-        }
-    }
-    if let Some(settings) = root.get_mut("settings").and_then(|s| s.as_object_mut()) {
-        normalize_money_fields_on_entity(settings);
-    }
-}
-
 fn parse_import_payload_json(raw_json: &str) -> Result<(AppDataDoc, AppConfigDoc), crate::errors::AppError> {
     let raw_value: serde_json::Value = serde_json::from_str(raw_json).map_err(|e| e.to_string())?;
     let data: AppDataDoc = if let Some(app_data) = raw_value.get("appData") {
         let mut v = app_data.clone();
         normalize_legacy_expense_dates_in_import_json(&mut v);
-        normalize_money_fields_in_import_json(&mut v);
+        crate::money::normalize_money_fields_in_app_data_json(&mut v);
         serde_json::from_value(v).map_err(|e| e.to_string())?
     } else {
         let mut v = raw_value.clone();
         normalize_legacy_expense_dates_in_import_json(&mut v);
-        normalize_money_fields_in_import_json(&mut v);
+        crate::money::normalize_money_fields_in_app_data_json(&mut v);
         serde_json::from_value(v).map_err(|e| e.to_string())?
     };
     let mut config: AppConfigDoc = if let Some(app_cfg) = raw_value.get("appConfig") {

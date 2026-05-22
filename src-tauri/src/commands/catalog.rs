@@ -50,6 +50,35 @@ fn json_string_field(value: &serde_json::Value, key: &str) -> Option<String> {
         .filter(|s| !s.is_empty())
 }
 
+/// Category id for rows/settings after removing `deleting_id`.
+fn resolve_category_replacement(
+    categories: &[CategoryDoc],
+    deleting_id: &str,
+    defaults: &CatalogDefaults,
+) -> Result<String, AppError> {
+    let preferred = if defaults.default_category_id == deleting_id {
+        FALLBACK_CATEGORY_ID
+    } else {
+        defaults.default_category_id.as_str()
+    };
+
+    if preferred != deleting_id && categories.iter().any(|c| c.id == preferred) {
+        return Ok(preferred.to_string());
+    }
+
+    if deleting_id != FALLBACK_CATEGORY_ID
+        && categories.iter().any(|c| c.id == FALLBACK_CATEGORY_ID)
+    {
+        return Ok(FALLBACK_CATEGORY_ID.to_string());
+    }
+
+    categories
+        .iter()
+        .find(|c| c.id != deleting_id)
+        .map(|c| c.id.clone())
+        .ok_or_else(|| AppError::from("No category available for reassignment."))
+}
+
 fn load_catalog_defaults(
     guard: &crate::state::AppStateInner,
 ) -> Result<CatalogDefaults, AppError> {
@@ -201,11 +230,8 @@ pub fn catalogs_delete_category(
 
     let mut guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
     let defaults = load_catalog_defaults(&guard)?;
-    let replacement = if defaults.default_category_id == id {
-        FALLBACK_CATEGORY_ID.to_string()
-    } else {
-        defaults.default_category_id.clone()
-    };
+    let categories: Vec<CategoryDoc> = guard.table_list_typed(EntityTable::Categories)?;
+    let replacement = resolve_category_replacement(&categories, &id, &defaults)?;
 
     let mut subscriptions: Vec<SubscriptionDoc> = guard.table_list_typed(EntityTable::Subscriptions)?;
     let mut expenses: Vec<ExpenseDoc> = guard.table_list_typed(EntityTable::Expenses)?;
@@ -549,4 +575,61 @@ pub fn catalogs_max_sort_order(state: State<'_, AppState>, table: String) -> Res
         _ => 0,
     };
     Ok(max)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn category(id: &str) -> CategoryDoc {
+        CategoryDoc {
+            id: id.to_string(),
+            name: id.to_string(),
+            icon: String::new(),
+            sort_order: 0,
+            i18n_key: String::new(),
+        }
+    }
+
+    #[test]
+    fn resolve_category_replacement_prefers_valid_default() {
+        let cats = vec![category("cat-1"), category("cat-2")];
+        let defaults = CatalogDefaults {
+            main_currency_id: "cur-1".to_string(),
+            default_category_id: "cat-2".to_string(),
+            default_payment_method_id: "pm-1".to_string(),
+        };
+        assert_eq!(
+            resolve_category_replacement(&cats, "cat-9", &defaults).unwrap(),
+            "cat-2"
+        );
+    }
+
+    #[test]
+    fn resolve_category_replacement_when_default_deleted_uses_cat1() {
+        let cats = vec![category("cat-1"), category("cat-2")];
+        let defaults = CatalogDefaults {
+            main_currency_id: "cur-1".to_string(),
+            default_category_id: "cat-2".to_string(),
+            default_payment_method_id: "pm-1".to_string(),
+        };
+        assert_eq!(
+            resolve_category_replacement(&cats, "cat-2", &defaults).unwrap(),
+            "cat-1"
+        );
+    }
+
+    #[test]
+    fn resolve_category_replacement_without_cat1_uses_other_category() {
+        let cats = vec![category("cat-2"), category("cat-3")];
+        let defaults = CatalogDefaults {
+            main_currency_id: "cur-1".to_string(),
+            default_category_id: "cat-2".to_string(),
+            default_payment_method_id: "pm-1".to_string(),
+        };
+        assert_eq!(
+            resolve_category_replacement(&cats, "cat-2", &defaults).unwrap(),
+            "cat-3"
+        );
+    }
 }

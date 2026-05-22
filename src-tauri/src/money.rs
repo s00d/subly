@@ -203,3 +203,89 @@ pub mod serde_ipc_option {
         deserializer.deserialize_option(OptVisitor)
     }
 }
+
+/// Coerce legacy JSON numbers (pre–decimal-string sync) to decimal strings.
+pub fn json_money_value_to_string(v: &mut serde_json::Value) {
+    if v.is_number() {
+        let n = v.as_f64().unwrap_or(0.0);
+        *v = serde_json::Value::String(from_f64_legacy(n).normalize().to_string());
+    }
+}
+
+pub fn normalize_money_fields_on_entity(obj: &mut serde_json::Map<String, serde_json::Value>) {
+    for key in ["price", "amount", "rate", "budget"] {
+        if let Some(v) = obj.get_mut(key) {
+            json_money_value_to_string(v);
+        }
+    }
+    if let Some(history) = obj.get_mut("paymentHistory").and_then(|h| h.as_array_mut()) {
+        for rec in history {
+            if let Some(o) = rec.as_object_mut() {
+                if let Some(a) = o.get_mut("amount") {
+                    json_money_value_to_string(a);
+                }
+            }
+        }
+    }
+}
+
+/// Walk an `appData` JSON object and normalize money fields before typed decode.
+pub fn normalize_money_fields_in_app_data_json(value: &mut serde_json::Value) {
+    let Some(root) = value.as_object_mut() else {
+        return;
+    };
+    for list_key in ["subscriptions", "expenses", "currencies"] {
+        let Some(items) = root.get_mut(list_key).and_then(|a| a.as_array_mut()) else {
+            continue;
+        };
+        for item in items {
+            if let Some(o) = item.as_object_mut() {
+                normalize_money_fields_on_entity(o);
+            }
+        }
+    }
+    if let Some(settings) = root.get_mut("settings").and_then(|s| s.as_object_mut()) {
+        normalize_money_fields_on_entity(settings);
+    }
+}
+
+#[cfg(test)]
+mod sync_compat_tests {
+    use super::*;
+    use crate::models::CurrencyDoc;
+
+    #[test]
+    fn currency_doc_deserializes_legacy_f64_rate_from_json() {
+        let raw = serde_json::json!({
+            "id": "cur-eur",
+            "name": "Euro",
+            "symbol": "€",
+            "code": "EUR",
+            "rate": 0.01106,
+            "sortOrder": 0,
+            "i18nKey": ""
+        });
+        let doc: CurrencyDoc = serde_json::from_value(raw).expect("flexible money decode");
+        assert_eq!(doc.rate, from_f64_legacy(0.01106));
+    }
+
+    #[test]
+    fn app_data_sync_snapshot_accepts_legacy_f64_after_normalize() {
+        let doc = crate::test_support::base_seeded_doc().expect("seed");
+        let mut v = serde_json::to_value(&doc).expect("serialize");
+        if let Some(currencies) = v.get_mut("currencies").and_then(|c| c.as_array_mut()) {
+            for c in currencies {
+                if let Some(obj) = c.as_object_mut() {
+                    if let Some(rate) = obj.get("rate").and_then(|r| r.as_str()) {
+                        let f: f64 = rate.parse().unwrap_or(1.0);
+                        obj.insert("rate".into(), serde_json::json!(f));
+                    }
+                }
+            }
+        }
+        normalize_money_fields_in_app_data_json(&mut v);
+        let restored: crate::models::AppDataDoc =
+            serde_json::from_value(v).expect("sync appData decode");
+        assert_eq!(restored.currencies[0].rate, doc.currencies[0].rate);
+    }
+}

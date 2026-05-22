@@ -16,7 +16,7 @@ pub(crate) fn default_rate() -> Decimal {
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct SettingsDoc {
-    #[serde(default = "default_money_zero", with = "rust_decimal::serde::str")]
+    #[serde(default = "default_money_zero", with = "crate::money::serde_ipc")]
     pub(crate) budget: Decimal,
     #[serde(default)]
     pub(crate) main_currency_id: String,
@@ -77,7 +77,7 @@ pub(crate) struct SubscriptionDoc {
     pub(crate) name: String,
     #[serde(default)]
     pub(crate) logo: String,
-    #[serde(default = "default_money_zero", with = "rust_decimal::serde::str")]
+    #[serde(default = "default_money_zero", with = "crate::money::serde_ipc")]
     pub(crate) price: Decimal,
     #[serde(default)]
     pub(crate) currency_id: String,
@@ -210,7 +210,7 @@ pub(crate) struct ExpenseDoc {
     #[serde(default = "default_legacy_updated_at")]
     pub(crate) updated_at: i64,
     pub(crate) name: String,
-    #[serde(default = "default_money_zero", with = "rust_decimal::serde::str")]
+    #[serde(default = "default_money_zero", with = "crate::money::serde_ipc")]
     pub(crate) amount: Decimal,
     #[serde(default)]
     pub(crate) currency_id: String,
@@ -251,7 +251,7 @@ pub(crate) struct CurrencyDoc {
     pub(crate) symbol: String,
     #[serde(default)]
     pub(crate) code: String,
-    #[serde(default = "default_rate", with = "rust_decimal::serde::str")]
+    #[serde(default = "default_rate", with = "crate::money::serde_ipc")]
     pub(crate) rate: Decimal,
     #[serde(default)]
     pub(crate) sort_order: i64,
@@ -404,7 +404,7 @@ impl Default for AppConfigDoc {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct RatePoint {
-    #[serde(with = "rust_decimal::serde::str")]
+    #[serde(with = "crate::money::serde_ipc")]
     pub(crate) rate: Decimal,
     pub(crate) recorded_at: String,
 }
@@ -578,7 +578,7 @@ pub(crate) struct ExpenseInputDto {
     #[serde(default)]
     pub(crate) id: String,
     pub(crate) name: String,
-    #[serde(default = "default_money_zero", with = "rust_decimal::serde::str")]
+    #[serde(default = "default_money_zero", with = "crate::money::serde_ipc")]
     pub(crate) amount: Decimal,
     pub(crate) currency_id: String,
     pub(crate) created_at: String,
@@ -634,7 +634,7 @@ pub(crate) struct PaymentRecordDto {
     pub(crate) id: String,
     #[serde(default)]
     pub(crate) date: String,
-    #[serde(default = "default_money_zero", with = "rust_decimal::serde::str")]
+    #[serde(default = "default_money_zero", with = "crate::money::serde_ipc")]
     pub(crate) amount: Decimal,
     #[serde(default)]
     pub(crate) currency_id: String,
