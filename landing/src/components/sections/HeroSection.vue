@@ -8,7 +8,7 @@ import { useSiteContent } from "@/composables/useSiteContent";
 import { assetUrl, screenshotUrl } from "@/lib/assets";
 
 const { content } = useSiteContent();
-const downloadUrl = ref(content.value.siteMeta.releasesUrl);
+const downloadUrl = ref(content.value?.siteMeta.releasesUrl ?? "");
 
 onMounted(() => {
   downloadUrl.value = preferredDownloadUrl();

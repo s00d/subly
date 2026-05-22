@@ -22,10 +22,10 @@ const active = useActiveSection([
 const menuOpen = ref(false);
 const moreOpen = ref(false);
 const moreRoot = ref<HTMLElement | null>(null);
-const downloadUrl = ref(content.value.siteMeta.releasesUrl);
+const downloadUrl = ref(content.value?.siteMeta.releasesUrl ?? "");
 
 const moreMenuActive = computed(() =>
-  content.value.navMoreLinks.some((link) => active.value === link.id),
+  (content.value?.navMoreLinks ?? []).some((link) => active.value === link.id),
 );
 
 function closeMenu() {

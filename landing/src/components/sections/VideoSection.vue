@@ -8,13 +8,20 @@ import { screenshotUrl } from "@/lib/assets";
 import type { MdiIconName } from "@/mdi-icons";
 
 const { content } = useSiteContent();
-const activeId = ref(content.value.videoSection.demos[0]?.id ?? "desktop");
+const activeId = ref("desktop");
 const videoKey = ref(0);
 
-const activeDemo = computed(
-  () =>
-    content.value.videoSection.demos.find((d) => d.id === activeId.value) ??
-    content.value.videoSection.demos[0],
+const activeDemo = computed(() => {
+  const demos = content.value?.videoSection.demos ?? [];
+  return demos.find((d) => d.id === activeId.value) ?? demos[0];
+});
+
+watch(
+  () => content.value?.videoSection.demos[0]?.id,
+  (id) => {
+    if (id) activeId.value = id;
+  },
+  { immediate: true },
 );
 
 watch(activeId, () => {

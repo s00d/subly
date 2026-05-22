@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import SectionShell from "@/components/layout/SectionShell.vue";
 import RevealOnScroll from "@/components/ui/RevealOnScroll.vue";
 import UiIcon from "@/components/ui/UiIcon.vue";
@@ -8,12 +8,19 @@ import { screenshotUrl } from "@/lib/assets";
 import type { MdiIconName } from "@/mdi-icons";
 
 const { content } = useSiteContent();
-const activeId = ref(content.value.deviceGalleries[0]?.id ?? "desktop");
+const activeId = ref("desktop");
 
-const activeGallery = computed(
-  () =>
-    content.value.deviceGalleries.find((g) => g.id === activeId.value) ??
-    content.value.deviceGalleries[0],
+const activeGallery = computed(() => {
+  const galleries = content.value?.deviceGalleries ?? [];
+  return galleries.find((g) => g.id === activeId.value) ?? galleries[0];
+});
+
+watch(
+  () => content.value?.deviceGalleries[0]?.id,
+  (id) => {
+    if (id) activeId.value = id;
+  },
+  { immediate: true },
 );
 </script>
 

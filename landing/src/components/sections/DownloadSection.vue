@@ -9,7 +9,7 @@ import { preferredDownloadUrl } from "@/composables/useReleaseDownloads";
 import { useSiteContent } from "@/composables/useSiteContent";
 
 const { content, docPaths } = useSiteContent();
-const primaryUrl = ref(content.value.siteMeta.releasesUrl);
+const primaryUrl = ref(content.value?.siteMeta.releasesUrl ?? "");
 
 onMounted(() => {
   primaryUrl.value = preferredDownloadUrl();

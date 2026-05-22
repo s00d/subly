@@ -10,19 +10,19 @@ import {
 } from "@/content/index";
 import type { SiteContent } from "@/content/types";
 
-export function useSiteContent() {
-  const route = useRoute();
-  const router = useRouter();
+/** Shared across all `useSiteContent()` callers (one load state per app). */
+const content = shallowRef<SiteContent | null>(null);
+const loading = ref(true);
+const loadError = ref<string | null>(null);
+let loadGeneration = 0;
+let localeWatchStarted = false;
 
-  const locale = computed<LocaleId>(() => localeFromPath(route.path));
-  const content = shallowRef<SiteContent | null>(null);
-  const loading = ref(true);
-  const loadError = ref<string | null>(null);
-
-  let loadGeneration = 0;
+function startLocaleWatch(getLocale: () => LocaleId) {
+  if (localeWatchStarted) return;
+  localeWatchStarted = true;
 
   watch(
-    locale,
+    getLocale,
     async (loc) => {
       const generation = ++loadGeneration;
       loading.value = true;
@@ -44,9 +44,16 @@ export function useSiteContent() {
     },
     { immediate: true },
   );
+}
+
+export function useSiteContent() {
+  const route = useRoute();
+  const router = useRouter();
+
+  const locale = computed<LocaleId>(() => localeFromPath(route.path));
+  startLocaleWatch(() => locale.value);
 
   const ready = computed(() => content.value !== null && !loading.value);
-
   const homePath = computed(() => homePathFor(locale.value));
   const isHome = computed(() => isHomePath(route.path));
 
