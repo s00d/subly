@@ -8,7 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use crate::errors::{AppError, AppResult};
 use crate::models::{
     AppConfigDoc, AppDataDoc, CategoryDoc, DeletionTombstone, ExpenseDoc, HouseholdMemberDoc,
-    PaymentMethodDoc, SettingsDoc, TagDoc, TombstoneEntityKind,
+    SettingsDoc, TagDoc, TombstoneEntityKind,
 };
 
 pub struct AppStateInner {
@@ -240,6 +240,21 @@ pub(crate) fn decode_bin<T: DeserializeOwned>(raw: &[u8]) -> AppResult<T> {
     postcard::from_bytes(raw).map_err(AppError::from)
 }
 
+/// Postcard first; if that fails, accept a JSON UTF-8 blob (older mobile/desktop snapshots).
+pub(crate) fn decode_bin_postcard_or_json<T: DeserializeOwned>(raw: &[u8]) -> AppResult<T> {
+    match decode_bin::<T>(raw) {
+        Ok(v) => Ok(v),
+        Err(postcard_err) => {
+            let text = std::str::from_utf8(raw).map_err(|e| AppError::Message(e.to_string()))?;
+            serde_json::from_str::<T>(text).map_err(|json_err| {
+                AppError::Message(format!(
+                    "singleton decode failed (postcard: {postcard_err}; json: {json_err})"
+                ))
+            })
+        }
+    }
+}
+
 pub(crate) fn read_singleton_bin_typed<T>(
     db: &Database,
     table: TableDefinition<&str, &[u8]>,
@@ -255,7 +270,7 @@ where
     };
     let raw = table.get(KEY_DATA).map_err(AppError::from)?;
     match raw {
-        Some(v) => decode_bin(v.value()).map_err(|e| {
+        Some(v) => decode_bin_postcard_or_json(v.value()).map_err(|e| {
             AppError::Message(format!("singleton decode failed (key '{}'): {}", KEY_DATA, e))
         }),
         None => Ok(fallback),
@@ -388,7 +403,7 @@ pub fn load_app_data_typed(db: &Database) -> AppResult<(AppDataDoc, AppConfigDoc
     let categories: Vec<CategoryDoc> = read_entity_table_bin_typed(db, T2_CATEGORIES)?;
     let currencies = crate::money_migration::load_currencies_migrated(db)?;
     let household: Vec<HouseholdMemberDoc> = read_entity_table_bin_typed(db, T2_HOUSEHOLD)?;
-    let payment_methods: Vec<PaymentMethodDoc> = read_entity_table_bin_typed(db, T2_PAYMENT_METHODS)?;
+    let payment_methods = crate::money_migration::load_payment_methods_migrated(db)?;
     let tags: Vec<TagDoc> = read_entity_table_bin_typed(db, T2_TAGS)?;
     let settings = crate::money_migration::load_settings_migrated(db)?;
     let config: AppConfigDoc = read_singleton_bin_typed(db, T2_CONFIG, AppConfigDoc::default())?;

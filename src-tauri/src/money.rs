@@ -153,7 +153,12 @@ pub mod serde_ipc {
     where
         D: Deserializer<'de>,
     {
-        deserialize_flexible(deserializer)
+        // Postcard cannot use `deserialize_any` (flexible JSON/sync path only).
+        if deserializer.is_human_readable() {
+            deserialize_flexible(deserializer)
+        } else {
+            rust_decimal::serde::str::deserialize(deserializer)
+        }
     }
 }
 
@@ -196,7 +201,12 @@ pub mod serde_ipc_option {
             where
                 D2: Deserializer<'de>,
             {
-                deserialize_flexible(deserializer).map(Some)
+                let inner = if deserializer.is_human_readable() {
+                    deserialize_flexible(deserializer)?
+                } else {
+                    rust_decimal::serde::str::deserialize(deserializer)?
+                };
+                Ok(Some(inner))
             }
         }
 

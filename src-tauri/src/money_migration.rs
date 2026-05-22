@@ -6,9 +6,13 @@ use serde::de::DeserializeOwned;
 use crate::errors::{AppError, AppResult};
 use crate::money::{from_f64_legacy, MIGRATION_KV_KEY};
 use crate::models::{
-    CurrencyDoc, ExpenseDoc, PaymentRecordDto, RatePoint, SettingsDoc, SubscriptionDoc,
+    CurrencyDoc, ExpenseDoc, PaymentMethodDoc, PaymentRecordDto, RatePoint, SettingsDoc,
+    SubscriptionDoc,
 };
-use crate::state::{decode_bin, kv_set_in_tx, run_write_transaction, T2_CURRENCIES, T2_EXPENSES, T2_RATE_HISTORY, T2_SETTINGS, T2_SUBSCRIPTIONS};
+use crate::state::{
+    decode_bin, kv_set_in_tx, run_write_transaction, T2_CURRENCIES, T2_EXPENSES, T2_PAYMENT_METHODS,
+    T2_RATE_HISTORY, T2_SETTINGS, T2_SUBSCRIPTIONS,
+};
 
 pub(crate) mod legacy {
     use serde::{Deserialize, Serialize};
@@ -149,6 +153,21 @@ pub(crate) mod legacy {
         pub(crate) rate: f64,
         pub(crate) recorded_at: String,
     }
+
+    /// Pre-`enabled` payment methods (postcard layout before the field was added).
+    #[derive(Debug, Clone, Deserialize, Serialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct PaymentMethodDocV0 {
+        pub(crate) id: String,
+        #[serde(default)]
+        pub(crate) name: String,
+        #[serde(default)]
+        pub(crate) icon: String,
+        #[serde(default)]
+        pub(crate) sort_order: i64,
+        #[serde(default)]
+        pub(crate) i18n_key: String,
+    }
 }
 
 fn default_rate_f64() -> f64 {
@@ -159,19 +178,19 @@ fn default_rate_days() -> u32 {
     90
 }
 
-fn decode_row<T, L, F>(raw: &[u8], convert: F) -> AppResult<T>
+/// Decode a typed entity row: try legacy postcard layout first so we never
+/// mis-parse old `f64` money blobs as `Decimal` strings (which desyncs and
+/// surfaces as bogus `bool` postcard errors).
+pub(crate) fn decode_row<T, L, F>(raw: &[u8], convert: F) -> AppResult<T>
 where
     T: DeserializeOwned,
     L: DeserializeOwned,
     F: FnOnce(L) -> T,
 {
-    match decode_bin::<T>(raw) {
-        Ok(v) => Ok(v),
-        Err(_) => {
-            let legacy = decode_bin::<L>(raw)?;
-            Ok(convert(legacy))
-        }
+    if let Ok(legacy) = decode_bin::<L>(raw) {
+        return Ok(convert(legacy));
     }
+    decode_bin::<T>(raw)
 }
 
 fn read_money_table<T, L, F>(
@@ -297,6 +316,23 @@ impl From<legacy::RatePointV1> for RatePoint {
     }
 }
 
+impl From<legacy::PaymentMethodDocV0> for PaymentMethodDoc {
+    fn from(v: legacy::PaymentMethodDocV0) -> Self {
+        Self {
+            id: v.id,
+            name: v.name,
+            icon: v.icon,
+            enabled: true,
+            sort_order: v.sort_order,
+            i18n_key: v.i18n_key,
+        }
+    }
+}
+
+pub(crate) fn load_payment_methods_migrated(db: &Database) -> AppResult<Vec<PaymentMethodDoc>> {
+    read_money_table::<PaymentMethodDoc, legacy::PaymentMethodDocV0, _>(db, T2_PAYMENT_METHODS, Into::into)
+}
+
 pub(crate) fn load_subscriptions_migrated(db: &Database) -> AppResult<Vec<SubscriptionDoc>> {
     read_money_table::<SubscriptionDoc, legacy::SubscriptionDocV1, _>(db, T2_SUBSCRIPTIONS, Into::into)
 }
@@ -383,7 +419,9 @@ pub(crate) fn finalize_money_migration_if_needed(
 #[cfg(test)]
 mod tests {
     use super::legacy;
+    use super::decode_row;
     use crate::models::{ExpenseDoc, SubscriptionDoc};
+    use crate::money::from_f64_legacy;
     use crate::state::{decode_bin, encode_bin};
     use rust_decimal::Decimal;
     use std::str::FromStr;
@@ -429,6 +467,43 @@ mod tests {
         let a = Decimal::from_str("0.1").unwrap();
         let b = Decimal::from_str("0.2").unwrap();
         assert_eq!(a + b, Decimal::from_str("0.3").unwrap());
+    }
+
+    #[test]
+    fn decode_row_prefers_legacy_f64_subscription_postcard() {
+        let v1 = legacy::SubscriptionDocV1 {
+            id: "s1".into(),
+            updated_at: 1,
+            name: "Test".into(),
+            logo: String::new(),
+            price: 0.01106,
+            currency_id: "cur-1".into(),
+            next_payment: "2026-06-01".into(),
+            start_date: "2026-01-01".into(),
+            cycle: 3,
+            frequency: 1,
+            inactive: false,
+            category_id: "cat-1".into(),
+            payment_method_id: String::new(),
+            payer_user_id: String::new(),
+            cancellation_date: None,
+            notes: String::new(),
+            notify: true,
+            notify_days_before: 1,
+            last_notified_date: String::new(),
+            auto_renew: true,
+            url: String::new(),
+            replacement_subscription_id: None,
+            created_at: String::new(),
+            tags: vec![],
+            favorite: false,
+            payment_history: vec![],
+        };
+        let bytes = encode_bin(&v1).unwrap();
+        let doc: SubscriptionDoc =
+            decode_row::<SubscriptionDoc, legacy::SubscriptionDocV1, _>(&bytes, Into::into)
+                .expect("legacy-first decode");
+        assert_eq!(doc.price, from_f64_legacy(0.01106));
     }
 
     #[test]
