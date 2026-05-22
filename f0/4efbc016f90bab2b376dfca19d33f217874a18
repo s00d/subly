@@ -1,0 +1,41 @@
+src-tauri/src/money.rs
+  s_46eb22e28aedb5::t_6aeb8df2ae2fb8 206-270,291
+  s_46eb22e28aedb5::t_c471aebaf59e38 271-277,283-290
+  s_46eb22e28aedb5::t_454af9f513456f 278-282
+src-tauri/src/commands/catalog.rs
+  s_46eb22e28aedb5::t_145ed5ebdc9385 53-81
+  s_46eb22e28aedb5::t_9af71495c0bfff 233-234
+  s_46eb22e28aedb5::t_6069839dd04d10 579-635
+src-tauri/src/commands/sync/wire.rs
+  s_46eb22e28aedb5::t_5f14d301dce103 126-127
+src-tauri/src/commands/export.rs
+  s_46eb22e28aedb5::t_f9b21826f8a295 355,360
+src-tauri/src/models.rs
+  s_46eb22e28aedb5::t_7d0fab81bb2c04 407
+  s_46eb22e28aedb5::t_865caf69f93d13 637
+  s_46eb22e28aedb5::t_10e5b6a16575dd 19
+  s_46eb22e28aedb5::t_fe585025630494 80
+  s_46eb22e28aedb5::t_22cf43620dcf4c 254
+  s_46eb22e28aedb5::t_161491ee65b86a 581
+  s_46eb22e28aedb5::t_7249cbd1e5a106 213
+src-tauri/src/commands/ai/json_parse.rs
+  s_46eb22e28aedb5::t_692d5ef6412929 254-269
+  s_46eb22e28aedb5::t_376ce9a5e34369 92-96,100-103,108,125-126,133-134
+  s_46eb22e28aedb5::t_a616dabcf0b679 106
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "f04efbc016f90bab2b376dfca19d33f217874a18",
+  "prompts": {},
+  "sessions": {
+    "s_46eb22e28aedb5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2cf69a17-9c5d-40ae-9782-7f395222b99b",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
