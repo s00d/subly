@@ -1,0 +1,93 @@
+landing/src/content/index.ts
+  s_46eb22e28aedb5::t_f7ce4e16826355 9,11-12
+  s_46eb22e28aedb5::t_b288f19a664e95 2-8,10
+landing/src/content/site.de.ts
+  s_46eb22e28aedb5::t_ba4d4d880ca261 1,359-360
+  s_46eb22e28aedb5::t_f4bfdcb66986a9 2-358
+landing/src/content/site.pt.ts
+  s_46eb22e28aedb5::t_f4bfdcb66986a9 2-358
+  s_46eb22e28aedb5::t_5315d401d1b75b 1,359-360
+landing/src/content/site.ko.ts
+  s_46eb22e28aedb5::t_f4bfdcb66986a9 2-351
+  s_46eb22e28aedb5::t_7827e188b3d671 1,352-353
+landing/src/content/site.hi.ts
+  s_46eb22e28aedb5::t_f4bfdcb66986a9 2-357
+  s_46eb22e28aedb5::t_bffb32a95e5177 1,358-359
+landing/src/content/site.ar.ts
+  s_46eb22e28aedb5::t_1f57925bd5719e 1,358-359
+  s_46eb22e28aedb5::t_f4bfdcb66986a9 2-357
+README.md
+  s_46eb22e28aedb5::t_1587004c3c3991 22
+landing/src/composables/useSiteContent.ts
+  s_46eb22e28aedb5::t_c1bd3739a6b12e 1,7,11,18-49,72-74
+  s_46eb22e28aedb5::t_a2058be60e7005 6,51
+landing/src/content/site.ja.ts
+  s_46eb22e28aedb5::t_869d817209792c 1,352-353
+  s_46eb22e28aedb5::t_f4bfdcb66986a9 2-351
+landing/src/content/site.ru.ts
+  s_46eb22e28aedb5::t_d702e77b34f804 2
+  s_46eb22e28aedb5::t_3053d577e4a5b3 31
+landing/src/content/site.fr.ts
+  s_46eb22e28aedb5::t_f4bfdcb66986a9 2-358
+  s_46eb22e28aedb5::t_489ac181f2f6fc 1,359-360
+landing/scripts/copy-spa-fallback.mjs
+  s_46eb22e28aedb5::t_81d09af1f7543f 26-40
+landing/src/content/site.es.ts
+  s_46eb22e28aedb5::t_96096c9539d587 1,359-360
+  s_46eb22e28aedb5::t_f4bfdcb66986a9 2-358
+landing/src/App.vue
+  s_46eb22e28aedb5::t_01b5aa43b5e074 8
+  s_46eb22e28aedb5::t_4b907d995e2a78 17-19
+  s_46eb22e28aedb5::t_fd02a7d50d5229 12,15,20-23,33,41-52
+landing/src/content/site.en.ts
+  s_46eb22e28aedb5::t_8a49d430b0c703 2
+  s_46eb22e28aedb5::t_4f21b2412538c3 31
+landing/src/components/seo/JsonLd.vue
+  s_46eb22e28aedb5::t_f87314fa1a68e5 29
+  s_46eb22e28aedb5::t_c6c25fa3f1058b 4
+landing/src/content/site.tr.ts
+  s_46eb22e28aedb5::t_f4bfdcb66986a9 2-357
+  s_46eb22e28aedb5::t_ee8e77ec1b2b7f 1,358-359
+landing/src/router/index.ts
+  s_46eb22e28aedb5::t_47a269f248802d 2
+  s_46eb22e28aedb5::t_1f3ad9a463d7f6 29
+  s_46eb22e28aedb5::t_5b73a0e37f15b7 1,3,8-14,18
+  s_46eb22e28aedb5::t_7725589a34b75e 23
+landing/src/content/buildSiteContent.ts
+  s_46eb22e28aedb5::t_17de927e56bf7c 173-185
+  s_46eb22e28aedb5::t_0b0539ed27fbc4 200-202
+  s_46eb22e28aedb5::t_3c8ae16c37cd00 1-172,186-199,203-394
+landing/public/sitemap.xml
+  s_46eb22e28aedb5::t_372c909d207546 14-62
+landing/src/content/loadSiteContent.ts
+  s_46eb22e28aedb5::t_548d0d34db90bb 1-46
+landing/src/components/ui/LocaleSwitcher.vue
+  s_46eb22e28aedb5::t_035af013d8f73b 2,5-10,16-24,47,51,64,69-70
+landing/src/content/types.ts
+  s_46eb22e28aedb5::t_dd394dc6453b5f 2,4
+landing/src/content/docMeta.ts
+  s_46eb22e28aedb5::t_71b7f790ada329 1-5
+landing/src/content/site.zh.ts
+  s_46eb22e28aedb5::t_c44ad3cebff73d 1,352-353
+  s_46eb22e28aedb5::t_f4bfdcb66986a9 2-351
+landing/src/content/shared.ts
+  s_46eb22e28aedb5::t_0be5d3e4125aa7 1-15
+landing/src/content/locales.ts
+  s_46eb22e28aedb5::t_eeec6cabd88c38 1-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "0db1dc9169a2bbb0ac53923ca3d9b7a15d7fde7a",
+  "prompts": {},
+  "sessions": {
+    "s_46eb22e28aedb5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2cf69a17-9c5d-40ae-9782-7f395222b99b",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
