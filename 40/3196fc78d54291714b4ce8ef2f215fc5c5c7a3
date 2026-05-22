@@ -1,0 +1,500 @@
+src/pages/CurrencyRatesPage.vue
+  s_f68850e184135a::t_1aa3058f031332 16-22
+  s_f68850e184135a::t_1154a9be57b6cc 155
+  s_f68850e184135a::t_e6752f3eb1cd0e 393
+  s_f68850e184135a::t_1d0a09a0d6169b 168
+  s_f68850e184135a::t_3c30906d81cec8 224-226
+  s_f68850e184135a::t_57e2235ad9e09a 640,642
+  s_f68850e184135a::t_8118dd93ae3300 374,376
+  s_f68850e184135a::t_fea22cb31192ce 288-297
+  s_f68850e184135a::t_f7cc1ec325fbcd 254,280
+  s_f68850e184135a::t_6d35b78afd7381 559,561
+  s_f68850e184135a::t_282aaef5ce25de 308-316,325
+src/schemas/zod/expenseForm.ts
+  s_46eb22e28aedb5::t_5983448749cde6 2
+  s_46eb22e28aedb5::t_f80f39a77ddcf6 17-18
+  s_46eb22e28aedb5::t_2fe51fd5d0df77 7
+src-tauri/src/models.rs
+  s_46eb22e28aedb5::t_d9bc9565a1bbef 2,5-11
+  s_46eb22e28aedb5::t_f8931eaa6fdceb 19-20
+  s_46eb22e28aedb5::t_b4f909c5e0b977 407-408
+  s_46eb22e28aedb5::t_b7983df15f714a 80-81
+  s_46eb22e28aedb5::t_5ef313597bce85 213-214,581-582,638
+  s_46eb22e28aedb5::t_b6809d0e314233 254-255
+  s_46eb22e28aedb5::t_2e5815311495f3 438-439
+  s_46eb22e28aedb5::t_45595219cdb755 503-504
+  s_46eb22e28aedb5::t_ecbb5d66e46346 558
+  s_46eb22e28aedb5::t_109f2022b9d20d 608
+  s_46eb22e28aedb5::t_a8e81d416de962 627-628
+  s_46eb22e28aedb5::t_f1beb57f5785c0 637
+  s_46eb22e28aedb5::t_2289c18427bc98 484-485
+src-tauri/src/commands/ai/extract/chat_completions.rs
+  s_46eb22e28aedb5::t_98f0364763baaf 1-169
+src-tauri/src/commands/sync/providers/mod.rs
+  s_46eb22e28aedb5::t_d2712c20f562a0 69
+src/components/subscriptions/PaymentHistory.vue
+  s_46eb22e28aedb5::t_dcbe971a34a63e 24
+  s_46eb22e28aedb5::t_56437362108ffe 132
+  s_f68850e184135a::t_cb7a4c74002dc9 170
+  s_46eb22e28aedb5::t_e23b51acf0098c 211
+  s_46eb22e28aedb5::t_45b51bfa4f8b95 125
+  s_46eb22e28aedb5::t_b592090f2cd127 77
+  s_46eb22e28aedb5::t_bb2b5994a8e21b 60,67-70
+  s_46eb22e28aedb5::t_f8f9559e234eb1 4,6-14
+  s_46eb22e28aedb5::t_9db131adfe51ce 38-39
+src/components/dashboard/OverdueAlert.vue
+  s_f68850e184135a::t_d341ae49f311d9 6
+  s_46eb22e28aedb5::t_8891331e0babe2 10
+src/components/dashboard/SpendingTrend.vue
+  s_46eb22e28aedb5::t_e8591f018ff984 74-75
+  s_46eb22e28aedb5::t_61f84e01d1a270 76
+  s_46eb22e28aedb5::t_288bcb7a18bc72 20
+  s_46eb22e28aedb5::t_5757fc21bca79d 8
+  s_46eb22e28aedb5::t_3432e256673867 48
+  s_46eb22e28aedb5::t_4c432d7e862e3e 32
+  s_46eb22e28aedb5::t_60923b92a5490b 12
+src/components/subscriptions/SubscriptionForm.vue
+  s_f68850e184135a::t_79b8bb848703d2 29
+  s_f68850e184135a::t_10d0c1d4068790 326
+  s_f68850e184135a::t_619cdfb3036dff 92
+  s_f68850e184135a::t_e18e27ac49cab0 432-433
+src-tauri/src/commands/ai/shared.rs
+  s_46eb22e28aedb5::t_87028c9e827a3f 8-25,29,32-39,42-47,52,54,58-59
+  s_46eb22e28aedb5::t_cc0e4c192a4061 40-41,48-51,55-57
+src-tauri/src/commands/expenses.rs
+  s_46eb22e28aedb5::t_81f056403f210f 232-233
+  s_46eb22e28aedb5::t_3834525860672f 240-245
+  s_46eb22e28aedb5::t_c98c4a033b5b86 471
+src/services/notificationsClient.ts
+  s_46eb22e28aedb5::t_b2fea7f365f90b 3-4,11
+src/components/ai/AiSmartDialog.vue
+  s_46eb22e28aedb5::t_549929657af897 397,406
+  s_46eb22e28aedb5::t_9ba9ae80159769 518-519,521-551
+  s_46eb22e28aedb5::t_451ca92000ef12 42-45
+  s_46eb22e28aedb5::t_52809f2c5b44c0 567
+  s_f68850e184135a::t_c8396ef79e0bb3 41
+  s_46eb22e28aedb5::t_331c66370781e5 513-517,520,552-553
+  s_f68850e184135a::t_bd2a0b156dd9ff 607
+  s_46eb22e28aedb5::t_47c03904f0a148 882
+  s_46eb22e28aedb5::t_10bd5ce1f76d97 931,944
+  s_46eb22e28aedb5::t_1d51b802a0569d 572,579-580
+  s_f68850e184135a::t_fdead121c7b70d 576
+  s_46eb22e28aedb5::t_4d5abddccf117e 602,614,616
+  s_46eb22e28aedb5::t_c46efc6d554823 400
+src-tauri/src/keyring_store.rs
+  s_46eb22e28aedb5::t_28a1e159e9e9e9 1-3,15-17,24-28,31,37,48-49,51
+  s_46eb22e28aedb5::t_00384233b5c97d 4,8,36,38-47,50,52-63
+src/components/expenses/ExpenseDetail.vue
+  s_46eb22e28aedb5::t_6706d9638ce80a 143
+  s_46eb22e28aedb5::t_0771c4f739b5a3 47,52-53
+  s_46eb22e28aedb5::t_dc41f3500a4c36 4
+  s_f68850e184135a::t_febfc1252e13c2 76,79-86
+  s_46eb22e28aedb5::t_feaf19a324e033 48
+  s_f68850e184135a::t_6126add7b535f1 15-19
+CHANGELOG.md
+  s_46eb22e28aedb5::t_776298610f1336 8,14-15,21,23-26,32-36,40
+src-tauri/src/commands/ai/extract/mapping.rs
+  s_46eb22e28aedb5::t_eb226491bc1c2a 163,170,177,181
+  s_46eb22e28aedb5::t_77a42d8e42f752 71,78-80
+  s_46eb22e28aedb5::t_033718e5a3936f 98,100-101,109,111-112
+  s_46eb22e28aedb5::t_bc051178c9f22c 64,68-70,74-77
+src-tauri/src/commands/rates/history.rs
+  s_46eb22e28aedb5::t_b09754bcc7c733 46,48
+  s_46eb22e28aedb5::t_d56e6e9f76e6de 43-45,47,51-57
+src/lib/money.ts
+  s_46eb22e28aedb5::t_ac8d6e6763fd22 87,89-91,93-95,97-100
+  s_46eb22e28aedb5::t_83833d4e023fe1 101-102,104-112
+  s_46eb22e28aedb5::t_bf80eaaab8219c 3,8-9,16,22-23,38-42,63,72,74,76,83,88,92,96,103
+  s_46eb22e28aedb5::t_82639dbf2748a5 1-2,4-7,10-15,17-21,24-37,43-62,64-71,73,75,77-82,84-86
+src/locales/pt.json
+  s_46eb22e28aedb5::t_ba96ea88614b12 13
+src-tauri/src/commands/dashboard.rs
+  s_46eb22e28aedb5::t_d17d1fe656b8b5 144,169,203,615,617,745
+  s_46eb22e28aedb5::t_0fdb34a5ea7b9d 213
+  s_46eb22e28aedb5::t_dc2ce48dbfa7a1 124-125
+  s_46eb22e28aedb5::t_8cb93a5028821c 818,820
+  s_46eb22e28aedb5::t_3afa8bde90a1cc 426-427,429-430
+  s_46eb22e28aedb5::t_ec0997f29fdb46 171,173
+  s_46eb22e28aedb5::t_d3dadc1079a5e1 415-418
+  s_46eb22e28aedb5::t_0ad76ca506b961 507,509
+  s_46eb22e28aedb5::t_d94685fe6130cc 178
+  s_46eb22e28aedb5::t_eddade2c331c6d 555,561
+  s_46eb22e28aedb5::t_92f7da4b9322da 855
+  s_46eb22e28aedb5::t_391f75f20e0d20 384-385,393-394,439-440
+  s_46eb22e28aedb5::t_3fb06527319470 670-674,676
+  s_46eb22e28aedb5::t_532b6af4d93ba0 797
+  s_46eb22e28aedb5::t_dda9cfd4173798 98,101-102
+  s_46eb22e28aedb5::t_56a371f49cafea 714-723,725
+  s_46eb22e28aedb5::t_6328d60108981e 346-349
+  s_46eb22e28aedb5::t_a64ae818b06a0c 292-299,301-312
+  s_46eb22e28aedb5::t_14032c05a95f82 620,622
+  s_46eb22e28aedb5::t_b229e0c395e3ab 2
+  s_46eb22e28aedb5::t_553d611ba7c9e4 756
+  s_46eb22e28aedb5::t_0be0ee2a5fb2ca 480,484-489,491
+  s_46eb22e28aedb5::t_22914c6805bb41 245
+  s_46eb22e28aedb5::t_5fa016bf06cc97 748
+  s_46eb22e28aedb5::t_595ee175d9b333 146-147,152
+  s_46eb22e28aedb5::t_7f6df80a241087 760-763
+  s_46eb22e28aedb5::t_ce650ffdd5d906 876,879-880,884-885
+  s_46eb22e28aedb5::t_01fe68fa24a7fc 231
+  s_46eb22e28aedb5::t_02a78d7d4c0c2f 258-259
+  s_46eb22e28aedb5::t_8eebd1b5183d95 359-366
+  s_46eb22e28aedb5::t_21be6e0361ac49 403-404
+  s_46eb22e28aedb5::t_f1f20ba8556b51 517-532,534
+  s_46eb22e28aedb5::t_39bd338eff3d37 272-273
+  s_46eb22e28aedb5::t_5ddc9eeee929c9 802,805
+  s_46eb22e28aedb5::t_853b6896575459 279-282
+  s_46eb22e28aedb5::t_c56eea132875b9 323-324
+  s_46eb22e28aedb5::t_4aecf9ec86aabb 706
+  s_46eb22e28aedb5::t_6c5df034ec0110 768
+  s_46eb22e28aedb5::t_a87de477f4de62 892,895-896,900-901
+  s_46eb22e28aedb5::t_ff9007742a3e0f 446-447,449-450
+  s_46eb22e28aedb5::t_6f9af95cbfccc6 662,666
+  s_46eb22e28aedb5::t_beb6ad6834c931 436-437
+src/components/dashboard/ExpenseSummary.vue
+  s_f68850e184135a::t_c477d70c2d3f41 6
+  s_f68850e184135a::t_0e6155dc21ac28 56
+  s_f68850e184135a::t_2d93f70f1f0ba7 60
+  s_f68850e184135a::t_e503b9bd4ea612 77
+  s_f68850e184135a::t_009d325aca65c1 27-28
+  s_f68850e184135a::t_603729d590800b 15
+src/components/settings/HouseholdSection.vue
+  s_46eb22e28aedb5::t_f5a6f37a51fb8f 7
+  s_46eb22e28aedb5::t_1730db19ae948d 50-56
+src/locales/de.json
+  s_46eb22e28aedb5::t_847fcec62aefb5 13
+src/pages/ExpensesPage.vue
+  s_f68850e184135a::t_7537a31938c7d5 392
+  s_f68850e184135a::t_f3626ac622c925 421-428,435
+  s_46eb22e28aedb5::t_02435d5c391c5e 431-432
+  s_46eb22e28aedb5::t_b8da1fe234295d 87
+  s_46eb22e28aedb5::t_0def8428aaeaed 381-382
+  s_46eb22e28aedb5::t_2395058c8bfba2 747,780
+  s_f68850e184135a::t_d57ea6e20e104e 33-36
+  s_46eb22e28aedb5::t_98f311a6ba8f9c 14
+src/locales/ko.json
+  s_46eb22e28aedb5::t_d143ac2764a998 13
+package.json
+  s_46eb22e28aedb5::t_ce0a073fe505e7 30
+  s_46eb22e28aedb5::t_fb97808261299d 36
+src/components/ai/AiSubscriptionImportPreviewList.vue
+  s_46eb22e28aedb5::t_a8d2aa1bd458e6 99-103
+  s_46eb22e28aedb5::t_6ef3fe4197ef94 153
+src-tauri/src/commands/catalog.rs
+  s_46eb22e28aedb5::t_8dba2c624b9d40 305-307
+  s_46eb22e28aedb5::t_5aff69f0313fb8 98
+  s_46eb22e28aedb5::t_6e6f154cae5242 89-92
+  s_46eb22e28aedb5::t_d35bc01187c27d 1,3-7,10-15,23-53,55-85,93-97,99-108,110-113,116-117,120,128-135,139,146-150,158,163-174,179-188,191,193-245,247,249-250,253,255-304,308-312,314,316-320,336,338-342,345,347-388,390,392-396,399,401-460,462,464-465,468,470-512,514,516-517
+  s_46eb22e28aedb5::t_9f1e5e3acd9caa 54
+src/components/dashboard/MonthCompareWidget.vue
+  s_46eb22e28aedb5::t_464de98f15f113 88
+  s_46eb22e28aedb5::t_27a05347660871 60-61,65-69,74-82
+  s_46eb22e28aedb5::t_0f89c727473c7d 136,138
+  s_46eb22e28aedb5::t_ae4e3414d75044 5
+  s_46eb22e28aedb5::t_d83e69df6378c2 91,93
+  s_46eb22e28aedb5::t_52d6941c900bb8 111
+  s_46eb22e28aedb5::t_3f9b44bc480609 126
+  s_46eb22e28aedb5::t_b92be848499e83 13,15
+src/utils/catalogDefaults.ts
+  s_46eb22e28aedb5::t_ff7ff5f259a1b8 1-66
+src-tauri/src/test_support.rs
+  s_46eb22e28aedb5::t_ffc98d6a010755 46
+  s_46eb22e28aedb5::t_46efd274785ef8 70
+  s_46eb22e28aedb5::t_e724760ba17413 80
+src-tauri/src/commands/ai/catalog_snapshot.rs
+  s_46eb22e28aedb5::t_55ff9e4b37f7da 116-178
+  s_46eb22e28aedb5::t_5d636af4c8feba 434-438
+  s_46eb22e28aedb5::t_ee023c2bc634c4 252-292
+  s_46eb22e28aedb5::t_15848cd19616d3 306
+  s_46eb22e28aedb5::t_104167e68b0964 433,439-446
+  s_46eb22e28aedb5::t_e012c4631da2e4 484-540
+src/pages/SubscriptionsPage.vue
+  s_46eb22e28aedb5::t_030690a14fecd4 456-458
+  s_46eb22e28aedb5::t_84bbb2606ca925 11
+src/components/settings/PaymentMethodsSection.vue
+  s_46eb22e28aedb5::t_a8129148ad44af 8-9
+  s_46eb22e28aedb5::t_ae7484771d56ec 95-101
+  s_46eb22e28aedb5::t_6aaf4bd4b58064 175
+  s_46eb22e28aedb5::t_a01df4bdea54f4 27
+src-tauri/src/widget_snapshot.rs
+  s_46eb22e28aedb5::t_0d6145e8621237 8-10
+  s_46eb22e28aedb5::t_50c89250548c32 36-37
+  s_46eb22e28aedb5::t_8bcf83b2fd16be 56-57
+  s_46eb22e28aedb5::t_f3970a2c3faebc 319
+  s_46eb22e28aedb5::t_2b9bf0b98add39 198-212
+src/locales/tr.json
+  s_46eb22e28aedb5::t_f13ecbcd163647 13
+src/components/dashboard/CategoryAverages.vue
+  s_46eb22e28aedb5::t_4e7bb15883c54b 5
+  s_46eb22e28aedb5::t_ce8d247b75b6b1 12
+  s_46eb22e28aedb5::t_d9c25961979962 52-61
+src/components/subscriptions/SubscriptionDetail.vue
+  s_46eb22e28aedb5::t_28ee97f05b85d1 210-211
+  s_f68850e184135a::t_f06515e1e5f7c4 221,224-231
+  s_46eb22e28aedb5::t_fa368b4fc8dbf1 332,334
+  s_46eb22e28aedb5::t_8b906bf904efcf 4
+  s_f68850e184135a::t_c1fa7016dcf9d1 271
+  s_46eb22e28aedb5::t_b6c03d487a5527 55-56
+  s_f68850e184135a::t_805553e4bbb3e6 20-24
+src-tauri/src/money.rs
+  s_46eb22e28aedb5::t_c09a3fa69716bf 96,120,139-173,175-178,204
+  s_46eb22e28aedb5::t_9b22080da0be83 174
+  s_46eb22e28aedb5::t_e650001e97bbcb 179-203
+  s_46eb22e28aedb5::t_57b66616fc972d 1-3,5-32,34-85,97-119,121-138,205
+  s_46eb22e28aedb5::t_8ce761a0b1ce68 4
+  s_46eb22e28aedb5::t_12c6620416ce12 33
+  s_46eb22e28aedb5::t_0ff8b484f9f132 86-95
+src-tauri/src/commands/ai/extract/smart/subscription.rs
+  s_46eb22e28aedb5::t_818e8ebff33ff2 252
+  s_46eb22e28aedb5::t_ef502993642b8a 168
+src-tauri/src/money_migration.rs
+  s_46eb22e28aedb5::t_93e5e4f783e8fc 11
+  s_46eb22e28aedb5::t_d5590454998231 326-329
+  s_46eb22e28aedb5::t_09d76153cb74d2 2,456-457
+  s_46eb22e28aedb5::t_b34a781b7a8290 351-354
+  s_46eb22e28aedb5::t_2ccfc08134b5fd 373-379
+  s_46eb22e28aedb5::t_82e1adfb3a9116 1,3-10,12-325,330-350,355-372,380-382,387,392
+  s_46eb22e28aedb5::t_5f99306fe8abfe 383-386,388-391,393-423,425-455
+  s_46eb22e28aedb5::t_e8ff09c37b1c8f 424
+src-tauri/src/commands/export.rs
+  s_46eb22e28aedb5::t_95ffe33a256552 311-334
+  s_46eb22e28aedb5::t_64619832d70ff1 374-392,398,403
+src-tauri/src/commands/ai/dto.rs
+  s_46eb22e28aedb5::t_51833a4f6dc05d 71-72
+  s_46eb22e28aedb5::t_f7c03fc4f99aaa 160-161
+  s_46eb22e28aedb5::t_dd74de5fdf4d38 123-124
+  s_46eb22e28aedb5::t_234b057dadc173 7
+  s_46eb22e28aedb5::t_3eb3d531555615 188-189
+src-tauri/src/commands/ai/providers/mod.rs
+  s_46eb22e28aedb5::t_18c5a90cc6d2d2 194-217
+src/locales/es.json
+  s_46eb22e28aedb5::t_9ecafe1521e4a1 13
+src/services/ratesClient.ts
+  s_46eb22e28aedb5::t_315e7ddec1aa38 23
+src-tauri/src/lib.rs
+  s_46eb22e28aedb5::t_89a3f9844da997 10-11
+  s_46eb22e28aedb5::t_0d19fab6dd41c7 233-234,237-242,245-250,255-257,262-264,269-271
+  s_46eb22e28aedb5::t_dd13095d78080f 677
+  s_46eb22e28aedb5::t_beb10c008b4aa1 353-355
+src/locales/ja.json
+  s_46eb22e28aedb5::t_d37740ad869d4f 13
+src-tauri/src/state.rs
+  s_46eb22e28aedb5::t_7f948e9ae4f38d 21
+  s_46eb22e28aedb5::t_84dace09667e67 386-387,389
+  s_46eb22e28aedb5::t_6e19dfdbbc8c48 449
+  s_46eb22e28aedb5::t_c5cbda7e956297 393
+  s_46eb22e28aedb5::t_47addae36aaa73 10-11
+  s_46eb22e28aedb5::t_ede516bed9e53f 226
+  s_46eb22e28aedb5::t_1c9e37902b69a4 228
+src/schemas/appData.ts
+  s_46eb22e28aedb5::t_630490031c392f 29,76
+  s_46eb22e28aedb5::t_71e78bed9a0f20 235-236
+  s_46eb22e28aedb5::t_9c2bb20adf843c 2-4
+  s_46eb22e28aedb5::t_a7118754ab6a8f 191,234
+  s_46eb22e28aedb5::t_05e7f838c6f794 327
+  s_46eb22e28aedb5::t_5c5d9a04755887 351
+  s_46eb22e28aedb5::t_f3a9e981b63c06 371
+  s_46eb22e28aedb5::t_a26016f9735429 66
+  s_46eb22e28aedb5::t_681f6b769aba32 38
+  s_46eb22e28aedb5::t_0b8a0ec8986f64 139
+  s_46eb22e28aedb5::t_0987169a8e7faa 301
+src/locales/hi.json
+  s_46eb22e28aedb5::t_68707fe4420925 13
+src/types/dashboardIpc.ts
+  s_46eb22e28aedb5::t_cd84326a37863a 1,9,17-20,26-27,38-39,45,47,54-64,68-69,75,77,90-91,93,95,102,106
+src-tauri/src/commands/ai/prompts/smart.rs
+  s_46eb22e28aedb5::t_a4d0915ba85e2b 239-240
+  s_46eb22e28aedb5::t_ee2da0d1a57503 302-303
+  s_46eb22e28aedb5::t_5fd5e02ed5c7d2 199-202
+  s_46eb22e28aedb5::t_09b2f8b75ee8a3 258
+src/components/dashboard/StatsCards.vue
+  s_46eb22e28aedb5::t_adf7b5ecc91a43 102-104,107
+  s_46eb22e28aedb5::t_7ffcad1b18e8c7 6
+  s_46eb22e28aedb5::t_c186f27dee127d 10-17
+src/locales/zh.json
+  s_46eb22e28aedb5::t_d31e19738fe705 13
+src-tauri/src/commands/rates/providers/mod.rs
+  s_46eb22e28aedb5::t_2ff95e69e89d2f 368-369
+  s_46eb22e28aedb5::t_9c5058d55df2c4 377-378
+src/components/dashboard/DayOfWeekWidget.vue
+  s_46eb22e28aedb5::t_1d0316ff47a91a 8,15
+  s_46eb22e28aedb5::t_eab7647986856d 79-81
+  s_46eb22e28aedb5::t_984b8b41cd630e 27
+  s_46eb22e28aedb5::t_9c7dd34b22f2cb 40
+  s_46eb22e28aedb5::t_120e949ac74c5e 56
+src/components/settings/CurrenciesSection.vue
+  s_46eb22e28aedb5::t_ff8468dbd0f9e7 8-9
+  s_46eb22e28aedb5::t_c9c42bf004e9d0 25
+  s_46eb22e28aedb5::t_c16bea0c61d9f2 162
+  s_46eb22e28aedb5::t_a492f6a9f07ca6 100,104-111
+  s_f68850e184135a::t_b2a83392b2deb4 90
+src/pages/CalendarPage.vue
+  s_f68850e184135a::t_0f9a9fd499377e 280-281,289,293,298,302
+  s_f68850e184135a::t_d93eccf11e7fac 30
+  s_f68850e184135a::t_ceeae605419379 241
+  s_46eb22e28aedb5::t_74de5d0258da43 216
+src/components/dashboard/AvgCheckWidget.vue
+  s_46eb22e28aedb5::t_4ac35098aaba4a 5,12
+src/components/settings/CategoriesSection.vue
+  s_46eb22e28aedb5::t_76bd3f8aa6c5c9 27
+  s_46eb22e28aedb5::t_df9ca0d61f0097 206
+  s_46eb22e28aedb5::t_58e28a1e1cb662 106,110-117
+  s_46eb22e28aedb5::t_06ef7a803acb3c 8-9
+src/components/calendar/CalendarDayModal.vue
+  s_46eb22e28aedb5::t_1b4ff50961f450 8
+  s_46eb22e28aedb5::t_717d00eefb7d6c 14-15
+src-tauri/src/state_tables.rs
+  s_46eb22e28aedb5::t_9dd87af735173e 8
+src-tauri/src/commands/ai/extract/mod.rs
+  s_46eb22e28aedb5::t_dea548a57286a8 41
+src/components/settings/TagsSection.vue
+  s_46eb22e28aedb5::t_5495e1ed92c13c 23
+  s_46eb22e28aedb5::t_898a3a846b2781 77-84
+  s_46eb22e28aedb5::t_a710048e230247 11-12
+src-tauri/src/commands/seed.rs
+  s_46eb22e28aedb5::t_784c0abe2e0e3e 27-60
+  s_46eb22e28aedb5::t_fc1748053d945c 118
+src/components/dashboard/RateHistoryWidget.vue
+  s_f68850e184135a::t_f0da5ab4952788 262
+  s_f68850e184135a::t_918c209adbfd98 12
+  s_f68850e184135a::t_f01885740789f0 136-139
+  s_f68850e184135a::t_4bbe405d1c1880 41
+  s_f68850e184135a::t_ef76970c93b092 247,249
+  s_f68850e184135a::t_215adc9183ed39 232,234-235
+  s_f68850e184135a::t_3bdd8dbddfcf7b 257
+src/pages/DashboardPage.vue
+  s_46eb22e28aedb5::t_465c428e004a5d 25
+  s_46eb22e28aedb5::t_3836a2ffe4f86c 163-165,167-168
+  s_f68850e184135a::t_2797f03519b72f 371-372
+  s_f68850e184135a::t_3efb827a58f933 246-247
+  s_f68850e184135a::t_f92528f735d3db 363
+  s_f68850e184135a::t_878fba3700c07a 173
+  s_46eb22e28aedb5::t_c13a911c2f4710 230-232
+  s_46eb22e28aedb5::t_faea077966ec3c 258-260,262
+  s_f68850e184135a::t_e536397d1d2d3d 257,261,263
+  s_46eb22e28aedb5::t_603a99113d5091 182
+  s_46eb22e28aedb5::t_6ed4722d35b611 351-359
+  s_f68850e184135a::t_c5c3f4439e3680 367
+  s_46eb22e28aedb5::t_8409bfb57f1dc2 384
+  s_46eb22e28aedb5::t_71804dcc4cf96e 217-221
+src/locales/ar.json
+  s_46eb22e28aedb5::t_27c2989acd4755 13
+src-tauri/Cargo.toml
+  s_46eb22e28aedb5::t_861763de82d091 40
+src/components/dashboard/LifetimeCosts.vue
+  s_46eb22e28aedb5::t_92786094fcccc5 32
+  s_46eb22e28aedb5::t_5275f309925f00 22
+  s_46eb22e28aedb5::t_62dab472802316 11
+  s_46eb22e28aedb5::t_086eb46ae055fc 5
+src/locales/fr.json
+  s_46eb22e28aedb5::t_611fc453f6ffe0 13
+src-tauri/src/commands/sync/config.rs
+  s_46eb22e28aedb5::t_b637e5382fa7da 61-64
+  s_46eb22e28aedb5::t_b3defffaf65297 91
+  s_46eb22e28aedb5::t_f0bfbe5af62f1f 76-79
+src/components/dashboard/UpcomingPayments.vue
+  s_f68850e184135a::t_fae9368a9d4037 5
+  s_46eb22e28aedb5::t_4bbfbc2320b204 10
+src/components/dashboard/TagExpensesWidget.vue
+  s_46eb22e28aedb5::t_988c790422110d 89
+  s_46eb22e28aedb5::t_72bb62757829e6 48
+  s_46eb22e28aedb5::t_2ecab1c3574453 61
+  s_46eb22e28aedb5::t_8f9edf5efda178 8
+src/components/expenses/ExpenseForm.vue
+  s_f68850e184135a::t_65d247812a439f 123
+  s_f68850e184135a::t_03292a92d0cbf2 147
+  s_f68850e184135a::t_d2940c914b60bb 280-281
+  s_f68850e184135a::t_761a2909940709 22
+  s_f68850e184135a::t_29153e92f96932 227
+src/schemas/zod/subscriptionForm.ts
+  s_46eb22e28aedb5::t_645c2939ab4c17 17
+  s_46eb22e28aedb5::t_f9108a8a28ae94 6
+  s_46eb22e28aedb5::t_88fc147759d519 36
+src-tauri/src/commands/sync/orchestrator.rs
+  s_46eb22e28aedb5::t_7b236c6e1ee3c7 13-20
+  s_46eb22e28aedb5::t_ed0584dd835458 112-123
+  s_46eb22e28aedb5::t_9cce021359feea 188-193
+  s_46eb22e28aedb5::t_2142a57221382f 133,135
+src/components/ai/AiImportPreviewList.vue
+  s_46eb22e28aedb5::t_2d275bc5ddaf46 170
+  s_46eb22e28aedb5::t_b4c6c0f168fbdf 153
+  s_46eb22e28aedb5::t_0dda788cfc88c2 99-103
+src-tauri/src/commands/notifications.rs
+  s_46eb22e28aedb5::t_bb99e83765d958 47-48
+  s_46eb22e28aedb5::t_76518f669aa535 170-173
+  s_46eb22e28aedb5::t_a456769af57f6d 5,7
+  s_46eb22e28aedb5::t_6a3e0cb3246141 16-17
+  s_46eb22e28aedb5::t_f49311905bccc3 209,214-215
+  s_46eb22e28aedb5::t_971e974696e465 305,494
+  s_46eb22e28aedb5::t_8334d7d0db99cb 672
+  s_46eb22e28aedb5::t_a79ebeb0be1e9d 354
+  s_46eb22e28aedb5::t_cd0f4ce987d3ac 166-169,174-204
+  s_46eb22e28aedb5::t_e0030e1ecb0df2 495
+src-tauri/src/commands/ai/extract/context.rs
+  s_46eb22e28aedb5::t_c615cff1191265 45-46,56-57
+  s_46eb22e28aedb5::t_02bc849bc8262c 30-32
+  s_46eb22e28aedb5::t_9a15641654e592 13
+src-tauri/src/commands/ai/extract/smart/expense.rs
+  s_46eb22e28aedb5::t_7e9debf452ed49 374,377-379,383-384,398,400
+  s_46eb22e28aedb5::t_3c1629ac6822b0 321-322,333
+  s_46eb22e28aedb5::t_0edd29cd517bb9 394
+  s_46eb22e28aedb5::t_d42b05e5e8efd6 164
+  s_46eb22e28aedb5::t_d2bd3ad5ae2fe6 364
+  s_46eb22e28aedb5::t_4139f9ba94fe77 193,245
+src/schemas/zod/common.ts
+  s_46eb22e28aedb5::t_355ecd9ad1e7b7 36-49
+src/components/settings/BudgetNotificationsSection.vue
+  s_f68850e184135a::t_6e720be7af748d 22
+  s_f68850e184135a::t_4e69654f9df50c 100
+  s_f68850e184135a::t_b649fa9363a6e4 62
+src-tauri/src/commands/subscriptions.rs
+  s_46eb22e28aedb5::t_4fa015da54c4cc 304
+  s_46eb22e28aedb5::t_406eea76bb7f60 799
+  s_46eb22e28aedb5::t_430bfe9d360cc9 490,562
+  s_46eb22e28aedb5::t_137dd388fdc126 792
+src-tauri/src/commands/ai/json_parse.rs
+  s_46eb22e28aedb5::t_7a1c29b6d50683 45-47
+  s_46eb22e28aedb5::t_d1a6f780544ee0 6-10,35-44,59,77-98,100-101,104-105,107,113,116-127,206-222,240-246
+  s_46eb22e28aedb5::t_fd119d1cfe3c7c 48-54
+src-tauri/src/commands/tray.rs
+  s_46eb22e28aedb5::t_558369f5c2d41a 75-76
+  s_46eb22e28aedb5::t_4b0319d15ba315 43
+src/services/catalogClient.ts
+  s_46eb22e28aedb5::t_290b173bb3b70f 31
+src/components/dashboard/ForecastCard.vue
+  s_46eb22e28aedb5::t_8888789fe32d2a 12
+  s_46eb22e28aedb5::t_93fbcd5bd80f1b 15-18
+  s_46eb22e28aedb5::t_a75559413f9831 73,75-76,78
+  s_46eb22e28aedb5::t_05b24260f07ae1 5
+src/composables/useCurrencyFormat.ts
+  s_46eb22e28aedb5::t_0b32af9519932b 5-10,28-35,37,40,42,45-46,50,53
+  s_46eb22e28aedb5::t_21b411740c1e6f 36,49
+src/components/calendar/CalendarGrid.vue
+  s_46eb22e28aedb5::t_f18466b9594175 5-6,11-12
+src-tauri/src/commands/ai/extract/vision_io.rs
+  s_46eb22e28aedb5::t_9c9e86a824e4c1 7,72-83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "403196fc78d54291714b4ce8ef2f215fc5c5c7a3",
+  "prompts": {},
+  "sessions": {
+    "s_46eb22e28aedb5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2cf69a17-9c5d-40ae-9782-7f395222b99b",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    },
+    "s_f68850e184135a": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "9c9e8c38-df82-4e6d-92f2-0cfdb21e1d79",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
