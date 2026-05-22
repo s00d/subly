@@ -23,7 +23,21 @@ function writeCopy(destRelative) {
 
 writeCopy("404.html");
 
-const spaRoutes = ["ru/index.html", "privacy/index.html", "changelog/index.html"];
+const spaRoutes = [
+  "ru/index.html",
+  "zh/index.html",
+  "es/index.html",
+  "fr/index.html",
+  "de/index.html",
+  "pt/index.html",
+  "ja/index.html",
+  "ko/index.html",
+  "ar/index.html",
+  "hi/index.html",
+  "tr/index.html",
+  "privacy/index.html",
+  "changelog/index.html",
+];
 
 for (const rel of spaRoutes) {
   writeCopy(rel);

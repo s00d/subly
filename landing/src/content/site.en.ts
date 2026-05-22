@@ -1,4 +1,5 @@
 import type { SiteContent } from "./types";
+import { buildLocaleSwitcherOptions } from "./locales";
 
 const sharedUrls = {
   repoUrl: "https://github.com/s00d/subly",
@@ -27,13 +28,7 @@ export const siteMeta = {
   ...sharedUrls,
 } as const;
 
-export const localeSwitcher = {
-  ariaLabel: "Language",
-  options: [
-    { id: "en" as const, label: "English" },
-    { id: "ru" as const, label: "Русский" },
-  ],
-};
+export const localeSwitcher = buildLocaleSwitcherOptions("Language");
 
 export const headerNav = {
   download: "Download",

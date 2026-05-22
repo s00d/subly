@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from "vue";
 import { useSiteContent } from "@/composables/useSiteContent";
+import { jsonLdLanguage } from "@/content/locales";
 import releases from "@/generated/releases.json";
 import type { ReleasesManifest } from "@/types/releases";
 
@@ -25,7 +26,7 @@ const graph = computed(() => {
         url: meta.siteUrl,
         name: "Subly",
         description: meta.description,
-        inLanguage: meta.locale.startsWith("ru") ? "ru" : "en",
+        inLanguage: jsonLdLanguage(meta.locale),
       },
       {
         "@type": "SoftwareApplication",

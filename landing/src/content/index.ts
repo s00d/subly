@@ -1,26 +1,15 @@
-import { enContent } from "./site.en";
-import { ruContent } from "./site.ru";
-import type { LocaleId, SiteContent } from "./types";
-
 export type { LocaleId, SiteContent } from "./types";
-
-const contentByLocale: Record<LocaleId, SiteContent> = {
-  en: enContent,
-  ru: ruContent,
-};
-
-export function getSiteContent(locale: LocaleId): SiteContent {
-  return contentByLocale[locale];
-}
-
-export function localeFromPath(path: string): LocaleId {
-  const normalized = path.replace(/\/+$/, "") || "/";
-  return normalized === "/ru" || normalized.startsWith("/ru/") ? "ru" : "en";
-}
-
-export function homePathFor(locale: LocaleId): string {
-  return locale === "ru" ? "/ru" : "/";
-}
+export {
+  SUPPORT_LOCALES,
+  LANGUAGE_NAMES,
+  LOCALE_META,
+  homePathFor,
+  localeFromPath,
+  isHomePath,
+  buildLocaleSwitcherOptions,
+} from "./locales";
+export { loadSiteContent, preloadSiteContent } from "./loadSiteContent";
+export { docPageTitles } from "./docMeta";
 
 /** Privacy and changelog stay on English routes for every locale. */
 export const docPaths = {

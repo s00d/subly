@@ -1,6 +1,7 @@
 import type { MdiIconName } from "@/mdi-icons";
+import type { LocaleId } from "./locales";
 
-export type LocaleId = "en" | "ru";
+export type { LocaleId };
 
 export interface LocaleOption {
   id: LocaleId;

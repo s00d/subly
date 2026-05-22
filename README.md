@@ -19,7 +19,7 @@
 
 <p align="center">
   <a href="https://s00d.github.io/subly/"><strong>Live site</strong></a>
-  — marketing landing with features, screenshots, and download links
+  — marketing landing (12 languages, same as the app) with features, screenshots, and download links
 </p>
 
 ## Download
