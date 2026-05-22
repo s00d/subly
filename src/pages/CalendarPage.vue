@@ -24,6 +24,7 @@ import { AlertTriangle, LayoutList, LayoutGrid, Rows3, CreditCard, Wallet, Calen
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
 import { useCalendarStore } from "@/stores/calendarStore";
+import { useNowStore } from "@/stores/nowStore";
 import { ui } from "@/lib/tv";
 import { formatErrorForToast } from "@/utils/formatError";
 
@@ -36,6 +37,8 @@ const pageLogPrefix = "[CalendarPage]";
 const metaStore = useAppMetaStore();
 const subscriptionsStore = useSubscriptionsStore();
 const calendarStore = useCalendarStore();
+const nowStore = useNowStore();
+const { now: reactiveNow } = storeToRefs(nowStore);
 const metaRefs = storeToRefs(metaStore);
 const settings = computed(() => metaRefs.settings.value);
 const categories = computed(() => metaRefs.categories.value ?? []);
@@ -53,6 +56,7 @@ function logPageError(scope: string, error: unknown, extra?: Record<string, unkn
 }
 
 onMounted(() => {
+  nowStore.ensureStarted();
   loadInitial().then(() => {
     updateHeaderActions();
     loadMonthExpenses();
@@ -63,9 +67,8 @@ onUnmounted(() => {
 });
 
 // --- Navigation ---
-const now = new Date();
-const currentMonth = ref(now.getMonth());
-const currentYear = ref(now.getFullYear());
+const currentMonth = ref(reactiveNow.value.getMonth());
+const currentYear = ref(reactiveNow.value.getFullYear());
 const compactWeekIndex = ref(0);
 
 const currentMonthLabel = computed(() => {
@@ -84,13 +87,14 @@ const currentMonthLabel = computed(() => {
 const viewMode = computed(() => settings.value?.calendarViewMode || "default");
 const isCompactView = computed(() => viewMode.value === "compact");
 
-const isCurrentMonth = computed(() =>
-  isCompactView.value
+const isCurrentMonth = computed(() => {
+  const today = reactiveNow.value;
+  return isCompactView.value
     ? currentWeekMonthIndex.value === compactWeekIndex.value
-      && currentMonth.value === now.getMonth()
-      && currentYear.value === now.getFullYear()
-    : currentMonth.value === now.getMonth() && currentYear.value === now.getFullYear()
-);
+      && currentMonth.value === today.getMonth()
+      && currentYear.value === today.getFullYear()
+    : currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear();
+});
 
 function prevMonth() {
   if (isCompactView.value) {
@@ -143,8 +147,9 @@ function nextMonth() {
 }
 
 function resetMonth() {
-  currentMonth.value = now.getMonth();
-  currentYear.value = now.getFullYear();
+  const today = reactiveNow.value;
+  currentMonth.value = today.getMonth();
+  currentYear.value = today.getFullYear();
   compactWeekIndex.value = currentWeekMonthIndex.value;
 }
 
@@ -191,7 +196,7 @@ const calendarGrid = computed<CalendarCell[]>(() => {
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = (new Date(year, month, 1).getDay() + 6) % 7;
 
-  const today = new Date();
+  const today = reactiveNow.value;
   const todayDay = today.getDate();
   const todayMonth = today.getMonth();
   const todayYear = today.getFullYear();
@@ -242,8 +247,9 @@ const monthWeeks = computed<CalendarCell[][]>(() => {
   return weeks;
 });
 const currentWeekMonthIndex = computed(() => {
-  const todayDay = now.getDate();
-  if (currentMonth.value !== now.getMonth() || currentYear.value !== now.getFullYear()) return 0;
+  const today = reactiveNow.value;
+  const todayDay = today.getDate();
+  if (currentMonth.value !== today.getMonth() || currentYear.value !== today.getFullYear()) return 0;
   return monthWeeks.value.findIndex((week) => week.some((cell) => !cell.isEmpty && cell.day === todayDay));
 });
 const compactWeekCells = computed<CalendarCell[]>(() => {
@@ -262,7 +268,8 @@ const weekDayLabels = computed(() => [
   t("sun"),
 ]);
 watch([currentYear, currentMonth], () => {
-  compactWeekIndex.value = currentMonth.value === now.getMonth() && currentYear.value === now.getFullYear()
+  const today = reactiveNow.value;
+  compactWeekIndex.value = currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear()
     ? Math.max(currentWeekMonthIndex.value, 0)
     : 0;
 }, { immediate: true });
@@ -272,7 +279,7 @@ const monthStats = computed(() => {
   let totalCost = 0;
   let totalDue = 0;
   let count = 0;
-  const today = new Date();
+  const today = reactiveNow.value;
 
   for (const cell of calendarGrid.value) {
     if (cell.isEmpty) continue;

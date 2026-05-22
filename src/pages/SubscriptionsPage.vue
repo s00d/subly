@@ -54,7 +54,6 @@ import Tooltip from "@/components/ui/Tooltip.vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
-import { useNowStore } from "@/stores/nowStore";
 import { ui } from "@/lib/tv";
 import { formatErrorForToast } from "@/utils/formatError";
 import { useAiConfigStore } from "@/stores/aiConfigStore";
@@ -67,8 +66,6 @@ const { fmt } = useCurrencyFormat();
 const { fmtDateMedium } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 const { copyToClipboard } = useClipboard();
-const nowStore = useNowStore();
-const { now } = storeToRefs(nowStore);
 const showFilters = ref(false);
 const metaStore = useAppMetaStore();
 const subscriptionsStore = useSubscriptionsStore();
@@ -159,7 +156,6 @@ function updateHeaderActions() {
 
 onMounted(() => {
   loadInitial().then(() => {
-    nowStore.ensureStarted();
     updateHeaderActions();
     handleSubQueryParam();
     fetchFilteredSubs();

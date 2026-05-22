@@ -61,18 +61,22 @@ function playNotificationSoundFrontend() {
   }
 }
 
+async function refreshAllData() {
+  await metaStore.refresh();
+  await Promise.all([
+    dashboardStore.loadPage(true),
+    subscriptionsStore.loadBrief(subscriptionsStore.currentFilter),
+    expensesStore.loadPage(expensesStore.page, expensesStore.currentFilter),
+    expensesStore.refreshSummary(expensesStore.currentFilter),
+    calendarStore.reloadCurrentMonth(),
+    catalogsUsageStore.refreshIfLoaded(),
+  ]);
+}
+
 async function handlePullRemote() {
   const result = await pullRemote();
   if (result.ok) {
-    await metaStore.refresh();
-    await Promise.all([
-      dashboardStore.loadPage(true),
-      subscriptionsStore.loadBrief(subscriptionsStore.currentFilter),
-      expensesStore.loadPage(expensesStore.page, expensesStore.currentFilter),
-      expensesStore.refreshSummary(expensesStore.currentFilter),
-      calendarStore.reloadCurrentMonth(),
-      catalogsUsageStore.refreshIfLoaded(),
-    ]);
+    await refreshAllData();
     toast(t("sync_pull_success"));
   } else {
     const msg =
@@ -107,6 +111,7 @@ const metaStore = useAppMetaStore();
 const catalogsUsageStore = useCatalogsUsageStore();
 const nowStore = useNowStore();
 const { settings } = storeToRefs(metaStore);
+const { todayId } = storeToRefs(nowStore);
 
 interface DataChangedEventPayload {
   entity?: string;
@@ -116,14 +121,15 @@ interface DataChangedEventPayload {
 function scheduleStoresRefresh() {
   if (refreshDataTimer) clearTimeout(refreshDataTimer);
   refreshDataTimer = setTimeout(() => {
-    void dashboardStore.loadPage(true);
-    void subscriptionsStore.loadBrief(subscriptionsStore.currentFilter);
-    void expensesStore.loadPage(expensesStore.page, expensesStore.currentFilter);
-    void expensesStore.refreshSummary(expensesStore.currentFilter);
-    void calendarStore.reloadCurrentMonth();
-    void catalogsUsageStore.refreshIfLoaded();
+    void refreshAllData();
   }, 120);
 }
+
+watch(todayId, (newId, oldId) => {
+  if (oldId === undefined || oldId === newId) return;
+  console.log("[App] Day changed, refreshing data...");
+  void refreshAllData();
+});
 
 function logUnhandledRejection(event: PromiseRejectionEvent) {
   console.error("[Global] Unhandled promise rejection", {
@@ -261,6 +267,7 @@ onMounted(async () => {
   await finishBoot();
 
   wakeHandler = () => {
+    nowStore.refresh();
     runNotificationCheck();
     checkRemote().catch((e) => {
       const message = formatErrorForToast(e, t);

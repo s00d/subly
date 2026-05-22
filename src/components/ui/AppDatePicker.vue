@@ -8,6 +8,8 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from "@lucide/vue";
+import { storeToRefs } from "pinia";
+import { useNowStore } from "@/stores/nowStore";
 import { tv, ui } from "@/lib/tv";
 
 const props = defineProps<{
@@ -24,6 +26,8 @@ const emit = defineEmits<{
 }>();
 
 const { t, locale } = useI18n();
+const nowStore = useNowStore();
+const { now: reactiveNow } = storeToRefs(nowStore);
 
 const isOpen = ref(false);
 const popoverRef = ref<HTMLElement | null>(null);
@@ -63,6 +67,7 @@ const monthNames = computed(() => {
 });
 
 const calendarDays = computed(() => {
+  void reactiveNow.value;
   const year = currentYear.value;
   const month = currentMonth.value;
   const firstDayOfMonth = new Date(year, month, 1).getDay();
@@ -112,7 +117,7 @@ function inRange(d: Date) {
   return true;
 }
 
-const isToday = (d: Date) => formatIso(d) === formatIso(new Date());
+const isToday = (d: Date) => formatIso(d) === formatIso(reactiveNow.value);
 const isSelected = (d: Date) => formatIso(d) === props.modelValue;
 
 function toggleOpen() {
