@@ -1,0 +1,40 @@
+src/App.vue
+  s_46eb22e28aedb5::t_919784cdd61cc8 64-75,79
+  s_46eb22e28aedb5::t_6fc5b83d0d67cc 124,128-132
+  s_46eb22e28aedb5::t_54e6b2167f9a2f 114
+  s_46eb22e28aedb5::t_04b58926bd3261 270
+src/stores/nowStore.ts
+  s_46eb22e28aedb5::t_84ce35de86726f 2,5-16,21-22,27-34,38,45
+src/components/ui/AppDatePicker.vue
+  s_46eb22e28aedb5::t_616d53221bdac9 70
+  s_46eb22e28aedb5::t_731b8d5ec9db9d 29-30
+  s_46eb22e28aedb5::t_3d9566e7f03680 120
+  s_46eb22e28aedb5::t_6dc50f43f4305f 11-12
+src/pages/CalendarPage.vue
+  s_46eb22e28aedb5::t_e8ce1a0f77f86e 90-92,94-97
+  s_46eb22e28aedb5::t_a16315859855b2 271-272
+  s_46eb22e28aedb5::t_c4bdffc62a2151 27
+  s_46eb22e28aedb5::t_e1c57bc6e14a83 150-152
+  s_46eb22e28aedb5::t_d447b6a5d71947 250-252
+  s_46eb22e28aedb5::t_c601ee660a3da2 199
+  s_46eb22e28aedb5::t_bb92f0228f3efc 282
+  s_46eb22e28aedb5::t_08c536788d18fb 59
+  s_46eb22e28aedb5::t_59e6fea45a2c5d 40-41
+  s_46eb22e28aedb5::t_f8a822251b2245 70-71
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "ebaa9511b3badc889aaabbb63dd9704fd1317fc9",
+  "prompts": {},
+  "sessions": {
+    "s_46eb22e28aedb5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2cf69a17-9c5d-40ae-9782-7f395222b99b",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
