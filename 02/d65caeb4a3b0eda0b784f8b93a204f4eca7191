@@ -1,0 +1,9 @@
+src-tauri/gen/apple/subly_iOS/subly_iOS.entitlements
+  ai_agent 22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "02d65caeb4a3b0eda0b784f8b93a204f4eca7191",
+  "prompts": {}
+}
