@@ -1,0 +1,34 @@
+src-tauri/src/money_migration.rs
+  s_46eb22e28aedb5::t_725b3b9372026f 156-170
+  s_46eb22e28aedb5::t_37d7b6fe1d4fef 9-10
+  s_46eb22e28aedb5::t_63325093f36b88 184
+  s_46eb22e28aedb5::t_5d92d34eaa5c20 12-14
+  s_46eb22e28aedb5::t_6ca161b4928c33 319-335
+  s_46eb22e28aedb5::t_d16861e46abfcc 422,424
+  s_46eb22e28aedb5::t_1b1d9d617ecc5a 473-508
+  s_46eb22e28aedb5::t_5f6e6da1e53388 181-183,190-191,193
+src-tauri/src/state.rs
+  s_46eb22e28aedb5::t_1b876b58956cd6 243-257
+  s_46eb22e28aedb5::t_ca81d607a17ff5 406
+  s_46eb22e28aedb5::t_037da6cd0f1646 273
+  s_46eb22e28aedb5::t_06444b2809420d 11
+src-tauri/src/money.rs
+  s_46eb22e28aedb5::t_4c7fbea8264469 156-161
+  s_46eb22e28aedb5::t_cf07c0c0e80d11 204-209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "b1989bc1f826a08d7d42fe5498ceb2cad4f023ad",
+  "prompts": {},
+  "sessions": {
+    "s_46eb22e28aedb5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2cf69a17-9c5d-40ae-9782-7f395222b99b",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
