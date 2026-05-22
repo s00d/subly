@@ -1,0 +1,30 @@
+landing/src/components/sections/DownloadSection.vue
+  s_46eb22e28aedb5::t_5b6113ed042feb 12
+landing/src/components/sections/DeviceGallerySection.vue
+  s_46eb22e28aedb5::t_b1e8176f87156e 2
+  s_46eb22e28aedb5::t_42292d55d12551 11,13-23
+landing/src/composables/useSiteContent.ts
+  s_46eb22e28aedb5::t_e99ebfa691dc65 13-18,20-22,25,47,49-51,53-56
+landing/src/components/sections/HeroSection.vue
+  s_46eb22e28aedb5::t_996d1f7a34a3bb 11
+landing/src/components/sections/VideoSection.vue
+  s_46eb22e28aedb5::t_4af81266b4d9b1 11,14-24
+landing/src/components/layout/SiteHeader.vue
+  s_46eb22e28aedb5::t_8a7f502d66d8e4 25,28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "d55fd98a1ef71ed49dcfac4f75c20cedad68b171",
+  "prompts": {},
+  "sessions": {
+    "s_46eb22e28aedb5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2cf69a17-9c5d-40ae-9782-7f395222b99b",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
