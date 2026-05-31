@@ -424,20 +424,19 @@ mod android_impl {
             notify_widgets_updated,
         );
     }
-}
 
-#[cfg(target_os = "android")]
-#[no_mangle]
-pub extern "system" fn Java_com_s00d_subly_MainActivity_nativeInitWidgetBridge(
-    mut env: JNIEnv,
-    _class: JClass,
-) -> jint {
-    match env.get_java_vm() {
-        Ok(vm) => {
-            android_impl::store_java_vm(vm);
-            jni::sys::JNI_VERSION_1_6
+    #[no_mangle]
+    pub extern "system" fn Java_com_s00d_subly_MainActivity_nativeInitWidgetBridge(
+        mut env: JNIEnv,
+        _class: JClass,
+    ) -> jint {
+        match env.get_java_vm() {
+            Ok(vm) => {
+                store_java_vm(vm);
+                JNI_VERSION_1_6
+            }
+            Err(_) => JNI_VERSION_1_6,
         }
-        Err(_) => JNI_VERSION_1_6,
     }
 }
 
