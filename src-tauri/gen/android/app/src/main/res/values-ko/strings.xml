@@ -1,0 +1,12 @@
+<resources>
+    <string name="widget_upcoming_title">예정</string>
+    <string name="widget_no_upcoming">예정된 결제 없음</string>
+    <string name="widget_err_no_group">위젯을 사용하려면 Subly를 한 번 실행하세요.</string>
+    <string name="widget_err_open_app">결제를 불러오려면 Subly를 여세요.</string>
+    <string name="widget_err_bad_data">새로고침하려면 Subly를 여세요.</string>
+    <string name="widget_display_name">Subly</string>
+    <string name="widget_description">예정된 구독 결제.</string>
+    <string name="widget_date_today">오늘</string>
+    <string name="widget_date_tomorrow">내일</string>
+    <string name="widget_more_count">외 %d건</string>
+</resources>

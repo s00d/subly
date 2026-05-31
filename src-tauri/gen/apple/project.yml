@@ -58,12 +58,14 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: 1.0.4
-        CFBundleVersion: "10005"
+        CFBundleShortVersionString: 1.0.5
+        CFBundleVersion: "10006"
     # Must match src-tauri/entitlements/ios.plist (App Groups + iCloud). Empty gen/subly_iOS*.entitlements breaks widget + sync.
     entitlements:
       path: ../../entitlements/ios.plist
     scheme:
+      testTargets:
+        - SublyWidgetTests
       environmentVariables:
         RUST_BACKTRACE: full
         RUST_LOG: info
@@ -124,8 +126,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.s00d.subly.widget
         PRODUCT_NAME: SublyWidgetExtension
         INFOPLIST_FILE: ../../ios-apple/SublyWidget/Info.plist
-        MARKETING_VERSION: 1.0.4
-        CURRENT_PROJECT_VERSION: "10005"
+        MARKETING_VERSION: 1.0.5
+        CURRENT_PROJECT_VERSION: "10006"
         TARGETED_DEVICE_FAMILY: "1,2"
         IPHONEOS_DEPLOYMENT_TARGET: 16.0
         SWIFT_VERSION: "5.0"
@@ -135,3 +137,21 @@ targets:
       - sdk: SwiftUI.framework
       - sdk: WidgetKit.framework
       - sdk: UIKit.framework
+
+  SublyWidgetTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: ../../ios-apple/SublyWidgetTests
+      # App extensions are not linkable; compile shared loader with the test bundle.
+      - path: ../../ios-apple/SublyWidget/WidgetSnapshotIO.swift
+    settings:
+      base:
+        DEVELOPMENT_TEAM: R6VC7JTLE8
+        CODE_SIGN_STYLE: Automatic
+        PRODUCT_BUNDLE_IDENTIFIER: com.s00d.subly.widget.tests
+        PRODUCT_NAME: SublyWidgetTests
+        GENERATE_INFOPLIST_FILE: YES
+        IPHONEOS_DEPLOYMENT_TARGET: 16.0
+        SWIFT_VERSION: "5.0"
+      groups: [app]

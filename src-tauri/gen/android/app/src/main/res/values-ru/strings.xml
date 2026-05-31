@@ -1,0 +1,12 @@
+<resources>
+    <string name="widget_upcoming_title">Предстоящие</string>
+    <string name="widget_no_upcoming">Нет предстоящих платежей</string>
+    <string name="widget_err_no_group">Откройте Subly один раз.</string>
+    <string name="widget_err_open_app">Откройте Subly для загрузки.</string>
+    <string name="widget_err_bad_data">Откройте Subly для обновления.</string>
+    <string name="widget_display_name">Subly</string>
+    <string name="widget_description">Предстоящие платежи по подпискам.</string>
+    <string name="widget_date_today">Сегодня</string>
+    <string name="widget_date_tomorrow">Завтра</string>
+    <string name="widget_more_count">ещё %d</string>
+</resources>

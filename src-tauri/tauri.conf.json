@@ -46,6 +46,25 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "fileAssociations": [
+      {
+        "ext": [
+          "subly"
+        ],
+        "mimeType": "application/octet-stream",
+        "name": "Subly Backup Archive",
+        "rank": "Owner",
+        "exportedType": {
+          "identifier": "com.s00d.subly.backup",
+          "conformsTo": [
+            "public.data"
+          ]
+        },
+        "androidIntentActionFilters": [
+          "view"
+        ]
+      }
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -57,10 +76,10 @@
     "iOS": {
       "developmentTeam": "R6VC7JTLE8",
       "minimumSystemVersion": "16.0",
-      "bundleVersion": "10005"
+      "bundleVersion": "10006"
     },
     "macOS": {
-      "bundleVersion": "10005",
+      "bundleVersion": "10006",
       "entitlements": "entitlements/macos.plist",
       "files": {
         "embedded.provisionprofile": "profiles/Subly_DeveloperID_iCloud_macOS.provisionprofile"

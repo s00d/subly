@@ -10,5 +10,10 @@ pub async fn app_ready(app: tauri::AppHandle) -> Result<(), AppError> {
         let _ = main.show();
         let _ = main.set_focus();
     }
+
+    // After DB + UI are up, refresh home-screen widget data (setup may run before the webview is ready).
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    crate::widget_snapshot::export_widget_snapshot_from_app(&app);
+
     Ok(())
 }

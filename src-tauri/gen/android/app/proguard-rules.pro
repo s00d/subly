@@ -1,4 +1,6 @@
 # Add project specific ProGuard rules here.
+-keep class com.s00d.subly.widget.** { *; }
+-keep class * extends androidx.glance.appwidget.GlanceAppWidgetReceiver { *; }
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
 #

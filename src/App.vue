@@ -20,7 +20,7 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { useAlerts } from "@/composables/useAlerts";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { invokeCommand } from "@/services/commandClient";
+import { callCommand, invokeCommand } from "@/services/commandClient";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrent as getCurrentDeepLinks, onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { useDashboardStore } from "@/stores/dashboardStore";
@@ -32,10 +32,14 @@ import { useCatalogsUsageStore } from "@/stores/catalogsUsageStore";
 import { useNowStore } from "@/stores/nowStore";
 import AppLayout from "@/components/layout/AppLayout.vue";
 import InAppAlerts from "@/components/ui/InAppAlerts.vue";
+import Modal from "@/components/ui/Modal.vue";
+import { importFromSubly } from "@/services/exportClient";
 import { formatErrorForToast } from "@/utils/formatError";
 
 const router = useRouter();
 const isLoading = ref(true);
+const showBackupRestoreConfirm = ref(false);
+const pendingBackupPath = ref<string | null>(null);
 const { alerts, setAlerts, dismiss, dismissAll } = useAlerts();
 const { t } = useI18n();
 const { toast } = useToast();
@@ -100,6 +104,7 @@ let unlistenDeepLinks: (() => void) | null = null;
 let unlistenLocalNotifications: (() => void) | null = null;
 let unlistenSingleInstanceDeepLink: (() => void) | null = null;
 let unlistenDataChanged: (() => void) | null = null;
+let unlistenBackupOpened: (() => void) | null = null;
 let wakeHandler: (() => void) | null = null;
 let visibilityHandler: (() => void) | null = null;
 let refreshDataTimer: ReturnType<typeof setTimeout> | null = null;
@@ -195,6 +200,35 @@ async function finishBoot() {
   setTimeout(finalize, 350);
 }
 
+async function maybeRestoreBackup(path: string) {
+  pendingBackupPath.value = path;
+  showBackupRestoreConfirm.value = true;
+}
+
+async function confirmRestoreBackup() {
+  const path = pendingBackupPath.value;
+  showBackupRestoreConfirm.value = false;
+  pendingBackupPath.value = null;
+  if (!path) return;
+  try {
+    const res = await importFromSubly(path);
+    if (!res.ok) {
+      toast(t("import_error"), "error");
+      return;
+    }
+    await refreshAllData();
+    toast(t("import_success"));
+  } catch (e) {
+    console.error("Backup restore failed:", e);
+    toast(formatErrorForToast(e, t), "error");
+  }
+}
+
+function cancelRestoreBackup() {
+  showBackupRestoreConfirm.value = false;
+  pendingBackupPath.value = null;
+}
+
 async function handleOAuthUrls(urls: string[]) {
   for (const url of urls) {
     if (!url.startsWith("subly://oauth/callback")) continue;
@@ -240,6 +274,12 @@ onMounted(async () => {
     }
     scheduleStoresRefresh();
   });
+  unlistenBackupOpened = await listen<string[]>("backup:opened", (event) => {
+    const firstPath = event.payload?.[0];
+    if (firstPath) {
+      void maybeRestoreBackup(firstPath);
+    }
+  });
 
   try {
     // Avoid hanging the splash if initSync is slow (e.g. flaky network) — cap at 3s.
@@ -257,6 +297,11 @@ onMounted(async () => {
         void handleOAuthUrls(event.payload);
       }
     });
+    const initialBackupPaths = await callCommand<string[]>("opened_backup_paths");
+    const firstBackupPath = initialBackupPaths?.[0];
+    if (firstBackupPath) {
+      void maybeRestoreBackup(firstBackupPath);
+    }
   } catch (e) {
     const message = formatErrorForToast(e, t);
     syncStatus.error = message;
@@ -312,6 +357,7 @@ onUnmounted(() => {
   if (unlistenSingleInstanceDeepLink) unlistenSingleInstanceDeepLink();
   if (unlistenLocalNotifications) unlistenLocalNotifications();
   if (unlistenDataChanged) unlistenDataChanged();
+  if (unlistenBackupOpened) unlistenBackupOpened();
   if (refreshDataTimer) clearTimeout(refreshDataTimer);
   if (wakeHandler) window.removeEventListener("focus", wakeHandler);
   if (visibilityHandler) document.removeEventListener("visibilitychange", visibilityHandler);
@@ -405,4 +451,27 @@ if (typeof window !== "undefined") {
     />
     <router-view />
   </AppLayout>
+  <Modal
+    :show="showBackupRestoreConfirm"
+    :title="t('import_subly')"
+    @close="cancelRestoreBackup"
+  >
+    <p class="text-sm text-text-muted">
+      Обнаружен файл резервной копии .subly. Восстановить данные из него?
+    </p>
+    <template #footer>
+      <button
+        class="px-4 py-2 rounded-lg border border-border text-text-secondary text-sm font-medium hover:bg-surface-hover"
+        @click="cancelRestoreBackup"
+      >
+        {{ t('cancel') }}
+      </button>
+      <button
+        class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90"
+        @click="confirmRestoreBackup"
+      >
+        {{ t('confirm') }}
+      </button>
+    </template>
+  </Modal>
 </template>

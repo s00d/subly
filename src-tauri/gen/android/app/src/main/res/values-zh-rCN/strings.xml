@@ -1,0 +1,12 @@
+<resources>
+    <string name="widget_upcoming_title">即将到来</string>
+    <string name="widget_no_upcoming">暂无即将扣款</string>
+    <string name="widget_err_no_group">请打开一次 Subly 以启用小组件。</string>
+    <string name="widget_err_open_app">请打开 Subly 以加载付款。</string>
+    <string name="widget_err_bad_data">请打开 Subly 以刷新。</string>
+    <string name="widget_display_name">Subly</string>
+    <string name="widget_description">即将到来的订阅付款。</string>
+    <string name="widget_date_today">今天</string>
+    <string name="widget_date_tomorrow">明天</string>
+    <string name="widget_more_count">另有 %d 项</string>
+</resources>

@@ -1,0 +1,7 @@
+<resources>
+    <string name="widget_err_no_group">Open Subly once to enable the widget.</string>
+    <string name="widget_err_open_app">Open Subly to load payments.</string>
+    <string name="widget_err_bad_data">Open Subly to refresh.</string>
+    <string name="widget_date_today">Today</string>
+    <string name="widget_date_tomorrow">Tomorrow</string>
+</resources>

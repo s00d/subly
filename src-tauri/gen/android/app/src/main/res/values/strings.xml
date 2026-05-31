@@ -1,4 +1,14 @@
 <resources>
     <string name="app_name">Subly</string>
     <string name="main_activity_title">Subly</string>
+    <string name="widget_upcoming_title">Upcoming</string>
+    <string name="widget_no_upcoming">No upcoming payments</string>
+    <string name="widget_err_no_group">Open Subly once to enable the widget.</string>
+    <string name="widget_err_open_app">Open Subly to load payments.</string>
+    <string name="widget_err_bad_data">Open Subly to refresh.</string>
+    <string name="widget_display_name">Subly</string>
+    <string name="widget_description">Upcoming subscription payments.</string>
+    <string name="widget_date_today">Today</string>
+    <string name="widget_date_tomorrow">Tomorrow</string>
+    <string name="widget_more_count">+%d more</string>
 </resources>

@@ -1,0 +1,12 @@
+<resources>
+    <string name="widget_upcoming_title">القادمة</string>
+    <string name="widget_no_upcoming">لا توجد مدفوعات قادمة</string>
+    <string name="widget_err_no_group">افتح Subly مرة واحدة لتفعيل الودجة.</string>
+    <string name="widget_err_open_app">افتح Subly لتحميل المدفوعات.</string>
+    <string name="widget_err_bad_data">افتح Subly للتحديث.</string>
+    <string name="widget_display_name">Subly</string>
+    <string name="widget_description">مدفوعات الاشتراك القادمة.</string>
+    <string name="widget_date_today">اليوم</string>
+    <string name="widget_date_tomorrow">غداً</string>
+    <string name="widget_more_count">+%d أخرى</string>
+</resources>

@@ -375,9 +375,9 @@ pub async fn sync_dispatch_internal(
                     "app:data-changed",
                     serde_json::json!({ "entity": "appData", "action": "sync_pull" }),
                 );
-                #[cfg(target_os = "ios")]
+                #[cfg(any(target_os = "ios", target_os = "android"))]
                 {
-                    crate::widget_snapshot::export_ios_widget_snapshot_from_app(&app);
+                    crate::widget_snapshot::export_widget_snapshot_from_app(&app);
                 }
                 SyncDispatchData::Ok(SyncOkDto::success())
             } else {

@@ -347,7 +347,10 @@ pub(crate) fn load_currencies_migrated(db: &Database) -> AppResult<Vec<CurrencyD
 
 pub(crate) fn load_settings_migrated(db: &Database) -> AppResult<SettingsDoc> {
     let tx = db.begin_read().map_err(AppError::from)?;
-    let t = tx.open_table(T2_SETTINGS).map_err(AppError::from)?;
+    let t = match tx.open_table(T2_SETTINGS) {
+        Ok(t) => t,
+        Err(_) => return Ok(crate::state::default_settings_doc()),
+    };
     let entry = t.get(crate::state::KEY_DATA).map_err(AppError::from)?;
     match entry {
         None => Ok(crate::state::default_settings_doc()),

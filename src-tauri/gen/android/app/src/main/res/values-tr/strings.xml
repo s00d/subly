@@ -1,0 +1,12 @@
+<resources>
+    <string name="widget_upcoming_title">Yaklaşan</string>
+    <string name="widget_no_upcoming">Yaklaşan ödeme yok</string>
+    <string name="widget_err_no_group">Görünümü etkinleştirmek için Subly\'yi bir kez açın.</string>
+    <string name="widget_err_open_app">Ödemeleri yüklemek için Subly\'yi açın.</string>
+    <string name="widget_err_bad_data">Yenilemek için Subly\'yi açın.</string>
+    <string name="widget_display_name">Subly</string>
+    <string name="widget_description">Yaklaşan abonelik ödemeleri.</string>
+    <string name="widget_date_today">Bugün</string>
+    <string name="widget_date_tomorrow">Yarın</string>
+    <string name="widget_more_count">+%d daha</string>
+</resources>

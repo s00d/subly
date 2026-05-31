@@ -49,6 +49,17 @@
          </EnvironmentVariable>
       </EnvironmentVariables>
       <Testables>
+         <TestableReference
+            skipped = "NO"
+            parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "21D8C85A45E79C1168105493"
+               BuildableName = "SublyWidgetTests.xctest"
+               BlueprintName = "SublyWidgetTests"
+               ReferencedContainer = "container:subly.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

@@ -1,0 +1,13 @@
+{
+  "updatedAt": "2026-01-01T00:00:00Z",
+  "items": [
+    {
+      "id": "legacy-1",
+      "name": "Legacy plan",
+      "nextPayment": "2099-01-15",
+      "price": 9.99,
+      "currencyId": "cur-eur",
+      "currencyCode": "EUR"
+    }
+  ]
+}

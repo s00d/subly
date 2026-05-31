@@ -1,0 +1,12 @@
+<resources>
+    <string name="widget_upcoming_title">Anstehend</string>
+    <string name="widget_no_upcoming">Keine anstehenden Zahlungen</string>
+    <string name="widget_err_no_group">Subly einmal öffnen, um das Widget zu aktivieren.</string>
+    <string name="widget_err_open_app">Subly öffnen, um Zahlungen zu laden.</string>
+    <string name="widget_err_bad_data">Subly öffnen zum Aktualisieren.</string>
+    <string name="widget_display_name">Subly</string>
+    <string name="widget_description">Anstehende Abonnementzahlungen.</string>
+    <string name="widget_date_today">Heute</string>
+    <string name="widget_date_tomorrow">Morgen</string>
+    <string name="widget_more_count">+%d weitere</string>
+</resources>

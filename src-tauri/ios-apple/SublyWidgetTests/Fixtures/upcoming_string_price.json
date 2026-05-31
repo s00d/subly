@@ -1,0 +1,14 @@
+{
+  "updatedAt": "2026-05-31T12:00:00+00:00",
+  "items": [
+    {
+      "id": "sub-widget-fixture-1",
+      "name": "Streaming",
+      "nextPayment": "2099-06-01",
+      "price": "12.50",
+      "currencyId": "cur-usd",
+      "currencyCode": "USD",
+      "iconFile": "icons/sub-widget-fixture-1.png"
+    }
+  ]
+}

@@ -12,4 +12,4 @@ export const sharedUrls = {
   ogImage: "https://s00d.github.io/subly/screenshots/01_dashboard_overview.png",
 } as const;
 
-export const SOFTWARE_VERSION = "1.0.4";
+export const SOFTWARE_VERSION = "1.0.5";

@@ -1,7 +1,7 @@
 {
   "name": "subly",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.0.5",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,6 +11,8 @@
     "test:backend": "cargo test --manifest-path src-tauri/Cargo.toml --lib",
     "test:restart-smoke": "cargo test --manifest-path src-tauri/Cargo.toml restart_smoke_ --lib",
     "test:known-risks": "cargo test --manifest-path src-tauri/Cargo.toml --lib -- --ignored",
+    "test:ios-widget": "cd src-tauri/gen/apple && xcodegen generate && xcodebuild test -scheme subly_iOS -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.6' -only-testing:SublyWidgetTests",
+    "test:android-widget": "cd src-tauri/gen/android && JAVA_HOME=\"$(/usr/libexec/java_home -v 17)\" ./gradlew :widget-core:testDebugUnitTest",
     "cargo:outdated": "cargo outdated --manifest-path src-tauri/Cargo.toml --workspace --depth 1 -x tauri-plugin-single-instance --verbose",
     "bump:version": "node scripts/bump-app-version.mjs",
     "landing:dev": "pnpm -C landing dev",

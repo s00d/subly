@@ -2,36 +2,9 @@ import SwiftUI
 import UIKit
 import WidgetKit
 
-private let kAppGroup = "group.com.s00d.subly"
-private let kJsonRelative = "widget/upcoming.json"
-
-// MARK: - JSON
-
-struct WidgetSnapshotItem: Codable {
-    let id: String
-    let name: String
-    let nextPayment: String
-    let price: Double
-    let currencyId: String
-    /// ISO 4217 from app catalog; optional for older snapshot files.
-    let currencyCode: String?
-    /// Relative path under the shared `widget/` folder (e.g. `icons/<id>.png`), written by the main app.
-    let iconFile: String?
-}
-
-struct WidgetSnapshotFile: Codable {
-    let updatedAt: String?
-    let items: [WidgetSnapshotItem]
-}
-
 struct SimpleEntry: TimelineEntry {
     /// Moment this entry becomes active; date-dependent labels use this (not wall-clock) so midnight transitions work offline.
     let date: Date
-    let items: [WidgetSnapshotItem]
-    let errorKey: String?
-}
-
-private struct LoadedSnapshot {
     let items: [WidgetSnapshotItem]
     let errorKey: String?
 }
@@ -110,7 +83,7 @@ struct UpcomingProvider: TimelineProvider {
 
     func getSnapshot(in _: Context, completion: @escaping (SimpleEntry) -> Void) {
         let snap = loadSnapshot()
-        completion(SimpleEntry(date: Date(), items: snap.items, errorKey: snap.errorKey))
+        completion(SimpleEntry(date: Date(), items: snap.items, errorKey: snap.errorKey?.rawValue))
     }
 
     func getTimeline(in _: Context, completion: @escaping (Timeline<SimpleEntry>) -> Void) {
@@ -118,8 +91,8 @@ struct UpcomingProvider: TimelineProvider {
         let now = Date()
         let calendar = Calendar.current
 
-        if snap.errorKey != nil {
-            let entry = SimpleEntry(date: now, items: snap.items, errorKey: snap.errorKey)
+        if let err = snap.errorKey {
+            let entry = SimpleEntry(date: now, items: snap.items, errorKey: err.rawValue)
             let retry = calendar.date(byAdding: .hour, value: 1, to: now) ?? now.addingTimeInterval(3600)
             completion(Timeline(entries: [entry], policy: .after(retry)))
             return
@@ -144,19 +117,8 @@ struct UpcomingProvider: TimelineProvider {
         completion(Timeline(entries: entries, policy: .after(now.addingTimeInterval(jsonReloadInterval))))
     }
 
-    private func loadSnapshot() -> LoadedSnapshot {
-        guard let base = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: kAppGroup) else {
-            return LoadedSnapshot(items: [], errorKey: "widget_err_no_group")
-        }
-        let url = base.appendingPathComponent(kJsonRelative)
-        guard let data = try? Data(contentsOf: url) else {
-            return LoadedSnapshot(items: [], errorKey: "widget_err_open_app")
-        }
-        let dec = JSONDecoder()
-        guard let file = try? dec.decode(WidgetSnapshotFile.self, from: data) else {
-            return LoadedSnapshot(items: [], errorKey: "widget_err_bad_data")
-        }
-        return LoadedSnapshot(items: file.items, errorKey: nil)
+    private func loadSnapshot() -> WidgetSnapshotLoadResult {
+        WidgetSnapshotLoader.loadFromAppGroup()
     }
 }
 
@@ -206,7 +168,9 @@ private func formatDayShort(_ iso: String) -> String {
 private func widgetRasterIconURL(iconFile: String?) -> URL? {
     guard let rel = iconFile?.trimmingCharacters(in: .whitespacesAndNewlines), !rel.isEmpty,
           !rel.contains(".."),
-          let base = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: kAppGroup)
+          let base = FileManager.default.containerURL(
+              forSecurityApplicationGroupIdentifier: WidgetSnapshotPaths.appGroupId
+          )
     else { return nil }
     let url = base.appendingPathComponent("widget").appendingPathComponent(rel)
     return FileManager.default.fileExists(atPath: url.path) ? url : nil

@@ -1,9 +1,8 @@
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use tauri::Emitter;
 use tauri::Manager;
 use redb::{Database, ReadableDatabase, TableDefinition};
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 mod commands;
 pub mod errors;
 pub(crate) mod keyring_store;
@@ -137,6 +136,7 @@ use commands::tray::setup_desktop_tray;
 
 pub(crate) const KV_TABLE: TableDefinition<&str, &str> = TableDefinition::new("subly_kv");
 static APP_DB: OnceLock<Arc<Database>> = OnceLock::new();
+struct OpenedBackupPaths(Mutex<Vec<String>>);
 
 /// Resolves the absolute path to `subly.redb`.
 ///
@@ -240,6 +240,15 @@ pub(crate) fn convert_to_main(
     rates: &std::collections::HashMap<String, rust_decimal::Decimal>,
 ) -> rust_decimal::Decimal {
     money::convert_to_main(amount, currency_id, rates)
+}
+
+#[tauri::command]
+fn opened_backup_paths(app: tauri::AppHandle) -> Vec<String> {
+    app.state::<OpenedBackupPaths>()
+        .0
+        .lock()
+        .map(|v| v.clone())
+        .unwrap_or_default()
 }
 
 pub(crate) fn price_per_month(
@@ -443,6 +452,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
+        .manage(OpenedBackupPaths(Mutex::new(vec![])))
         .invoke_handler(tauri::generate_handler![
             icloud::icloud_container_url,
             icloud::icloud_write_file,
@@ -549,6 +559,7 @@ pub fn run() {
             sync_flush_before_exit,
             sync_dismiss_pending_update,
             app_ready,
+            opened_backup_paths,
             ai_get_providers,
             ai_test_connection,
             ai_smart_input,
@@ -570,9 +581,14 @@ pub fn run() {
             app.manage(std::sync::Mutex::new(state::AppStateInner { db, app_data: initial_data }));
             ensure_rates_scheduler_started(app.handle().clone());
 
+            #[cfg(any(target_os = "ios", target_os = "android"))]
+            {
+                widget_snapshot::export_widget_snapshot_from_app(app.handle());
+            }
+
             #[cfg(target_os = "ios")]
             {
-                widget_snapshot::export_ios_widget_snapshot_from_app(app.handle());
+                widget_snapshot::install_ios_widget_reload_on_activate();
             }
 
             #[cfg(any(target_os = "android", target_os = "ios"))]
@@ -643,14 +659,46 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app: &tauri::AppHandle, event| {
+            #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
+            if let tauri::RunEvent::Opened { urls } = event {
+                let mut paths = Vec::new();
+                for url in urls {
+                    if let Ok(path) = url.to_file_path() {
+                        let is_subly = path
+                            .extension()
+                            .and_then(|x| x.to_str())
+                            .map(|x| x.eq_ignore_ascii_case("subly"))
+                            .unwrap_or(false);
+                        if is_subly {
+                            paths.push(path.to_string_lossy().into_owned());
+                        }
+                    }
+                }
+                if !paths.is_empty() {
+                    if let Ok(mut guard) = app.state::<OpenedBackupPaths>().0.lock() {
+                        guard.extend(paths.clone());
+                    }
+                    let _ = app.emit("backup:opened", paths);
+                }
+            }
+        })
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::state::{save_app_data_typed, T2_CONFIG};
+
+    #[test]
+    fn startup_succeeds_when_settings_table_missing() {
+        let (_dir, db) = crate::test_support::temp_db().expect("create temp db");
+        init_kv_table(&db).expect("init kv only");
+        let (loaded, loaded_cfg) = load_initial_state_for_startup(&db).expect("fresh db startup");
+        assert!(loaded_cfg.initialized);
+        assert!(!loaded.categories.is_empty(), "should seed defaults on first run");
+    }
 
     #[test]
     fn startup_loads_seed_when_config_not_initialized() {

@@ -5520,6 +5520,7 @@ dependencies = [
  "encoding_rs",
  "futures",
  "image",
+ "jni",
  "libc",
  "objc2",
  "objc2-foundation",

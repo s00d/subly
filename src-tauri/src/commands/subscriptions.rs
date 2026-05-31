@@ -98,8 +98,8 @@ fn emit_subscriptions_changed(app: &tauri::AppHandle, action: &str) {
             "action": action
         }),
     );
-    #[cfg(target_os = "ios")]
-    crate::widget_snapshot::export_ios_widget_snapshot_from_app(app);
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    crate::widget_snapshot::export_widget_snapshot_from_app(app);
 }
 
 fn subscription_row_from_input(mut input: SubscriptionInputDto) -> Result<SubscriptionDoc, crate::errors::AppError> {
@@ -572,13 +572,13 @@ pub fn get_upcoming_subscriptions(state: State<'_, AppState>, days: i64, limit: 
     Ok(out)
 }
 
-#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+#[cfg_attr(not(any(target_os = "ios", target_os = "android")), allow(dead_code))]
 pub(crate) const WIDGET_UPCOMING_DAYS: i64 = 30;
-#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+#[cfg_attr(not(any(target_os = "ios", target_os = "android")), allow(dead_code))]
 pub(crate) const WIDGET_UPCOMING_LIMIT: usize = 10;
 
-/// Upcoming subscriptions for the iOS widget snapshot (no credentials, bounded list).
-#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
+/// Upcoming subscriptions for home screen widget snapshots (no credentials, bounded list).
+#[cfg_attr(not(any(target_os = "ios", target_os = "android")), allow(dead_code))]
 pub(crate) fn collect_upcoming_subscription_docs_for_widget(
     guard: &crate::state::AppStateInner,
 ) -> Result<Vec<SubscriptionDoc>, crate::errors::AppError> {

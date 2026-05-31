@@ -92,6 +92,8 @@ ureq = { version = "3", default-features = true }
 # Some transitive deps still pull `native-tls` / OpenSSL; Android NDK has no system libssl.
 # Cargo unions features across the graph — `vendored` forces a self-built OpenSSL for Android ABIs.
 openssl-sys = { version = "0.9", features = ["vendored"] }
+jni = "0.21"
+ureq = { version = "3", default-features = true }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
@@ -100,4 +102,5 @@ tauri-plugin-single-instance = { version = "2.4.2", features = ["deep-link"] }
 
 [dev-dependencies]
 tempfile = "3"
+ureq = { version = "3", default-features = true }
 

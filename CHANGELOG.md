@@ -5,6 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.5] - 2026-05-31
+
+### Added
+
+- **Android home-screen widgets** (Glance) — upcoming payments snapshot, same JSON contract as iOS (`widget/upcoming.json`).
+- **Shared widget snapshot pipeline** in Rust for iOS and Android (export on startup, subscription changes, sync).
+- **Widget tests** — Rust contract tests, iOS `SublyWidgetTests`, Android `widget-core` unit tests (`pnpm test:ios-widget`, `pnpm test:android-widget`).
+
+### Changed
+
+- **iOS widget** — decodes `price` as decimal string (Rust `money::serde_ipc`) or legacy JSON number; reload timelines when the app becomes active and after `app_ready`.
+- **iOS widget loader** — `WidgetSnapshotIO.swift` shared decode path; Xcode unit test target.
+
+### Fixed
+
+- **Fresh install / partial database** — startup no longer aborts when typed table `settings_v2` is missing; defaults apply and first-run seed runs as intended.
+- **iOS widget “open Subly”** — corrupted or mismatched snapshot decode no longer sticks after opening the app (string `price` + reload hooks).
+
 ## [1.0.4] - 2026-05-22
 
 ### Added
@@ -229,6 +247,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.1] - 2026-02-11
 ## [0.1.0] - 2026-02-11
 
+[1.0.5]: https://github.com/s00d/subly/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/s00d/subly/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/s00d/subly/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/s00d/subly/compare/v1.0.1...v1.0.2

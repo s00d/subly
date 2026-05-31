@@ -1,0 +1,12 @@
+<resources>
+    <string name="widget_upcoming_title">予定</string>
+    <string name="widget_no_upcoming">予定の支払いはありません</string>
+    <string name="widget_err_no_group">ウィジェットを有効にするには Subly を一度開いてください。</string>
+    <string name="widget_err_open_app">支払いを読み込むには Subly を開いてください。</string>
+    <string name="widget_err_bad_data">更新するには Subly を開いてください。</string>
+    <string name="widget_display_name">Subly</string>
+    <string name="widget_description">今後のサブスクリプション支払い。</string>
+    <string name="widget_date_today">今日</string>
+    <string name="widget_date_tomorrow">明日</string>
+    <string name="widget_more_count">他 %d 件</string>
+</resources>

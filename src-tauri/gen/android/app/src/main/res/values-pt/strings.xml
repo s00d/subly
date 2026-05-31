@@ -1,0 +1,12 @@
+<resources>
+    <string name="widget_upcoming_title">Próximos</string>
+    <string name="widget_no_upcoming">Sem pagamentos próximos</string>
+    <string name="widget_err_no_group">Abra o Subly uma vez para ativar o widget.</string>
+    <string name="widget_err_open_app">Abra o Subly para carregar os pagamentos.</string>
+    <string name="widget_err_bad_data">Abra o Subly para atualizar.</string>
+    <string name="widget_display_name">Subly</string>
+    <string name="widget_description">Próximos pagamentos de assinaturas.</string>
+    <string name="widget_date_today">Hoje</string>
+    <string name="widget_date_tomorrow">Amanhã</string>
+    <string name="widget_more_count">+%d a mais</string>
+</resources>

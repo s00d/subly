@@ -1,23 +1,15 @@
-//! Writes a JSON snapshot for the iOS Home Screen widget (App Group shared container).
-//! The widget extension cannot access Tauri/reddb; it only reads `widget/upcoming.json`.
+//! Writes a JSON snapshot for iOS / Android home screen widgets.
+//! Widget UI only reads `widget/upcoming.json` (+ raster icons under `widget/icons/`).
 //!
-//! Heavy work (HTTP logo fetches + filesystem writes) is dispatched onto a background
-//! thread so the UI/main thread never blocks waiting for slow `ureq` calls. A simple
-//! `IN_PROGRESS` + `PENDING_REFRESH` pair coalesces bursts of subscription mutations
-//! into at most one extra refresh after the running job completes.
-//!
-//! `upcoming.json` is written via `upcoming.json.tmp` + `rename` so iOS suspend during
-//! I/O cannot leave the widget with a truncated JSON file.
+//! Heavy work runs on a background thread; `IN_PROGRESS` + `PENDING_REFRESH` coalesce bursts.
 
-#[cfg(target_os = "ios")]
-mod ios_impl {
+#[cfg(any(target_os = "ios", target_os = "android", test))]
+mod shared {
     use crate::commands::subscriptions::collect_upcoming_subscription_docs_for_widget;
     use crate::models::{CurrencyDoc, SubscriptionDoc};
     use crate::state::AppStateInner;
     use crate::state::EntityTable;
     use base64::Engine;
-    use objc2::rc::autoreleasepool;
-    use objc2_foundation::{NSFileManager, NSString};
     use serde::Serialize;
     use sha2::{Digest, Sha256};
     use std::collections::HashMap;
@@ -27,85 +19,56 @@ mod ios_impl {
     use std::sync::OnceLock;
     use std::time::Duration;
 
-    pub(super) const APP_GROUP_ID: &str = "group.com.s00d.subly";
-    const RELATIVE_WIDGET_DIR: &str = "widget";
+    pub const RELATIVE_WIDGET_DIR: &str = "widget";
     const ICON_SUBDIR: &str = "icons";
-    /// Raster PNGs keyed by SHA256(trimmed URL); kept until URL changes or user clears app data.
     const HTTP_LOGO_CACHE_SUBDIR: &str = "logo_cache";
     const UPCOMING_FILE: &str = "upcoming.json";
-    /// Written first, then renamed over `upcoming.json` so the widget never reads a partial file.
     const UPCOMING_FILE_TMP: &str = "upcoming.json.tmp";
-
-    /// Per-request budget for logo HTTP fetches. Kept tight because the snapshot blocks
-    /// the next widget timeline reload; a slow CDN should not stall app shutdown either.
     const HTTP_LOGO_TIMEOUT: Duration = Duration::from_secs(4);
 
-    /// True while a background snapshot job is running. Prevents stacking up threads
-    /// when the user makes a burst of changes.
     static IN_PROGRESS: AtomicBool = AtomicBool::new(false);
-    /// Signals that another snapshot was requested while a job was running, so the
-    /// worker should loop once more with fresh data before exiting.
     static PENDING_REFRESH: AtomicBool = AtomicBool::new(false);
 
     #[derive(Serialize)]
-    struct WidgetUpcomingItem {
-        id: String,
-        name: String,
+    pub struct WidgetUpcomingItem {
+        pub id: String,
+        pub name: String,
         #[serde(rename = "nextPayment")]
-        next_payment: String,
+        pub next_payment: String,
         #[serde(with = "crate::money::serde_ipc")]
-        price: rust_decimal::Decimal,
+        pub price: rust_decimal::Decimal,
         #[serde(rename = "currencyId")]
-        currency_id: String,
-        /// ISO 4217 for locale-aware currency formatting (matches web Intl / fmtCurrency).
+        pub currency_id: String,
         #[serde(rename = "currencyCode")]
-        currency_code: String,
-        /// Relative to `widget/`: raster PNG written by the app for the widget (`icons/<id>.png`).
+        pub currency_code: String,
         #[serde(rename = "iconFile", skip_serializing_if = "Option::is_none")]
-        icon_file: Option<String>,
+        pub icon_file: Option<String>,
     }
 
     #[derive(Serialize)]
-    struct WidgetSnapshot {
+    pub struct WidgetSnapshot {
         #[serde(rename = "updatedAt")]
-        updated_at: String,
-        items: Vec<WidgetUpcomingItem>,
+        pub updated_at: String,
+        pub items: Vec<WidgetUpcomingItem>,
     }
 
-    /// Owned snapshot input pulled from `AppStateInner`; safe to send across threads.
-    pub(super) struct SnapshotJob {
-        subs: Vec<SubscriptionDoc>,
-        code_by_id: HashMap<String, String>,
+    pub struct SnapshotJob {
+        pub subs: Vec<SubscriptionDoc>,
+        pub code_by_id: HashMap<String, String>,
     }
 
-    /// `widget_reload.swift` defines this with `@_cdecl`; it is linked into the app binary, not into
-    /// `libapp.a`. A direct `extern "C"` would leave an unresolved symbol when `cargo` links the Rust
-    /// static library — resolve at runtime instead.
-    fn reload_widget_timelines_if_swift_linked() {
-        use std::ffi::CString;
-        for name in ["_subly_reload_widget_timelines", "subly_reload_widget_timelines"] {
-            let Ok(cstr) = CString::new(name) else {
-                continue;
-            };
-            unsafe {
-                let ptr = libc::dlsym(libc::RTLD_DEFAULT, cstr.as_ptr());
-                if ptr.is_null() {
-                    continue;
-                }
-                let f: extern "C" fn() = std::mem::transmute(ptr);
-                f();
-                return;
-            }
-        }
-    }
-
-    fn app_group_root() -> Option<PathBuf> {
-        autoreleasepool(|_pool| {
-            let fm = NSFileManager::defaultManager();
-            let url = fm.containerURLForSecurityApplicationGroupIdentifier(&NSString::from_str(APP_GROUP_ID))?;
-            let path = url.path()?;
-            Some(PathBuf::from(path.to_string()))
-        })
+    pub fn collect_job(inner: &AppStateInner) -> Result<SnapshotJob, crate::errors::AppError> {
+        let subs = collect_upcoming_subscription_docs_for_widget(inner)?;
+        let currencies: Vec<CurrencyDoc> = inner.table_list_typed(EntityTable::Currencies)?;
+        let code_by_id: HashMap<String, String> = currencies
+            .into_iter()
+            .map(|c| {
+                let code = c.code.trim();
+                let iso = if code.is_empty() { "USD" } else { code };
+                (c.id, iso.to_string())
+            })
+            .collect();
+        Ok(SnapshotJob { subs, code_by_id })
     }
 
     fn data_uri_header_is_svg(data_uri: &str) -> bool {
@@ -145,8 +108,6 @@ mod ios_impl {
         let _ = fs::write(path, png);
     }
 
-    /// Single shared HTTP agent: connection pooling + bounded total per-request timeout
-    /// so a stalled host can't pin a worker thread for minutes.
     fn http_agent() -> &'static ureq::Agent {
         static AGENT: OnceLock<ureq::Agent> = OnceLock::new();
         AGENT.get_or_init(|| {
@@ -166,7 +127,6 @@ mod ios_impl {
         Some(buf)
     }
 
-    /// Uses on-disk PNG cache for HTTP(S) logos; network only on first successful fetch per URL.
     fn http_logo_raster_cached(cache_dir: &Path, url: &str) -> Option<Vec<u8>> {
         if let Some(cached) = read_http_logo_cache_hit(cache_dir, url) {
             return Some(cached);
@@ -195,8 +155,6 @@ mod ios_impl {
         Some(out)
     }
 
-    /// Replace `path` atomically: write full payload to a sibling `.tmp`, then `rename`.
-    /// If the process is suspended mid-write, the previous file at `path` stays intact.
     fn atomic_write_file(path: &Path, contents: &[u8]) -> Result<(), String> {
         let parent = path
             .parent()
@@ -254,35 +212,14 @@ mod ios_impl {
         Some(format!("{}/{}", ICON_SUBDIR, fname))
     }
 
-    /// Synchronously pulls owned data out of the locked state. Cheap; safe to call under a lock.
-    pub(super) fn collect_job(
-        inner: &AppStateInner,
-    ) -> Result<SnapshotJob, crate::errors::AppError> {
-        let subs = collect_upcoming_subscription_docs_for_widget(inner)?;
-        let currencies: Vec<CurrencyDoc> = inner.table_list_typed(EntityTable::Currencies)?;
-        let code_by_id: HashMap<String, String> = currencies
-            .into_iter()
-            .map(|c| {
-                let code = c.code.trim();
-                let iso = if code.is_empty() { "USD" } else { code };
-                (c.id, iso.to_string())
-            })
-            .collect();
-        Ok(SnapshotJob { subs, code_by_id })
-    }
+    /// `widget_dir` is the absolute path to the `widget/` folder.
+    pub fn write_snapshot(widget_dir: &Path, job: &SnapshotJob) -> Result<(), String> {
+        fs::create_dir_all(widget_dir).map_err(|e| e.to_string())?;
 
-    /// Heavy phase: HTTP fetches + filesystem writes. Runs without holding any app lock.
-    fn write_snapshot(job: &SnapshotJob) -> Result<(), crate::errors::AppError> {
-        let root = app_group_root().ok_or_else(|| {
-            "App Group container unavailable (enable group.com.s00d.subly for the app)".to_string()
-        })?;
-        let dir = root.join(RELATIVE_WIDGET_DIR);
-        fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-
-        let logo_cache_dir = dir.join(HTTP_LOGO_CACHE_SUBDIR);
+        let logo_cache_dir = widget_dir.join(HTTP_LOGO_CACHE_SUBDIR);
         fs::create_dir_all(&logo_cache_dir).map_err(|e| e.to_string())?;
 
-        let icons_dir = dir.join(ICON_SUBDIR);
+        let icons_dir = widget_dir.join(ICON_SUBDIR);
         let _ = fs::remove_dir_all(&icons_dir);
         fs::create_dir_all(&icons_dir).map_err(|e| e.to_string())?;
 
@@ -314,17 +251,21 @@ mod ios_impl {
             items,
         };
 
-        let path = dir.join(UPCOMING_FILE);
+        let path = widget_dir.join(UPCOMING_FILE);
         let json = serde_json::to_string_pretty(&snapshot).map_err(|e| e.to_string())?;
         atomic_write_file(&path, json.as_bytes())?;
-
-        reload_widget_timelines_if_swift_linked();
         Ok(())
     }
 
-    /// Spawns the snapshot worker; returns immediately. If a worker is already running,
-    /// schedules a single follow-up refresh so the very latest state still ships out.
-    pub(super) fn export_snapshot_async(app_handle: tauri::AppHandle, initial: SnapshotJob) {
+    pub fn export_snapshot_async<F, G>(
+        app_handle: tauri::AppHandle,
+        initial: SnapshotJob,
+        resolve_widget_dir: F,
+        after_write: G,
+    ) where
+        F: Fn(&tauri::AppHandle) -> Result<PathBuf, String> + Send + Sync + 'static,
+        G: Fn() + Send + Sync + 'static,
+    {
         if IN_PROGRESS
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .is_err()
@@ -337,13 +278,22 @@ mod ios_impl {
             use tauri::Manager;
             let mut job = initial;
             loop {
-                if let Err(e) = write_snapshot(&job) {
-                    eprintln!("[subly][widget] snapshot failed: {}", e);
+                match resolve_widget_dir(&app_handle) {
+                    Ok(dir) => {
+                        if let Err(e) = write_snapshot(&dir, &job) {
+                            eprintln!("[subly][widget] snapshot failed: {}", e);
+                        } else {
+                            after_write();
+                        }
+                    }
+                    Err(e) => eprintln!("[subly][widget] widget dir: {}", e),
                 }
                 if !PENDING_REFRESH.swap(false, Ordering::AcqRel) {
                     break;
                 }
-                let Some(state) = app_handle.try_state::<crate::AppState>() else { break };
+                let Some(state) = app_handle.try_state::<crate::AppState>() else {
+                    break;
+                };
                 let Ok(guard) = state.lock() else { break };
                 match collect_job(&guard) {
                     Ok(fresh) => job = fresh,
@@ -358,21 +308,151 @@ mod ios_impl {
     }
 }
 
-/// Refresh widget data from subscription state (no-op outside iOS).
-///
-/// Synchronously copies the data we need out of the lock, then dispatches the actual
-/// HTTP/disk work to a background thread. Callers don't block on network. Coalesces
-/// rapid bursts via an internal pending-refresh flag.
-#[cfg_attr(not(target_os = "ios"), allow(dead_code))]
-pub fn export_ios_widget_snapshot_from_app(app: &tauri::AppHandle) {
-    #[cfg(target_os = "ios")]
+#[cfg(target_os = "ios")]
+mod ios_impl {
+    use super::shared::{self, SnapshotJob};
+    use objc2::rc::autoreleasepool;
+    use objc2_foundation::{NSFileManager, NSString};
+    use std::path::PathBuf;
+
+    const APP_GROUP_ID: &str = "group.com.s00d.subly";
+
+    fn call_swift_widget_fn(symbol: &str) -> bool {
+        use std::ffi::CString;
+        let Ok(cstr) = CString::new(symbol) else {
+            return false;
+        };
+        unsafe {
+            let ptr = libc::dlsym(libc::RTLD_DEFAULT, cstr.as_ptr());
+            if ptr.is_null() {
+                return false;
+            }
+            let f: extern "C" fn() = std::mem::transmute(ptr);
+            f();
+            true
+        }
+    }
+
+    fn reload_widget_timelines_if_swift_linked() {
+        for name in ["_subly_reload_widget_timelines", "subly_reload_widget_timelines"] {
+            if call_swift_widget_fn(name) {
+                return;
+            }
+        }
+    }
+
+    pub(super) fn install_widget_reload_on_activate_if_swift_linked() {
+        for name in [
+            "_subly_install_widget_reload_on_activate",
+            "subly_install_widget_reload_on_activate",
+        ] {
+            if call_swift_widget_fn(name) {
+                return;
+            }
+        }
+    }
+
+    fn app_group_widget_dir() -> Result<PathBuf, String> {
+        let root = autoreleasepool(|_pool| {
+            let fm = NSFileManager::defaultManager();
+            let url =
+                fm.containerURLForSecurityApplicationGroupIdentifier(&NSString::from_str(APP_GROUP_ID))?;
+            let path = url.path()?;
+            Some(PathBuf::from(path.to_string()))
+        })
+        .ok_or_else(|| {
+            "App Group container unavailable (enable group.com.s00d.subly for the app)".to_string()
+        })?;
+        Ok(root.join(shared::RELATIVE_WIDGET_DIR))
+    }
+
+    pub fn start_export(app: &tauri::AppHandle, job: SnapshotJob) {
+        let app = app.clone();
+        shared::export_snapshot_async(
+            app,
+            job,
+            |_| app_group_widget_dir(),
+            reload_widget_timelines_if_swift_linked,
+        );
+    }
+}
+
+#[cfg(target_os = "android")]
+mod android_impl {
+    use super::shared::SnapshotJob;
+    use jni::objects::JClass;
+    use jni::sys::{jint, JNI_VERSION_1_6};
+    use jni::{JNIEnv, JavaVM};
+    use std::path::PathBuf;
+    use std::sync::OnceLock;
+    use tauri::Manager;
+
+    static JAVA_VM: OnceLock<JavaVM> = OnceLock::new();
+
+    pub fn store_java_vm(vm: JavaVM) {
+        let _ = JAVA_VM.set(vm);
+    }
+
+    pub fn notify_widgets_updated() {
+        let Some(vm) = JAVA_VM.get() else {
+            return;
+        };
+        let Ok(mut env) = vm.attach_current_thread() else {
+            return;
+        };
+        let Ok(class) = env.find_class("com/s00d/subly/widget/WidgetSnapshotNotifier") else {
+            return;
+        };
+        let _ = env.call_static_method(class, "notifySnapshotUpdated", "()V", &[]);
+    }
+
+    fn widget_dir_for_app(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+        let base = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|e| format!("app_local_data_dir: {e}"))?;
+        std::fs::create_dir_all(&base).map_err(|e| e.to_string())?;
+        Ok(base.join(super::shared::RELATIVE_WIDGET_DIR))
+    }
+
+    pub fn start_export(app: &tauri::AppHandle, job: SnapshotJob) {
+        let app = app.clone();
+        super::shared::export_snapshot_async(
+            app,
+            job,
+            |handle| widget_dir_for_app(handle),
+            notify_widgets_updated,
+        );
+    }
+}
+
+#[cfg(target_os = "android")]
+#[no_mangle]
+pub extern "system" fn Java_com_s00d_subly_MainActivity_nativeInitWidgetBridge(
+    mut env: JNIEnv,
+    _class: JClass,
+) -> jint {
+    match env.get_java_vm() {
+        Ok(vm) => {
+            android_impl::store_java_vm(vm);
+            jni::sys::JNI_VERSION_1_6
+        }
+        Err(_) => JNI_VERSION_1_6,
+    }
+}
+
+/// Refresh widget data from subscription state (no-op on desktop).
+#[cfg_attr(not(any(target_os = "ios", target_os = "android")), allow(dead_code))]
+pub fn export_widget_snapshot_from_app(app: &tauri::AppHandle) {
+    #[cfg(any(target_os = "ios", target_os = "android"))]
     {
         use tauri::Manager;
+
         let Some(state) = app.try_state::<crate::AppState>() else {
             return;
         };
         let job = match state.lock() {
-            Ok(guard) => match ios_impl::collect_job(&guard) {
+            Ok(guard) => match shared::collect_job(&guard) {
                 Ok(j) => j,
                 Err(e) => {
                     eprintln!("[subly][widget] collect failed: {}", e);
@@ -381,8 +461,243 @@ pub fn export_ios_widget_snapshot_from_app(app: &tauri::AppHandle) {
             },
             Err(_) => return,
         };
-        ios_impl::export_snapshot_async(app.clone(), job);
+        #[cfg(target_os = "ios")]
+        ios_impl::start_export(app, job);
+        #[cfg(target_os = "android")]
+        android_impl::start_export(app, job);
     }
-    #[cfg(not(target_os = "ios"))]
-    let _ = app;
+
+    #[cfg(not(any(target_os = "ios", target_os = "android")))]
+    {
+        let _ = app;
+    }
+}
+
+/// Back-compat alias for existing call sites.
+#[cfg_attr(not(any(target_os = "ios", target_os = "android")), allow(dead_code))]
+pub fn export_ios_widget_snapshot_from_app(app: &tauri::AppHandle) {
+    export_widget_snapshot_from_app(app);
+}
+
+#[cfg(target_os = "ios")]
+pub fn install_ios_widget_reload_on_activate() {
+    ios_impl::install_widget_reload_on_activate_if_swift_linked();
+}
+
+#[cfg(not(target_os = "ios"))]
+pub fn install_ios_widget_reload_on_activate() {}
+
+#[cfg(test)]
+mod tests {
+    use super::shared::{self, SnapshotJob, WidgetUpcomingItem};
+    use crate::commands::subscriptions::{
+        collect_upcoming_subscription_docs_for_widget, WIDGET_UPCOMING_DAYS,
+        WIDGET_UPCOMING_LIMIT,
+    };
+    use crate::models::SubscriptionDoc;
+    use crate::state::{save_app_data_typed, AppStateInner};
+    use chrono::Local;
+    use rust_decimal::Decimal;
+    use std::collections::HashMap;
+    use std::fs;
+    use std::str::FromStr;
+    use std::sync::Arc;
+
+    /// Mirrors iOS/Android widget JSON consumers: accept string or legacy number `price`.
+    fn decode_price_like_widget_ui(value: &serde_json::Value) -> f64 {
+        match value {
+            serde_json::Value::Number(n) => n.as_f64().unwrap_or(0.0),
+            serde_json::Value::String(s) => s.trim().parse().unwrap_or(0.0),
+            _ => 0.0,
+        }
+    }
+
+    fn seeded_subscription_template() -> SubscriptionDoc {
+        let doc = crate::test_support::doc_with_restart_sensitive_fields().expect("seed doc");
+        doc.subscriptions
+            .into_iter()
+            .next()
+            .expect("restart-sensitive seed must include a subscription")
+    }
+
+    fn sample_job() -> SnapshotJob {
+        let mut sub = seeded_subscription_template();
+        sub.id = "sub-widget-1".to_string();
+        sub.name = "Streaming".to_string();
+        sub.next_payment = "2099-06-01".to_string();
+        sub.price = Decimal::from_str("12.50").expect("decimal");
+        let currency_id = sub.currency_id.clone();
+        SnapshotJob {
+            subs: vec![sub],
+            code_by_id: HashMap::from([(currency_id, "USD".to_string())]),
+        }
+    }
+
+    fn subscription_with_next_in_days(id: &str, days: i64, inactive: bool) -> SubscriptionDoc {
+        let pay = Local::now().date_naive() + chrono::Duration::days(days);
+        let mut sub = seeded_subscription_template();
+        sub.id = id.to_string();
+        sub.name = format!("Sub {id}");
+        sub.next_payment = pay.format("%Y-%m-%d").to_string();
+        sub.price = Decimal::from_str("1.00").expect("decimal");
+        sub.inactive = inactive;
+        sub
+    }
+
+    fn state_with_subscriptions(subs: Vec<SubscriptionDoc>) -> (tempfile::TempDir, AppStateInner) {
+        let (dir, db) = crate::test_support::temp_db().expect("temp db");
+        let mut doc = crate::test_support::base_seeded_doc().expect("seed");
+        doc.subscriptions = subs;
+        save_app_data_typed(&db, &doc, &crate::test_support::default_config()).expect("save");
+        let inner = AppStateInner {
+            db: Arc::new(db),
+            app_data: doc,
+        };
+        (dir, inner)
+    }
+
+    #[test]
+    fn widget_price_serializes_as_decimal_string() {
+        let item = WidgetUpcomingItem {
+            id: "x".into(),
+            name: "Test".into(),
+            next_payment: "2099-01-01".into(),
+            price: Decimal::from_str("9.99").expect("decimal"),
+            currency_id: "c1".into(),
+            currency_code: "USD".into(),
+            icon_file: None,
+        };
+        let v = serde_json::to_value(&item).expect("serialize");
+        assert!(
+            v.get("price")
+                .and_then(|p| p.as_str())
+                .is_some(),
+            "widget IPC must emit price as string, got {:?}",
+            v.get("price")
+        );
+        assert_eq!(v["price"], "9.99");
+    }
+
+    #[test]
+    fn write_snapshot_writes_upcoming_json_with_string_prices() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let widget_dir = dir.path().join(shared::RELATIVE_WIDGET_DIR);
+        shared::write_snapshot(&widget_dir, &sample_job()).expect("write");
+
+        let path = widget_dir.join("upcoming.json");
+        assert!(path.is_file(), "upcoming.json must exist");
+
+        let tmp = widget_dir.join("upcoming.json.tmp");
+        assert!(!tmp.exists(), "atomic write must not leave .tmp behind");
+
+        let root: serde_json::Value = serde_json::from_slice(&fs::read(&path).expect("read"))
+            .expect("json");
+        let items = root["items"].as_array().expect("items array");
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0]["name"], "Streaming");
+        assert!(
+            items[0]["price"].is_string(),
+            "written snapshot must use string prices"
+        );
+        assert_eq!(items[0]["price"], "12.50");
+    }
+
+    #[test]
+    fn widget_consumer_accepts_string_and_legacy_number_price() {
+        let string_json = serde_json::json!({
+            "updatedAt": "2026-01-01T00:00:00Z",
+            "items": [{
+                "id": "a",
+                "name": "A",
+                "nextPayment": "2099-01-01",
+                "price": "19.99",
+                "currencyId": "c",
+                "currencyCode": "USD"
+            }]
+        });
+        let number_json = serde_json::json!({
+            "updatedAt": "2026-01-01T00:00:00Z",
+            "items": [{
+                "id": "b",
+                "name": "B",
+                "nextPayment": "2099-01-01",
+                "price": 4.5,
+                "currencyId": "c",
+                "currencyCode": "EUR"
+            }]
+        });
+
+        for doc in [string_json, number_json] {
+            let items = doc["items"].as_array().expect("items");
+            assert_eq!(items.len(), 1);
+            let amount = decode_price_like_widget_ui(&items[0]["price"]);
+            assert!(amount > 0.0, "consumer decode failed for {:?}", items[0]["price"]);
+        }
+    }
+
+    #[test]
+    fn ios_xctest_fixture_uses_string_price_contract() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+            "ios-apple/SublyWidgetTests/Fixtures/upcoming_string_price.json",
+        );
+        let root: serde_json::Value =
+            serde_json::from_slice(&fs::read(&path).expect("ios fixture")).expect("json");
+        assert!(
+            root["items"][0]["price"].is_string(),
+            "shared iOS fixture must use string price (Rust serde_ipc)"
+        );
+        assert_eq!(root["items"][0]["price"], "12.50");
+    }
+
+    #[test]
+    fn write_snapshot_output_is_decodable_by_consumer_rules() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let widget_dir = dir.path().join(shared::RELATIVE_WIDGET_DIR);
+        shared::write_snapshot(&widget_dir, &sample_job()).expect("write");
+        let path = widget_dir.join("upcoming.json");
+        let root: serde_json::Value =
+            serde_json::from_slice(&fs::read(path).expect("read")).expect("json");
+        let items = root["items"].as_array().expect("items");
+        assert!(!items.is_empty());
+        let price = decode_price_like_widget_ui(&items[0]["price"]);
+        assert!((price - 12.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn collect_upcoming_respects_window_inactive_and_limit() {
+        let mut subs = vec![
+            subscription_with_next_in_days("active-soon", 3, false),
+            subscription_with_next_in_days("inactive-soon", 3, true),
+            subscription_with_next_in_days("too-far", WIDGET_UPCOMING_DAYS + 5, false),
+            subscription_with_next_in_days("past", -2, false),
+        ];
+        for i in 0..WIDGET_UPCOMING_LIMIT + 3 {
+            subs.push(subscription_with_next_in_days(
+                &format!("bulk-{i}"),
+                5 + i as i64,
+                false,
+            ));
+        }
+        let (_dir, inner) = state_with_subscriptions(subs);
+        let rows = collect_upcoming_subscription_docs_for_widget(&inner).expect("collect");
+        assert!(rows.iter().all(|s| !s.inactive));
+        assert!(rows.len() <= WIDGET_UPCOMING_LIMIT);
+        assert!(rows.iter().any(|s| s.id == "active-soon"));
+        assert!(!rows.iter().any(|s| s.id == "inactive-soon"));
+        assert!(!rows.iter().any(|s| s.id == "too-far"));
+        assert!(!rows.iter().any(|s| s.id == "past"));
+    }
+
+    #[test]
+    fn collect_job_builds_currency_codes() {
+        let (_dir, inner) = state_with_subscriptions(vec![subscription_with_next_in_days(
+            "one", 7, false,
+        )]);
+        let job = shared::collect_job(&inner).expect("collect_job");
+        assert!(!job.subs.is_empty());
+        assert!(
+            job.code_by_id.values().any(|c| !c.is_empty()),
+            "currency ISO codes should be populated from catalog"
+        );
+    }
 }
