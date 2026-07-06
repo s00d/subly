@@ -1,0 +1,122 @@
+src-tauri/src/commands/sync/providers/mod.rs
+  s_46eb22e28aedb5::t_98c6bcdf8b4448 1
+  s_46eb22e28aedb5::t_707348ae207198 19-20
+  s_46eb22e28aedb5::t_51a2fc1e98f8b1 130-141
+src/locales/zh.json
+  s_46eb22e28aedb5::t_0c1021e79d6322 529-547
+src-tauri/src/commands/sync/providers/gdrive.rs
+  s_46eb22e28aedb5::t_779fd7b06e0379 58-59
+  s_46eb22e28aedb5::t_739bebbc82bdef 131
+  s_46eb22e28aedb5::t_d0ffc2171d258b 72
+  s_46eb22e28aedb5::t_76ef1b3db258cd 57
+  s_46eb22e28aedb5::t_2545ed12d0fed0 73-74
+  s_46eb22e28aedb5::t_c268618b188903 40
+  s_46eb22e28aedb5::t_f4d5be392ff99e 29-39,41-43
+  s_46eb22e28aedb5::t_7eff08e7cd1980 20-21
+src-tauri/src/commands/sync/providers/onedrive.rs
+  s_46eb22e28aedb5::t_648135ff9a4509 31-32
+  s_46eb22e28aedb5::t_f38cdd142f1fcc 48-58
+  s_46eb22e28aedb5::t_f29f216d7bdcb5 10-11
+src/locales/pt.json
+  s_46eb22e28aedb5::t_0c1021e79d6322 529-547
+src/components/settings/SyncOAuthModal.vue
+  s_46eb22e28aedb5::t_b368580ca76f70 1-54
+src/locales/ko.json
+  s_46eb22e28aedb5::t_0c1021e79d6322 529-547
+src-tauri/src/lib.rs
+  s_46eb22e28aedb5::t_20646910d32784 55
+  s_46eb22e28aedb5::t_7c6b25b981be8d 563
+src/locales/tr.json
+  s_46eb22e28aedb5::t_0c1021e79d6322 529-547
+src/locales/es.json
+  s_46eb22e28aedb5::t_0c1021e79d6322 529-547
+src-tauri/src/commands/sync/mod.rs
+  s_46eb22e28aedb5::t_3204314d49eb27 29,32
+  s_46eb22e28aedb5::t_7d5309ff5ebef9 450,452,455
+  s_46eb22e28aedb5::t_1333c9f67e0459 26,33
+  s_46eb22e28aedb5::t_21e52f3ebb86ed 28,30-31
+  s_46eb22e28aedb5::t_214e5a09239308 449,451,453-454,456-465
+  s_46eb22e28aedb5::t_cf75c3802ceb48 481-528
+src-tauri/src/commands/sync/providers/webdav.rs
+  s_46eb22e28aedb5::t_3fd0cba3b14911 48-49
+  s_46eb22e28aedb5::t_49792956180c72 57-111
+src/locales/fr.json
+  s_46eb22e28aedb5::t_0c1021e79d6322 529-547
+src/locales/hi.json
+  s_46eb22e28aedb5::t_0c1021e79d6322 529-547
+src/locales/de.json
+  s_46eb22e28aedb5::t_0c1021e79d6322 529-547
+docs/design/systems/sync.md
+  s_46eb22e28aedb5::t_322d401ef52a1f 60-94,98-104,110-111,122-131
+  s_46eb22e28aedb5::t_c9ac515e23c29a 132
+src/locales/ja.json
+  s_46eb22e28aedb5::t_0c1021e79d6322 529-547
+src/locales/ru.json
+  s_46eb22e28aedb5::t_a1425e95916e6d 576-594
+src/locales/ar.json
+  s_46eb22e28aedb5::t_0c1021e79d6322 529-547
+src-tauri/src/commands/sync/oauth.rs
+  s_46eb22e28aedb5::t_8f49e0490fbc28 223-237
+src-tauri/src/commands/sync/state.rs
+  s_46eb22e28aedb5::t_aa96302fb83e62 50-65
+  s_46eb22e28aedb5::t_0e59c4f5e553e1 66-83,86-98
+  s_46eb22e28aedb5::t_f4d6e43cc2facf 19,30-33,43-49
+src/locales/en.json
+  s_46eb22e28aedb5::t_04565cabbee75c 576-594
+src-tauri/src/commands/sync/orchestrator.rs
+  s_46eb22e28aedb5::t_0e4c6fe40597ac 52
+  s_46eb22e28aedb5::t_3f8a5ae6d01273 217
+  s_46eb22e28aedb5::t_11f468c195f345 260,264,266-339
+  s_46eb22e28aedb5::t_329f8993af5486 359
+  s_46eb22e28aedb5::t_9efce4fcd3137f 27,37-51,53
+  s_46eb22e28aedb5::t_f0605765c8a263 436-439
+  s_46eb22e28aedb5::t_bd665e652d8316 552-555
+  s_46eb22e28aedb5::t_a8b1645cd6b826 613-624
+  s_46eb22e28aedb5::t_97074e35378bce 536
+  s_46eb22e28aedb5::t_110cf0eaf44595 8-9
+  s_46eb22e28aedb5::t_96c08403329aa9 376
+  s_46eb22e28aedb5::t_4b844384e0ee8b 391-394
+  s_46eb22e28aedb5::t_afbf3f38e1d058 468
+  s_46eb22e28aedb5::t_36f89138fc93ce 605
+  s_46eb22e28aedb5::t_135708978a6f3e 498-501
+  s_46eb22e28aedb5::t_5b22bd14bdb241 54
+src/components/settings/CloudSyncSection.vue
+  s_46eb22e28aedb5::t_cf304872a6c00f 384-390,393
+  s_46eb22e28aedb5::t_83037038182838 104-107
+  s_46eb22e28aedb5::t_0ede947c129577 7-8,19,23
+  s_46eb22e28aedb5::t_89c0d3eee921bd 39
+  s_46eb22e28aedb5::t_51cf1abfdacf11 108
+  s_46eb22e28aedb5::t_27ca83ed65f7e9 52-68
+  s_46eb22e28aedb5::t_c143a98d9afefc 179-184,195-216
+  s_46eb22e28aedb5::t_d8f189b9434769 286-302
+  s_46eb22e28aedb5::t_6bc5e39364952c 434-435
+  s_46eb22e28aedb5::t_d96e23affa6eb5 217
+  s_46eb22e28aedb5::t_24f996b29b3905 383
+src-tauri/src/commands/sync/providers/icloud.rs
+  s_46eb22e28aedb5::t_0e46f12263a28a 15-16
+src-tauri/src/commands/sync/providers/dropbox.rs
+  s_46eb22e28aedb5::t_d7eea33af701ff 47-48
+  s_46eb22e28aedb5::t_7ca0d1b9890d05 63-73
+src/services/syncClient.ts
+  s_46eb22e28aedb5::t_9da3f2fc2a7e35 47-48
+  s_46eb22e28aedb5::t_0476b713bc8a83 6,17-18,99-106,121-142,184,197,201,205,212,214,218-221
+  s_46eb22e28aedb5::t_0ab99ccdbe6915 222
+src-tauri/src/commands/sync/types.rs
+  s_46eb22e28aedb5::t_b449164e337d83 13-20,32-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "d4b0fb9d19b1f44b314c3b0948d2807e34faf970",
+  "prompts": {},
+  "sessions": {
+    "s_46eb22e28aedb5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2cf69a17-9c5d-40ae-9782-7f395222b99b",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
