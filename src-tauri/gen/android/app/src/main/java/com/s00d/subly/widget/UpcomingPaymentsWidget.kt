@@ -17,6 +17,7 @@ import androidx.glance.LocalContext
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
@@ -44,8 +45,9 @@ class SublyWidgetReceiver : GlanceAppWidgetReceiver() {
 
 class UpcomingPaymentsWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val appWidgetId = GlanceAppWidgetManager(context).getAppWidgetId(id)
         val minWidthDp = AppWidgetManager.getInstance(context)
-            .getAppWidgetOptions(id)
+            .getAppWidgetOptions(appWidgetId)
             .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
         provideContent {
             WidgetChrome(minWidthDp = minWidthDp) {
