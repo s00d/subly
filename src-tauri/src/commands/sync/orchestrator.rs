@@ -5,7 +5,8 @@ use super::{
     set_dropbox_app_secret, set_webdav_password,
     SyncEnableDto, SyncHasUpdateDto, SyncOkDto, SyncUiSchemaDto,
     sync_build_push_meta, sync_merge_with_tombstones, sync_payload_fits_limit, sync_push_revision_mismatch, sync_runtime,
-    sync_should_pull, sync_status_from_config, token_key, SyncCredentialsDto, SyncPayload, SyncProviderType,
+    sync_should_pull, sync_oauth_message_key, oauth_credentials_missing_key, oauth_connect_ready,
+    refresh_runtime_status, webdav_credentials_ready, token_key, SyncCredentialsDto, SyncPayload, SyncProviderType,
     KR_SYNC_DROPBOX_APP_SECRET, KR_SYNC_WEBDAV_PASSWORD, MAX_SYNC_PAYLOAD_BYTES,
 };
 use std::sync::OnceLock;
@@ -23,7 +24,7 @@ fn icloud_fail_response(
     event: &str,
     err: crate::errors::AppError,
 ) -> Result<SyncDispatchResponse, crate::errors::AppError> {
-    if let Some(key) = super::providers::icloud::icloud_sync_message_key(&err) {
+    if let Some(key) = provider_io_message_key(&err) {
         return Ok(SyncDispatchResponse {
             ok: true,
             event: event.to_string(),
@@ -31,6 +32,24 @@ fn icloud_fail_response(
         });
     }
     Err(err)
+}
+
+fn oauth_token_fail_response(
+    event: &str,
+    err: crate::errors::AppError,
+) -> Result<SyncDispatchResponse, crate::errors::AppError> {
+    if let Some(key) = sync_oauth_message_key(&err) {
+        return Ok(SyncDispatchResponse {
+            ok: true,
+            event: event.to_string(),
+            data: SyncDispatchData::Ok(SyncOkDto::fail(key)),
+        });
+    }
+    Err(err)
+}
+
+fn provider_io_message_key(err: &crate::errors::AppError) -> Option<&'static str> {
+    super::providers::provider_io_message_key(err).or_else(|| sync_oauth_message_key(err))
 }
 
 fn persist_merged_snapshot(
@@ -195,8 +214,7 @@ pub async fn sync_dispatch_internal(
     }
     let current_status = {
         let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
-        rt.status = sync_status_from_config(&cfg);
-        rt.status.clone()
+        refresh_runtime_status(&cfg, &mut rt)
     };
 
     let _sync_guard = if command.needs_sync_lock() {
@@ -238,33 +256,88 @@ pub async fn sync_dispatch_internal(
             SyncDispatchData::Ok(SyncOkDto::success())
         }
         SyncDispatchCommand::Enable { provider } => {
-            // iCloud: do not block enable on folder discovery. On iOS the Drive path may appear
-            // only after first sync/open in Files; push/pull will surface I/O errors if needed.
             cfg.provider = Some(provider.clone());
-            cfg.enabled = true;
-            save_sync_config(&cfg)?;
+            cfg.enabled = false;
             {
                 let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                 rt.oauth_pkce_verifier = None;
+                rt.oauth_pending_provider = None;
             }
-            if let Some(url) = provider_auth_url(&provider, &cfg) {
-                {
-                    let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
-                    rt.oauth_pending_provider = Some(provider);
+
+            match &provider {
+                SyncProviderType::Gdrive | SyncProviderType::Dropbox | SyncProviderType::Onedrive => {
+                    if !oauth_connect_ready(&provider, &cfg) {
+                        cfg.provider = None;
+                        save_sync_config(&cfg)?;
+                        SyncDispatchData::Enable(SyncEnableDto {
+                            ok: false,
+                            awaiting_oauth: None,
+                            auth_url: None,
+                            message_key: Some(oauth_credentials_missing_key(&provider).to_string()),
+                        })
+                    } else if let Some(url) = provider_auth_url(&provider, &cfg) {
+                        save_sync_config(&cfg)?;
+                        {
+                            let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
+                            rt.oauth_pending_provider = Some(provider.clone());
+                            refresh_runtime_status(&cfg, &mut rt);
+                        }
+                        SyncDispatchData::Enable(SyncEnableDto {
+                            ok: true,
+                            awaiting_oauth: Some(true),
+                            auth_url: Some(url),
+                            message_key: None,
+                        })
+                    } else {
+                        cfg.provider = None;
+                        save_sync_config(&cfg)?;
+                        SyncDispatchData::Enable(SyncEnableDto {
+                            ok: false,
+                            awaiting_oauth: None,
+                            auth_url: None,
+                            message_key: Some(oauth_credentials_missing_key(&provider).to_string()),
+                        })
+                    }
                 }
-                SyncDispatchData::Enable(SyncEnableDto {
-                    ok: true,
-                    awaiting_oauth: Some(true),
-                    auth_url: Some(url),
-                    message_key: None,
-                })
-            } else {
-                SyncDispatchData::Enable(SyncEnableDto {
-                    ok: true,
-                    awaiting_oauth: Some(false),
-                    auth_url: None,
-                    message_key: None,
-                })
+                SyncProviderType::Webdav => {
+                    if !webdav_credentials_ready(&cfg) {
+                        cfg.provider = None;
+                        save_sync_config(&cfg)?;
+                        SyncDispatchData::Enable(SyncEnableDto {
+                            ok: false,
+                            awaiting_oauth: None,
+                            auth_url: None,
+                            message_key: Some("sync_webdav_credentials_missing".to_string()),
+                        })
+                    } else {
+                        cfg.enabled = true;
+                        save_sync_config(&cfg)?;
+                        {
+                            let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
+                            refresh_runtime_status(&cfg, &mut rt);
+                        }
+                        SyncDispatchData::Enable(SyncEnableDto {
+                            ok: true,
+                            awaiting_oauth: Some(false),
+                            auth_url: None,
+                            message_key: None,
+                        })
+                    }
+                }
+                SyncProviderType::Icloud => {
+                    cfg.enabled = true;
+                    save_sync_config(&cfg)?;
+                    {
+                        let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
+                        refresh_runtime_status(&cfg, &mut rt);
+                    }
+                    SyncDispatchData::Enable(SyncEnableDto {
+                        ok: true,
+                        awaiting_oauth: Some(false),
+                        auth_url: None,
+                        message_key: None,
+                    })
+                }
             }
         }
         SyncDispatchCommand::Disable => {
@@ -283,7 +356,7 @@ pub async fn sync_dispatch_internal(
                 let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                 rt.oauth_pending_provider = None;
                 rt.oauth_pkce_verifier = None;
-                rt.status = sync_status_from_config(&cfg);
+                refresh_runtime_status(&cfg, &mut rt);
             }
             SyncDispatchData::Ok(SyncOkDto::success())
         }
@@ -300,6 +373,7 @@ pub async fn sync_dispatch_internal(
             {
                 let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
                 rt.oauth_pending_provider = None;
+                refresh_runtime_status(&cfg, &mut rt);
             }
             SyncDispatchData::Ok(SyncOkDto::success())
         }
@@ -314,7 +388,10 @@ pub async fn sync_dispatch_internal(
                     })
                 }
             };
-            let token = provider_access_token(&provider, &cfg).await?;
+            let token = match provider_access_token(&provider, &cfg).await {
+                Ok(t) => t,
+                Err(e) => return oauth_token_fail_response(&event, e),
+            };
             let remote = provider_download(&app, &provider, &cfg, token.as_deref()).await?;
             if let Some(payload) = remote {
                 let remote_ts = payload.meta.updated_at.max(payload.meta.last_synced_at);
@@ -356,7 +433,10 @@ pub async fn sync_dispatch_internal(
                     })
                 }
             };
-            let token = provider_access_token(&provider, &cfg).await?;
+            let token = match provider_access_token(&provider, &cfg).await {
+                Ok(t) => t,
+                Err(e) => return oauth_token_fail_response(&event, e),
+            };
             let remote = match provider_download(&app, &provider, &cfg, token.as_deref()).await {
                 Ok(r) => r,
                 Err(e) => return icloud_fail_response(&event, e),
@@ -385,7 +465,7 @@ pub async fn sync_dispatch_internal(
                 save_sync_config(&cfg)?;
                 {
                     let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
-                    rt.status = sync_status_from_config(&cfg);
+                    refresh_runtime_status(&cfg, &mut rt);
                     rt.status.remote_updated_at = remote_ts;
                     rt.status.pending_update = false;
                 }
@@ -415,7 +495,10 @@ pub async fn sync_dispatch_internal(
                     })
                 }
             };
-            let token = provider_access_token(&provider, &cfg).await?;
+            let token = match provider_access_token(&provider, &cfg).await {
+                Ok(t) => t,
+                Err(e) => return oauth_token_fail_response(&event, e),
+            };
             if !force_overwrite_remote {
                 let remote = match provider_download(&app, &provider, &cfg, token.as_deref()).await {
                     Ok(r) => r,
@@ -450,7 +533,7 @@ pub async fn sync_dispatch_internal(
             save_sync_config(&cfg)?;
             {
                 let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
-                rt.status = sync_status_from_config(&cfg);
+                refresh_runtime_status(&cfg, &mut rt);
                 rt.status.remote_updated_at = payload.meta.updated_at;
             }
             SyncDispatchData::Ok(SyncOkDto::success())
@@ -466,7 +549,10 @@ pub async fn sync_dispatch_internal(
                     })
                 }
             };
-            let token = provider_access_token(&provider, &cfg).await?;
+            let token = match provider_access_token(&provider, &cfg).await {
+                Ok(t) => t,
+                Err(e) => return oauth_token_fail_response(&event, e),
+            };
             let remote_opt = match provider_download(&app, &provider, &cfg, token.as_deref()).await {
                 Ok(r) => r,
                 Err(e) => return icloud_fail_response(&event, e),
@@ -516,7 +602,7 @@ pub async fn sync_dispatch_internal(
                 save_sync_config(&cfg)?;
                 {
                     let mut rt = sync_runtime().lock().map_err(|_| crate::errors::AppError::SyncRuntimeLockPoisoned)?;
-                    rt.status = sync_status_from_config(&cfg);
+                    refresh_runtime_status(&cfg, &mut rt);
                 }
                 SyncDispatchData::Ok(SyncOkDto::success())
             }
@@ -524,7 +610,18 @@ pub async fn sync_dispatch_internal(
         SyncDispatchCommand::FlushBeforeExit { timeout_ms } => {
             let start = std::time::Instant::now();
             let result = if let Some(provider) = cfg.provider.clone() {
-                let token = provider_access_token(&provider, &cfg).await?;
+                let token = match provider_access_token(&provider, &cfg).await {
+                    Ok(t) => t,
+                    Err(_) => return Ok(SyncDispatchResponse {
+                        ok: true,
+                        event,
+                        data: SyncDispatchData::Ok(SyncOkDto {
+                            ok: false,
+                            pending_update: None,
+                            message_key: Some("sync_oauth_required".to_string()),
+                        }),
+                    }),
+                };
                 let remote_opt = provider_download(&app, &provider, &cfg, token.as_deref()).await?;
                 if sync_push_revision_mismatch(&cfg.remote_revision, remote_opt.as_ref()) {
                     false

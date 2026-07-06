@@ -4,6 +4,8 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import {
   syncStatus,
+  oauthPending,
+  openOAuthModal,
   getProviders,
   getSyncSettings,
   saveProviderSettings,
@@ -14,9 +16,11 @@ import {
   pushLocalForce,
   checkRemote,
   dismissPendingUpdate,
+  testWebdavConnection,
 } from "@/services/syncClient";
 import type { SyncProviderType, SyncProviderSchema } from "@/services/syncClient";
 import Modal from "@/components/ui/Modal.vue";
+import SyncOAuthModal from "@/components/settings/SyncOAuthModal.vue";
 import SecretInput from "@/components/ui/SecretInput.vue";
 import { ChevronRight, Cloud, CloudOff, Download, Save, Upload } from "@lucide/vue";
 import { ui } from "@/lib/tv";
@@ -32,7 +36,7 @@ const isConnecting = ref(false);
 const isSaving = ref<SyncProviderType | null>(null);
 const formValues = reactive<Record<string, Record<string, string>>>({});
 const fieldErrors = reactive<Record<string, string>>({});
-const showRevisionConflict = ref(false);
+const isTestingWebdav = ref(false);
 
 onMounted(() => {
   const cfg = getSyncSettings();
@@ -45,8 +49,23 @@ onMounted(() => {
   });
 });
 
-const activeProvider = computed(() => allProviders.value.find((p) => p.type === syncStatus.provider) ?? null);
-const visibleProviders = computed(() => allProviders.value.filter((p) => p.type !== syncStatus.provider));
+const showRevisionConflict = ref(false);
+
+const isConnected = computed(() => syncStatus.enabled && !syncStatus.oauthPending);
+const activeProvider = computed(() =>
+  isConnected.value ? allProviders.value.find((p) => p.type === syncStatus.provider) ?? null : null,
+);
+const visibleProviders = computed(() => {
+  if (isConnected.value && syncStatus.provider) {
+    return allProviders.value.filter((p) => p.type !== syncStatus.provider);
+  }
+  return allProviders.value;
+});
+const oauthPendingProvider = computed(() => {
+  const type = syncStatus.oauthPendingProvider ?? oauthPending.provider;
+  if (!type) return null;
+  return allProviders.value.find((p) => p.type === type) ?? null;
+});
 
 function providerLabel(type: SyncProviderType): string {
   return t(`sync_provider_${type}`);
@@ -80,6 +99,11 @@ function validateProviderFields(provider: SyncProviderSchema, silentClear = fals
     }
   }
   return false;
+}
+
+function canConnect(provider: SyncProviderSchema): boolean {
+  if (!provider.requiresSaveBeforeConnect) return true;
+  return canSave(provider);
 }
 
 function canSave(provider: SyncProviderSchema): boolean {
@@ -152,8 +176,12 @@ async function connectProvider(type: SyncProviderType) {
   try {
     const res = await enableProvider(type);
     if (res.ok) {
-      toast(t("sync_success"));
-      expandedProvider.value = null;
+      if (res.awaitingOAuth) {
+        // OAuth modal opened by syncClient; browser opened once.
+      } else {
+        toast(t("sync_connected"));
+        expandedProvider.value = null;
+      }
     } else {
       toast((res.messageKey && t(res.messageKey)) || t("sync_not_available"), "error");
     }
@@ -161,6 +189,29 @@ async function connectProvider(type: SyncProviderType) {
     toast(formatErrorForToast(e, t), "error");
   } finally {
     isConnecting.value = false;
+  }
+}
+
+async function cancelOAuthPending() {
+  await disableProvider();
+}
+
+function resumeOAuthModal() {
+  if (oauthPending.authUrl && oauthPending.provider) {
+    openOAuthModal(oauthPending.authUrl, oauthPending.provider);
+  }
+}
+
+async function handleTestWebdav() {
+  isTestingWebdav.value = true;
+  try {
+    const res = await testWebdavConnection();
+    if (res.ok) toast(t("sync_webdav_test_ok"));
+    else toast((res.messageKey && t(res.messageKey)) || t("sync_operation_failed"), "error");
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  } finally {
+    isTestingWebdav.value = false;
   }
 }
 
@@ -231,6 +282,23 @@ async function handleConflictForcePush() {
       <h2 :class="ui.sectionTitle()">{{ t("cloud_sync") }}</h2>
     </div>
     <p class="text-xs sm:text-sm text-text-muted mb-4">{{ t("cloud_sync_desc") }}</p>
+
+    <div
+      v-if="syncStatus.oauthPending && oauthPendingProvider"
+      class="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
+    >
+      <p class="text-xs text-amber-900 dark:text-amber-100 mb-2">
+        {{ t("sync_oauth_pending_banner", { provider: providerLabel(oauthPendingProvider.type) }) }}
+      </p>
+      <div class="flex gap-2">
+        <button type="button" class="px-3 py-1.5 rounded-lg text-xs bg-primary text-white" @click="resumeOAuthModal">
+          {{ t("sync_oauth_open_browser") }}
+        </button>
+        <button type="button" class="px-3 py-1.5 rounded-lg text-xs border border-border" @click="cancelOAuthPending">
+          {{ t("sync_oauth_cancel") }}
+        </button>
+      </div>
+    </div>
 
     <div v-if="activeProvider" class="mb-4 p-4 rounded-xl bg-surface-secondary border border-border">
       <div class="flex items-center justify-between">
@@ -313,8 +381,16 @@ async function handleConflictForcePush() {
               <Save :size="12" class="inline-block mr-1" />{{ isSaving === provider.type ? t("sync_saving") : t("sync_save_credentials") }}
             </button>
             <button
+              v-if="provider.type === 'webdav'"
+              @click="handleTestWebdav"
+              :disabled="isTestingWebdav || !canSave(provider)"
+              class="px-3 py-1.5 rounded-lg text-xs border border-border disabled:opacity-50"
+            >
+              {{ isTestingWebdav ? t("sync_checking") : t("sync_webdav_test_connection") }}
+            </button>
+            <button
               @click="connectProvider(provider.type)"
-              :disabled="isConnecting || !canSave(provider)"
+              :disabled="isConnecting || !canConnect(provider)"
               class="px-3 py-1.5 rounded-lg text-xs bg-primary text-white disabled:opacity-50"
             >
               {{ t("sync_connect") }}
@@ -355,5 +431,7 @@ async function handleConflictForcePush() {
         </button>
       </div>
     </Modal>
+
+    <SyncOAuthModal :provider-label="providerLabel" />
   </section>
 </template>

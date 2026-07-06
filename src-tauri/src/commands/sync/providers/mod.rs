@@ -1,4 +1,4 @@
-use super::{SyncConfig, SyncPayload, SyncProviderType};
+use super::{SyncAuthKind, SyncConfig, SyncPayload, SyncProviderType};
 use crate::keyring_store;
 use serde::{Deserialize, Serialize};
 mod gdrive;
@@ -16,6 +16,8 @@ pub struct ProviderInfo {
     pub name: String,
     pub icon: String,
     pub fields: Vec<ProviderField>,
+    pub auth_kind: SyncAuthKind,
+    pub requires_save_before_connect: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,4 +126,16 @@ pub async fn provider_upload(
         SyncProviderType::Webdav => webdav::upload(cfg, payload).await,
         SyncProviderType::Icloud => icloud::upload(app, cfg, payload).await,
     }
+}
+
+pub(crate) fn provider_io_message_key(err: &crate::errors::AppError) -> Option<&'static str> {
+    icloud::icloud_sync_message_key(err)
+        .or_else(|| gdrive::gdrive_sync_message_key(err))
+        .or_else(|| dropbox::dropbox_sync_message_key(err))
+        .or_else(|| onedrive::onedrive_sync_message_key(err))
+        .or_else(|| webdav::webdav_sync_message_key(err))
+}
+
+pub async fn webdav_test_connection(cfg: &SyncConfig) -> Result<(), crate::errors::AppError> {
+    webdav::test_connection(cfg).await
 }

@@ -45,11 +45,68 @@ pub fn descriptor() -> super::ProviderInfo {
                 has_saved_value: None,
             },
         ],
+        auth_kind: super::SyncAuthKind::Credentials,
+        requires_save_before_connect: true,
     }
 }
 
 fn item_url(base: &str, name: &str) -> String {
     format!("{}/{}", base.trim_end_matches('/'), name)
+}
+
+pub(crate) fn webdav_sync_message_key(err: &crate::errors::AppError) -> Option<&'static str> {
+    let msg = err.to_string().to_lowercase();
+    if msg.contains("webdav auth") || msg.contains("401") || msg.contains("403") {
+        return Some("sync_webdav_auth_failed");
+    }
+    if msg.contains("webdav") || msg.contains("tls") || msg.contains("certificate") {
+        return Some("sync_webdav_unreachable");
+    }
+    None
+}
+
+/// HEAD/PROPFIND against the configured base URL to verify reachability and credentials.
+pub async fn test_connection(cfg: &SyncConfig) -> Result<(), crate::errors::AppError> {
+    if cfg.webdav_url.trim().is_empty() || cfg.webdav_username.trim().is_empty() {
+        return Err(crate::errors::AppError::from("webdav credentials missing"));
+    }
+    let pwd = webdav_password()?;
+    let base = cfg.webdav_url.trim_end_matches('/').to_string();
+    let client = tauri_plugin_http::reqwest::Client::new();
+    let auth = (cfg.webdav_username.clone(), Some(pwd));
+
+    let head = client
+        .head(&base)
+        .basic_auth(auth.0.clone(), auth.1.clone())
+        .send()
+        .await
+        .map_err(|e| crate::errors::AppError::from(format!("webdav tls/connect: {}", e)))?;
+
+    let status = head.status();
+    if status.is_success() || status.as_u16() == 405 || status.as_u16() == 501 {
+        return Ok(());
+    }
+    if status.as_u16() == 401 || status.as_u16() == 403 {
+        return Err(crate::errors::AppError::from(format!("webdav auth failed: {}", status)));
+    }
+
+    let propfind = Method::from_bytes(b"PROPFIND")
+        .map_err(|_| crate::errors::AppError::from("PROPFIND method"))?;
+    let pf = client
+        .request(propfind, &base)
+        .basic_auth(auth.0, auth.1)
+        .header("Depth", "0")
+        .send()
+        .await
+        .map_err(|e| crate::errors::AppError::from(format!("webdav propfind: {}", e)))?;
+    let pf_status = pf.status();
+    if pf_status.is_success() || pf_status.as_u16() == 207 {
+        return Ok(());
+    }
+    if pf_status.as_u16() == 401 || pf_status.as_u16() == 403 {
+        return Err(crate::errors::AppError::from(format!("webdav auth failed: {}", pf_status)));
+    }
+    Err(crate::errors::AppError::from(format!("webdav test failed: {}", pf_status)))
 }
 
 pub async fn download(cfg: &SyncConfig) -> Result<Option<SyncPayload>, crate::errors::AppError> {

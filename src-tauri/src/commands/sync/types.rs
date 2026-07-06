@@ -10,6 +10,14 @@ pub enum SyncProviderType {
     Webdav,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum SyncAuthKind {
+    None,
+    Oauth,
+    Credentials,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SyncStatusDto {
@@ -21,6 +29,11 @@ pub struct SyncStatusDto {
     pub remote_updated_at: i64,
     pub local_updated_at: i64,
     pub pending_update: bool,
+    /// True while browser OAuth is in progress (tokens not stored yet).
+    #[serde(default)]
+    pub oauth_pending: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oauth_pending_provider: Option<SyncProviderType>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

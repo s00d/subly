@@ -12,6 +12,8 @@ pub fn descriptor() -> super::ProviderInfo {
         name: "iCloud".to_string(),
         icon: "icloud".to_string(),
         fields: vec![],
+        auth_kind: super::SyncAuthKind::None,
+        requires_save_before_connect: false,
     }
 }
 

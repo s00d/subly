@@ -220,3 +220,18 @@ pub async fn provider_access_token(provider: &SyncProviderType, cfg: &SyncConfig
         _ => Ok(None),
     }
 }
+
+/// Map OAuth/token errors to stable UI message keys.
+pub fn sync_oauth_message_key(err: &crate::errors::AppError) -> Option<&'static str> {
+    let msg = err.to_string().to_lowercase();
+    if msg.contains("oauth tokens missing") || msg.contains("provider has no oauth token") {
+        return Some("sync_oauth_required");
+    }
+    if msg.contains("pkce verifier missing") {
+        return Some("sync_oauth_pkce_missing");
+    }
+    if msg.contains("oauth exchange failed") || msg.contains("token refresh failed") {
+        return Some("sync_oauth_required");
+    }
+    None
+}

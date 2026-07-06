@@ -7,8 +7,8 @@ fn enc_query(s: &str) -> String {
     utf8_percent_encode(s, NON_ALPHANUMERIC).to_string()
 }
 
-/// Временное имя внутри `approot` для атомарной замены основного файла.
-const ONEDRIVE_TMP_NAME: &str = "subly-sync-v1.upload.tmp";
+/// Temporary upload name inside OneDrive `approot` for atomic replace.
+const ONEDRIVE_TMP_NAME: &str = "subly-sync-v2.sublysync.upload.tmp";
 
 pub fn descriptor() -> super::ProviderInfo {
     super::ProviderInfo {
@@ -28,6 +28,8 @@ pub fn descriptor() -> super::ProviderInfo {
                 has_saved_value: None,
             },
         ],
+        auth_kind: super::SyncAuthKind::Oauth,
+        requires_save_before_connect: true,
     }
 }
 
@@ -41,6 +43,17 @@ pub fn auth_url(cfg: &SyncConfig) -> Option<String> {
         enc_query(OAUTH_REDIRECT_URI),
         enc_query("Files.ReadWrite.AppFolder offline_access"),
     ))
+}
+
+pub(crate) fn onedrive_sync_message_key(err: &crate::errors::AppError) -> Option<&'static str> {
+    let msg = err.to_string().to_lowercase();
+    if msg.contains("401") || msg.contains("unauthorized") {
+        return Some("sync_oauth_required");
+    }
+    if msg.contains("onedrive") {
+        return Some("sync_onedrive_error");
+    }
+    None
 }
 
 pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<SyncPayload>, crate::errors::AppError> {

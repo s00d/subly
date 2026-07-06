@@ -23,11 +23,14 @@ pub(crate) use config::{
     KR_SYNC_WEBDAV_PASSWORD, MAX_SYNC_PAYLOAD_BYTES, OAUTH_REDIRECT_URI, SYNC_FILENAME,
 };
 pub(crate) use wire::{decode_sync_payload, encode_sync_payload};
-pub(crate) use oauth::{exchange_oauth_code, provider_access_token};
+pub(crate) use oauth::{exchange_oauth_code, provider_access_token, sync_oauth_message_key};
 pub(crate) use orchestrator::{sync_dispatch_internal, SyncDispatchCommand, SyncDispatchResponse};
-pub(crate) use providers::{provider_auth_url, provider_download, provider_upload, providers_list};
-pub(crate) use state::{sync_runtime, sync_status_from_config};
-pub(crate) use types::{OAuthTokens, SyncConfig, SyncMeta, SyncPayload};
+pub(crate) use providers::{provider_auth_url, provider_download, provider_upload, providers_list, webdav_test_connection};
+pub(crate) use state::{
+    oauth_connect_ready, oauth_credentials_missing_key, refresh_runtime_status, sync_runtime,
+    webdav_credentials_ready,
+};
+pub(crate) use types::{OAuthTokens, SyncAuthKind, SyncConfig, SyncMeta, SyncPayload};
 use crate::models::{AppDataDoc, DeletionTombstone, TombstoneEntityKind};
 use self::providers::ProviderInfo;
 use std::collections::HashMap;
@@ -443,6 +446,23 @@ pub async fn sync_dismiss_pending_update(
     extract_data(response)
 }
 
+#[tauri::command]
+pub async fn sync_webdav_test_connection(_app: tauri::AppHandle) -> Result<SyncOkDto, crate::errors::AppError> {
+    let cfg = load_sync_config()?;
+    match webdav_test_connection(&cfg).await {
+        Ok(()) => Ok(SyncOkDto::success()),
+        Err(e) => {
+            if let Some(key) = providers::provider_io_message_key(&e) {
+                Ok(SyncOkDto::fail(key))
+            } else if e.to_string().contains("credentials missing") {
+                Ok(SyncOkDto::fail("sync_webdav_credentials_missing"))
+            } else {
+                Err(e)
+            }
+        }
+    }
+}
+
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 #[tauri::command]
 pub fn sync_icloud_debug_state() -> providers::icloud_native::IcloudDebugState {
@@ -458,6 +478,54 @@ pub fn sync_icloud_debug_state() -> serde_json::Value {
 #[cfg(test)]
 mod tests {
     use super::{sync_merge_app_data, sync_merge_with_tombstones, sync_push_revision_mismatch};
+    use crate::commands::sync::state::{
+        dropbox_credentials_ready, oauth_connect_ready, onedrive_credentials_ready, sync_status_snapshot,
+        webdav_credentials_ready,
+    };
+    use crate::commands::sync::types::{SyncConfig, SyncProviderType};
+
+    #[test]
+    fn oauth_enable_leaves_disabled_until_finish() {
+        let mut cfg = SyncConfig::default();
+        cfg.provider = Some(SyncProviderType::Gdrive);
+        cfg.enabled = false;
+        let status = sync_status_snapshot(&cfg, Some(&SyncProviderType::Gdrive));
+        assert!(!status.enabled);
+        assert!(status.oauth_pending);
+        assert_eq!(status.oauth_pending_provider, Some(SyncProviderType::Gdrive));
+    }
+
+    #[test]
+    fn oauth_finish_enables_provider_in_status_snapshot() {
+        let mut cfg = SyncConfig::default();
+        cfg.provider = Some(SyncProviderType::Gdrive);
+        cfg.enabled = true;
+        let status = sync_status_snapshot(&cfg, None);
+        assert!(status.enabled);
+        assert!(!status.oauth_pending);
+    }
+
+    #[test]
+    fn webdav_enable_requires_url_and_username() {
+        let mut cfg = SyncConfig::default();
+        assert!(!webdav_credentials_ready(&cfg));
+        cfg.webdav_url = "https://example.com/dav".to_string();
+        assert!(!webdav_credentials_ready(&cfg));
+        cfg.webdav_username = "user".to_string();
+        assert!(webdav_credentials_ready(&cfg));
+    }
+
+    #[test]
+    fn dropbox_oauth_requires_key_and_saved_secret() {
+        let mut cfg = SyncConfig::default();
+        assert!(!dropbox_credentials_ready(&cfg));
+        assert!(!oauth_connect_ready(&SyncProviderType::Dropbox, &cfg));
+        cfg.dropbox_app_key = "appkey12345678".to_string();
+        assert!(!dropbox_credentials_ready(&cfg));
+        cfg.onedrive_client_id = "client-id-12345678".to_string();
+        assert!(onedrive_credentials_ready(&cfg));
+        assert!(oauth_connect_ready(&SyncProviderType::Gdrive, &cfg));
+    }
 
     #[test]
     fn sync_merge_local_tombstone_drops_remote_row_when_delete_is_newer() {

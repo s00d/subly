@@ -3,6 +3,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { callCommand } from "@/services/commandClient";
 
 export type SyncProviderType = "icloud" | "gdrive" | "dropbox" | "onedrive" | "webdav";
+export type SyncAuthKind = "none" | "oauth" | "credentials";
 
 export interface SyncStatus {
   provider: SyncProviderType | null;
@@ -13,6 +14,8 @@ export interface SyncStatus {
   remoteUpdatedAt: number;
   localUpdatedAt: number;
   pendingUpdate: boolean;
+  oauthPending: boolean;
+  oauthPendingProvider: SyncProviderType | null;
 }
 
 export interface SyncProviderFieldValidation {
@@ -41,6 +44,8 @@ export interface SyncProviderSchema {
   name: string;
   icon: string;
   fields: SyncProviderFieldSchema[];
+  authKind?: SyncAuthKind;
+  requiresSaveBeforeConnect?: boolean;
 }
 
 export interface SyncSettings {
@@ -91,6 +96,14 @@ export const syncStatus = reactive<SyncStatus>({
   remoteUpdatedAt: 0,
   localUpdatedAt: 0,
   pendingUpdate: false,
+  oauthPending: false,
+  oauthPendingProvider: null,
+});
+
+export const oauthPending = reactive({
+  open: false,
+  authUrl: null as string | null,
+  provider: null as SyncProviderType | null,
 });
 
 let syncSettings: SyncSettings = { ...defaultSettings };
@@ -105,6 +118,28 @@ function applyStatus(next: SyncStatus) {
   syncStatus.remoteUpdatedAt = next.remoteUpdatedAt;
   syncStatus.localUpdatedAt = next.localUpdatedAt;
   syncStatus.pendingUpdate = next.pendingUpdate;
+  syncStatus.oauthPending = !!next.oauthPending;
+  syncStatus.oauthPendingProvider = next.oauthPendingProvider ?? null;
+
+  if (next.oauthPending && next.oauthPendingProvider) {
+    oauthPending.provider = next.oauthPendingProvider;
+  } else if (!next.oauthPending) {
+    oauthPending.open = false;
+    oauthPending.authUrl = null;
+    oauthPending.provider = null;
+  }
+}
+
+export function openOAuthModal(authUrl: string, provider: SyncProviderType) {
+  oauthPending.open = true;
+  oauthPending.authUrl = authUrl;
+  oauthPending.provider = provider;
+}
+
+export function closeOAuthModal() {
+  oauthPending.open = false;
+  oauthPending.authUrl = null;
+  oauthPending.provider = null;
 }
 
 async function refreshStatus() {
@@ -141,13 +176,12 @@ export function getSyncSettings(): SyncSettings {
 export async function saveProviderSettings(provider: SyncProviderType, credentials: Record<string, string>): Promise<void> {
   const settings = await callCommand<SyncSettings>("sync_save_settings", { provider, credentials });
   syncSettings = { ...defaultSettings, ...settings };
-  // Keep `hasSavedValue` indicators in sync with the keyring without
-  // forcing the caller to reload the whole UI.
   await refreshProvidersSchema();
 }
 
 export type EnableProviderResult = {
   ok: boolean;
+  awaitingOAuth?: boolean;
   /** Backend i18n key when `ok` is false */
   messageKey?: string;
 };
@@ -160,21 +194,30 @@ export async function enableProvider(provider: SyncProviderType): Promise<Enable
     messageKey?: string;
   }>("sync_enable_provider", { provider });
   if (res.awaitingOAuth && res.authUrl) {
+    openOAuthModal(res.authUrl, provider);
     await openUrl(res.authUrl);
   }
   await refreshStatus();
-  return { ok: !!res.ok, messageKey: res.messageKey };
+  return { ok: !!res.ok, awaitingOAuth: res.awaitingOAuth, messageKey: res.messageKey };
 }
 
 export async function disableProvider(): Promise<void> {
+  closeOAuthModal();
   await callCommand("sync_disable_provider");
   await refreshStatus();
 }
 
 export async function finishOAuth(code: string, provider?: SyncProviderType): Promise<boolean> {
   const res = await callCommand<{ ok: boolean }>("sync_oauth_finish", { code, provider });
+  closeOAuthModal();
   await refreshStatus();
+  await refreshProvidersSchema();
   return !!res.ok;
+}
+
+export async function testWebdavConnection(): Promise<{ ok: boolean; messageKey?: string }> {
+  const res = await callCommand<SyncOkResponse>("sync_webdav_test_connection");
+  return { ok: !!res.ok, messageKey: res.messageKey };
 }
 
 export async function checkRemote(): Promise<boolean> {

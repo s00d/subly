@@ -44,6 +44,8 @@ pub fn descriptor() -> super::ProviderInfo {
                 has_saved_value: None,
             },
         ],
+        auth_kind: super::SyncAuthKind::Oauth,
+        requires_save_before_connect: true,
     }
 }
 
@@ -56,6 +58,17 @@ pub fn auth_url(cfg: &SyncConfig) -> Option<String> {
         enc_query(&cfg.dropbox_app_key),
         enc_query(OAUTH_REDIRECT_URI),
     ))
+}
+
+pub(crate) fn dropbox_sync_message_key(err: &crate::errors::AppError) -> Option<&'static str> {
+    let msg = err.to_string().to_lowercase();
+    if msg.contains("401") || msg.contains("unauthorized") {
+        return Some("sync_oauth_required");
+    }
+    if msg.contains("dropbox") {
+        return Some("sync_dropbox_error");
+    }
+    None
 }
 
 pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<SyncPayload>, crate::errors::AppError> {

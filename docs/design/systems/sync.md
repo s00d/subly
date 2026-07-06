@@ -57,18 +57,57 @@ Visible in Files as **Subly → Subly-v1** when `NSUbiquitousContainers` is set 
 | `sync_pull_legacy_format` | Remote file is v1 JSON |
 | `sync_pull_no_remote_file` | No candidate file in cloud folder |
 
-Orchestrator maps iCloud `Err` from `provider_download` to `SyncOkDto.messageKey` for pull/push/sync-now.
+Orchestrator maps provider I/O `Err` from `provider_download` / missing OAuth tokens to `SyncOkDto.messageKey` for pull/push/sync-now.
+
+## Connection states
+
+| State | `cfg.enabled` | Runtime | UI |
+|-------|---------------|---------|-----|
+| disconnected | false | — | provider list |
+| `oauth_pending` | false | `oauth_pending_provider` set | OAuth modal + banner |
+| connected | true | tokens / iCloud I/O OK | Pull / Push panel |
+| setup_required | false | — | credentials form + Save |
+
+OAuth providers (GDrive, Dropbox, OneDrive): `enabled = true` only after `sync_oauth_finish`. iCloud: `enabled` immediately on Connect. WebDAV: `enabled` when URL + username are saved.
+
+## OAuth flow
+
+1. User taps **Connect** → `sync_enable_provider` returns `awaitingOAuth: true` + `authUrl` (does **not** set `enabled` yet).
+2. UI opens browser (`openUrl`) and shows `SyncOAuthModal`.
+3. Provider redirects to `subly://oauth/callback?code=…&state=gdrive|dropbox|onedrive`.
+4. `App.vue` → `finishOAuth` → `sync_oauth_finish` stores tokens, sets `enabled = true`.
+5. **Cancel** → `sync_disable_provider` clears pending state.
+
+`SyncStatusDto`: `oauthPending`, `oauthPendingProvider`.
+
+### OAuth / provider message keys
+
+| Key | When |
+|-----|------|
+| `sync_oauth_required` | Pull/push without stored tokens |
+| `sync_oauth_pkce_missing` | GDrive PKCE verifier lost (restart mid-flow) |
+| `sync_dropbox_credentials_missing` | Connect before Save key/secret |
+| `sync_onedrive_credentials_missing` | Connect before Save client ID |
+| `sync_webdav_credentials_missing` | Connect / test without URL+user |
+| `sync_gdrive_unauthorized` | GDrive HTTP 401 |
+| `sync_webdav_auth_failed` | WebDAV 401/403 |
+| `sync_webdav_unreachable` | WebDAV network/TLS errors |
 
 ## Lifecycle
 
-1. **Connect** — `sync_enable_provider` (iCloud: no credentials)
-2. **Upload** — encode local snapshot → provider upload (iCloud: canonical v2 filename only)
-3. **Check** — download metadata path / compare revision
-4. **Pull** — download → merge → persist → emit `app:data-changed`
+1. **Connect** — `sync_enable_provider` (credentials per `ProviderInfo.requiresSaveBeforeConnect`)
+2. **OAuth finish** (if applicable) — deep link → `sync_oauth_finish`
+3. **Upload** — encode local snapshot → provider upload
+4. **Check** — download metadata path / compare revision
+5. **Pull** — download → merge → persist → emit `app:data-changed`
+
+WebDAV: optional `sync_webdav_test_connection` (HEAD/PROPFIND) before Connect.
 
 Logs: filter `[subly][icloud]` in Console.app.
 
 ## Manual smoke checklist (pre-release)
+
+### iCloud
 
 | # | Scenario | Expected |
 |---|----------|----------|
@@ -79,6 +118,17 @@ Logs: filter `[subly][icloud]` in Console.app.
 | 5 | File evicted (Settings → storage) → Pull | `sync_icloud_materializing`, not “no file” |
 | 6 | iCloud off | `sync_icloud_unavailable` |
 | 7 | App restart | No re-Connect required |
+
+### All cloud providers
+
+| # | Provider | Scenario | Expected |
+|---|----------|----------|----------|
+| 1 | GDrive | Connect → modal → browser → deep link | Connected panel; no false “success” before OAuth |
+| 2 | Dropbox | Save keys → Connect → OAuth → Upload/Pull | Works on second device |
+| 3 | OneDrive | Save client ID → Connect → OAuth → Upload/Pull | Works |
+| 4 | WebDAV | Save → Test connection → Connect → Upload/Pull | Wrong password → `sync_webdav_auth_failed` |
+| 5 | iCloud | After OAuth fixes | Connected panel unchanged |
+| 6 | Any OAuth | Connect → close browser → Cancel | Not left in “Connected” state |
 
 ## Verification
 

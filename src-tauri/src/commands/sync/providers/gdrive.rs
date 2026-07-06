@@ -17,11 +17,28 @@ pub fn descriptor() -> super::ProviderInfo {
         name: "Google Drive".to_string(),
         icon: "gdrive".to_string(),
         fields: vec![],
+        auth_kind: super::SyncAuthKind::Oauth,
+        requires_save_before_connect: false,
     }
 }
 
 pub fn auth_url() -> Option<String> {
     oauth::google_authorize_url().ok()
+}
+
+pub(crate) fn gdrive_sync_message_key(err: &crate::errors::AppError) -> Option<&'static str> {
+    let msg = err.to_string().to_lowercase();
+    if msg.contains("401") || msg.contains("unauthorized") {
+        return Some("sync_gdrive_unauthorized");
+    }
+    if msg.contains("gdrive") {
+        return Some("sync_gdrive_error");
+    }
+    None
+}
+
+fn gdrive_http_err(context: &str, status: tauri_plugin_http::reqwest::StatusCode) -> crate::errors::AppError {
+    crate::errors::AppError::from(format!("gdrive {} failed: {}", context, status))
 }
 
 pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<SyncPayload>, crate::errors::AppError> {
@@ -37,6 +54,9 @@ pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<Sy
         .await
         .map_err(|e| e.to_string())?;
     if !list_resp.status().is_success() {
+        if list_resp.status() == tauri_plugin_http::reqwest::StatusCode::UNAUTHORIZED {
+            return Err(gdrive_http_err("list", list_resp.status()));
+        }
         return Ok(None);
     }
     let list_json: GdriveFilesListResponse = list_resp.json().await.map_err(|e| e.to_string())?;
@@ -49,6 +69,9 @@ pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<Sy
         .await
         .map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
+        if resp.status() == tauri_plugin_http::reqwest::StatusCode::UNAUTHORIZED {
+            return Err(gdrive_http_err("download", resp.status()));
+        }
         return Ok(None);
     }
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
@@ -105,10 +128,7 @@ pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str
         .await
         .map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
-        return Err(crate::errors::AppError::from(format!(
-            "gdrive upload failed: {}",
-            resp.status()
-        )));
+        return Err(gdrive_http_err("upload", resp.status()));
     }
     Ok(())
 }
