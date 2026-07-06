@@ -19,6 +19,20 @@ fn sync_lock() -> &'static Mutex<()> {
     GLOBAL_SYNC_LOCK.get_or_init(|| Mutex::new(()))
 }
 
+fn icloud_fail_response(
+    event: &str,
+    err: crate::errors::AppError,
+) -> Result<SyncDispatchResponse, crate::errors::AppError> {
+    if let Some(key) = super::providers::icloud::icloud_sync_message_key(&err) {
+        return Ok(SyncDispatchResponse {
+            ok: true,
+            event: event.to_string(),
+            data: SyncDispatchData::Ok(SyncOkDto::fail(key)),
+        });
+    }
+    Err(err)
+}
+
 fn persist_merged_snapshot(
     guard: &mut crate::state::AppStateInner,
     merged: &crate::models::AppDataDoc,
@@ -343,7 +357,11 @@ pub async fn sync_dispatch_internal(
                 }
             };
             let token = provider_access_token(&provider, &cfg).await?;
-            if let Some(remote) = provider_download(&app, &provider, &cfg, token.as_deref()).await? {
+            let remote = match provider_download(&app, &provider, &cfg, token.as_deref()).await {
+                Ok(r) => r,
+                Err(e) => return icloud_fail_response(&event, e),
+            };
+            if let Some(remote) = remote {
                 let (merged, merged_tombstones) = {
                     let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
                     let local_ts = crate::state::load_deletion_tombstones(guard.db.as_ref())?;
@@ -399,7 +417,10 @@ pub async fn sync_dispatch_internal(
             };
             let token = provider_access_token(&provider, &cfg).await?;
             if !force_overwrite_remote {
-                let remote = provider_download(&app, &provider, &cfg, token.as_deref()).await?;
+                let remote = match provider_download(&app, &provider, &cfg, token.as_deref()).await {
+                    Ok(r) => r,
+                    Err(e) => return icloud_fail_response(&event, e),
+                };
                 if sync_push_revision_mismatch(&cfg.remote_revision, remote.as_ref()) {
                     return Ok(SyncDispatchResponse {
                         ok: true,
@@ -446,7 +467,10 @@ pub async fn sync_dispatch_internal(
                 }
             };
             let token = provider_access_token(&provider, &cfg).await?;
-            let remote_opt = provider_download(&app, &provider, &cfg, token.as_deref()).await?;
+            let remote_opt = match provider_download(&app, &provider, &cfg, token.as_deref()).await {
+                Ok(r) => r,
+                Err(e) => return icloud_fail_response(&event, e),
+            };
             let has_update = if let Some(ref remote) = remote_opt {
                 let remote_ts = remote.meta.updated_at.max(remote.meta.last_synced_at);
                 sync_should_pull(

@@ -8,11 +8,19 @@ pub const ONEDRIVE_TOKEN_KEY: &str = "onedrive_tokens";
 pub(crate) const KR_SYNC_DROPBOX_APP_SECRET: &str = "subly.sync.dropbox_app_secret";
 pub(crate) const KR_SYNC_WEBDAV_PASSWORD: &str = "subly.sync.webdav_password";
 
+/// iCloud ubiquity container id (entitlements + App Store Connect).
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+pub const APP_ICLOUD_CONTAINER_ID: &str = "iCloud.com.s00d.subly";
 /// Подпапка внутри ubiquity `Documents/` (iOS/macOS).
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 pub const SYNC_ICLOUD_FOLDER: &str = "Subly-v1";
+/// Legacy user-visible iCloud Drive path segment (macOS migration only).
+#[cfg(target_os = "macos")]
+pub const SYNC_LEGACY_CLOUDDOCS_SEGMENT: &str = "com~apple~CloudDocs";
 /// Имя файла синка (все провайдеры). Dropbox по-прежнему: `/Apps/Subly/<файл>`.
 pub const SYNC_FILENAME: &str = "subly-sync-v2.sublysync";
+/// Старое имя из UI/ранних сборок; iCloud может ещё содержать этот файл.
+pub const SYNC_FILENAME_LEGACY_JSON: &str = "subly-sync-v1.json";
 pub const MAX_SYNC_PAYLOAD_BYTES: usize = 2_500_000;
 /// Единый redirect для OAuth (Google / Dropbox / OneDrive). Должен совпадать с deep link в приложении.
 pub const OAUTH_REDIRECT_URI: &str = "subly://oauth/callback";

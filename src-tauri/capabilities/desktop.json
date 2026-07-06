@@ -54,22 +54,6 @@
     {
       "identifier": "fs:allow-read-text-file",
       "allow": [{ "path": "**" }]
-    },
-    {
-      "identifier": "fs:allow-read-text-file",
-      "allow": [{ "path": "/Users/*/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
-    },
-    {
-      "identifier": "fs:allow-write-text-file",
-      "allow": [{ "path": "/Users/*/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
-    },
-    {
-      "identifier": "fs:allow-read-file",
-      "allow": [{ "path": "/Users/*/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
-    },
-    {
-      "identifier": "fs:allow-write-file",
-      "allow": [{ "path": "/Users/*/Library/Mobile Documents/com~apple~CloudDocs/Subly-v1/**" }]
     }
   ]
 }

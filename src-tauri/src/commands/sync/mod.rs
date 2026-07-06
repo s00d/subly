@@ -1,5 +1,6 @@
 mod config;
 pub(crate) mod oauth;
+mod icloud_resolve;
 mod orchestrator;
 pub(crate) mod providers;
 mod state;

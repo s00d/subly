@@ -2,11 +2,17 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>ITSAppUsesNonExemptEncryption</key>
-  <false/>
-  <key>NSCameraUsageDescription</key>
-  <string>Subly uses the camera so you can take a photo for subscription logos.</string>
-  <key>NSPhotoLibraryUsageDescription</key>
-  <string>Subly uses your photo library so you can pick an image for subscription logos.</string>
+	<key>NSUbiquitousContainers</key>
+	<dict>
+		<key>iCloud.com.s00d.subly</key>
+		<dict>
+			<key>NSUbiquitousContainerIsDocumentScopePublic</key>
+			<true/>
+			<key>NSUbiquitousContainerName</key>
+			<string>Subly</string>
+			<key>NSUbiquitousContainerSupportedFolderLevels</key>
+			<string>One</string>
+		</dict>
+	</dict>
 </dict>
 </plist>

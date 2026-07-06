@@ -8,11 +8,20 @@ type TFn = (key: string, values?: Record<string, string | number>) => string;
 export function formatErrorForToast(err: unknown, t: TFn): string {
   const mapKnown = (m: string): string => {
     if (
+      m === "sync_icloud_unavailable" ||
+      m === "sync_icloud_materializing" ||
+      m === "sync_pull_legacy_format"
+    ) {
+      return t(m);
+    }
+    if (m.includes("iCloud ubiquity container is unavailable")) {
+      return t("sync_icloud_unavailable");
+    }
+    if (
       m.includes("startDownloadingUbiquitousItem failed") ||
-      m.includes("iCloud ubiquity container is unavailable") ||
       m.includes("icloud file is not materialized yet")
     ) {
-      return t("sync_pull_no_remote_file");
+      return t("sync_icloud_materializing");
     }
     return m;
   };

@@ -24,10 +24,5 @@
   <array>
     <string>iCloud.com.s00d.subly</string>
   </array>
-  <!-- Legacy: older builds synced under the user-visible iCloud Drive folder; kept until all installs use ubiquity. -->
-  <key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
-  <array>
-    <string>Library/Mobile Documents/com~apple~CloudDocs</string>
-  </array>
 </dict>
 </plist>

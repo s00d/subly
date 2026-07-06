@@ -59,7 +59,12 @@ targets:
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
         CFBundleShortVersionString: 1.0.5
-        CFBundleVersion: "10006"
+        CFBundleVersion: "10007"
+        NSUbiquitousContainers:
+          iCloud.com.s00d.subly:
+            NSUbiquitousContainerIsDocumentScopePublic: true
+            NSUbiquitousContainerName: Subly
+            NSUbiquitousContainerSupportedFolderLevels: One
     # Must match src-tauri/entitlements/ios.plist (App Groups + iCloud). Empty gen/subly_iOS*.entitlements breaks widget + sync.
     entitlements:
       path: ../../entitlements/ios.plist

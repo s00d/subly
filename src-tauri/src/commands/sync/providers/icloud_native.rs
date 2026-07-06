@@ -5,16 +5,23 @@
 use core::ptr::NonNull;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use block2::RcBlock;
 use objc2::rc::autoreleasepool;
 use objc2_foundation::{
     NSFileCoordinator, NSFileCoordinatorReadingOptions, NSFileCoordinatorWritingOptions, NSFileManager, NSError,
-    NSString, NSURL,
+    NSString, NSURL, NSURLUbiquitousItemDownloadingStatusCurrent,
+    NSURLUbiquitousItemDownloadingStatusDownloaded, NSURLUbiquitousItemDownloadingStatusKey,
+    NSURLUbiquitousItemIsDownloadingKey,
 };
+use objc2::rc::Retained;
+use objc2::runtime::AnyObject;
+
+use super::super::icloud_resolve::resolve_icloud_sync_file_from_names;
 
 #[cfg(any(target_os = "ios", target_os = "macos"))]
-const APP_ICLOUD_CONTAINER_ID: &str = "iCloud.com.s00d.subly";
+use crate::commands::sync::config::APP_ICLOUD_CONTAINER_ID;
 
 fn path_to_file_url(path: &Path) -> Result<objc2::rc::Retained<NSURL>, crate::errors::AppError> {
     let s = path
@@ -74,41 +81,112 @@ pub(crate) fn ubiquity_sync_subdir(relative_folder: &str) -> Option<PathBuf> {
     })
 }
 
+/// Directory listing via NSFileManager (may include iCloud placeholders not visible to `std::fs::read_dir`).
+pub(crate) fn list_directory_names(dir: &Path) -> Vec<String> {
+    autoreleasepool(|_pool| {
+        let Some(s) = dir.to_str() else {
+            return Vec::new();
+        };
+        let fm = NSFileManager::defaultManager();
+        let Ok(arr) = fm.contentsOfDirectoryAtPath_error(&NSString::from_str(s)) else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for i in 0..arr.count() {
+            out.push(arr.objectAtIndex(i).to_string());
+        }
+        out.sort();
+        out
+    })
+}
+
+/// Pick the sync blob inside the ubiquity folder (current v2 name, legacy v1, or any `subly-sync*`).
+pub(crate) fn resolve_icloud_sync_file(dir: &Path) -> Option<PathBuf> {
+    let primary = dir.join(crate::commands::sync::config::SYNC_FILENAME);
+    if primary.is_file() {
+        return Some(primary);
+    }
+    let legacy = dir.join(crate::commands::sync::config::SYNC_FILENAME_LEGACY_JSON);
+    if legacy.is_file() {
+        return Some(legacy);
+    }
+
+    let names = list_directory_names(dir);
+    resolve_icloud_sync_file_from_names(dir, &names)
+}
+
 enum LocalItemState {
     Ready,
     Missing,
 }
 
+fn ubiquitous_item_downloaded(url: &NSURL, path: &Path) -> bool {
+    if path.is_file() {
+        return true;
+    }
+    autoreleasepool(|_pool| {
+        let mut status_value: Option<Retained<AnyObject>> = None;
+        let status_ok = unsafe {
+            url.getResourceValue_forKey_error(
+                &mut status_value,
+                NSURLUbiquitousItemDownloadingStatusKey,
+            )
+            .is_ok()
+        };
+        if status_ok {
+            if let Some(obj) = status_value {
+                if let Some(status) = obj.downcast_ref::<NSString>() {
+                    let s = status.to_string();
+                    let downloaded = unsafe { NSURLUbiquitousItemDownloadingStatusDownloaded.to_string() };
+                    let current = unsafe { NSURLUbiquitousItemDownloadingStatusCurrent.to_string() };
+                    if s == downloaded || s == current {
+                        return path.is_file();
+                    }
+                }
+            }
+        }
+        let mut downloading: Option<Retained<AnyObject>> = None;
+        let _ = unsafe {
+            url.getResourceValue_forKey_error(&mut downloading, NSURLUbiquitousItemIsDownloadingKey)
+        };
+        false
+    })
+}
+
+fn wait_for_ubiquitous_download(path: &Path, url: &NSURL, attempts: usize, step: Duration) -> bool {
+    for _ in 0..attempts {
+        if ubiquitous_item_downloaded(url, path) {
+            return true;
+        }
+        std::thread::sleep(step);
+    }
+    false
+}
+
 fn prepare_ubiquitous_item_local(path: &Path) -> Result<LocalItemState, crate::errors::AppError> {
     autoreleasepool(|_pool| {
+        if path.is_file() {
+            return Ok(LocalItemState::Ready);
+        }
+
         let url = path_to_file_url(path)?;
         let fm = NSFileManager::defaultManager();
         let is_ubiquitous = fm.isUbiquitousItemAtURL(&url);
-        if path.exists() {
+
+        // On a second device the file may exist in iCloud metadata before a local placeholder appears.
+        // Always try startDownloading — even when isUbiquitous is false for a not-yet-materialized path.
+        let dl_res = fm.startDownloadingUbiquitousItemAtURL_error(&url);
+        if wait_for_ubiquitous_download(path, &url, 36, Duration::from_millis(250)) {
             return Ok(LocalItemState::Ready);
         }
-        if !is_ubiquitous {
-            return Ok(LocalItemState::Missing);
-        }
-        let dl_res = fm.startDownloadingUbiquitousItemAtURL_error(&url);
-        for _ in 0..12 {
-            if path.exists() {
-                return Ok(LocalItemState::Ready);
-            }
-            std::thread::sleep(std::time::Duration::from_millis(250));
-        }
+
         match dl_res {
-            Ok(()) => Err(crate::errors::AppError::from(format!(
-                "icloud file is not materialized yet (ubiquitous={}, path={})",
-                is_ubiquitous,
-                path.display()
-            ))),
-            Err(e) => Err(crate::errors::AppError::from(format!(
-                "startDownloadingUbiquitousItem failed (ubiquitous={}, path={}, err={})",
-                is_ubiquitous,
-                path.display(),
-                e.localizedDescription()
-            ))),
+            Ok(()) => Err(crate::errors::AppError::from("sync_icloud_materializing")),
+            Err(_) if is_ubiquitous => Err(crate::errors::AppError::from("sync_icloud_materializing")),
+            Err(_) if path.parent().is_some_and(|d| resolve_icloud_sync_file(d).is_some()) => {
+                Err(crate::errors::AppError::from("sync_icloud_materializing"))
+            }
+            Err(_) => Ok(LocalItemState::Missing),
         }
     })
 }
@@ -231,6 +309,12 @@ pub(crate) fn coordinated_write_bytes(path: &Path, contents: &[u8]) -> Result<()
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
         }
+        let tmp_file_name = format!(
+            "{}.tmp",
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(crate::commands::sync::config::SYNC_FILENAME)
+        );
         let coordinator = NSFileCoordinator::new();
         let data = contents.to_vec();
         let out: Arc<Mutex<WriteOutcome>> = Arc::new(Mutex::new(None));
@@ -242,13 +326,21 @@ pub(crate) fn coordinated_write_bytes(path: &Path, contents: &[u8]) -> Result<()
                 return;
             };
             let pb = PathBuf::from(p.to_string());
-            let res = std::fs::OpenOptions::new()
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(&pb)
-                .and_then(|mut f| std::io::Write::write_all(&mut f, &data).map(|_| ()));
-            *out_cb.lock().expect("lock") = Some(res.map_err(crate::errors::AppError::from));
+            let tmp_pb = pb.with_file_name(&tmp_file_name);
+            let res = (|| -> Result<(), crate::errors::AppError> {
+                {
+                    let mut f = std::fs::OpenOptions::new()
+                        .write(true)
+                        .create(true)
+                        .truncate(true)
+                        .open(&tmp_pb)?;
+                    std::io::Write::write_all(&mut f, &data)?;
+                    f.sync_all()?;
+                }
+                std::fs::rename(&tmp_pb, &pb)?;
+                Ok(())
+            })();
+            *out_cb.lock().expect("lock") = Some(res);
         });
         let mut coord_err: Option<objc2::rc::Retained<NSError>> = None;
         coordinator.coordinateWritingItemAtURL_options_error_byAccessor(
@@ -279,4 +371,55 @@ pub(crate) fn coordinated_write_bytes(path: &Path, contents: &[u8]) -> Result<()
             Some(Ok(())) => Ok(()),
         }
     })
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn legacy_clouddocs_sync_dir(folder: &str) -> Option<PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    Some(
+        PathBuf::from(home)
+            .join("Library/Mobile Documents")
+            .join(crate::commands::sync::config::SYNC_LEGACY_CLOUDDOCS_SEGMENT)
+            .join(folder),
+    )
+}
+
+/// One-shot: copy SS2 blob from legacy `com~apple~CloudDocs/Subly-v1` into ubiquity when ubiquity is empty.
+#[cfg(target_os = "macos")]
+pub(crate) fn migrate_legacy_clouddocs_if_needed(folder: &str) -> Result<(), crate::errors::AppError> {
+    let Some(ubiquity_dir) = ubiquity_sync_subdir(folder) else {
+        return Ok(());
+    };
+    if resolve_icloud_sync_file(&ubiquity_dir).is_some() {
+        return Ok(());
+    }
+    let Some(legacy_dir) = legacy_clouddocs_sync_dir(folder) else {
+        return Ok(());
+    };
+    if !legacy_dir.is_dir() {
+        return Ok(());
+    }
+    let names: Vec<String> = std::fs::read_dir(&legacy_dir)
+        .ok()
+        .map(|rd| {
+            rd.flatten()
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .collect()
+        })
+        .unwrap_or_default();
+    let Some(legacy_path) = resolve_icloud_sync_file_from_names(&legacy_dir, &names) else {
+        return Ok(());
+    };
+    let raw = std::fs::read(&legacy_path)?;
+    if !raw.starts_with(b"SS2") {
+        return Ok(());
+    }
+    let canonical = ubiquity_dir.join(crate::commands::sync::config::SYNC_FILENAME);
+    coordinated_write_bytes(&canonical, &raw)?;
+    eprintln!(
+        "[subly][icloud] migrated CloudDocs → ubiquity from {} to {}",
+        legacy_path.display(),
+        canonical.display()
+    );
+    Ok(())
 }
