@@ -13,7 +13,6 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
-import androidx.glance.LocalContext
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -51,7 +50,7 @@ class UpcomingPaymentsWidget : GlanceAppWidget() {
             .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
         provideContent {
             WidgetChrome(minWidthDp = minWidthDp) {
-                WidgetBody(compact = minWidthDp < 180)
+                WidgetBody(context = context, compact = minWidthDp < 180)
             }
         }
     }
@@ -77,8 +76,7 @@ private fun WidgetChrome(minWidthDp: Int, content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun WidgetBody(compact: Boolean) {
-    val context = LocalContext.current
+private fun WidgetBody(context: Context, compact: Boolean) {
     val snapshot = WidgetSnapshotLoader.load(context)
     val open = actionStartActivity(ComponentName(context, MainActivity::class.java))
     val tap = GlanceModifier.clickable(open)
@@ -86,26 +84,25 @@ private fun WidgetBody(compact: Boolean) {
     when {
         snapshot.errorKey != null -> {
             Box(modifier = tap.fillMaxSize(), contentAlignment = Alignment.Center) {
-                ErrorState(snapshot.errorKey!!)
+                ErrorState(context, snapshot.errorKey!!)
             }
         }
         snapshot.items.isEmpty() -> {
             Box(modifier = tap.fillMaxSize(), contentAlignment = Alignment.Center) {
-                EmptyState()
+                EmptyState(context)
             }
         }
         compact -> {
-            SmallBody(snapshot.items.first())
+            SmallBody(context, snapshot.items.first())
         }
         else -> {
-            LargeBody(snapshot.items)
+            LargeBody(context, snapshot.items)
         }
     }
 }
 
 @Composable
-private fun ErrorState(errorKey: String) {
-    val context = LocalContext.current
+private fun ErrorState(context: Context, errorKey: String) {
     Text(
         text = WidgetSnapshotLoader.errorMessage(context, errorKey),
         style = TextStyle(
@@ -118,8 +115,7 @@ private fun ErrorState(errorKey: String) {
 }
 
 @Composable
-private fun EmptyState() {
-    val context = LocalContext.current
+private fun EmptyState(context: Context) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             modifier = GlanceModifier
@@ -150,8 +146,7 @@ private fun EmptyState() {
 }
 
 @Composable
-private fun SmallBody(item: WidgetSnapshotItem) {
-    val context = LocalContext.current
+private fun SmallBody(context: Context, item: WidgetSnapshotItem) {
     Column(modifier = GlanceModifier.fillMaxSize()) {
         Box(
             modifier = GlanceModifier
@@ -161,7 +156,7 @@ private fun SmallBody(item: WidgetSnapshotItem) {
         ) {}
         Spacer(GlanceModifier.height(10.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            SubscriptionAvatar(item, 44.dp)
+            SubscriptionAvatar(context, item, 44.dp)
             Spacer(GlanceModifier.width(10.dp))
             Column(modifier = GlanceModifier.fillMaxWidth()) {
                 Text(
@@ -199,8 +194,7 @@ private fun SmallBody(item: WidgetSnapshotItem) {
 }
 
 @Composable
-private fun LargeBody(items: List<WidgetSnapshotItem>) {
-    val context = LocalContext.current
+private fun LargeBody(context: Context, items: List<WidgetSnapshotItem>) {
     val (left, right, rest) = splitForGrid(items)
 
     Column(modifier = GlanceModifier.fillMaxSize()) {
@@ -214,8 +208,8 @@ private fun LargeBody(items: List<WidgetSnapshotItem>) {
             maxLines = 1,
         )
         Spacer(GlanceModifier.height(4.dp))
-        left.forEach { CompactRow(it, dense = true) }
-        right.forEach { CompactRow(it, dense = true) }
+        left.forEach { CompactRow(context, it, dense = true) }
+        right.forEach { CompactRow(context, it, dense = true) }
         if (rest > 0) {
             Spacer(GlanceModifier.height(4.dp))
             Text(
@@ -241,8 +235,7 @@ private fun splitForGrid(items: List<WidgetSnapshotItem>): Triple<List<WidgetSna
 }
 
 @Composable
-private fun CompactRow(item: WidgetSnapshotItem, dense: Boolean) {
-    val context = LocalContext.current
+private fun CompactRow(context: Context, item: WidgetSnapshotItem, dense: Boolean) {
     val avatar = if (dense) 20.dp else 24.dp
     Row(
         modifier = GlanceModifier
@@ -250,7 +243,7 @@ private fun CompactRow(item: WidgetSnapshotItem, dense: Boolean) {
             .padding(vertical = if (dense) 3.dp else 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SubscriptionAvatar(item, avatar)
+        SubscriptionAvatar(context, item, avatar)
         Spacer(GlanceModifier.width(if (dense) 5.dp else 6.dp))
         Column {
             Text(
@@ -285,8 +278,7 @@ private fun CompactRow(item: WidgetSnapshotItem, dense: Boolean) {
 }
 
 @Composable
-private fun SubscriptionAvatar(item: WidgetSnapshotItem, edge: androidx.compose.ui.unit.Dp) {
-    val context = LocalContext.current
+private fun SubscriptionAvatar(context: Context, item: WidgetSnapshotItem, edge: androidx.compose.ui.unit.Dp) {
     val path = WidgetSnapshotLoader.iconPath(context, item.iconFile)
     val bitmap = path?.let { BitmapFactory.decodeFile(it.absolutePath) }
     if (bitmap != null) {
