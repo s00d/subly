@@ -1,0 +1,63 @@
+src-tauri/src/lib.rs
+  s_46eb22e28aedb5::t_b46f5e8250120e 47
+  s_46eb22e28aedb5::t_e12db80429cd27 562
+src-tauri/src/commands/sync/providers/icloud.rs
+  s_46eb22e28aedb5::t_455c3edc513698 23
+  s_46eb22e28aedb5::t_0aa349b7e42ea5 101-103
+  s_46eb22e28aedb5::t_4ee124255c56b2 204,208
+src/locales/ar.json
+  s_46eb22e28aedb5::t_2788622f0a8d2b 699-700
+src/locales/pt.json
+  s_46eb22e28aedb5::t_2788622f0a8d2b 699-700
+docs/design/systems/sync.md
+  s_46eb22e28aedb5::t_6b330bdea53f6e 91-110
+src/locales/tr.json
+  s_46eb22e28aedb5::t_2788622f0a8d2b 699-700
+src-tauri/src/commands/sync/mod.rs
+  s_46eb22e28aedb5::t_417b811facf383 446-457
+src/locales/hi.json
+  s_46eb22e28aedb5::t_2788622f0a8d2b 699-700
+src/utils/formatError.ts
+  s_46eb22e28aedb5::t_e84fcc09d70915 12
+src/locales/ru.json
+  s_46eb22e28aedb5::t_7c971b28443785 563
+src/locales/en.json
+  s_46eb22e28aedb5::t_01921b6bfd5674 563
+src/locales/fr.json
+  s_46eb22e28aedb5::t_2788622f0a8d2b 699-700
+src/locales/ko.json
+  s_46eb22e28aedb5::t_2788622f0a8d2b 699-700
+src/locales/es.json
+  s_46eb22e28aedb5::t_2788622f0a8d2b 699-700
+src/locales/ja.json
+  s_46eb22e28aedb5::t_2788622f0a8d2b 699-700
+src/locales/de.json
+  s_46eb22e28aedb5::t_2788622f0a8d2b 699-700
+src-tauri/src/commands/sync/providers/icloud_native.rs
+  s_46eb22e28aedb5::t_b3951027b7203d 7
+  s_46eb22e28aedb5::t_95175ec3d9412a 112,120-126
+  s_46eb22e28aedb5::t_4abb307aaf9264 128
+  s_46eb22e28aedb5::t_d61801f983689e 33-108
+  s_46eb22e28aedb5::t_b2107d2087c59a 185,187-190,199
+  s_46eb22e28aedb5::t_3e0c4b4ea1728e 127,236-244
+  s_46eb22e28aedb5::t_cfa3a1ff66f0ca 403-411
+  s_46eb22e28aedb5::t_56f7b327f918b5 14
+src/locales/zh.json
+  s_46eb22e28aedb5::t_2788622f0a8d2b 699-700
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "111197b47e4a15dca4422496cef9b41ac67ff7be",
+  "prompts": {},
+  "sessions": {
+    "s_46eb22e28aedb5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2cf69a17-9c5d-40ae-9782-7f395222b99b",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
