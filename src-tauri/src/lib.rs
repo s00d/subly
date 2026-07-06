@@ -665,7 +665,7 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app: &tauri::AppHandle, event| {
+        .run(|app, event| {
             #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
             if let tauri::RunEvent::Opened { urls } = event {
                 let mut paths = Vec::new();
@@ -687,6 +687,10 @@ pub fn run() {
                     }
                     let _ = app.emit("backup:opened", paths);
                 }
+            }
+            #[cfg(not(any(target_os = "macos", target_os = "ios", target_os = "android")))]
+            {
+                let _ = (app, event);
             }
         })
 }

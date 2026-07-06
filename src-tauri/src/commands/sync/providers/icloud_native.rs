@@ -32,6 +32,8 @@ fn path_to_file_url(path: &Path) -> Result<objc2::rc::Retained<NSURL>, crate::er
 
 static CONTAINER_ROOT_CACHE: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
 
+/// Clear cached ubiquity container root (e.g. after account switch). Reserved for future hooks.
+#[allow(dead_code)]
 pub(crate) fn invalidate_container_cache() {
     if let Some(lock) = CONTAINER_ROOT_CACHE.get() {
         if let Ok(mut guard) = lock.lock() {

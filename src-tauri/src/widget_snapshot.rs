@@ -484,6 +484,7 @@ pub fn install_ios_widget_reload_on_activate() {
 }
 
 #[cfg(not(target_os = "ios"))]
+#[allow(dead_code)]
 pub fn install_ios_widget_reload_on_activate() {}
 
 #[cfg(test)]

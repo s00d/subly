@@ -49,11 +49,6 @@ pub(crate) fn icloud_subly_sync_dir() -> Option<PathBuf> {
     icloud_native::ubiquity_sync_subdir(SYNC_ICLOUD_FOLDER)
 }
 
-#[cfg(not(any(target_os = "macos", target_os = "ios")))]
-pub(crate) fn icloud_subly_sync_dir() -> Option<PathBuf> {
-    None
-}
-
 #[cfg(target_os = "macos")]
 fn debug_dir_entries(path: &std::path::Path) -> String {
     match std::fs::read_dir(path) {

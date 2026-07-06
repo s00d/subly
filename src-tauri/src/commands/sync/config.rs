@@ -20,6 +20,7 @@ pub const SYNC_LEGACY_CLOUDDOCS_SEGMENT: &str = "com~apple~CloudDocs";
 /// Имя файла синка (все провайдеры). Dropbox по-прежнему: `/Apps/Subly/<файл>`.
 pub const SYNC_FILENAME: &str = "subly-sync-v2.sublysync";
 /// Старое имя из UI/ранних сборок; iCloud может ещё содержать этот файл.
+#[cfg_attr(not(any(target_os = "macos", target_os = "ios")), allow(dead_code))]
 pub const SYNC_FILENAME_LEGACY_JSON: &str = "subly-sync-v1.json";
 pub const MAX_SYNC_PAYLOAD_BYTES: usize = 2_500_000;
 /// Единый redirect для OAuth (Google / Dropbox / OneDrive). Должен совпадать с deep link в приложении.

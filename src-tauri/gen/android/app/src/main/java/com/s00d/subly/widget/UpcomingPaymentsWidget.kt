@@ -1,10 +1,12 @@
 package com.s00d.subly.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.content.Context
 import android.graphics.BitmapFactory
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
@@ -12,7 +14,6 @@ import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.LocalContext
-import androidx.glance.LocalSize
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -43,27 +44,30 @@ class SublyWidgetReceiver : GlanceAppWidgetReceiver() {
 
 class UpcomingPaymentsWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val minWidthDp = AppWidgetManager.getInstance(context)
+            .getAppWidgetOptions(id)
+            .getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 250)
         provideContent {
-            WidgetChrome {
-                WidgetBody()
+            WidgetChrome(minWidthDp = minWidthDp) {
+                WidgetBody(compact = minWidthDp < 180)
             }
         }
     }
 }
 
+private fun paddingForMinWidth(minWidthDp: Int): Dp = when {
+    minWidthDp < 180 -> 14.dp
+    minWidthDp < 280 -> 10.dp
+    else -> 12.dp
+}
+
 @Composable
-private fun WidgetChrome(content: @Composable () -> Unit) {
-    val size = LocalSize.current
-    val pad = when {
-        size.width < 180.dp -> 14.dp
-        size.width < 280.dp -> 10.dp
-        else -> 12.dp
-    }
+private fun WidgetChrome(minWidthDp: Int, content: @Composable () -> Unit) {
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
             .background(SublyWidgetTheme.backgroundProvider)
-            .padding(pad),
+            .padding(paddingForMinWidth(minWidthDp)),
         contentAlignment = Alignment.TopStart,
     ) {
         content()
@@ -71,10 +75,9 @@ private fun WidgetChrome(content: @Composable () -> Unit) {
 }
 
 @Composable
-private fun WidgetBody() {
+private fun WidgetBody(compact: Boolean) {
     val context = LocalContext.current
     val snapshot = WidgetSnapshotLoader.load(context)
-    val size = LocalSize.current
     val open = actionStartActivity(ComponentName(context, MainActivity::class.java))
     val tap = GlanceModifier.clickable(open)
 
@@ -89,7 +92,7 @@ private fun WidgetBody() {
                 EmptyState()
             }
         }
-        size.width < 180.dp -> {
+        compact -> {
             SmallBody(snapshot.items.first())
         }
         else -> {

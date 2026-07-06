@@ -15,7 +15,7 @@ use serde::Deserialize;
 use tauri::ipc::Channel;
 
 use crate::commands::ai::dto::{
-    AiImportKind, AiImportMetadata, AiSmartResultDto, AiUsage, CatalogSnapshot, ExpenseDraftDto,
+    AiImportKind, AiImportMetadata, AiSmartResultDto, AiUsage, ExpenseDraftDto,
     ExpenseLineItem, StatementDraftRow, StatementImportProgress, StatementImportStats,
 };
 use crate::commands::ai::extract::context::ExtractContext;

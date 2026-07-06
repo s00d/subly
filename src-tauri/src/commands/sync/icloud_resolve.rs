@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use super::config::{SYNC_FILENAME, SYNC_FILENAME_LEGACY_JSON};
 
+#[cfg_attr(not(any(target_os = "macos", target_os = "ios")), allow(dead_code))]
 pub(crate) fn is_sync_candidate_name(name: &str) -> bool {
     name == SYNC_FILENAME
         || name == SYNC_FILENAME_LEGACY_JSON
@@ -11,6 +12,7 @@ pub(crate) fn is_sync_candidate_name(name: &str) -> bool {
 }
 
 /// Pick sync blob from directory listing (canonical v2, legacy v1, or any `subly-sync*`).
+#[cfg_attr(not(any(target_os = "macos", target_os = "ios")), allow(dead_code))]
 pub(crate) fn resolve_icloud_sync_file_from_names(dir: &Path, names: &[String]) -> Option<PathBuf> {
     if names.iter().any(|n| n == SYNC_FILENAME) {
         return Some(dir.join(SYNC_FILENAME));

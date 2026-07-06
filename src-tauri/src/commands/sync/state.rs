@@ -45,10 +45,6 @@ pub fn sync_status_snapshot(
     }
 }
 
-pub fn sync_status_from_config(cfg: &SyncConfig) -> SyncStatusDto {
-    sync_status_snapshot(cfg, None)
-}
-
 /// Rebuild status from config + runtime, preserving in-flight UI fields.
 pub fn refresh_runtime_status(cfg: &SyncConfig, rt: &mut SyncRuntime) -> SyncStatusDto {
     let pending = rt.oauth_pending_provider.as_ref();
