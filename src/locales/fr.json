@@ -696,5 +696,6 @@
   "ai_smart_paste_hint": "Astuce : collez une capture (Cmd/Ctrl + V) directement dans le champ texte.",
   "ai_smart_touch_upload_sub": "Touchez pour choisir une photo ou un fichier — reçus, PDF, tableurs, captures (mêmes formats qu’au bureau).",
   "sync_icloud_materializing": "iCloud télécharge encore le fichier de synchro. Attendez quelques secondes en Wi‑Fi, ouvrez Fichiers → Subly puis réessayez Télécharger et appliquer.",
-  "sync_pull_legacy_format": "Le fichier cloud utilise l’ancien format JSON (subly-sync-v1.json). Mettez à jour Subly sur tous les appareils puis renvoyez vers le cloud pour créer subly-sync-v2.sublysync."
+  "sync_pull_legacy_format": "Le fichier cloud utilise l’ancien format JSON (subly-sync-v1.json). Mettez à jour Subly sur tous les appareils puis renvoyez vers le cloud pour créer subly-sync-v2.sublysync.",
+  "sync_icloud_not_signed_in": "Connectez-vous à iCloud sur cet appareil (Réglages → identifiant Apple), activez iCloud Drive, puis touchez Connecter à nouveau."
 }

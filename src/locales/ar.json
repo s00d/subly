@@ -696,5 +696,6 @@
   "ai_smart_paste_hint": "نصيحة: الصق لقطة شاشة (Cmd/Ctrl + V) مباشرة في حقل النص.",
   "ai_smart_touch_upload_sub": "المس لاختيار صورة أو ملف — إيصالات وPDF وجداول ولقطات (نفس الأنماط كما على سطح المكتب).",
   "sync_icloud_materializing": "لا يزال iCloud يحمّل ملف المزامنة. انتظر بضع ثوانٍ على Wi‑Fi، افتح الملفات → Subly ثم أعد التنزيل والتطبيق.",
-  "sync_pull_legacy_format": "ملف السحابة يستخدم تنسيق JSON القديم (subly-sync-v1.json). حدّث Subly على جميع الأجهزة ثم ارفع مرة أخرى لإنشاء subly-sync-v2.sublysync."
+  "sync_pull_legacy_format": "ملف السحابة يستخدم تنسيق JSON القديم (subly-sync-v1.json). حدّث Subly على جميع الأجهزة ثم ارفع مرة أخرى لإنشاء subly-sync-v2.sublysync.",
+  "sync_icloud_not_signed_in": "سجّل الدخول إلى iCloud على هذا الجهاز (الإعدادات → Apple ID)، فعّل iCloud Drive، ثم اضغط اتصال مرة أخرى."
 }

@@ -88,3 +88,23 @@ pnpm build
 ```
 
 Real-device / TestFlight smoke required; simulator may strip iCloud entitlements.
+
+## Relation to `tauri-plugin-icloud-container`
+
+Subly keeps a **custom** `icloud_native.rs` (objc2) instead of the community plugin because:
+
+| | Plugin | Subly |
+|---|--------|-------|
+| macOS | Not implemented | Required (MAS + Developer ID) |
+| Scope | Generic FS API (21 commands) | Single sync blob + orchestrator |
+| Watch events | `NSMetadataQuery` / `NSFilePresenter` | Not yet (manual `sync_check_remote`) |
+
+Ideas already ported from the plugin design:
+
+- `ubiquityIdentityToken` → `sync_icloud_not_signed_in` vs `sync_icloud_unavailable`
+- Cached container root URL (invalidate manually via `invalidate_container_cache` if needed)
+- `NSURL` resource keys for download status / errors
+- Directory listing before `Path::is_file` for cloud placeholders
+- `sync_icloud_debug_state` Tauri command (container path, entries, resolved file)
+
+**Future (optional):** `NSMetadataQuery` watch on `Documents/Subly-v1` to set `pending_update` when another device uploads — similar to plugin `watch_directory` + `icloud://directory-changed`. Not needed for the current pull/push UX but would reduce reliance on background polls.

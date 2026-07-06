@@ -696,5 +696,6 @@
   "ai_smart_paste_hint": "ヒント：スクリーンショットを Cmd/Ctrl + V で直接貼り付けできます。",
   "ai_smart_touch_upload_sub": "タップで写真・ファイルを選びます。レシート、PDF、表、スクリーンショット（PCと同じ形式に対応）。",
   "sync_icloud_materializing": "iCloud が同期ファイルをまだダウンロード中です。Wi‑Fi で数秒待ち、ファイル → Subly を開いてから再度ダウンロードして適用してください。",
-  "sync_pull_legacy_format": "クラウドのファイルは旧 JSON 形式 (subly-sync-v1.json) です。全デバイスで Subly を更新し、再度クラウドにアップロードして subly-sync-v2.sublysync を作成してください。"
+  "sync_pull_legacy_format": "クラウドのファイルは旧 JSON 形式 (subly-sync-v1.json) です。全デバイスで Subly を更新し、再度クラウドにアップロードして subly-sync-v2.sublysync を作成してください。",
+  "sync_icloud_not_signed_in": "このデバイスで iCloud にサインインし（設定 → Apple ID）、iCloud Drive をオンにしてから再度接続してください。"
 }

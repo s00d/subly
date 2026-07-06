@@ -560,6 +560,7 @@
   "sync_upload_auto": "Автозагрузка в облако...",
   "sync_pull_no_remote_file": "В этом облаке ещё нет файла синхронизации. На первом устройстве нажмите «Отправить в облако», чтобы создать subly-sync-v2.sublysync. Если Subly уже на другом устройстве — отправьте оттуда или проверьте доступ к iCloud Drive для Subly.",
   "sync_icloud_unavailable": "Папка iCloud Drive недоступна. Включите iCloud Drive (Настройки → Apple ID → iCloud), войдите в аккаунт и повторите. Иногда помогает один раз открыть приложение «Файлы» → iCloud Drive.",
+  "sync_icloud_not_signed_in": "Войдите в Apple ID на этом устройстве (Настройки → Apple ID) и включите iCloud Drive, затем снова нажмите «Подключить».",
   "sync_icloud_materializing": "iCloud ещё загружает файл синхронизации. Подождите на Wi‑Fi, откройте «Файлы» → Subly, затем снова «Загрузить и применить».",
   "sync_pull_legacy_format": "Файл в облаке в устаревшем JSON-формате (subly-sync-v1.json). Обновите Subly на всех устройствах и снова «Отправить в облако», чтобы создать subly-sync-v2.sublysync.",
   "sync_connected_push_hint": "Если для Subly в этом облаке ещё нет файла, сначала «Отправить в облако», а не «Загрузить и применить». «Загрузить» берёт уже существующий subly-sync-v2.sublysync.",

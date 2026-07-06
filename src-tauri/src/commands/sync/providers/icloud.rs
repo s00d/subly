@@ -20,6 +20,7 @@ pub(crate) fn icloud_sync_message_key(err: &crate::errors::AppError) -> Option<&
     match err {
         crate::errors::AppError::Message(m) => match m.as_str() {
             "sync_icloud_unavailable" => Some("sync_icloud_unavailable"),
+            "sync_icloud_not_signed_in" => Some("sync_icloud_not_signed_in"),
             "sync_icloud_materializing" => Some("sync_icloud_materializing"),
             "sync_pull_legacy_format" => Some("sync_pull_legacy_format"),
             _ if m.contains("icloud file is not materialized")
@@ -97,7 +98,9 @@ pub async fn download(_app: &tauri::AppHandle, _cfg: &SyncConfig) -> Result<Opti
             let _ = icloud_native::migrate_legacy_clouddocs_if_needed(SYNC_ICLOUD_FOLDER);
         }
         let Some(dir) = icloud_native::ubiquity_sync_subdir(SYNC_ICLOUD_FOLDER) else {
-            return Err(crate::errors::AppError::from("sync_icloud_unavailable"));
+            return Err(crate::errors::AppError::from(
+                icloud_native::icloud_availability_error_key(),
+            ));
         };
         let Some(path) = icloud_native::resolve_icloud_sync_file(&dir) else {
             #[cfg(target_os = "ios")]
@@ -198,11 +201,11 @@ pub async fn upload(_app: &tauri::AppHandle, _cfg: &SyncConfig, _payload: &SyncP
     {
         #[cfg(target_os = "macos")]
         let dir = icloud_native::ubiquity_sync_subdir(SYNC_ICLOUD_FOLDER).ok_or_else(|| {
-            crate::errors::AppError::from("sync_icloud_unavailable")
+            crate::errors::AppError::from(icloud_native::icloud_availability_error_key())
         })?;
         #[cfg(target_os = "ios")]
         let dir = icloud_native::ubiquity_sync_subdir(SYNC_ICLOUD_FOLDER).ok_or_else(|| {
-            crate::errors::AppError::from("sync_icloud_unavailable")
+            crate::errors::AppError::from(icloud_native::icloud_availability_error_key())
         })?;
         let raw = encode_sync_payload(_payload)?;
         let path = dir.join(SYNC_FILENAME);

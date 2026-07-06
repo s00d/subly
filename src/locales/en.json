@@ -560,6 +560,7 @@
   "sync_upload_auto": "Auto-uploading to cloud...",
   "sync_pull_no_remote_file": "No sync file in this cloud yet. On the first device tap Upload to Cloud to create subly-sync-v2.sublysync. If you already use Subly on another device, upload from there or check iCloud Drive access for Subly.",
   "sync_icloud_unavailable": "iCloud Drive folder is not available. On iPhone: enable iCloud Drive, ensure you are signed into iCloud, then try again. Opening Files → iCloud Drive once can help the system create the folder.",
+  "sync_icloud_not_signed_in": "Sign in to iCloud on this device (Settings → Apple ID), enable iCloud Drive, then try Connect again.",
   "sync_icloud_materializing": "iCloud is still downloading the sync file. Wait a few seconds on Wi‑Fi, open Files → Subly once, then try Download & Apply again.",
   "sync_pull_legacy_format": "The cloud file uses an old JSON format (subly-sync-v1.json). Update Subly on all devices, then Upload to Cloud again to create subly-sync-v2.sublysync.",
   "sync_connected_push_hint": "If this cloud is empty for Subly, use Upload to Cloud before Download & Apply. Download only loads an existing subly-sync-v2.sublysync.",

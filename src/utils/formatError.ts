@@ -9,6 +9,7 @@ export function formatErrorForToast(err: unknown, t: TFn): string {
   const mapKnown = (m: string): string => {
     if (
       m === "sync_icloud_unavailable" ||
+      m === "sync_icloud_not_signed_in" ||
       m === "sync_icloud_materializing" ||
       m === "sync_pull_legacy_format"
     ) {

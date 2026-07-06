@@ -696,5 +696,6 @@
   "ai_smart_paste_hint": "팁: 스크린샷을 Cmd/Ctrl + V로 텍스트 필드에 바로 붙여넣으세요.",
   "ai_smart_touch_upload_sub": "탭하여 사진·문서·내보내기 파일을 고릅니다(데스크톱과 동일한 형식).",
   "sync_icloud_materializing": "iCloud가 아직 동기화 파일을 다운로드 중입니다. Wi‑Fi에서 잠시 기다린 뒤 파일 → Subly를 열고 다시 다운로드 및 적용하세요.",
-  "sync_pull_legacy_format": "클라우드 파일이 이전 JSON 형식(subly-sync-v1.json)입니다. 모든 기기에서 Subly를 업데이트한 뒤 다시 업로드해 subly-sync-v2.sublysync을 만드세요."
+  "sync_pull_legacy_format": "클라우드 파일이 이전 JSON 형식(subly-sync-v1.json)입니다. 모든 기기에서 Subly를 업데이트한 뒤 다시 업로드해 subly-sync-v2.sublysync을 만드세요.",
+  "sync_icloud_not_signed_in": "이 기기에서 iCloud에 로그인하고(설정 → Apple ID) iCloud Drive를 켠 뒤 다시 연결하세요."
 }

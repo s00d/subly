@@ -443,6 +443,18 @@ pub async fn sync_dismiss_pending_update(
     extract_data(response)
 }
 
+#[cfg(any(target_os = "macos", target_os = "ios"))]
+#[tauri::command]
+pub fn sync_icloud_debug_state() -> providers::icloud_native::IcloudDebugState {
+    providers::icloud_native::icloud_debug_state(crate::commands::sync::config::SYNC_ICLOUD_FOLDER)
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "ios")))]
+#[tauri::command]
+pub fn sync_icloud_debug_state() -> serde_json::Value {
+    serde_json::json!({ "available": false })
+}
+
 #[cfg(test)]
 mod tests {
     use super::{sync_merge_app_data, sync_merge_with_tombstones, sync_push_revision_mismatch};

@@ -4,14 +4,14 @@
 
 use core::ptr::NonNull;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use block2::RcBlock;
 use objc2::rc::autoreleasepool;
 use objc2_foundation::{
     NSFileCoordinator, NSFileCoordinatorReadingOptions, NSFileCoordinatorWritingOptions, NSFileManager, NSError,
-    NSString, NSURL, NSURLUbiquitousItemDownloadingStatusCurrent,
+    NSString, NSURL, NSURLUbiquitousItemDownloadingErrorKey, NSURLUbiquitousItemDownloadingStatusCurrent,
     NSURLUbiquitousItemDownloadingStatusDownloaded, NSURLUbiquitousItemDownloadingStatusKey,
     NSURLUbiquitousItemIsDownloadingKey,
 };
@@ -30,14 +30,86 @@ fn path_to_file_url(path: &Path) -> Result<objc2::rc::Retained<NSURL>, crate::er
     Ok(NSURL::fileURLWithPath(&NSString::from_str(s)))
 }
 
+static CONTAINER_ROOT_CACHE: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
+
+pub(crate) fn invalidate_container_cache() {
+    if let Some(lock) = CONTAINER_ROOT_CACHE.get() {
+        if let Ok(mut guard) = lock.lock() {
+            *guard = None;
+        }
+    }
+}
+
+/// Mirrors `FileManager.ubiquityIdentityToken` from tauri-plugin-icloud-container.
+pub(crate) fn is_icloud_user_signed_in() -> bool {
+    autoreleasepool(|_pool| NSFileManager::defaultManager().ubiquityIdentityToken().is_some())
+}
+
+pub(crate) fn icloud_availability_error_key() -> &'static str {
+    if is_icloud_user_signed_in() {
+        "sync_icloud_unavailable"
+    } else {
+        "sync_icloud_not_signed_in"
+    }
+}
+
+fn resolve_container_root_url() -> Option<objc2::rc::Retained<NSURL>> {
+    autoreleasepool(|_pool| {
+        let fm = NSFileManager::defaultManager();
+        fm.URLForUbiquityContainerIdentifier(Some(&NSString::from_str(APP_ICLOUD_CONTAINER_ID)))
+    })
+}
+
+fn cached_container_root() -> Option<PathBuf> {
+    let lock = CONTAINER_ROOT_CACHE.get_or_init(|| Mutex::new(None));
+    if let Ok(guard) = lock.lock() {
+        if let Some(path) = guard.as_ref() {
+            return Some(path.clone());
+        }
+    }
+    let container = resolve_container_root_url()?;
+    let path = container.path().map(|p| PathBuf::from(p.to_string()))?;
+    if let Ok(mut guard) = lock.lock() {
+        *guard = Some(path.clone());
+    }
+    Some(path)
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IcloudDebugState {
+    pub signed_in: bool,
+    pub container_path: Option<String>,
+    pub sync_dir: Option<String>,
+    pub dir_entries: Vec<String>,
+    pub resolved_sync_file: Option<String>,
+}
+
+pub(crate) fn icloud_debug_state(sync_folder: &str) -> IcloudDebugState {
+    let signed_in = is_icloud_user_signed_in();
+    let sync_dir = ubiquity_sync_subdir(sync_folder);
+    let container_path = cached_container_root().map(|p| p.to_string_lossy().into_owned());
+    let dir_entries = sync_dir
+        .as_ref()
+        .map(|d| list_directory_names(d))
+        .unwrap_or_default();
+    let resolved_sync_file = sync_dir
+        .as_ref()
+        .and_then(|d| resolve_icloud_sync_file(d))
+        .map(|p| p.to_string_lossy().into_owned());
+    IcloudDebugState {
+        signed_in,
+        container_path,
+        sync_dir: sync_dir.map(|p| p.to_string_lossy().into_owned()),
+        dir_entries,
+        resolved_sync_file,
+    }
+}
+
 /// `Documents/<relative_folder>` inside the app’s iCloud container (see entitlements).
 pub(crate) fn ubiquity_sync_subdir(relative_folder: &str) -> Option<PathBuf> {
     autoreleasepool(|_pool| {
-        let fm = NSFileManager::defaultManager();
-        #[cfg(any(target_os = "ios", target_os = "macos"))]
-        let container = fm.URLForUbiquityContainerIdentifier(Some(&NSString::from_str(APP_ICLOUD_CONTAINER_ID)))?;
-        #[cfg(not(any(target_os = "ios", target_os = "macos")))]
-        let container = fm.URLForUbiquityContainerIdentifier(None)?;
+        let container = resolve_container_root_url()?;
         #[cfg(any(target_os = "ios", target_os = "macos"))]
         if let Some(cpath) = container.path() {
             #[cfg(target_os = "ios")]
@@ -45,6 +117,15 @@ pub(crate) fn ubiquity_sync_subdir(relative_folder: &str) -> Option<PathBuf> {
             #[cfg(target_os = "macos")]
             eprintln!("[subly][icloud][macos] container={}", cpath);
         }
+        if let Some(cpath) = container.path() {
+            if let Ok(mut guard) = CONTAINER_ROOT_CACHE
+                .get_or_init(|| Mutex::new(None))
+                .lock()
+            {
+                *guard = Some(PathBuf::from(cpath.to_string()));
+            }
+        }
+        let fm = NSFileManager::defaultManager();
         let docs = container.URLByAppendingPathComponent(&NSString::from_str("Documents"))?;
         #[cfg(any(target_os = "ios", target_os = "macos"))]
         if let Some(dpath) = docs.path() {
@@ -101,7 +182,12 @@ pub(crate) fn list_directory_names(dir: &Path) -> Vec<String> {
 }
 
 /// Pick the sync blob inside the ubiquity folder (current v2 name, legacy v1, or any `subly-sync*`).
+/// Prefer `NSFileManager` listing — it sees iCloud placeholders that `Path::is_file` misses.
 pub(crate) fn resolve_icloud_sync_file(dir: &Path) -> Option<PathBuf> {
+    let names = list_directory_names(dir);
+    if let Some(path) = resolve_icloud_sync_file_from_names(dir, &names) {
+        return Some(path);
+    }
     let primary = dir.join(crate::commands::sync::config::SYNC_FILENAME);
     if primary.is_file() {
         return Some(primary);
@@ -110,9 +196,7 @@ pub(crate) fn resolve_icloud_sync_file(dir: &Path) -> Option<PathBuf> {
     if legacy.is_file() {
         return Some(legacy);
     }
-
-    let names = list_directory_names(dir);
-    resolve_icloud_sync_file_from_names(dir, &names)
+    None
 }
 
 enum LocalItemState {
@@ -149,6 +233,15 @@ fn ubiquitous_item_downloaded(url: &NSURL, path: &Path) -> bool {
         let _ = unsafe {
             url.getResourceValue_forKey_error(&mut downloading, NSURLUbiquitousItemIsDownloadingKey)
         };
+        let mut dl_err: Option<Retained<AnyObject>> = None;
+        if unsafe {
+            url.getResourceValue_forKey_error(&mut dl_err, NSURLUbiquitousItemDownloadingErrorKey)
+                .is_ok()
+        } {
+            if dl_err.is_some() {
+                return false;
+            }
+        }
         false
     })
 }
@@ -307,7 +400,15 @@ pub(crate) fn coordinated_write_bytes(path: &Path, contents: &[u8]) -> Result<()
     autoreleasepool(|_pool| {
         let url = path_to_file_url(path)?;
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
+            let parent_url = path_to_file_url(parent)?;
+            let fm = NSFileManager::defaultManager();
+            let _ = unsafe {
+                fm.createDirectoryAtURL_withIntermediateDirectories_attributes_error(
+                    parent_url.as_ref(),
+                    true,
+                    None,
+                )
+            };
         }
         let tmp_file_name = format!(
             "{}.tmp",
