@@ -58,8 +58,8 @@ targets:
           - UIInterfaceOrientationPortraitUpsideDown
           - UIInterfaceOrientationLandscapeLeft
           - UIInterfaceOrientationLandscapeRight
-        CFBundleShortVersionString: 1.0.5
-        CFBundleVersion: "10007"
+        CFBundleShortVersionString: 1.0.6
+        CFBundleVersion: "10008"
         NSUbiquitousContainers:
           iCloud.com.s00d.subly:
             NSUbiquitousContainerIsDocumentScopePublic: true
@@ -131,8 +131,8 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.s00d.subly.widget
         PRODUCT_NAME: SublyWidgetExtension
         INFOPLIST_FILE: ../../ios-apple/SublyWidget/Info.plist
-        MARKETING_VERSION: 1.0.5
-        CURRENT_PROJECT_VERSION: "10006"
+        MARKETING_VERSION: 1.0.6
+        CURRENT_PROJECT_VERSION: "10008"
         TARGETED_DEVICE_FAMILY: "1,2"
         IPHONEOS_DEPLOYMENT_TARGET: 16.0
         SWIFT_VERSION: "5.0"

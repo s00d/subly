@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.6] - 2026-07-06
+
+### Added
+
+- **Cloud sync OAuth UX** — pending modal and banner for GDrive/Dropbox/OneDrive; WebDAV test connection command.
+- **Sync provider metadata** — `authKind` and `requiresSaveBeforeConnect` in UI schema.
+
+### Changed
+
+- **OAuth providers** — `enabled` is set only after `oauth_finish`, not on Connect (fixes false “connected” for Google Drive).
+- **iCloud sync** — ubiquity container path, coordinated I/O, legacy CloudDocs migration (macOS).
+
+### Fixed
+
+- Structured sync error keys for OAuth, GDrive, Dropbox, OneDrive, and WebDAV pull/push flows.
+
 ## [1.0.5] - 2026-05-31
 
 ### Added
@@ -247,6 +263,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.1] - 2026-02-11
 ## [0.1.0] - 2026-02-11
 
+[1.0.6]: https://github.com/s00d/subly/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/s00d/subly/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/s00d/subly/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/s00d/subly/compare/v1.0.2...v1.0.3

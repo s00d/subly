@@ -22,7 +22,7 @@ export const siteMeta = {
   siteUrl: "https://s00d.github.io/subly/",
   canonicalUrl: "https://s00d.github.io/subly/",
   locale: "en_US",
-  softwareVersion: "1.0.5",
+  softwareVersion: "1.0.6",
   applicationCategory: "FinanceApplication",
   operatingSystems: ["macOS", "Windows", "Linux", "iOS", "Android"],
   ...sharedUrls,
