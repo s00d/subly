@@ -1,0 +1,102 @@
+src-tauri/src/commands/sync/orchestrator.rs
+  s_46eb22e28aedb5::t_45d1d00d0d31fa 470-473
+  s_46eb22e28aedb5::t_e2784ea03fc140 22-35
+  s_46eb22e28aedb5::t_89395c943b5846 360-364
+  s_46eb22e28aedb5::t_eba4d40890c47b 420-423
+src/locales/hi.json
+  s_46eb22e28aedb5::t_8b13f01736bbcf 484,504-506,534,538,556,697-699
+src/locales/ru.json
+  s_46eb22e28aedb5::t_818e48f246e731 527
+  s_46eb22e28aedb5::t_5a7cec20612da0 580
+  s_46eb22e28aedb5::t_83ab94f412a040 561,563,565
+  s_46eb22e28aedb5::t_049bb9412e2087 584
+  s_46eb22e28aedb5::t_02a7eefd918788 602
+  s_46eb22e28aedb5::t_8439877fd9de89 564
+src/locales/en.json
+  s_46eb22e28aedb5::t_87c28ce6360577 564
+  s_46eb22e28aedb5::t_8ae71299fb65c6 584
+  s_46eb22e28aedb5::t_25699ad411f112 561,563,565
+  s_46eb22e28aedb5::t_22d8390a698d6c 602
+  s_46eb22e28aedb5::t_8d7d22597028be 527
+  s_46eb22e28aedb5::t_d10a9c7fc76e5e 580
+src-tauri/src/commands/sync/providers/icloud_native.rs
+  s_46eb22e28aedb5::t_b3252be77ec7dd 139
+  s_46eb22e28aedb5::t_0fc165773d8ae4 140-142
+  s_46eb22e28aedb5::t_0857f2ef11eb7a 115
+  s_46eb22e28aedb5::t_fac2baef4a2007 15-16
+  s_46eb22e28aedb5::t_a51b8e07ac7f88 18-19,24
+  s_46eb22e28aedb5::t_08810d924c61ae 123-138,143-148,150-165,179,184-185,187
+  s_46eb22e28aedb5::t_fe7b80e32e2286 14
+  s_46eb22e28aedb5::t_ea5f754ae43239 91,95-96
+  s_46eb22e28aedb5::t_5d775de0fa0aad 375-425
+  s_46eb22e28aedb5::t_75d63ad1825dff 21
+  s_46eb22e28aedb5::t_628cd51e835b69 8,84-90,92-94,97-114,116-117,168-171,175-177,180,182,186,188-189
+  s_46eb22e28aedb5::t_923993ca692efc 149
+  s_46eb22e28aedb5::t_bdb98b41884896 312,329
+  s_46eb22e28aedb5::t_58ffcb6f5dbf6e 313-317,330-343
+  s_46eb22e28aedb5::t_8dc238002676a7 20
+src/locales/fr.json
+  s_46eb22e28aedb5::t_8b13f01736bbcf 484,504-506,534,538,556,697-699
+src-tauri/tauri.conf.json
+  s_46eb22e28aedb5::t_82c477f54e4b30 79,82-83
+src/locales/ko.json
+  s_46eb22e28aedb5::t_8b13f01736bbcf 484,504-506,534,538,556,697-699
+src-tauri/src/commands/sync/icloud_resolve.rs
+  s_46eb22e28aedb5::t_59f7f2bfccf6fe 1-67
+src/locales/ar.json
+  s_46eb22e28aedb5::t_8b13f01736bbcf 484,504-506,534,538,556,697-699
+src/locales/es.json
+  s_46eb22e28aedb5::t_8b13f01736bbcf 484,504-506,534,538,556,697-699
+src/locales/ja.json
+  s_46eb22e28aedb5::t_8b13f01736bbcf 484,504-506,534,538,556,697-699
+src/locales/tr.json
+  s_46eb22e28aedb5::t_8b13f01736bbcf 484,504-506,534,538,556,697-699
+src-tauri/gen/apple/project.yml
+  s_46eb22e28aedb5::t_bd476394401250 62
+  s_46eb22e28aedb5::t_1c02017d2d20ab 63-67
+src/utils/formatError.ts
+  s_46eb22e28aedb5::t_05cdb35ceb13eb 17-19,24
+  s_46eb22e28aedb5::t_817cb7514c80bf 10-16
+src-tauri/src/commands/sync/config.rs
+  s_46eb22e28aedb5::t_8da5b729804a2c 11-13,17-19
+  s_46eb22e28aedb5::t_14a41fe3916545 22-23
+src-tauri/gen/apple/subly_iOS/Info.plist
+  s_46eb22e28aedb5::t_f975c256fd853a 80-81
+  s_46eb22e28aedb5::t_2077e1bf385ed5 20
+  s_46eb22e28aedb5::t_20c78675ac0387 82-93
+src-tauri/src/commands/sync/providers/icloud.rs
+  s_46eb22e28aedb5::t_6386518fd9a176 18-21,25-43
+  s_46eb22e28aedb5::t_c28e6507409cbd 102,105-117
+  s_46eb22e28aedb5::t_a5cbe0c031977a 22-24
+  s_46eb22e28aedb5::t_8498fe2aff3f22 95-98,100
+  s_46eb22e28aedb5::t_352b7c35aacf25 101,147,157,159,170,174-187
+  s_46eb22e28aedb5::t_5392fdabcb25f9 201,205
+src/locales/de.json
+  s_46eb22e28aedb5::t_8b13f01736bbcf 484,504-506,534,538,556,697-699
+src/locales/pt.json
+  s_46eb22e28aedb5::t_8b13f01736bbcf 484,504-506,534,538,556,697-699
+src/locales/zh.json
+  s_46eb22e28aedb5::t_8b13f01736bbcf 484,504-506,534,538,556,697-699
+docs/design/systems/sync.md
+  s_46eb22e28aedb5::t_a33fd9d69f6abf 1-90
+src-tauri/Info.plist
+  s_46eb22e28aedb5::t_fd2cb7636e53b8 5-16
+src-tauri/src/commands/sync/mod.rs
+  s_46eb22e28aedb5::t_a6d3ab755c9fd2 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "837508be4854b5c65dd17b9cd6605085eb004c9b",
+  "prompts": {},
+  "sessions": {
+    "s_46eb22e28aedb5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2cf69a17-9c5d-40ae-9782-7f395222b99b",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
