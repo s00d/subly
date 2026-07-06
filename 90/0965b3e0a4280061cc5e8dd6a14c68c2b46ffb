@@ -1,0 +1,33 @@
+src-tauri/src/widget_snapshot.rs
+  s_46eb22e28aedb5::t_5bd96d846da235 487
+src-tauri/src/commands/ai/extract/smart/expense.rs
+  s_46eb22e28aedb5::t_49a788b5d433eb 18
+src-tauri/src/commands/sync/icloud_resolve.rs
+  s_46eb22e28aedb5::t_724f8899e2d233 15
+  s_46eb22e28aedb5::t_8a50dd593d1c40 7
+src-tauri/src/commands/sync/providers/icloud_native.rs
+  s_46eb22e28aedb5::t_029c2dd34d70a9 35-36
+src-tauri/src/commands/sync/config.rs
+  s_46eb22e28aedb5::t_69e591d577e98f 23
+src-tauri/src/lib.rs
+  s_46eb22e28aedb5::t_cd85cc3d505700 668,691-693
+  s_46eb22e28aedb5::t_4e9499778ed2d1 694
+src-tauri/gen/android/app/src/main/java/com/s00d/subly/widget/UpcomingPaymentsWidget.kt
+  s_46eb22e28aedb5::t_a6e7cee1864e1a 3,9,47-49,51-52,58-63,65,70,78,95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "900965b3e0a4280061cc5e8dd6a14c68c2b46ffb",
+  "prompts": {},
+  "sessions": {
+    "s_46eb22e28aedb5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2cf69a17-9c5d-40ae-9782-7f395222b99b",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
