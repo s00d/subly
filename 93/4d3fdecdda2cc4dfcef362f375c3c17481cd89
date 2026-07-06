@@ -1,0 +1,30 @@
+src-tauri/gen/android/app/src/main/java/com/s00d/subly/widget/UpcomingPaymentsWidget.kt
+  s_46eb22e28aedb5::t_8e538bf499af74 87,92,96,99
+  s_46eb22e28aedb5::t_95b8f0780a878e 53
+  s_46eb22e28aedb5::t_7f2bae825b4525 159
+  s_46eb22e28aedb5::t_91f0ae03dd96aa 105
+  s_46eb22e28aedb5::t_63cb2210769201 79
+  s_46eb22e28aedb5::t_dad526de4140ef 197
+  s_46eb22e28aedb5::t_5252709d0a4d01 238
+  s_46eb22e28aedb5::t_9669a0f55af243 211-212
+  s_46eb22e28aedb5::t_86946829198c6e 246
+  s_46eb22e28aedb5::t_0293d0a998e5b9 149
+  s_46eb22e28aedb5::t_3485f585c1448c 281
+  s_46eb22e28aedb5::t_6377ed0e22027b 118
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "934d3fdecdda2cc4dfcef362f375c3c17481cd89",
+  "prompts": {},
+  "sessions": {
+    "s_46eb22e28aedb5": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2cf69a17-9c5d-40ae-9782-7f395222b99b",
+        "model": "default"
+      },
+      "human_author": "Pavel Kuzmin <Virus191288@gmail.com>"
+    }
+  }
+}
