@@ -687,6 +687,19 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
         .run(|app, event| {
+            // Closing hides the window (CloseRequested above); a Dock click must bring it back.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                // Check the main window itself: another window (splash) may count as "visible".
+                let main_visible = app
+                    .get_webview_window("main")
+                    .and_then(|w| w.is_visible().ok())
+                    .unwrap_or(false);
+                if !main_visible {
+                    crate::commands::tray::show_main_window(app);
+                }
+                return;
+            }
             #[cfg(any(target_os = "macos", target_os = "ios", target_os = "android"))]
             if let tauri::RunEvent::Opened { urls } = event {
                 let mut paths = Vec::new();

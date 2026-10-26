@@ -35,6 +35,9 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Default list includes the removed legacy `tools` package -> sdkmanager exits 1.
+          packages: platform-tools
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable

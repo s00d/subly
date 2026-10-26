@@ -5,9 +5,11 @@ use tauri::tray::TrayIconBuilder;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use tauri::Manager;
 
+/// Brings the main window back (it is hidden, not destroyed, on close).
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-fn show_main_window(app: &tauri::AppHandle) {
+pub(crate) fn show_main_window(app: &tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
         let _ = window.show();
         let _ = window.set_focus();
     }
