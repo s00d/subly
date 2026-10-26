@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- macOS: clicking the Dock icon brings back the window after it was closed with the red button.
+- Closing the window no longer destroys it (the JS close hook let `@tauri-apps/api` destroy the window): the Dock icon (macOS) and tray bring it back; the splash screen now really closes.
 - CI: Android release workflow no longer fails in "Setup Android SDK" (legacy `tools` package removed).
 - Desktop notifications: no burst after renewal, "N days before" reminders delivered; mobile scheduling fallback.
 - Sync connectors: no auto-push over an empty remote, HTTP timeouts, WebDAV MOVE fallback/redirects, 401 mapping, OneDrive direct PUT, Google Drive `trashed=false`.

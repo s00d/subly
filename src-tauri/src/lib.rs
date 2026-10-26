@@ -680,8 +680,11 @@ pub fn run() {
             }
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+                // Only the main window lives on hidden (Dock / tray bring it back); the splash must really close.
+                if window.label() == "main" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
             }
         })
         .build(tauri::generate_context!())

@@ -99,7 +99,6 @@ function handleDismissSync() {
 
 let notificationInterval: ReturnType<typeof setInterval> | null = null;
 let unlistenCloseRequested: (() => void) | null = null;
-let closingWithSync = false;
 let mediaQueryList: MediaQueryList | null = null;
 let mediaQueryListener: ((e: MediaQueryListEvent) => void) | null = null;
 let unlistenDeepLinks: (() => void) | null = null;
@@ -354,12 +353,11 @@ onMounted(async () => {
 
   try {
     const appWindow = getCurrentWindow();
-    unlistenCloseRequested = await appWindow.onCloseRequested(async (event) => {
-      if (closingWithSync || !syncStatus.enabled) return;
+    // Close only hides the window (Rust `CloseRequested` handler). `onCloseRequested` destroys the
+    // window unless the event is prevented — then the Dock/tray had nothing left to show.
+    unlistenCloseRequested = await appWindow.onCloseRequested((event) => {
       event.preventDefault();
-      closingWithSync = true;
-      await flushSyncBeforeExit();
-      await appWindow.close();
+      if (syncStatus.enabled) void flushSyncBeforeExit().catch((e) => console.warn("Sync flush on hide failed:", e));
     });
   } catch (e) {
     console.warn("Close sync hook skipped:", e);
