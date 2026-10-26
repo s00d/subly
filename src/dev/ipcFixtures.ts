@@ -37,6 +37,16 @@ export async function installIpcMock(): Promise<void> {
     exact.set(argsKey(f.cmd, f.args), f.result);
     latest.set(f.cmd, f.result);
   }
+  // `?lang=ru&theme=light` — override recorded settings (store screenshots in every locale/theme).
+  const q = new URLSearchParams(location.search);
+  const settingsKey = argsKey("config_get", { key: "settings" });
+  const recorded = exact.get(settingsKey);
+  if (recorded && typeof recorded === "object" && (q.has("lang") || q.has("theme"))) {
+    const patched: Record<string, unknown> = { ...(recorded as Record<string, unknown>) };
+    if (q.has("lang")) patched.language = q.get("lang");
+    if (q.has("theme")) patched.darkTheme = q.get("theme") === "dark" ? 1 : 0;
+    exact.set(settingsKey, patched);
+  }
   mockWindows("main");
   mockIPC(
     (cmd, args) => {
