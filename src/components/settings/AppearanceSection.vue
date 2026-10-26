@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Modal from "@/components/ui/Modal.vue";
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getAvailableLanguages } from "@/i18n";
@@ -10,12 +11,15 @@ import AppToggle from "@/components/ui/AppToggle.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import { Sun, Moon, Monitor, Check, AlertTriangle, Languages } from "@lucide/vue";
 import { useScrollLock } from "@/composables/useScrollLock";
-import { ui, typo } from "@/lib/tv";
+import { typo, button } from "@/lib/tv";
+import UiCard from "@/components/ui/UiCard.vue";
+import SavedIndicator, { useAutoSave } from "@/components/settings/SavedIndicator.vue";
 
 const props = defineProps<{ lookupSettings: Settings | null }>();
 const { t } = useI18n();
 const metaStore = useAppMetaStore();
 const settings = ref<Settings | null>(null);
+const { savedAt, run } = useAutoSave();
 watch(
   () => props.lookupSettings,
   (value) => {
@@ -28,8 +32,10 @@ async function updateSettings(updates: Partial<Settings>) {
   if (!settings.value) return;
   const next = { ...settings.value, ...updates };
   settings.value = next;
-  if (updates.language) await setLanguage(updates.language);
-  await metaStore.updateSettings(next);
+  await run(async () => {
+    if (updates.language) await setLanguage(updates.language);
+    await metaStore.updateSettings(next);
+  });
 }
 
 const colorThemes = [
@@ -58,9 +64,23 @@ function setColorTheme(theme: string) {
   updateSettings({ colorTheme: theme });
 }
 
-function toggleSetting(key: "monthlyPrice" | "convertCurrency" | "showOriginalPrice" | "showSubscriptionProgress" | "disabledToBottom" | "hideDisabled") {
+function toggleSetting(key: "monthlyPrice" | "convertCurrency" | "showOriginalPrice" | "showSubscriptionProgress") {
   if (!settings.value) return;
   updateSettings({ [key]: !settings.value[key] } as Partial<Settings>);
+}
+
+/** One choice over the two legacy flags (they conflicted as separate toggles). */
+type InactiveMode = "show" | "bottom" | "hide";
+const inactiveMode = computed<InactiveMode>(() =>
+  settings.value?.hideDisabled ? "hide" : settings.value?.disabledToBottom ? "bottom" : "show",
+);
+const inactiveModeOptions = computed<SelectOption[]>(() => [
+  { value: "show", label: t("inactive_subscriptions_show") },
+  { value: "bottom", label: t("inactive_subscriptions_bottom") },
+  { value: "hide", label: t("inactive_subscriptions_hide") },
+]);
+function setInactiveMode(mode: InactiveMode) {
+  updateSettings({ disabledToBottom: mode === "bottom", hideDisabled: mode === "hide" });
 }
 
 const languages = getAvailableLanguages();
@@ -99,27 +119,30 @@ function closeLangModal() {
 </script>
 
 <template>
-  <section class="bg-surface rounded-xl border border-border p-4 sm:p-5">
-    <h2 :class="[ui.sectionTitle(), 'mb-3 sm:mb-4']">{{ t('appearance') }}</h2>
+  <UiCard :title="t('appearance')">
+    <template #actions>
+      <SavedIndicator :at="savedAt" />
+    </template>
 
     <h3 :class="[typo.subsection(), 'mb-2']">{{ t('theme') }}</h3>
     <div class="flex flex-wrap gap-2 mb-4 sm:mb-5">
       <button v-for="opt in ([{ val: 0 as const, icon: Sun, label: t('light_theme') }, { val: 1 as const, icon: Moon, label: t('dark_theme') }, { val: 2 as const, icon: Monitor, label: t('automatic') }])"
-        :key="opt.val" @click="setDarkTheme(opt.val)"
-        class="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg border text-xs sm:text-sm font-medium"
-        :class="settings?.darkTheme === opt.val ? 'border-primary bg-primary-light text-primary' : 'border-border text-text-secondary'"
+        :key="opt.val" type="button" @click="setDarkTheme(opt.val)"
+        :aria-pressed="settings?.darkTheme === opt.val"
+        :class="button({ pressed: settings?.darkTheme === opt.val, class: settings?.darkTheme === opt.val ? '' : 'text-text-secondary' })"
       >
         <component :is="opt.icon" :size="14" /> {{ opt.label }}
       </button>
     </div>
 
     <h3 :class="[typo.subsection(), 'mb-2']">{{ t('colors') }}</h3>
-    <div class="flex flex-wrap justify-center gap-2.5 mb-5">
+    <div class="flex flex-wrap gap-2.5 mb-5">
       <button v-for="theme in colorThemes" :key="theme.id" @click="setColorTheme(theme.id)"
         type="button"
         class="color-swatch appearance-none shrink-0 grow-0 basis-9 aspect-square w-9 h-9 min-w-9 min-h-9 p-0 m-0 leading-none rounded-full border-2 inline-flex items-center justify-center transition-transform duration-200 hover:scale-110 active:scale-95"
         :class="[settings?.colorTheme === theme.id ? 'border-text-primary scale-110 shadow-sm' : 'border-transparent', theme.bg]"
-        :title="theme.id"
+        :aria-pressed="settings?.colorTheme === theme.id"
+        :aria-label="t('colors')"
       >
         <Check v-if="settings?.colorTheme === theme.id" :size="14" class="text-white drop-shadow-sm" />
       </button>
@@ -135,51 +158,23 @@ function closeLangModal() {
       <AppToggle :modelValue="Boolean(settings?.convertCurrency)" @update:modelValue="toggleSetting('convertCurrency')" :label="t('convert_prices')" />
       <AppToggle :modelValue="Boolean(settings?.showOriginalPrice)" @update:modelValue="toggleSetting('showOriginalPrice')" :label="t('show_original_price')" />
       <AppToggle :modelValue="Boolean(settings?.showSubscriptionProgress)" @update:modelValue="toggleSetting('showSubscriptionProgress')" :label="t('show_subscription_progress')" />
-      <AppToggle :modelValue="Boolean(settings?.disabledToBottom)" @update:modelValue="toggleSetting('disabledToBottom')" :label="t('show_disabled_subscriptions_at_the_bottom')" />
-      <AppToggle :modelValue="Boolean(settings?.hideDisabled)" @update:modelValue="toggleSetting('hideDisabled')" :label="t('hide_disabled_subscriptions')" />
+      <AppSelect
+        :modelValue="inactiveMode"
+        @update:modelValue="(v: string | number) => setInactiveMode(String(v) as InactiveMode)"
+        :options="inactiveModeOptions"
+        :label="t('inactive_subscriptions_mode')"
+      />
     </div>
-  </section>
+  </UiCard>
 
   <!-- Language change confirmation modal -->
-  <Teleport to="body">
-    <Transition name="app-modal">
-      <div v-if="showLangModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-        <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="closeLangModal" />
-        <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-md p-4 sm:p-6">
-          <div class="flex items-center gap-3 mb-3">
-            <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-              <Languages :size="20" class="text-blue-500" />
-            </div>
-            <div>
-              <h3 :class="ui.sectionTitle()">{{ t('language_change') }}</h3>
-            </div>
-          </div>
-
-          <p class="text-sm text-text-secondary mb-2">{{ t('language_change_desc') }}</p>
-          <p class="text-xs text-text-muted mb-5">{{ t('language_change_hint') }}</p>
-
-          <div class="flex flex-col sm:flex-row gap-2">
-            <button
-              @click="confirmWithTranslate"
-              class="flex-1 px-4 py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors"
-            >
-              {{ t('language_change_translate') }}
-            </button>
-            <button
-              @click="confirmWithoutTranslate"
-              class="flex-1 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-text-primary hover:bg-surface-hover transition-colors"
-            >
-              {{ t('language_change_keep') }}
-            </button>
-            <button
-              @click="closeLangModal"
-              class="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium text-text-muted hover:bg-surface-hover transition-colors"
-            >
-              {{ t('cancel') }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </Transition>
-  </Teleport>
+  <Modal :show="showLangModal" :title="t('language_change')" max-width="28rem" @close="closeLangModal">
+    <p class="text-sm text-text-secondary">{{ t('language_change_desc') }}</p>
+    <p class="mt-1.5 text-xs text-text-muted">{{ t('language_change_hint') }}</p>
+    <template #footer>
+      <button :class="button({ intent: 'ghost' })" @click="closeLangModal">{{ t('cancel') }}</button>
+      <button :class="button()" @click="confirmWithoutTranslate">{{ t('language_change_keep') }}</button>
+      <button :class="button({ intent: 'primary' })" @click="confirmWithTranslate">{{ t('language_change_translate') }}</button>
+    </template>
+  </Modal>
 </template>

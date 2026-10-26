@@ -34,3 +34,5 @@ store-listings.html
 keystore.properties
 *.keystore
 *.jks
+# Dev-only IPC fixtures recorded from `tauri dev` (src/dev/ipcFixtures.ts)
+.dev/

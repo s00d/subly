@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import AppCheckbox from "@/components/ui/AppCheckbox.vue";
+import UiViewSwitch from "@/components/ui/UiViewSwitch.vue";
+import Modal from "@/components/ui/Modal.vue";
+import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
+import UiEmptyState from "@/components/ui/UiEmptyState.vue";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
@@ -27,35 +32,12 @@ import ContextActionMenu, {
   type ContextMenuRow,
   type ContextMenuExcludeRect,
 } from "@/components/ui/ContextActionMenu.vue";
-import {
-  Plus,
-  Search,
-  Pencil,
-  Trash2,
-  RefreshCw,
-  ExternalLink,
-  CreditCard,
-  AlertTriangle,
-  Star,
-  StarOff,
-  CopyPlus,
-  ClipboardCopy,
-  CheckSquare,
-  Square,
-  Hash,
-  CircleDollarSign,
-  LayoutList,
-  LayoutGrid,
-  Rows3,
-  FolderOpen,
-  Filter,
-  Sparkles,
-} from "@lucide/vue";
+import { Plus, Search, Pencil, Trash2, RefreshCw, ExternalLink, CreditCard, Star, StarOff, CopyPlus, ClipboardCopy, CheckSquare, Square, CircleDollarSign, FolderOpen, Filter, Sparkles } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
-import { ui } from "@/lib/tv";
+import { ui, avatarTone, button } from "@/lib/tv";
 import { formatErrorForToast } from "@/utils/formatError";
 import { useAiConfigStore } from "@/stores/aiConfigStore";
 
@@ -130,16 +112,7 @@ function onAiImported(_count: number) {
 
 // Register header action
 function updateHeaderActions() {
-  const viewIcon = viewMode.value === "compact" ? Rows3 : viewMode.value === "expanded" ? LayoutGrid : LayoutList;
-  const nextViewMode = viewMode.value === "compact" ? "default" : viewMode.value === "default" ? "expanded" : "compact";
-  const currentViewTitle = viewMode.value === "compact" ? t("view_compact") : viewMode.value === "expanded" ? t("view_expanded") : t("view_default");
-  const nextViewTitle = nextViewMode === "compact" ? t("view_compact") : nextViewMode === "expanded" ? t("view_expanded") : t("view_default");
-
-  const actions: HeaderAction[] = [
-    { id: "toggle-sub-filters", icon: Filter, title: showFilters.value ? `${t("filter")} ✓` : `${t("filter")} ✕`, onClick: () => { showFilters.value = !showFilters.value; }, style: showFilters.value ? "warning" : "neutral" },
-    { id: "cycle-sub-view", icon: viewIcon, title: `${currentViewTitle} → ${nextViewTitle}`, onClick: () => setViewMode(nextViewMode), style: "accent" },
-    { id: "sub-selection-mode", icon: CheckSquare, title: selectionMode.value ? `${t("select")} ✓` : `${t("select")} ✕`, onClick: toggleSelectionMode, style: selectionMode.value ? "success" : "neutral" },
-  ];
+  const actions: HeaderAction[] = [];
   if (showAiHeaderButton.value) {
     actions.push({
       id: "ai-smart-sub",
@@ -151,7 +124,7 @@ function updateHeaderActions() {
       style: "accent",
     });
   }
-  actions.push({ id: "add-sub", icon: Plus, title: t("new_subscription"), onClick: openAdd, style: "primary" });
+  actions.push({ id: "add-sub", icon: Plus, title: t("new_subscription"), label: t("add"), onClick: openAdd, style: "primary" });
   setActions(actions);
 }
 
@@ -172,16 +145,19 @@ onUnmounted(() => {
 // Watch for route query changes (e.g. from tray navigation)
 watch(() => route.query.sub, () => handleSubQueryParam());
 
-function handleSubQueryParam() {
+async function handleSubQueryParam() {
   const subId = route.query.sub as string | undefined;
-  if (subId) {
-    const sub = subscriptions.value.find((s) => s.id === subId);
-    if (sub) {
-      openDetail(sub);
-    }
-    // Clear the query to avoid re-opening on route re-render
-    vueRouter.replace({ query: {} });
+  if (!subId) return;
+  // Clear the query to avoid re-opening on route re-render
+  vueRouter.replace({ query: {} });
+  let sub = subscriptions.value.find((s) => s.id === subId);
+  if (!sub && activeFilterCount.value > 0) {
+    // Hidden by the current filter: drop it and load the full list first.
+    resetFilters();
+    await fetchFilteredSubs();
+    sub = subscriptions.value.find((s) => s.id === subId);
   }
+  if (sub) openDetail(sub);
 }
 
 // Form
@@ -209,6 +185,17 @@ const filterTag = ref<string>("");
 // View mode & grouping
 const viewMode = computed(() => settings.value?.subscriptionViewMode || "default");
 const groupBy = computed(() => settings.value?.subscriptionGroupBy || "none");
+
+/** Non-default filters in effect (drives the badge on the Filter button and "no results" state). */
+const activeFilterCount = computed(() => (filterCategory.value ? 1 : 0) + (filterPayment.value ? 1 : 0) + (filterState.value ? 1 : 0) + (filterTag.value ? 1 : 0) + (searchQuery.value.trim() ? 1 : 0));
+
+function resetFilters() {
+  searchQuery.value = "";
+  filterCategory.value = "";
+  filterPayment.value = "";
+  filterState.value = "";
+  filterTag.value = "";
+}
 
 function setViewMode(mode: "default" | "compact" | "expanded") {
   updateSettings({ subscriptionViewMode: mode });
@@ -254,6 +241,11 @@ const groupedSubscriptions = computed<SubGroup[]>(() => {
   }));
 });
 
+/** Per-group monthly sum in the main currency (active only), shown in the group header. */
+function groupMonthlyTotal(subs: SubscriptionListItem[]) {
+  return moneyFromDecimal(sumMoney(subs.filter((s) => !s.inactive).map((s) => s.monthlyPriceMain)));
+}
+
 const groupByOptions = computed<SelectOption[]>(() => [
   { value: "none", label: t("group_none") },
   { value: "category", label: t("group_category") },
@@ -295,36 +287,45 @@ function deselectAll() {
   selectedIds.value = new Set();
 }
 
+/** Mutations from list actions: surface backend errors as a toast and resync the list. */
+async function guarded(fn: () => Promise<void>) {
+  try {
+    await fn();
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+    fetchFilteredSubs();
+  }
+}
+
 function batchDeleteSelected() {
   batchDeleteConfirmIds.value = [...selectedIds.value];
 }
 
 async function confirmBatchDelete() {
-  if (batchDeleteConfirmIds.value.length > 0) {
-    await subscriptionsStore.batchDelete(batchDeleteConfirmIds.value);
-    toast(t("batch_deleted").replace("{count}", String(batchDeleteConfirmIds.value.length)));
+  const ids = batchDeleteConfirmIds.value;
+  batchDeleteConfirmIds.value = [];
+  if (ids.length === 0) return;
+  await guarded(async () => {
+    await subscriptionsStore.batchDelete(ids);
+    toast(t("batch_deleted", { count: ids.length }));
     selectedIds.value = new Set();
     selectionMode.value = false;
     fetchFilteredSubs();
-  }
-  batchDeleteConfirmIds.value = [];
+  });
 }
 
-async function batchDeactivate() {
+async function batchSetInactive(inactive: boolean) {
   const ids = [...selectedIds.value];
-  await subscriptionsStore.batchSetInactive(ids, true);
-  toast(t("batch_updated").replace("{count}", String(ids.length)));
-  selectedIds.value = new Set();
-  fetchFilteredSubs();
+  await guarded(async () => {
+    await subscriptionsStore.batchSetInactive(ids, inactive);
+    toast(t("batch_updated", { count: ids.length }));
+    selectedIds.value = new Set();
+    fetchFilteredSubs();
+  });
 }
 
-async function batchActivate() {
-  const ids = [...selectedIds.value];
-  await subscriptionsStore.batchSetInactive(ids, false);
-  toast(t("batch_updated").replace("{count}", String(ids.length)));
-  selectedIds.value = new Set();
-  fetchFilteredSubs();
-}
+const batchDeactivate = () => batchSetInactive(true);
+const batchActivate = () => batchSetInactive(false);
 
 function openBatchCategoryModal() {
   batchCategoryId.value = settings.value?.defaultCategoryId || "cat-1";
@@ -333,11 +334,13 @@ function openBatchCategoryModal() {
 
 async function confirmBatchCategory() {
   const ids = [...selectedIds.value];
-  await subscriptionsStore.batchSetCategory(ids, batchCategoryId.value);
-  toast(t("batch_updated").replace("{count}", String(ids.length)));
   showBatchCategoryModal.value = false;
-  selectedIds.value = new Set();
-  fetchFilteredSubs();
+  await guarded(async () => {
+    await subscriptionsStore.batchSetCategory(ids, batchCategoryId.value);
+    toast(t("batch_updated", { count: ids.length }));
+    selectedIds.value = new Set();
+    fetchFilteredSubs();
+  });
 }
 
 const contextMenuOpen = ref(false);
@@ -452,12 +455,39 @@ function showContextMenu(sub: Subscription, event: MouseEvent, anchorRect?: DOMR
 const filteredSubscriptions = computed<SubscriptionListItem[]>(
   () => subscriptionsStore.items,
 );
+/** Monthly total in the main currency (backend converts each row; summing raw prices mixed currencies). */
 const totalSubscriptionsAmount = computed(() =>
-  moneyFromDecimal(
-    sumMoney(filteredSubscriptions.value.map((sub) => sub.monthlyPrice ?? sub.price ?? "0")),
-  ),
+  moneyFromDecimal(sumMoney(filteredSubscriptions.value.filter((s) => !s.inactive).map((s) => s.monthlyPriceMain))),
 );
 const subscriptionsSummaryCurrencyId = computed(() => settings.value?.mainCurrencyId || "cur-1");
+
+/** Row price honouring display settings: convert to main currency, original price, monthly equivalent. */
+function priceView(sub: SubscriptionListItem) {
+  const main = subscriptionsSummaryCurrencyId.value;
+  const converted = Boolean(settings.value?.convertCurrency) && sub.currencyId !== main;
+  const primary = converted ? fmt(sub.priceMain, main) : fmt(sub.price, sub.currencyId);
+  const extra: string[] = [];
+  if (converted && settings.value?.showOriginalPrice) extra.push(fmt(sub.price, sub.currencyId));
+  const isMonthly = sub.cycle === 3 && sub.frequency === 1;
+  if (settings.value?.monthlyPrice && !isMonthly) {
+    extra.push(`≈ ${converted ? fmt(sub.monthlyPriceMain, main) : fmt(sub.monthlyPrice, sub.currencyId)}/${t("mo")}`);
+  }
+  return { primary, secondary: extra.join(" · ") };
+}
+
+/** "in 2 days" / "due today" / "overdue by 3 days" — readable instead of a bare "2d". */
+function dueLabel(sub: SubscriptionListItem): string {
+  const d = sub.daysLeft;
+  if (d < 0) return t("overdue_by_alert", { days: -d }, -d);
+  if (d === 0) return t("due_today_alert");
+  return t("in_days_alert", { days: d }, d);
+}
+
+function dueTone(sub: SubscriptionListItem): string {
+  if (sub.urgency === "overdue" || sub.urgency === "danger") return "text-danger";
+  if (sub.urgency === "warn") return "text-warning";
+  return "text-text-muted";
+}
 
 function buildSubFilter(): SubscriptionFilter {
   const f: SubscriptionFilter = {
@@ -493,7 +523,11 @@ function fetchFilteredSubsDebounced() {
   subDebounce = setTimeout(fetchFilteredSubs, 200);
 }
 
-watch([searchQuery, filterCategory, filterPayment, filterTag, filterState, sortBy], fetchFilteredSubsDebounced);
+watch([searchQuery, filterCategory, filterPayment, filterTag, filterState, sortBy], () => {
+  // Hidden rows must not stay selected: batch actions would hit subscriptions the user can't see.
+  selectedIds.value = new Set();
+  fetchFilteredSubsDebounced();
+});
 
 // Tag filter options
 const tagFilterOptions = computed<SelectOption[]>(() => [
@@ -522,9 +556,8 @@ function isSubOverdue(sub: SubscriptionListItem): boolean {
 }
 
 function getDaysBadgeState(sub: SubscriptionListItem): "days-badge--danger" | "days-badge--warn" | "days-badge--normal" {
-  const days = getSubDaysLeft(sub);
-  if (days <= 3) return "days-badge--danger";
-  if (days <= 7) return "days-badge--warn";
+  if (sub.urgency === "overdue" || sub.urgency === "danger") return "days-badge--danger";
+  if (sub.urgency === "warn") return "days-badge--warn";
   return "days-badge--normal";
 }
 
@@ -586,34 +619,39 @@ function requestDelete(id: string) {
 }
 
 async function confirmDelete() {
-  if (deleteConfirmId.value) {
-    await subscriptionsStore.deleteById(deleteConfirmId.value);
+  const id = deleteConfirmId.value;
+  deleteConfirmId.value = null;
+  if (!id) return;
+  await guarded(async () => {
+    await subscriptionsStore.deleteById(id);
     toast(t("subscription_deleted"));
     fetchFilteredSubs();
-  }
-  deleteConfirmId.value = null;
+  });
 }
 
 function cancelDelete() { deleteConfirmId.value = null; }
 
 async function handleClone(id: string) {
   showDetail.value = false;
-  await subscriptionsStore.cloneById(id);
-  toast(t("subscription_added"));
-  fetchFilteredSubs();
+  await guarded(async () => {
+    await subscriptionsStore.cloneById(id);
+    toast(t("subscription_added"));
+  });
 }
 
 async function handleRenew(id: string) {
   showDetail.value = false;
-  await subscriptionsStore.recordPayment(id);
-  toast(t("payment_recorded"));
-  fetchFilteredSubs();
+  await handleRecordPayment(id);
 }
 
 async function handleRecordPayment(id: string) {
-  await subscriptionsStore.recordPayment(id);
-  toast(t("payment_recorded"));
-  fetchFilteredSubs();
+  try {
+    await subscriptionsStore.recordPayment(id);
+    toast(t("payment_recorded"));
+    await fetchFilteredSubs();
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  }
 }
 
 async function handleOpenUrl(url: string) {
@@ -633,8 +671,12 @@ async function handleCopyName(sub: Subscription) {
 }
 
 async function handleToggleFavorite(id: string) {
-  await subscriptionsStore.toggleFavorite(id);
-  await fetchFilteredSubs();
+  try {
+    await subscriptionsStore.toggleFavorite(id);
+    await fetchFilteredSubs();
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  }
 }
 
 async function onSaved() {
@@ -660,7 +702,7 @@ const paymentFilterOptions = computed<SelectOption[]>(() => [
 ]);
 
 const stateFilterOptions = computed<SelectOption[]>(() => [
-  { value: "", label: t("filter") },
+  { value: "", label: t("all_states") },
   { value: "active", label: t("active_subscriptions") },
   { value: "inactive", label: t("inactive_subscriptions") },
 ]);
@@ -673,8 +715,10 @@ function onDetailDelete(id: string) { requestDelete(id); }
 function onDetailOpenUrl(url: string) { handleOpenUrl(url); }
 function onDetailRecordPayment(id: string) { handleRecordPayment(id); }
 async function onDetailToggleFavorite(id: string) {
-  await subscriptionsStore.toggleFavorite(id);
-  fetchFilteredSubs();
+  await guarded(async () => {
+    await subscriptionsStore.toggleFavorite(id);
+    fetchFilteredSubs();
+  });
 }
 
 async function updateSettings(updates: Partial<Settings>) {
@@ -684,7 +728,7 @@ async function updateSettings(updates: Partial<Settings>) {
 
 async function loadInitial() {
   await metaStore.ensureLoaded();
-  await subscriptionsStore.loadBrief();
+  await subscriptionsStore.loadBrief(buildSubFilter());
 }
 
 </script>
@@ -692,6 +736,37 @@ async function loadInitial() {
 <template>
   <div class="max-w-5xl mx-auto">
     <!-- Filters -->
+    <!-- List toolbar: search always visible; filter / select / layout as labelled controls -->
+    <div class="mb-3 flex items-center gap-2">
+      <div class="relative min-w-0 flex-1">
+        <Search :size="14" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+        <input v-model="searchQuery" type="search" :placeholder="t('search')" :class="[ui.field(), 'pl-8 text-[13px]']" />
+      </div>
+      <button
+        type="button"
+        :class="button({ pressed: showFilters })"
+        :aria-pressed="showFilters"
+        @click="showFilters = !showFilters"
+      >
+        <Filter :size="14" />
+        <span class="max-sm:hidden">{{ t('filter') }}</span>
+        <span
+          v-if="activeFilterCount > 0"
+          class="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white tabular-nums"
+        >{{ activeFilterCount }}</span>
+      </button>
+      <button
+        type="button"
+        :class="button({ pressed: selectionMode })"
+        :aria-pressed="selectionMode"
+        @click="toggleSelectionMode"
+      >
+        <CheckSquare :size="14" />
+        <span class="max-sm:hidden">{{ t('select') }}</span>
+      </button>
+      <UiViewSwitch :model-value="viewMode" @update:model-value="setViewMode" />
+    </div>
+
     <Transition
       enter-active-class="transition ease-out duration-200"
       enter-from-class="opacity-0 -translate-y-2"
@@ -700,34 +775,28 @@ async function loadInitial() {
       leave-from-class="opacity-100 translate-y-0"
       leave-to-class="opacity-0 -translate-y-2"
     >
-      <div v-if="showFilters" class="mb-3 p-2.5 sm:p-4 rounded-xl border border-border bg-surface space-y-2">
-        <div class="relative min-w-0">
-          <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-          <input
-            v-model="searchQuery"
-            type="text"
-            :placeholder="t('search')"
-            class="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted hover:border-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
-          />
+      <div v-if="showFilters" class="mb-3 p-3 rounded-xl border border-border bg-surface shadow-sm space-y-2">
+        <div v-if="activeFilterCount > 0" class="flex justify-end -mb-1">
+          <button type="button" class="text-xs font-medium text-primary hover:text-primary-hover" @click="resetFilters">{{ t('reset_filters') }}</button>
         </div>
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
-          <div class="w-28 shrink-0">
-            <AppSelect v-model="sortBy" :options="sortOptions" size="sm" />
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div class="min-w-0">
+            <AppSelect v-model="sortBy" :options="sortOptions" />
           </div>
-          <div class="w-28 shrink-0">
-            <AppSelect v-model="filterCategory" :options="categoryFilterOptions" size="sm" />
+          <div class="min-w-0">
+            <AppSelect v-model="filterCategory" :options="categoryFilterOptions" />
           </div>
-          <div class="w-28 shrink-0">
-            <AppSelect v-model="filterPayment" :options="paymentFilterOptions" size="sm" />
+          <div class="min-w-0">
+            <AppSelect v-model="filterPayment" :options="paymentFilterOptions" />
           </div>
-          <div class="w-28 shrink-0">
-            <AppSelect v-model="filterState" :options="stateFilterOptions" size="sm" />
+          <div class="min-w-0">
+            <AppSelect v-model="filterState" :options="stateFilterOptions" />
           </div>
-          <div v-if="tags.length > 0" class="w-28 shrink-0" >
-            <AppSelect v-model="filterTag" :options="tagFilterOptions" size="sm" />
+          <div v-if="tags.length > 0" class="min-w-0">
+            <AppSelect v-model="filterTag" :options="tagFilterOptions" />
           </div>
-          <div class="w-32 shrink-0">
-            <AppSelect :modelValue="groupBy" @update:modelValue="(v: string | number) => setGroupBy(String(v) as 'none' | 'category' | 'payment_method')" :options="groupByOptions" size="sm" />
+          <div class="min-w-0">
+            <AppSelect :modelValue="groupBy" @update:modelValue="(v: string | number) => setGroupBy(String(v) as 'none' | 'category' | 'payment_method')" :options="groupByOptions" />
           </div>
         </div>
       </div>
@@ -742,34 +811,34 @@ async function loadInitial() {
       leave-from-class="opacity-100 translate-y-0"
       leave-to-class="opacity-0 -translate-y-2"
     >
-      <div v-if="selectionMode" class="flex items-center gap-1.5 sm:gap-2 mb-3 px-2 sm:px-3 py-2 rounded-lg bg-surface-secondary border border-border overflow-x-auto">
-        <span class="text-xs font-medium text-text-primary">{{ selectedIds.size }} {{ t('selected_count') }}</span>
-        <button @click="selectAll" class="p-1 rounded text-text-secondary hover:bg-surface transition-colors" :title="t('select_all')">
+      <div v-if="selectionMode" class="sticky top-2 z-10 flex items-center gap-1.5 mb-3 px-3 py-2 rounded-xl border border-border-strong bg-surface shadow-md overflow-x-auto">
+        <span class="text-xs font-semibold text-text-primary tabular-nums whitespace-nowrap">{{ selectedIds.size }} {{ t('selected_count') }}</span>
+        <button :class="button({ intent: 'ghost', size: 'iconSm' })" @click="selectAll" :title="t('select_all')">
           <CheckSquare :size="13" />
         </button>
-        <button @click="deselectAll" class="p-1 rounded text-text-muted hover:bg-surface-hover transition-colors" :title="t('deselect_all')">
+        <button :class="button({ intent: 'ghost', size: 'iconSm' })" @click="deselectAll" :title="t('deselect_all')">
           <Square :size="13" />
         </button>
         <div class="flex-1" />
         <button
           @click="batchActivate"
           :disabled="selectedIds.size === 0"
-          class="px-2.5 py-1 rounded-md text-[11px] font-medium border border-border text-text-secondary hover:bg-surface disabled:opacity-30 transition-colors"
+          :class="button({ size: 'sm' })"
         >{{ t('batch_activate') }}</button>
         <button
           @click="batchDeactivate"
           :disabled="selectedIds.size === 0"
-          class="px-2.5 py-1 rounded-md text-[11px] font-medium border border-border text-text-secondary hover:bg-surface disabled:opacity-30 transition-colors"
+          :class="button({ size: 'sm' })"
         >{{ t('batch_deactivate') }}</button>
         <button
           @click="openBatchCategoryModal"
           :disabled="selectedIds.size === 0"
-          class="px-2.5 py-1 rounded-md text-[11px] font-medium border border-border text-text-secondary hover:bg-surface disabled:opacity-30 transition-colors"
+          :class="button({ size: 'sm' })"
         >{{ t('batch_change_category') }}</button>
         <button
           @click="batchDeleteSelected"
           :disabled="selectedIds.size === 0"
-          class="px-2.5 py-1 rounded-md text-[11px] font-medium border border-border text-text-secondary hover:bg-surface disabled:opacity-30 transition-colors"
+          :class="button({ intent: 'ghost', size: 'sm' })" class="text-danger hover:text-danger"
         >{{ t('batch_delete') }}</button>
       </div>
     </Transition>
@@ -777,29 +846,26 @@ async function loadInitial() {
     <SubscriptionsListSkeleton v-if="!initialListLoaded" />
 
     <!-- Empty state -->
-    <div v-else-if="filteredSubscriptions.length === 0" class="text-center py-16">
-      <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-surface-hover flex items-center justify-center">
-        <CreditCard :size="36" class="text-text-muted" />
-      </div>
-      <p class="text-text-muted mb-4">{{ t('no_subscriptions_yet') }}</p>
-      <button
-        @click="openAdd"
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover"
-      >
-        <Plus :size="18" />
-        {{ t('add_first_subscription') }}
-      </button>
+    <div v-else-if="filteredSubscriptions.length === 0" :class="ui.panel()">
+      <UiEmptyState v-if="activeFilterCount > 0" :icon="Search" :title="t('nothing_found')">
+        <button :class="button()" @click="resetFilters">{{ t('reset_filters') }}</button>
+      </UiEmptyState>
+      <UiEmptyState v-else :icon="CreditCard" :title="t('no_subscriptions_yet')">
+        <button :class="button({ intent: 'primary' })" @click="openAdd">
+          <Plus :size="15" /> {{ t('add_first_subscription') }}
+        </button>
+      </UiEmptyState>
     </div>
 
     <!-- Subscription list -->
     <div v-else>
       <!-- Summary bar -->
-      <div class="flex items-center justify-between px-3 py-2 mb-3 rounded-lg bg-surface border border-border">
-        <div class="flex items-center gap-2 text-xs text-text-muted">
+      <div class="flex items-end justify-between px-1 pb-3">
+        <div class="flex items-center gap-1.5 text-xs text-text-muted">
           <CircleDollarSign :size="14" />
           <span>{{ filteredSubscriptions.length }} {{ t('subscriptions').toLowerCase() }}</span>
         </div>
-        <div class="text-sm font-semibold text-text-primary tabular-nums">
+        <div class="text-xl font-semibold text-text-primary tabular-nums tracking-[-0.02em]">
           {{ fmt(totalSubscriptionsAmount, subscriptionsSummaryCurrencyId) }}
         </div>
       </div>
@@ -812,25 +878,30 @@ async function loadInitial() {
           <span class="text-xs font-semibold text-text-primary uppercase tracking-wide">{{ group.label }}</span>
           <span class="text-[11px] text-text-muted tabular-nums">({{ group.subs.length }})</span>
           <div class="flex-1 h-px bg-border" />
+          <span class="text-xs font-semibold text-text-secondary tabular-nums">
+            {{ fmt(groupMonthlyTotal(group.subs), subscriptionsSummaryCurrencyId) }}<span class="font-normal text-text-muted">/{{ t('mo') }}</span>
+          </span>
         </div>
 
         <!-- Grid for expanded mode -->
         <div
           :class="
-            viewMode === 'expanded'
-              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-3'
-              : viewMode === 'compact'
-                ? 'flex flex-col gap-2 mb-3'
-                : 'flex flex-col gap-1.5 sm:gap-2 mb-3'
+ viewMode === 'expanded'
+              ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-4'
+              : viewMode === 'default'
+                ? 'flex flex-col gap-1.5 mb-4'
+                : 'flex flex-col gap-1 mb-4'
           "
         >
           <div
             v-for="sub in group.subs"
             :key="sub.id"
-            class="min-w-0 bg-surface rounded-2xl border overflow-hidden transition-all duration-200 shadow-sm hover:shadow-md hover:border-primary/25 active-scale"
+            class="relative min-w-0 overflow-hidden"
             :class="[
-              sub.inactive ? 'opacity-50' : '',
+ 'bg-surface border shadow-sm transition-[border-color,box-shadow] hover:border-border-strong',
+              viewMode === 'compact' ? 'rounded-lg' : 'rounded-xl',
               selectedIds.has(sub.id) ? 'border-primary ring-1 ring-primary/30' : 'border-border',
+              sub.inactive ? 'opacity-50' : '',
             ]"
           >
             <UniversalListRow
@@ -842,38 +913,30 @@ async function loadInitial() {
                 <div
                   v-if="selectionMode && viewMode !== 'expanded'"
                   class="shrink-0"
-                  @click.stop="toggleSelected(sub.id)"
-                >
-                  <div
-                    class="rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
-                    :class="[
-                      viewMode === 'compact' ? 'w-4 h-4' : 'w-5 h-5',
-                      selectedIds.has(sub.id) ? 'bg-primary border-primary text-white' : 'border-border hover:border-primary',
-                    ]"
+                  @click.stop
                   >
-                    <svg v-if="selectedIds.has(sub.id)" :width="viewMode === 'compact' ? 10 : 12" :height="viewMode === 'compact' ? 10 : 12" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                  </div>
+                    <AppCheckbox :model-value="selectedIds.has(sub.id)" :aria-label="t('select')" @update:model-value="toggleSelected(sub.id)" />
                 </div>
               </template>
               <template #leading>
                 <template v-if="viewMode === 'compact'">
                   <Tooltip v-if="!selectionMode" :text="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')">
-                    <button @click.stop="handleToggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-yellow-500' : 'text-border hover:text-yellow-400'">
+                    <button @click.stop="handleToggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-warning' : 'text-border-strong hover:text-warning'">
                       <Star :size="12" :fill="sub.favorite ? 'currentColor' : 'none'" />
                     </button>
                   </Tooltip>
-                  <div class="w-6 h-6 rounded bg-primary-light border border-border flex items-center justify-center text-[11px] font-bold text-primary shrink-0 overflow-hidden">
+                  <div class="w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-semibold shrink-0 overflow-hidden" :class="sub.logo ? 'bg-surface ring-1 ring-border' : avatarTone(sub.name)">
                     <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
                     <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
                   </div>
                 </template>
                 <template v-else-if="viewMode === 'default'">
                   <Tooltip v-if="!selectionMode" :text="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')">
-                    <button @click.stop="handleToggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors hidden sm:block" :class="sub.favorite ? 'text-yellow-500' : 'text-border hover:text-yellow-400'">
+                    <button @click.stop="handleToggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-warning' : 'text-border-strong hover:text-warning'">
                       <Star :size="16" :fill="sub.favorite ? 'currentColor' : 'none'" />
                     </button>
                   </Tooltip>
-                  <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary-light border border-border flex items-center justify-center text-xs sm:text-sm font-bold text-primary shrink-0 overflow-hidden">
+                  <div class="w-9 h-9 rounded-[10px] flex items-center justify-center text-sm font-semibold shrink-0 overflow-hidden" :class="sub.logo ? 'bg-surface ring-1 ring-border' : avatarTone(sub.name)">
                     <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
                     <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
                   </div>
@@ -899,27 +962,37 @@ async function loadInitial() {
                     <span class="hidden shrink-0 select-none text-border md:inline" aria-hidden="true">·</span>
                     <span
                       class="hidden shrink-0 tabular-nums text-[10px] whitespace-nowrap md:inline"
-                      :class="isSubOverdue(sub) ? 'font-medium text-red-500' : 'text-text-muted'"
+                      :class="isSubOverdue(sub) ? 'font-medium text-danger' : 'text-text-muted'"
                     >{{ formatDate(sub.nextPayment) }}</span>
 
                     <span
                       v-if="!sub.autoRenew"
-                      class="hidden shrink-0 rounded bg-orange-500/15 px-1 py-px text-[9px] font-semibold text-orange-600 lg:inline dark:text-orange-400"
+                      class="hidden shrink-0 rounded bg-warning/15 px-1 py-px text-[9px] font-semibold text-warning lg:inline dark:text-warning"
                     >{{ t('manual_renewal_short') }}</span>
 
                     <span
-                      v-if="getCategoryName(sub.categoryId)"
+                      v-if="getCategoryName(sub.categoryId) && groupBy !== 'category'"
                       class="hidden max-w-[5rem] shrink-0 truncate text-[10px] text-text-muted lg:inline lg:max-w-[7rem]"
                     >{{ getCategoryName(sub.categoryId) }}</span>
                   </template>
                 </div>
                 <div v-else-if="viewMode === 'default'" class="min-w-0">
-                  <p class="text-xs sm:text-sm font-medium text-text-primary truncate">{{ sub.name }}</p>
-                  <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="text-[11px] sm:text-xs text-text-muted">
-                      {{ billingCycleText(sub.cycle, sub.frequency) }}
-                      <span v-if="!sub.autoRenew" class="ml-1 text-orange-500">({{ t('manual_renewal') }})</span>
-                    </span>
+                  <p class="text-sm font-semibold text-text-primary truncate">{{ sub.name }}</p>
+                  <div class="mt-0.5 flex items-center gap-1.5 overflow-hidden whitespace-nowrap text-xs text-text-muted sm:flex-wrap">
+                    <span class="shrink-0">{{ billingCycleText(sub.cycle, sub.frequency) }}</span>
+                    <!-- Phones: the date column is hidden, so the due hint moves into this line -->
+                    <template v-if="!sub.inactive">
+                      <span class="text-border-strong sm:hidden" aria-hidden="true">·</span>
+                      <span class="truncate font-medium sm:hidden" :class="dueTone(sub)">{{ dueLabel(sub) }}</span>
+                    </template>
+                    <template v-if="getCategoryName(sub.categoryId) && groupBy !== 'category'">
+                      <span class="hidden text-border-strong sm:inline" aria-hidden="true">·</span>
+                      <span class="hidden items-center gap-1 max-w-[10rem] truncate sm:inline-flex">
+                        <IconDisplay v-if="getCategoryIcon(sub.categoryId)" :icon="getCategoryIcon(sub.categoryId)" :size="12" />
+                        {{ getCategoryName(sub.categoryId) }}
+                      </span>
+                    </template>
+                    <span v-if="!sub.autoRenew" class="hidden items-center rounded px-1.5 py-px text-[10px] font-semibold bg-warning/15 text-warning sm:inline-flex">{{ t('manual_renewal') }}</span>
                     <span v-for="tag in (sub.tags || []).slice(0, 3)" :key="tag" class="hidden sm:inline-flex items-center px-1.5 py-0 rounded text-[10px] font-medium bg-surface-hover text-text-muted border border-border">#{{ tag }}</span>
                     <span v-if="(sub.tags || []).length > 3" class="hidden sm:inline text-[10px] text-text-muted">+{{ sub.tags.length - 3 }}</span>
                   </div>
@@ -928,30 +1001,22 @@ async function loadInitial() {
               <template #meta>
                 <span
                   v-if="viewMode === 'compact' && !sub.inactive"
-                  class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-bold leading-none shrink-0 w-[56px] tabular-nums"
+                  class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-semibold leading-none shrink-0 w-[56px] tabular-nums"
                   :class="getDaysBadgeState(sub)"
                 >
                   {{ getSubDaysLeft(sub) }}{{ t('days_short') }}
                 </span>
-                <div v-else-if="viewMode === 'default'" class="text-right shrink-0 w-[60px] sm:w-[142px]">
-                  <div class="flex items-center gap-1 sm:gap-1.5 justify-end">
-                    <p class="hidden sm:block text-xs sm:text-sm font-medium tabular-nums" :class="isSubOverdue(sub) ? 'text-red-500' : 'text-text-primary'">
-                      <span class="tabular-nums whitespace-nowrap">{{ formatDate(sub.nextPayment) }}</span>
-                    </p>
-                    <span
-                      v-if="!sub.inactive"
-                      class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-bold leading-none w-[56px] tabular-nums"
-                      :class="getDaysBadgeState(sub)"
-                    >
-                      {{ getSubDaysLeft(sub) }}{{ t('days_short') }}
-                    </span>
-                  </div>
+                <div v-else-if="viewMode === 'default'" class="hidden text-right shrink-0 sm:block sm:w-[150px]">
+                  <p class="text-[13px] font-medium text-text-primary tabular-nums whitespace-nowrap">{{ formatDate(sub.nextPayment) }}</p>
+                  <p v-if="!sub.inactive" class="text-[11px] font-medium whitespace-nowrap truncate" :class="dueTone(sub)">{{ dueLabel(sub) }}</p>
+                  <p v-else class="text-[11px] text-text-muted">{{ t('inactive') }}</p>
                 </div>
               </template>
               <template #value>
-                <p v-if="viewMode === 'compact'" class="text-xs font-semibold text-primary shrink-0 w-[96px] text-right tabular-nums whitespace-nowrap">{{ fmt(sub.price, sub.currencyId) }}</p>
-                <div v-else-if="viewMode === 'default'" class="text-right shrink-0 w-[78px] sm:w-[112px]">
-                  <p class="text-xs sm:text-sm font-semibold text-primary tabular-nums whitespace-nowrap">{{ fmt(sub.price, sub.currencyId) }}</p>
+                <p v-if="viewMode === 'compact'" class="text-xs font-semibold text-text-primary shrink-0 w-[96px] text-right tabular-nums whitespace-nowrap">{{ priceView(sub).primary }}</p>
+                <div v-else-if="viewMode === 'default'" class="text-right shrink-0 w-[88px] sm:w-[124px]">
+                  <p class="text-[15px] font-semibold text-text-primary tabular-nums tracking-[-0.01em] whitespace-nowrap">{{ priceView(sub).primary }}</p>
+                  <p v-if="priceView(sub).secondary" class="text-[11px] text-text-muted tabular-nums whitespace-nowrap truncate">{{ priceView(sub).secondary }}</p>
                 </div>
               </template>
               <template #trailing>
@@ -969,12 +1034,10 @@ async function loadInitial() {
               </template>
               <template #expanded>
                 <div class="flex items-start gap-3 mb-3">
-                  <div v-if="selectionMode" class="shrink-0 mt-1" @click.stop="toggleSelected(sub.id)">
-                    <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
-                      :class="selectedIds.has(sub.id) ? 'bg-primary border-primary text-white' : 'border-border hover:border-primary'"
-                    ><svg v-if="selectedIds.has(sub.id)" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                  <div v-if="selectionMode" class="shrink-0 mt-1" @click.stop>
+                    <AppCheckbox :model-value="selectedIds.has(sub.id)" :aria-label="t('select')" @update:model-value="toggleSelected(sub.id)" />
                   </div>
-                  <div class="w-12 h-12 rounded-lg bg-primary-light border border-border flex items-center justify-center text-lg font-bold text-primary shrink-0 overflow-hidden">
+                  <div class="w-11 h-11 rounded-xl flex items-center justify-center text-base font-semibold shrink-0 overflow-hidden" :class="sub.logo ? 'bg-surface ring-1 ring-border' : avatarTone(sub.name)">
                     <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
                     <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
                   </div>
@@ -982,12 +1045,12 @@ async function loadInitial() {
                     <div class="flex items-center gap-2">
                       <p class="text-sm font-semibold text-text-primary truncate">{{ sub.name }}</p>
                       <Tooltip v-if="!selectionMode" :text="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')">
-                        <button @click.stop="handleToggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-yellow-500' : 'text-border hover:text-yellow-400'">
+                        <button @click.stop="handleToggleFavorite(sub.id)" class="shrink-0 p-0.5 rounded transition-colors" :class="sub.favorite ? 'text-warning' : 'text-border-strong hover:text-warning'">
                           <Star :size="14" :fill="sub.favorite ? 'currentColor' : 'none'" />
                         </button>
                       </Tooltip>
                     </div>
-                    <p class="text-xs text-text-muted flex items-center gap-1">
+                    <p v-if="groupBy !== 'category'" class="text-xs text-text-muted flex items-center gap-1">
                       <IconDisplay v-if="getCategoryIcon(sub.categoryId)" :icon="getCategoryIcon(sub.categoryId)" :size="12" />
                       {{ getCategoryName(sub.categoryId) }}
                     </p>
@@ -996,14 +1059,15 @@ async function loadInitial() {
 
                 <div class="flex items-end justify-between">
                   <div>
-                    <p class="text-lg font-bold text-primary tabular-nums">{{ fmt(sub.price, sub.currencyId) }}</p>
+                    <p class="text-lg font-semibold text-text-primary tabular-nums tracking-[-0.01em]">{{ priceView(sub).primary }}</p>
+                    <p v-if="priceView(sub).secondary" class="text-[11px] text-text-muted tabular-nums">{{ priceView(sub).secondary }}</p>
                     <p class="text-[11px] text-text-muted">{{ billingCycleText(sub.cycle, sub.frequency) }}</p>
                   </div>
                   <div class="text-right w-[136px]">
-                    <p class="text-xs font-medium tabular-nums whitespace-nowrap" :class="isSubOverdue(sub) ? 'text-red-500' : 'text-text-primary'">{{ formatDate(sub.nextPayment) }}</p>
+                    <p class="text-xs font-medium tabular-nums whitespace-nowrap" :class="isSubOverdue(sub) ? 'text-danger' : 'text-text-primary'">{{ formatDate(sub.nextPayment) }}</p>
                     <span
                       v-if="!sub.inactive"
-                      class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-bold leading-none mt-0.5 w-[56px] tabular-nums"
+                      class="days-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[11px] font-semibold leading-none mt-0.5 w-[56px] tabular-nums"
                       :class="getDaysBadgeState(sub)"
                     >
                       {{ getSubDaysLeft(sub) }}{{ t('days_short') }}
@@ -1023,10 +1087,15 @@ async function loadInitial() {
                 </div>
               </template>
               <template #after>
-                <div v-if="settings?.showSubscriptionProgress && !sub.inactive" class="h-1 bg-surface-hover">
-                  <div class="h-full transition-all duration-300"
-                    :class="getSubDaysLeft(sub) <= 3 ? 'bg-red-500' : getSubDaysLeft(sub) <= 7 ? 'bg-orange-400' : 'bg-primary'"
-                    :style="{ width: ((30 - getSubDaysLeft(sub)) / 30 * 100) + '%' }"
+                <!-- Cycle progress: a real bar with a track, inset to the text column in list modes -->
+                <div
+                  v-if="settings?.showSubscriptionProgress && !sub.inactive"
+                  class="absolute bottom-0 overflow-hidden"
+                  :class="viewMode === 'compact' ? 'inset-x-0 h-[2px] bg-surface-hover' : 'inset-x-0 h-[3px] bg-surface-hover'"
+                >
+                  <div class="h-full rounded-full transition-all duration-300"
+                    :class="sub.urgency === 'overdue' || sub.urgency === 'danger' ? 'bg-danger' : sub.urgency === 'warn' ? 'bg-warning' : 'bg-primary'"
+                    :style="{ width: sub.cycleProgress * 100 + '%' }"
                   />
                 </div>
               </template>
@@ -1069,77 +1138,35 @@ async function loadInitial() {
       @imported="onAiImported"
     />
 
-    <!-- Delete Confirmation Modal -->
-    <Teleport to="body">
-      <Transition name="app-modal">
-        <div v-if="deleteConfirmId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="cancelDelete" />
-          <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
-            <div class="flex items-center gap-3 mb-3 sm:mb-4">
-              <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
-                <AlertTriangle :size="18" class="text-red-500" />
-              </div>
-              <h3 :class="ui.sectionTitle()">{{ t('delete') }}</h3>
-            </div>
-            <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('confirm_delete_subscription') }}</p>
-            <div class="flex justify-end gap-2 sm:gap-3">
-              <button
-                @click="cancelDelete"
-                class="px-3 sm:px-4 py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover"
-              >{{ t('cancel') }}</button>
-              <button
-                @click="confirmDelete"
-                class="px-3 sm:px-4 py-2 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-medium hover:bg-red-700"
-              >{{ t('delete') }}</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <ConfirmDialog
+      :show="Boolean(deleteConfirmId)"
+      :title="t('delete')"
+      :message="t('confirm_delete_subscription')"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
 
-    <!-- Batch Delete Confirmation -->
-    <Teleport to="body">
-      <Transition name="app-modal">
-        <div v-if="batchDeleteConfirmIds.length > 0" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="batchDeleteConfirmIds = []" />
-          <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
-            <div class="flex items-center gap-3 mb-3 sm:mb-4">
-              <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
-                <AlertTriangle :size="18" class="text-red-500" />
-              </div>
-              <h3 :class="ui.sectionTitle()">{{ t('batch_delete') }}</h3>
-            </div>
-            <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('batch_confirm_delete').replace('{count}', String(batchDeleteConfirmIds.length)) }}</p>
-            <div class="flex justify-end gap-2 sm:gap-3">
-              <button @click="batchDeleteConfirmIds = []" class="px-3 sm:px-4 py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover">{{ t('cancel') }}</button>
-              <button @click="confirmBatchDelete" class="px-3 sm:px-4 py-2 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-medium hover:bg-red-700">{{ t('delete') }}</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <ConfirmDialog
+      :show="batchDeleteConfirmIds.length > 0"
+      :title="t('batch_delete')"
+      :message="t('batch_confirm_delete', { count: batchDeleteConfirmIds.length })"
+      @confirm="confirmBatchDelete"
+      @cancel="batchDeleteConfirmIds = []"
+    />
 
     <!-- Batch Change Category Modal -->
-    <Teleport to="body">
-      <Transition name="app-modal">
-        <div v-if="showBatchCategoryModal" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="showBatchCategoryModal = false" />
-          <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
-            <h3 :class="[ui.sectionTitle(), 'mb-3 sm:mb-4']">{{ t('batch_change_category') }}</h3>
-            <p class="text-xs sm:text-sm text-text-muted mb-3">{{ selectedIds.size }} {{ t('selected_count') }}</p>
-            <AppSelect
-              v-model="batchCategoryId"
-              :options="categoryFilterOptions.filter((o) => o.value !== '')"
-              :label="t('category')"
-            />
-            <div class="flex justify-end gap-3 mt-5">
-              <button @click="showBatchCategoryModal = false" class="px-4 py-2 rounded-lg border border-border text-sm font-medium text-text-secondary hover:bg-surface-hover">{{ t('cancel') }}</button>
-              <button @click="confirmBatchCategory" class="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover">{{ t('save') }}</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <Modal :show="showBatchCategoryModal" :title="t('batch_change_category')" max-width="24rem" @close="showBatchCategoryModal = false">
+      <p class="text-xs text-text-muted mb-3">{{ selectedIds.size }} {{ t('selected_count') }}</p>
+      <AppSelect
+        v-model="batchCategoryId"
+        :options="categoryFilterOptions.filter((o) => o.value !== '')"
+        :label="t('category')"
+      />
+      <template #footer>
+        <button :class="button()" @click="showBatchCategoryModal = false">{{ t('cancel') }}</button>
+        <button :class="button({ intent: 'primary' })" @click="confirmBatchCategory">{{ t('save') }}</button>
+      </template>
+    </Modal>
 
     <ContextActionMenu
       v-model:open="contextMenuOpen"
@@ -1155,29 +1182,19 @@ async function loadInitial() {
 
 <style scoped>
 .days-badge {
-  background: var(--color-surface-hover);
-  color: var(--color-text-primary);
-  border-width: 2px;
-  border-style: solid;
+  border-radius: 9999px;
+  font-weight: 600;
 }
-
 .days-badge--danger {
-  border-color: #f87171;
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+  color: var(--color-danger);
 }
-
 .days-badge--warn {
-  border-color: #fb923c;
+  background: color-mix(in srgb, var(--color-warning) 16%, transparent);
+  color: var(--color-warning);
 }
-
 .days-badge--normal {
-  border-color: var(--color-primary-hover);
-}
-
-:global(.dark) .days-badge--danger {
-  border-color: #ef4444;
-}
-
-:global(.dark) .days-badge--warn {
-  border-color: #f97316;
+  background: var(--color-surface-hover);
+  color: var(--color-text-secondary);
 }
 </style>

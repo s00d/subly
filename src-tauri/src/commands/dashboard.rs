@@ -14,8 +14,8 @@ fn parse_date_ymd(raw: &str) -> Option<chrono::NaiveDate> {
     if let Ok(date_time) = chrono::DateTime::parse_from_rfc3339(trimmed) {
         return Some(date_time.date_naive());
     }
-    if trimmed.len() >= 10 {
-        return chrono::NaiveDate::parse_from_str(&trimmed[..10], "%Y-%m-%d").ok();
+    if let Some(head) = trimmed.get(..10) {
+        return chrono::NaiveDate::parse_from_str(head, "%Y-%m-%d").ok();
     }
     None
 }
@@ -87,6 +87,16 @@ fn shift_calendar_month(year: i32, month: u32, delta: i32) -> (i32, u32) {
         y -= 1;
     }
     (y as i32, m as u32)
+}
+
+/// `YYYY-MM` labels for the `count` calendar months after `today`'s month.
+fn next_month_labels(today: chrono::NaiveDate, count: i32) -> Vec<String> {
+    (1..=count)
+        .map(|k| {
+            let (y, m) = shift_calendar_month(today.year(), today.month(), k);
+            ym_label(y, m)
+        })
+        .collect()
 }
 
 fn is_last_day_of_month(d: chrono::NaiveDate) -> bool {
@@ -471,8 +481,11 @@ pub struct DashboardTrendsDto {
 #[tauri::command]
 pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSummaryDto, crate::errors::AppError> {
     let data = { let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?; guard.doc()? };
-    let rates = crate::rate_map(&data);
-    let today = chrono::Local::now().date_naive();
+    Ok(build_dashboard_summary(&data, chrono::Local::now().date_naive()))
+}
+
+fn build_dashboard_summary(data: &crate::AppDataDoc, today: chrono::NaiveDate) -> DashboardSummaryDto {
+    let rates = crate::rate_map(data);
 
     let active = data.subscriptions.iter().filter(|s| !s.inactive).collect::<Vec<_>>();
     let inactive_count = data.subscriptions.iter().filter(|s| s.inactive).count();
@@ -488,11 +501,17 @@ pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSumm
         total_monthly / Decimal::from(active.len())
     };
 
+    // Every projected charge from today to month end (weekly = several), same rule as the Calendar stats.
+    let month_end = chrono::NaiveDate::from_ymd_opt(today.year(), today.month(), 1)
+        .and_then(|first| first.checked_add_months(chrono::Months::new(1)))
+        .and_then(|next| next.pred_opt())
+        .unwrap_or(today);
     let amount_due_this_month: Decimal = active
         .iter()
-        .filter_map(|s| chrono::NaiveDate::parse_from_str(&s.next_payment, "%Y-%m-%d").ok().map(|d| (s, d)))
-        .filter(|(_, d)| d.year() == today.year() && d.month() == today.month() && *d >= today)
-        .map(|(s, _)| crate::convert_to_main(s.price, &s.currency_id, &rates))
+        .map(|s| {
+            let n = crate::commands::subscriptions::payment_dates_in_window(s, today, month_end).map_or(0, |d| d.len());
+            crate::convert_to_main(s.price, &s.currency_id, &rates) * Decimal::from(n)
+        })
         .sum();
 
     let most_expensive = active
@@ -516,7 +535,8 @@ pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSumm
     let budget = data.settings.budget;
     let hundred = Decimal::from(100);
     let budget_used = if budget > Decimal::ZERO {
-        Some((total_spending / budget * hundred).min(hundred))
+        // Not clamped: >100 drives the over-budget (red) state; the UI clamps the bar width.
+        Some(total_spending / budget * hundred)
     } else {
         None
     };
@@ -543,26 +563,41 @@ pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSumm
         .copied()
         .filter(|s| parse_date_ymd(&s.next_payment).map(|d| d < today).unwrap_or(false))
         .collect::<Vec<_>>();
-    let upcoming_subscriptions = active
+    // Nearest 5 by effective next payment; a past date on an auto-renew sub is projected forward.
+    let mut upcoming_subscriptions = active
         .iter()
-        .copied()
-        .filter_map(|s| chrono::NaiveDate::parse_from_str(&s.next_payment, "%Y-%m-%d").ok().map(|d| (s, d)))
+        .filter_map(|s| {
+            let d = parse_date_ymd(&s.next_payment)?;
+            let d = if s.auto_renew && d < today {
+                crate::commands::subscriptions::first_cycle_date_on_or_after(d, s.cycle as u64, s.frequency as u64, today)?
+            } else {
+                d
+            };
+            Some((s, d))
+        })
         .filter(|(_, d)| *d >= today && *d <= today + chrono::Duration::days(30))
-        .map(|(s, _)| s)
+        .collect::<Vec<_>>();
+    upcoming_subscriptions.sort_by_key(|(_, d)| *d);
+    let upcoming_subscriptions = upcoming_subscriptions
+        .into_iter()
         .take(5)
+        .map(|(s, d)| crate::models::SubscriptionDoc {
+            next_payment: d.format("%Y-%m-%d").to_string(),
+            ..(*s).clone()
+        })
         .collect::<Vec<_>>();
 
     let month_total: Decimal = data
         .expenses
         .iter()
         .filter(|e| expense_in_calendar_month(e, today.year(), today.month()))
-        .map(|e| e.amount)
+        .map(|e| crate::convert_to_main(e.amount, &e.currency_id, &rates))
         .sum();
     let year_total: Decimal = data
         .expenses
         .iter()
         .filter(|e| expense_in_year(e, today.year()))
-        .map(|e| e.amount)
+        .map(|e| crate::convert_to_main(e.amount, &e.currency_id, &rates))
         .sum();
     let mut recent_expenses = data.expenses.clone();
     recent_expenses.sort_by(|a, b| {
@@ -577,7 +612,7 @@ pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSumm
     });
     recent_expenses.truncate(5);
 
-    Ok(DashboardSummaryDto {
+    DashboardSummaryDto {
         has_subscriptions: !data.subscriptions.is_empty(),
         active_count: active.len(),
         inactive_count,
@@ -593,13 +628,13 @@ pub fn get_dashboard_summary(state: State<'_, AppState>) -> Result<DashboardSumm
         total_savings_monthly,
         monthly_expenses_total,
         overdue_subscriptions: overdue_subscriptions.into_iter().cloned().collect(),
-        upcoming_subscriptions: upcoming_subscriptions.into_iter().cloned().collect(),
+        upcoming_subscriptions,
         expense_aggregation: DashboardExpenseAggregationDto {
             month_total,
             year_total,
             recent_expenses,
         },
-    })
+    }
 }
 
 #[tauri::command]
@@ -679,8 +714,8 @@ pub fn get_dashboard_forecast(state: State<'_, AppState>) -> Result<DashboardFor
         forecast: DashboardForecastInnerDto {
             next_month,
             next_quarter,
-            next_month_label: String::new(),
-            quarter_labels: Vec::new(),
+            next_month_label: next_month_labels(now, 1).remove(0),
+            quarter_labels: next_month_labels(now, 3),
         },
         month_comparison: DashboardMonthComparisonDto {
             current_month: resolved.current_month_label.clone(),
@@ -698,12 +733,15 @@ pub fn get_dashboard_forecast(state: State<'_, AppState>) -> Result<DashboardFor
 #[tauri::command]
 pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrendsDto, crate::errors::AppError> {
     let data = { let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?; guard.doc()? };
-    let rates = crate::rate_map(&data);
-    let now = chrono::Local::now().date_naive();
+    Ok(build_dashboard_trends(&data, chrono::Local::now().date_naive()))
+}
+
+fn build_dashboard_trends(data: &crate::AppDataDoc, now: chrono::NaiveDate) -> DashboardTrendsDto {
+    let rates = crate::rate_map(data);
 
     let mut top = data.expenses.clone();
     top.retain(|e| expense_in_calendar_month(e, now.year(), now.month()));
-    top.sort_by(|a, b| b.amount.cmp(&a.amount));
+    top.sort_by_key(|b| std::cmp::Reverse(crate::convert_to_main(b.amount, &b.currency_id, &rates)));
     top.truncate(5);
 
     let month_expenses = data
@@ -727,7 +765,7 @@ pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrend
     for e in &month_expenses {
         if let Some(d) = e.naive_date() {
             let idx = d.weekday().num_days_from_sunday() as usize;
-            day_map[idx] += e.amount;
+            day_map[idx] += crate::convert_to_main(e.amount, &e.currency_id, &rates);
             day_count[idx] += 1;
         }
     }
@@ -744,8 +782,9 @@ pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrend
 
     let mut tag_map: std::collections::HashMap<String, Decimal> = std::collections::HashMap::new();
     for e in month_expenses {
+        let amount = crate::convert_to_main(e.amount, &e.currency_id, &rates);
         for tag in &e.tags {
-            *tag_map.entry(tag.clone()).or_insert(Decimal::ZERO) += e.amount;
+            *tag_map.entry(tag.clone()).or_insert(Decimal::ZERO) += amount;
         }
     }
     let mut tags = tag_map
@@ -763,7 +802,7 @@ pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrend
         .sum();
     let mut spending_history = Vec::new();
     for back in (0..6).rev() {
-        let (y, m) = shift_calendar_month(now.year(), now.month(), -(back as i32));
+        let (y, m) = shift_calendar_month(now.year(), now.month(), -back);
         let anchor = chrono::NaiveDate::from_ymd_opt(y, m, 1).unwrap();
         let expenses_total: Decimal = data
             .expenses
@@ -822,7 +861,7 @@ pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrend
         })
         .collect::<Vec<_>>();
 
-    Ok(DashboardTrendsDto {
+    DashboardTrendsDto {
         spending_history,
         lifetime_costs,
         category_averages,
@@ -844,7 +883,7 @@ pub fn get_dashboard_trends(state: State<'_, AppState>) -> Result<DashboardTrend
             previous_month_label: cmp_res.previous_month_label,
         },
         tag_expense_stats: tags,
-    })
+    }
 }
 
 #[cfg(test)]
@@ -905,4 +944,92 @@ mod comparison_tests {
         assert_eq!(r.previous_count, 0);
     }
 
+    #[test]
+    fn next_month_labels_roll_over_year() {
+        let nov = chrono::NaiveDate::from_ymd_opt(2026, 11, 30).unwrap();
+        assert_eq!(next_month_labels(nov, 1), ["2026-12"]);
+        assert_eq!(next_month_labels(nov, 3), ["2026-12", "2027-01", "2027-02"]);
+    }
+
+    fn doc_with_rate_two() -> crate::AppDataDoc {
+        let mut doc = crate::test_support::base_seeded_doc().expect("doc");
+        doc.currencies[1].rate = Decimal::from(2);
+        doc
+    }
+
+    #[test]
+    fn summary_upcoming_is_nearest_first_and_projects_auto_renew() {
+        let mut doc = doc_with_rate_two();
+        let base = crate::test_support::doc_with_restart_sensitive_fields()
+            .expect("doc")
+            .subscriptions
+            .last()
+            .cloned()
+            .expect("sub");
+        let sub = |id: &str, next: &str, auto_renew: bool, inactive: bool| crate::models::SubscriptionDoc {
+            id: id.into(),
+            next_payment: next.into(),
+            auto_renew,
+            inactive,
+            ..base.clone()
+        };
+        doc.subscriptions = vec![
+            sub("a", "2026-05-25", false, false),
+            sub("b", "2026-05-12", false, false),
+            sub("c", "2026-05-15", true, false),
+            sub("d", "2026-04-11", true, false), // monthly auto-renew -> 2026-05-11
+            sub("e", "2026-05-01", false, false), // past, manual -> not upcoming
+            sub("f", "2026-05-11", false, true),  // inactive
+            sub("g", "2026-07-01", false, false), // beyond 30 days
+        ];
+        let today = chrono::NaiveDate::from_ymd_opt(2026, 5, 10).unwrap();
+        let s = build_dashboard_summary(&doc, today);
+        let ids = s.upcoming_subscriptions.iter().map(|x| x.id.as_str()).collect::<Vec<_>>();
+        assert_eq!(ids, ["d", "b", "c", "a"]);
+        assert_eq!(s.upcoming_subscriptions[0].next_payment, "2026-05-11");
+    }
+
+    #[test]
+    fn summary_and_trends_convert_mixed_currencies_to_main() {
+        let mut doc = doc_with_rate_two();
+        let usd = doc.currencies[1].id.clone();
+        let eur = doc.currencies[0].id.clone();
+        let mut big_usd = expense_row(2026, 5, 4, Decimal::from(30), &usd); // 15 in main
+        big_usd.tags = vec!["t".into()];
+        let mut eur_row = expense_row(2026, 5, 5, Decimal::from(20), &eur); // 20 in main
+        eur_row.tags = vec!["t".into()];
+        let old = expense_row(2026, 2, 3, Decimal::from(4), &usd); // 2 in main, same year
+        doc.expenses = vec![big_usd, eur_row, old];
+        let today = chrono::NaiveDate::from_ymd_opt(2026, 5, 10).unwrap();
+
+        let s = build_dashboard_summary(&doc, today);
+        assert_eq!(s.expense_aggregation.month_total, Decimal::from(35));
+        assert_eq!(s.expense_aggregation.year_total, Decimal::from(37));
+
+        let t = build_dashboard_trends(&doc, today);
+        assert_eq!(t.top_expenses[0].currency_id, eur, "20 EUR outranks 30 USD (=15)");
+        let dow_total: Decimal = t.day_of_week_stats.iter().map(|d| d.total).sum();
+        assert_eq!(dow_total, Decimal::from(35));
+        assert_eq!(t.tag_expense_stats[0].total, Decimal::from(35));
+    }
+
+    #[test]
+    fn amount_due_counts_every_charge_left_this_month() {
+        let mut doc = doc_with_rate_two();
+        let base = crate::test_support::doc_with_restart_sensitive_fields().expect("doc").subscriptions.last().cloned().expect("sub");
+        doc.subscriptions = vec![crate::models::SubscriptionDoc {
+            id: "weekly".into(),
+            price: Decimal::from(10),
+            currency_id: doc.currencies[0].id.clone(),
+            cycle: 2,
+            frequency: 1,
+            next_payment: "2026-05-11".into(),
+            inactive: false,
+            ..base
+        }];
+        let today = chrono::NaiveDate::from_ymd_opt(2026, 5, 10).unwrap();
+        let s = build_dashboard_summary(&doc, today);
+        // 11, 18, 25 May; main currency (rate 1).
+        assert_eq!(s.amount_due_this_month, Decimal::from(30));
+    }
 }

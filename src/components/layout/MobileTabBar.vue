@@ -56,7 +56,7 @@ const tabBarTv = tv({
       "fixed left-0 right-0 z-40 bg-surface/95 backdrop-blur-md border-t border-border md:hidden pb-[env(safe-area-inset-bottom,0px)] will-change-[bottom] shadow-[0_-2px_12px_rgba(0,0,0,0.04)] dark:shadow-[0_-2px_18px_rgba(0,0,0,0.35)]",
     inner: "relative flex items-stretch h-16",
     indicator:
-      "mtb-indicator pointer-events-none absolute top-2 bottom-2 left-0 rounded-2xl bg-primary/10 dark:bg-primary/20 ring-1 ring-primary/15 dark:ring-primary/25",
+      "mtb-indicator pointer-events-none absolute top-2 bottom-2 left-0 rounded-xl bg-primary/10 dark:bg-primary/20 ring-1 ring-primary/15 dark:ring-primary/25",
     tab:
       "mtb-tab relative z-10 flex-1 inline-flex flex-col items-center justify-center gap-1 select-none transition-[color,transform] duration-200 ease-out active:scale-[0.92]",
     tabIcon: "mtb-icon relative transition-transform duration-300 ease-out",

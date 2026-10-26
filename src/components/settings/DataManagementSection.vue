@@ -9,7 +9,9 @@ import {
 } from "@/services/exportClient";
 import { resetAppData } from "@/services/appDataClient";
 import { Archive, RotateCcw } from "@lucide/vue";
-import { ui } from "@/lib/tv";
+import { ui, button } from "@/lib/tv";
+import UiCard from "@/components/ui/UiCard.vue";
+import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import { formatErrorForToast } from "@/utils/formatError";
 
 const { t } = useI18n();
@@ -94,9 +96,9 @@ async function onPickSubly(event: Event) {
 }
 
 async function handleResetData() {
+  showResetConfirm.value = false;
   try {
     await resetAppData();
-    showResetConfirm.value = false;
     toast(t("reset_success"));
   } catch (e) {
     console.error(e);
@@ -106,38 +108,38 @@ async function handleResetData() {
 </script>
 
 <template>
-  <section class="bg-surface rounded-xl border border-border p-4 sm:p-5">
-    <h2 :class="[ui.sectionTitle(), 'mb-2']">{{ t('data_management') }}</h2>
-    <p class="text-xs sm:text-sm text-text-muted mb-4">{{ t('export_import_info') }}</p>
+  <UiCard :title="t('data_management')">
+    <p class="text-xs sm:text-sm text-text-muted mb-4">{{ t('export_import_info_subly') }}</p>
 
-    <div class="space-y-3 mb-6">
-      <div class="rounded-lg border border-border p-3">
-        <h3 :class="[ui.sectionTitle(), 'mb-2']">.subly</h3>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <button @click="handleExportSubly" :disabled="isExporting" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-border text-text-secondary text-xs sm:text-sm font-medium hover:bg-surface-hover disabled:opacity-50">
-            <Archive :size="14" /> {{ t('export_subly') }}
-          </button>
-          <button @click="triggerImportSubly" class="flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg border border-primary text-primary text-xs sm:text-sm font-medium hover:bg-primary-light">
-            <Archive :size="14" /> {{ t('import_subly') }}
-          </button>
-        </div>
+    <div class="rounded-lg border border-border p-3 mb-6">
+      <h3 :class="[ui.sectionTitle(), 'mb-2']">.subly</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <button type="button" @click="handleExportSubly" :disabled="isExporting" :class="button({ intent: 'secondary' })">
+          <Archive :size="14" /> {{ t('export_subly') }}
+        </button>
+        <button type="button" @click="triggerImportSubly" :class="button({ intent: 'secondary' })">
+          <Archive :size="14" /> {{ t('import_subly') }}
+        </button>
       </div>
     </div>
 
     <div class="pt-4 border-t border-border">
-      <div v-if="!showResetConfirm">
-        <button @click="showResetConfirm = true" class="flex items-center gap-2 px-4 py-2 rounded-lg border border-red-300 text-red-600 text-sm font-medium hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20">
-          <RotateCcw :size="16" /> {{ t('reset_data') }}
-        </button>
-      </div>
-      <div v-else class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-        <p class="text-sm text-red-700 dark:text-red-300 mb-3">{{ t('reset_data_confirm') }}</p>
-        <div class="flex gap-2">
-          <button @click="handleResetData" class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700">{{ t('confirm') }}</button>
-          <button @click="showResetConfirm = false" class="px-4 py-2 rounded-lg border border-border text-text-secondary text-sm font-medium hover:bg-surface-hover">{{ t('cancel') }}</button>
-        </div>
-      </div>
+      <button
+        type="button"
+        @click="showResetConfirm = true"
+        :class="button({ intent: 'ghost', class: 'text-danger hover:bg-danger/12 hover:text-danger' })"
+      >
+        <RotateCcw :size="14" /> {{ t('reset_data') }}
+      </button>
     </div>
-  </section>
+  </UiCard>
+  <ConfirmDialog
+    :show="showResetConfirm"
+    :title="t('reset_data')"
+    :message="t('reset_data_confirm')"
+    :confirm-label="t('confirm')"
+    @confirm="handleResetData"
+    @cancel="showResetConfirm = false"
+  />
   <input ref="sublyInput" type="file" accept=".subly" class="hidden" @change="onPickSubly" />
 </template>

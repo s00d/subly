@@ -64,8 +64,15 @@ export interface Subscription {
 /** Row from list/detail IPC (`SubscriptionListItemDto`): base subscription plus computed list fields. */
 export interface SubscriptionListItem extends Subscription {
   monthlyPrice: MoneyString;
+  /** Backend-converted to the main currency. */
+  priceMain: MoneyString;
+  monthlyPriceMain: MoneyString;
+  /** Signed: negative = days overdue. */
   daysLeft: number;
   overdue: boolean;
+  /** Elapsed share of the current billing cycle, 0..1 (backend-computed). */
+  cycleProgress: number;
+  urgency: "overdue" | "danger" | "warn" | "normal";
   /** Non-secret bitmap: which credential fields the user has saved. */
   credentialsMeta: SubscriptionCredentialsMeta;
 }
@@ -309,7 +316,7 @@ export function parseSubscription(raw: unknown): Subscription {
     payerUserId: asString(r.payerUserId),
     categoryId: asString(r.categoryId, "cat-1"),
     notify: asBool(r.notify, true),
-    notifyDaysBefore: asNumber(r.notifyDaysBefore, 1),
+    notifyDaysBefore: asNumber(r.notifyDaysBefore, -1),
     lastNotifiedDate: asString(r.lastNotifiedDate),
     inactive: asBool(r.inactive, false),
     autoRenew: asBool(r.autoRenew, true),
@@ -349,8 +356,14 @@ export function parseSubscriptionListItem(raw: unknown): SubscriptionListItem {
   return {
     ...base,
     monthlyPrice: asMoneyString(r.monthlyPrice),
+    priceMain: asMoneyString(r.priceMain ?? r.price),
+    monthlyPriceMain: asMoneyString(r.monthlyPriceMain ?? r.monthlyPrice),
     daysLeft: asNumber(r.daysLeft, 0),
     overdue: asBool(r.overdue, false),
+    cycleProgress: Math.min(1, Math.max(0, asNumber(r.cycleProgress, 0))),
+    urgency: (["overdue", "danger", "warn", "normal"] as const).includes(r.urgency as never)
+      ? (r.urgency as SubscriptionListItem["urgency"])
+      : "normal",
     credentialsMeta: parseCredentialsMeta(r.credentialsMeta),
   };
 }

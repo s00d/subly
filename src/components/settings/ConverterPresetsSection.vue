@@ -5,15 +5,19 @@ import { useToast } from "@/composables/useToast";
 import type { Settings } from "@/schemas/appData";
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import Toast from "@/components/ui/Toast.vue";
+import UiCard from "@/components/ui/UiCard.vue";
+import SavedIndicator, { useAutoSave } from "@/components/settings/SavedIndicator.vue";
+import ReorderButtons from "@/components/settings/ReorderButtons.vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
-import { Trash2, Plus, ChevronUp, ChevronDown, Zap } from "@lucide/vue";
-import { ui } from "@/lib/tv";
+import { Trash2, Plus, Zap } from "@lucide/vue";
+import { ui, button } from "@/lib/tv";
 
 const props = defineProps<{ lookupSettings: Settings | null }>();
 const { t } = useI18n();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 const metaStore = useAppMetaStore();
 const settings = ref<Settings | null>(null);
+const { savedAt, run } = useAutoSave();
 
 const newValue = ref("");
 watch(
@@ -24,19 +28,18 @@ watch(
   { immediate: true, deep: true },
 );
 
-const presets = computed(() =>
-  [...(settings.value?.converterPresets ?? [])].sort((a, b) => a - b),
-);
+// Saved order (the converter shows them in this order); sorting here made up/down a no-op.
+const presets = computed(() => settings.value?.converterPresets ?? []);
 
-async function updateSettings(updates: Partial<Settings>) {
+function updateSettings(updates: Partial<Settings>) {
   if (!settings.value) return;
   const next = { ...settings.value, ...updates };
   settings.value = next;
-  await metaStore.updateSettings(next);
+  void run(() => metaStore.updateSettings(next));
 }
 
 function addPreset() {
-  const raw = newValue.value.replace(/[^\d.]/g, "");
+  const raw = newValue.value.replace(",", ".").replace(/[^\d.]/g, "");
   const val = parseFloat(raw);
   if (isNaN(val) || val <= 0) return;
 
@@ -50,7 +53,6 @@ function addPreset() {
     converterPresets: [...current, val].sort((a, b) => a - b),
   });
   newValue.value = "";
-  toast(t("success"));
 }
 
 function removePreset(val: number) {
@@ -82,35 +84,26 @@ function fmtNum(n: number): string {
 </script>
 
 <template>
-  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-    <div class="flex items-center justify-between gap-2 mb-1">
-      <div class="flex items-center gap-2 shrink-0">
-        <Zap :size="16" class="text-primary" />
-        <h2 :class="ui.sectionTitle()">{{ t('converter_presets') }}</h2>
-      </div>
-    </div>
+  <UiCard :title="t('converter_presets')" :icon="Zap" icon-tone="text-primary">
+    <template #actions>
+      <SavedIndicator :at="savedAt" />
+    </template>
+
     <p class="text-xs text-text-muted mb-3">{{ t('converter_presets_desc') }}</p>
 
     <!-- Presets list -->
-    <div class="space-y-1.5 max-h-60 overflow-y-auto overflow-x-hidden">
+    <div class="space-y-1 max-h-60 overflow-y-auto overflow-x-hidden">
       <div
         v-for="(preset, idx) in presets"
         :key="preset"
-        class="flex items-center gap-2 rounded-lg px-2 py-1 group"
+        class="flex items-center gap-1.5 rounded-lg px-1.5 py-1 group"
       >
-        <!-- Move buttons -->
-        <div class="flex flex-row sm:flex-col shrink-0">
-          <Tooltip :text="t('move_up')">
-            <button @click="moveUp(preset)" :disabled="idx === 0" class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-              <ChevronUp :size="14" />
-            </button>
-          </Tooltip>
-          <Tooltip :text="t('move_down')">
-            <button @click="moveDown(preset)" :disabled="idx === presets.length - 1" class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors">
-              <ChevronDown :size="14" />
-            </button>
-          </Tooltip>
-        </div>
+        <ReorderButtons
+          :up-disabled="idx === 0"
+          :down-disabled="idx === presets.length - 1"
+          @up="moveUp(preset)"
+          @down="moveDown(preset)"
+        />
 
         <!-- Value -->
         <div class="flex-1 min-w-0">
@@ -121,7 +114,12 @@ function fmtNum(n: number): string {
 
         <!-- Delete -->
         <Tooltip :text="t('delete')">
-          <button @click="removePreset(preset)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0">
+          <button
+            type="button"
+            :aria-label="t('delete')"
+            @click="removePreset(preset)"
+            :class="button({ intent: 'ghost', size: 'icon', class: 'h-7 w-7 text-danger hover:bg-danger/12 hover:text-danger' })"
+          >
             <Trash2 :size="14" />
           </button>
         </Tooltip>
@@ -139,13 +137,13 @@ function fmtNum(n: number): string {
         pattern="[0-9]*[.,]?[0-9]*"
         :placeholder="t('amount')"
         @keydown.enter="addPreset"
-        class="flex-1 px-3 py-1.5 rounded-lg border border-border bg-surface text-sm text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow tabular-nums"
+        :class="ui.field({ class: 'flex-1 h-8 py-1 tabular-nums' })"
       />
-      <button @click="addPreset" class="px-3 py-1.5 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover transition-colors">
-        <Plus :size="14" class="inline mr-1" /> {{ t('add') }}
+      <button type="button" @click="addPreset" :class="button({ intent: 'secondary' })">
+        <Plus :size="14" /> {{ t('add') }}
       </button>
     </div>
 
     <Toast :show="showToast" :message="toastMsg" :type="toastType" @close="closeToast" />
-  </section>
+  </UiCard>
 </template>

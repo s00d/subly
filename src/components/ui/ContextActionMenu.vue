@@ -186,8 +186,8 @@ const holeScrimStrips = computed(() => {
               role="menuitem"
               class="ctx-item mx-1.5 flex w-[calc(100%-0.75rem)] cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm font-medium text-text-primary outline-none transition-[transform,background-color,color] duration-150 ease-out select-none hover:bg-surface-hover active:scale-[0.98] active:bg-surface-secondary focus-visible:bg-surface-hover focus-visible:ring-2 focus-visible:ring-primary/40 dark:hover:bg-white/[0.07] dark:active:bg-white/[0.1] dark:focus-visible:ring-primary/50"
               :class="
-                row.danger
-                  ? 'text-red-600 hover:bg-red-500/12 hover:text-red-700 active:bg-red-500/18 dark:text-red-400 dark:hover:bg-red-500/15 dark:hover:text-red-300'
+ row.danger
+                  ? 'text-danger hover:bg-danger/12 hover:text-red-700 active:bg-danger/18 dark:text-danger dark:hover:bg-danger/15 dark:hover:text-red-300'
                   : ''
               "
               @click="onRowClick(row)"
@@ -195,7 +195,7 @@ const holeScrimStrips = computed(() => {
               <span
                 v-if="row.icon"
                 class="ctx-item-icon flex size-[18px] shrink-0 items-center justify-center text-text-muted [.ctx-item:hover_&]:text-text-secondary"
-                :class="row.danger ? '!text-red-500 dark:!text-red-400 [.ctx-item:hover_&]:!text-red-600' : ''"
+                :class="row.danger ? '!text-danger dark:!text-danger [.ctx-item:hover_&]:!text-danger' : ''"
                 aria-hidden="true"
               >
                 <component :is="row.icon" :size="16" :stroke-width="2" class="shrink-0" />

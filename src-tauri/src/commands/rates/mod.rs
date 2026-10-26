@@ -1,5 +1,5 @@
 mod flags;
-mod history;
+pub(crate) mod history;
 mod providers;
 
 pub use flags::currency_get_flags;

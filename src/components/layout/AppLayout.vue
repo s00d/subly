@@ -15,7 +15,8 @@ const layoutTv = tv({
     root: "flex h-[100dvh] overflow-hidden",
     sidebar: "hidden md:flex",
     content: "flex-1 flex flex-col overflow-hidden min-w-0",
-    main: "flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 bg-surface-secondary",
+    main: "flex-1 overflow-y-auto bg-surface-secondary",
+    inner: "mx-auto w-full max-w-[1120px] px-3 pt-1 pb-3 sm:px-5 md:px-8 md:pb-8",
   },
 });
 
@@ -46,7 +47,9 @@ const slots = layoutTv();
     <div :class="slots.content()">
       <AppHeader @toggle-sidebar="sidebarOpen = !sidebarOpen" />
       <main :class="[slots.main(), 'app-main-safe']">
-        <slot />
+        <div :class="slots.inner()">
+          <slot />
+        </div>
       </main>
     </div>
     <MobileTabBar />

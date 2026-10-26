@@ -38,6 +38,12 @@ pub fn reset_app_data(app: tauri::AppHandle, state: State<'_, AppState>) -> Resu
         "app:data-changed",
         serde_json::json!({ "entity": "settings", "action": "reset" }),
     );
+    drop(guard);
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    {
+        crate::widget_snapshot::export_widget_snapshot_from_app(&app);
+        crate::commands::notifications::reschedule_from_app(&app);
+    }
     Ok(next)
 }
 

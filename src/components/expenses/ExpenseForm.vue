@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { localYmd } from "@/composables/useLocaleFormat";
+import { ref, watch, computed, nextTick, useId } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { formatErrorForToast } from "@/utils/formatError";
@@ -20,6 +21,7 @@ import { expenseFormFieldsSchema, coerceExpenseFormForValidation } from "@/schem
 import { useZodLiveForm } from "@/composables/useZodLiveForm";
 import type { ZodFieldMeta } from "@/composables/useZodErrors";
 import { moneyFromNumber, parseMoney, toDisplayNumber } from "@/lib/money";
+import { button } from "@/lib/tv";
 
 /**
  * Subset of `Expense` fields the form can pre-fill. Used by the AI quick-add
@@ -105,16 +107,22 @@ watchExpenseZod(form);
 
 const iconPreview = ref("");
 const isResolvingIcon = ref(false);
+const isSaving = ref(false);
+/** Footer submit button targets the form via `form=` so Enter-to-save keeps working. */
+const formId = useId();
+/** Wrapper around the Amount field; AppInput has no autofocus prop, so we focus its inner input. */
+const amountWrap = ref<HTMLElement | null>(null);
+
+function focusAmount() {
+  void nextTick(() => {
+    const input = amountWrap.value?.querySelector("input");
+    input?.focus();
+    input?.select();
+  });
+}
 
 function nextExpenseNumber(): number {
   return expensesCount.value + 1;
-}
-
-function localYmd(d = new Date()): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
 }
 
 function resetForm() {
@@ -155,6 +163,7 @@ watch(() => props.show, (val) => {
         if (p.url) form.value.url = p.url;
       }
     }
+    focusAmount();
   }
 });
 
@@ -186,12 +195,12 @@ async function applyDomainIcon() {
   try {
     const faviconUrl = await resolveFaviconFromInputUrl(form.value.url || "");
     if (!faviconUrl) {
-      toast("Could not load icon from this domain", "error");
+      toast(t("favicon_load_failed"), "error");
       return;
     }
     iconPreview.value = faviconUrl;
     await copyToClipboard(faviconUrl);
-    toast("Icon URL copied from domain");
+    toast(t("copied_to_clipboard"));
   } catch (e) {
     toast(formatErrorForToast(e, t), "error");
   } finally {
@@ -199,7 +208,8 @@ async function applyDomainIcon() {
   }
 }
 
-async function handleSave() {
+async function handleSave(addAnother = false) {
+  if (isSaving.value) return;
   if (!validateExpenseStrict()) {
     toast(t("fill_required_fields"), "error");
     return;
@@ -237,14 +247,32 @@ async function handleSave() {
     paymentRecordId: String(base.paymentRecordId ?? ""),
   };
 
+  isSaving.value = true;
   try {
     await upsertExpense(payload);
     toast(t("success"));
     emit("saved");
-    emit("close");
+    if (addAnother) {
+      // Keep the "context" of a batch entry (day, category, payment method); clear the rest.
+      const keep = {
+        date: form.value.date,
+        categoryId: form.value.categoryId,
+        paymentMethodId: form.value.paymentMethodId,
+      };
+      expensesCount.value += 1;
+      resetForm();
+      Object.assign(form.value, keep);
+      iconPreview.value = "";
+      clearExpenseZodDirty();
+      focusAmount();
+    } else {
+      emit("close");
+    }
   } catch (e) {
     console.error("Expense save failed:", e);
     toast(formatErrorForToast(e, t), "error");
+  } finally {
+    isSaving.value = false;
   }
 }
 
@@ -261,20 +289,10 @@ function loadLookupData() {
 
 <template>
   <Modal :show="show" :title="isEditing ? t('edit_expense') : t('add_expense')" @close="emit('close')">
-    <form @submit.prevent="handleSave" class="space-y-4 sm:space-y-5">
-      <!-- Name -->
-      <AppInput
-        :label="t('expense_name')"
-        :modelValue="form.name || ''"
-        @update:modelValue="(v) => { form.name = String(v); markExpenseFieldDirty('name'); }"
-        :placeholder="t('expense_name')"
-        :error="expenseErrors.name"
-        required
-      />
-
-      <!-- Amount + Currency -->
+    <form :id="formId" @submit.prevent="handleSave()" class="space-y-4 sm:space-y-5">
+      <!-- Amount + Currency (first: quick entry) -->
       <div class="flex flex-col sm:flex-row gap-3">
-        <div class="flex-1">
+        <div ref="amountWrap" class="flex-1">
           <AppInput
             :label="t('expense_amount')"
             :modelValue="toDisplayNumber(parseMoney(form.amount ?? '0'))"
@@ -296,6 +314,16 @@ function loadLookupData() {
           />
         </div>
       </div>
+
+      <!-- Name -->
+      <AppInput
+        :label="t('expense_name')"
+        :modelValue="form.name || ''"
+        @update:modelValue="(v) => { form.name = String(v); markExpenseFieldDirty('name'); }"
+        :placeholder="t('expense_name')"
+        :error="expenseErrors.name"
+        required
+      />
 
       <!-- Date -->
       <AppDatePicker
@@ -347,11 +375,11 @@ function loadLookupData() {
           type="button"
           @click="applyDomainIcon"
           :disabled="isResolvingIcon"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          :class="button({ size: 'sm' })"
         >
           <Loader2 v-if="isResolvingIcon" :size="14" class="animate-spin" />
           <Globe v-else :size="14" />
-          Get icon from domain
+          {{ t("get_icon_from_domain") }}
         </button>
         <img
           v-if="iconPreview"
@@ -378,17 +406,31 @@ function loadLookupData() {
         :rows="2"
       />
 
-      <!-- Actions -->
-      <div class="flex justify-end gap-3 pt-2">
-        <button type="button" @click="emit('close')"
-          class="px-4 py-2 text-sm rounded-lg bg-surface-hover text-text-secondary hover:bg-border">
+    </form>
+
+    <template #footer>
+      <div class="flex items-center justify-end gap-2 w-full">
+        <button type="button" :class="button({ intent: 'ghost' })" @click="emit('close')">
           {{ t('cancel') }}
         </button>
-        <button type="submit"
-          class="px-4 py-2 text-sm rounded-lg bg-primary text-white hover:opacity-90">
+        <button
+          v-if="!isEditing && !prefill"
+          type="button"
+          :class="button({ intent: 'secondary' })"
+          :disabled="isSaving"
+          @click="handleSave(true)"
+        >
+          {{ t('save_and_add_another') }}
+        </button>
+        <button
+          type="submit"
+          :form="formId"
+          :class="button({ intent: 'primary' })"
+          :disabled="isSaving"
+        >
           {{ t('save') }}
         </button>
       </div>
-    </form>
+    </template>
   </Modal>
 </template>

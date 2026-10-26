@@ -288,7 +288,7 @@ pub fn catalogs_delete_currency(
 
     if id == defaults.main_currency_id {
         return Err(AppError::from(
-            "You cannot remove the main currency or a currency that is still in use.",
+            "You cannot remove the main currency.",
         ));
     }
 
@@ -297,20 +297,37 @@ pub fn catalogs_delete_currency(
         return Err(AppError::from("You cannot delete the only currency."));
     }
 
+    // Items in the removed currency move to the main one *with their amounts converted*
+    // (relabelling 100 EUR as 100 USD silently changed every total).
     let replacement = defaults.main_currency_id.clone();
+    let rates = crate::rate_map(&guard.app_data);
+    let to_main = |amount: rust_decimal::Decimal| crate::convert_to_main(amount, &id, &rates).round_dp(2);
     let mut subscriptions: Vec<SubscriptionDoc> = guard.table_list_typed(EntityTable::Subscriptions)?;
     let mut expenses: Vec<ExpenseDoc> = guard.table_list_typed(EntityTable::Expenses)?;
     let mut touched = false;
 
     for sub in &mut subscriptions {
+        let mut changed = false;
         if sub.currency_id == id {
+            sub.price = to_main(sub.price);
             sub.currency_id = replacement.clone();
+            changed = true;
+        }
+        for rec in &mut sub.payment_history {
+            if rec.currency_id == id {
+                rec.amount = to_main(rec.amount);
+                rec.currency_id = replacement.clone();
+                changed = true;
+            }
+        }
+        if changed {
             guard.table_upsert_typed(EntityTable::Subscriptions, sub, &sub.id)?;
             touched = true;
         }
     }
     for exp in &mut expenses {
         if exp.currency_id == id {
+            exp.amount = to_main(exp.amount);
             exp.currency_id = replacement.clone();
             guard.table_upsert_typed(EntityTable::Expenses, exp, &exp.id)?;
             touched = true;
@@ -487,9 +504,53 @@ pub fn catalogs_delete_payment_method(
 }
 
 #[tauri::command]
-pub fn catalogs_upsert_tag(state: State<'_, AppState>, tag: TagDoc) -> Result<(), AppError> {
+pub fn catalogs_upsert_tag(app: tauri::AppHandle, state: State<'_, AppState>, tag: TagDoc) -> Result<(), AppError> {
     let mut guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
-    guard.table_upsert_typed(EntityTable::Tags, &tag, &tag.id)
+    let renamed = upsert_tag_cascading(&mut guard, &tag)?;
+    drop(guard);
+    if renamed {
+        let _ = app.emit("app:data-changed", serde_json::json!({ "entity": "tags", "action": "rename" }));
+    }
+    Ok(())
+}
+
+/// Items reference tags by *name*: a rename must follow into subscriptions and expenses,
+/// otherwise they keep the old (now unknown) name and usage drops to 0. Returns true if any item changed.
+fn upsert_tag_cascading(guard: &mut crate::state::AppStateInner, tag: &TagDoc) -> Result<bool, AppError> {
+    let tags: Vec<TagDoc> = guard.table_list_typed(EntityTable::Tags)?;
+    let old_name = tags.iter().find(|t| t.id == tag.id).map(|t| t.name.clone());
+    guard.table_upsert_typed(EntityTable::Tags, tag, &tag.id)?;
+    let Some(old_name) = old_name.filter(|n| !n.is_empty() && *n != tag.name) else {
+        return Ok(false);
+    };
+    let rename = |list: &mut Vec<String>| {
+        let mut hit = false;
+        for t in list.iter_mut() {
+            if *t == old_name {
+                t.clone_from(&tag.name);
+                hit = true;
+            }
+        }
+        if hit {
+            let mut seen = std::collections::HashSet::new();
+            list.retain(|t| seen.insert(t.clone()));
+        }
+        hit
+    };
+    let mut changed = false;
+    for mut sub in guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)? {
+        if rename(&mut sub.tags) {
+            guard.table_upsert_typed(EntityTable::Subscriptions, &sub, &sub.id)?;
+            changed = true;
+        }
+    }
+    for mut exp in guard.table_list_typed::<ExpenseDoc>(EntityTable::Expenses)? {
+        if rename(&mut exp.tags) {
+            guard.table_upsert_typed(EntityTable::Expenses, &exp, &exp.id)?;
+            changed = true;
+        }
+    }
+    Ok(changed)
 }
 
 #[tauri::command]
@@ -631,5 +692,26 @@ mod tests {
             resolve_category_replacement(&cats, "cat-2", &defaults).unwrap(),
             "cat-3"
         );
+    }
+}
+
+#[cfg(test)]
+mod tag_rename_tests {
+    use super::*;
+
+    #[test]
+    fn tag_rename_follows_into_items() {
+        let mut doc = crate::test_support::doc_with_restart_sensitive_fields().expect("doc");
+        let tag = TagDoc { id: "tag-work".into(), name: "Work".into(), ..doc.tags.first().cloned().expect("tag") };
+        doc.tags.push(tag.clone());
+        doc.subscriptions[0].tags = vec!["Work".into(), "Job".into()];
+        let (_dir, db) = crate::test_support::temp_db().expect("db");
+        crate::state::save_app_data_typed(&db, &doc, &crate::test_support::default_config()).expect("save");
+        let mut guard = crate::state::AppStateInner { db: std::sync::Arc::new(db), app_data: doc.clone() };
+        let changed = upsert_tag_cascading(&mut guard, &TagDoc { name: "Job".into(), ..tag }).expect("upsert");
+        assert!(changed);
+        let subs: Vec<SubscriptionDoc> = guard.table_list_typed(EntityTable::Subscriptions).expect("subs");
+        let s0 = subs.iter().find(|s| s.id == doc.subscriptions[0].id).expect("sub");
+        assert_eq!(s0.tags, vec!["Job".to_string()], "renamed and deduped");
     }
 }

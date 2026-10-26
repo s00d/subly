@@ -43,7 +43,7 @@ pub fn parse_llm_json<T: DeserializeOwned>(raw: &str) -> Result<T, AppError> {
     }
 
     // First balanced chunk only (forward order) for odd edge cases.
-    if let Some(start) = trimmed.find(|c: char| c == '{' || c == '[') {
+    if let Some(start) = trimmed.find(['{', '[']) {
         if let Some(json_chunk) = extract_balanced_json(trimmed, start) {
             return serde_json::from_str::<T>(&json_chunk).map_err(|e| {
                 AppError::from(format!(
@@ -189,10 +189,10 @@ mod tests {
 
     #[test]
     fn extracts_json_surrounded_by_prose() {
-        let raw = "Sure, here's the result:\n{\"name\":\"qux\",\"amount\":3.14}\nLet me know.";
+        let raw = "Sure, here's the result:\n{\"name\":\"qux\",\"amount\":3.25}\nLet me know.";
         let result: Sample = parse_llm_json(raw).unwrap();
         assert_eq!(result.name, "qux");
-        assert_eq!(result.amount, 3.14);
+        assert_eq!(result.amount, 3.25);
     }
 
     #[test]

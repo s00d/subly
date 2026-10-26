@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import UiCard from "@/components/ui/UiCard.vue";
 import type { Subscription } from "@/schemas/appData";
 import { useI18n } from "vue-i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
 import type { MoneyString } from "@/lib/money";
-import { ArrowRight } from "@lucide/vue";
+import { ArrowRight, CalendarClock } from "@lucide/vue";
+import { avatarTone } from "@/lib/tv";
 
 defineProps<{
   subscriptions: Subscription[];
@@ -16,21 +18,20 @@ const { fmtDateShort: formatDate } = useLocaleFormat();
 </script>
 
 <template>
-  <div class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
-    <div class="flex items-center justify-between mb-2.5 sm:mb-3">
-      <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('upcoming_payments') }}</h2>
-      <button @click="emit('navigate')" class="flex items-center gap-1 text-xs sm:text-sm text-primary hover:text-primary-hover font-medium">
-        {{ t('your_subscriptions') }} <ArrowRight :size="14" />
-      </button>
-    </div>
-    <div v-if="subscriptions.length === 0" class="text-xs sm:text-sm text-text-muted py-4">{{ t('no_upcoming_payments') }}</div>
-    <div v-else class="rounded-lg border border-border bg-surface-secondary overflow-hidden divide-y divide-border">
+  <UiCard :title="t('upcoming_payments')" :icon="CalendarClock" tone="primary">
+    <template #actions>
+    <button @click="emit('navigate')" class="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-hover">
+      {{ t('your_subscriptions') }} <ArrowRight :size="14" />
+    </button>
+    </template>
+    <div v-if="subscriptions.length === 0" class="text-xs text-text-muted py-6 text-center">{{ t('no_upcoming_payments') }}</div>
+    <div v-else class="-mx-2 divide-y divide-border">
       <div
         v-for="sub in subscriptions"
         :key="sub.id"
-        class="flex items-center gap-2 sm:gap-3 px-3 py-2.5 sm:py-3 transition-colors hover:bg-surface dark:hover:bg-white/6"
+        class="flex items-center gap-3 px-2 py-2.5 transition-colors rounded-lg hover:bg-surface-hover"
       >
-        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-primary-light flex items-center justify-center text-xs sm:text-sm font-bold text-primary shrink-0 overflow-hidden">
+        <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-[10px] flex items-center justify-center text-sm font-semibold shrink-0 overflow-hidden" :class="sub.logo ? 'bg-surface ring-1 ring-border' : avatarTone(sub.name)">
           <img v-if="sub.logo" :src="sub.logo" class="w-6 h-6 sm:w-7 sm:h-7 object-contain rounded" />
           <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
         </div>
@@ -43,5 +44,5 @@ const { fmtDateShort: formatDate } = useLocaleFormat();
         </span>
       </div>
     </div>
-  </div>
+  </UiCard>
 </template>

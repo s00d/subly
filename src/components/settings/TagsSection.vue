@@ -1,16 +1,21 @@
 <script setup lang="ts">
+import { useAppMetaStore } from "@/stores/appMetaStore";
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { upsertTag, deleteTag as deleteTagApi, maxSortOrder } from "@/services/catalogClient";
 import type { Tag } from "@/schemas/appData";
 import AppInput from "@/components/ui/AppInput.vue";
+import UiCard from "@/components/ui/UiCard.vue";
+import SavedIndicator, { useAutoSave } from "@/components/settings/SavedIndicator.vue";
+import SettingsSearch from "@/components/settings/SettingsSearch.vue";
+import ReorderButtons from "@/components/settings/ReorderButtons.vue";
 import Toast from "@/components/ui/Toast.vue";
-import { Trash2, Plus, ChevronUp, ChevronDown, Star, Search, Hash } from "@lucide/vue";
+import { Trash2, Plus, Star, Hash } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import { useCatalogsUsageStore } from "@/stores/catalogsUsageStore";
 import { formatErrorForToast } from "@/utils/formatError";
-import { ui } from "@/lib/tv";
+import { button } from "@/lib/tv";
 
 const props = defineProps<{
   lookupData: {
@@ -18,9 +23,12 @@ const props = defineProps<{
     tagUsage: Record<string, number>;
   } | null;
 }>();
+const metaStore = useAppMetaStore();
 const { t } = useI18n();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 const catalogsUsageStore = useCatalogsUsageStore();
+const { savedAt, run, debounce } = useAutoSave();
+const iconBtn = button({ intent: "ghost", size: "icon", class: "h-7 w-7" });
 const tags = ref<Tag[]>([]);
 const tagUsage = ref<Record<string, number>>({});
 watch(
@@ -55,6 +63,7 @@ async function updateTag(id: string, updates: Partial<Tag>) {
   if (!tag) return;
   const next = { ...tag, ...updates };
   await upsertTag(next);
+  metaStore.refreshSoon();
   Object.assign(tag, next);
 }
 async function reorderTags(ids: string[]) {
@@ -63,19 +72,30 @@ async function reorderTags(ids: string[]) {
     if (!tag) continue;
     const next = { ...tag, sortOrder: i };
     await upsertTag(next);
+    metaStore.refreshSoon();
     Object.assign(tag, next);
   }
 }
-async function addTag() {
-  const order = await maxSortOrder("tags");
-  const tag: Tag = { id: crypto.randomUUID(), name: "Tag", favorite: false, sortOrder: order + 1, i18nKey: "" };
-  await upsertTag(tag);
-  tags.value.push(tag);
+function addTag() {
+  void run(async () => {
+    const order = await maxSortOrder("tags");
+    const tag: Tag = { id: crypto.randomUUID(), name: "Tag", favorite: false, sortOrder: order + 1, i18nKey: "" };
+    await upsertTag(tag);
+    metaStore.refreshSoon();
+    tags.value.push(tag);
+  });
 }
-function saveTagName(id: string, name: string) { void updateTag(id, { name }); }
+/** Name edits: update the row now, persist once typing pauses. */
+function saveTagName(id: string, name: string) {
+  const tag = tags.value.find((t) => t.id === id);
+  if (!tag) return;
+  tag.name = name;
+  debounce(`name:${id}`, () => updateTag(id, { name: tag.name }));
+}
 async function removeTag(id: string) {
   try {
     await deleteTagApi(id);
+    metaStore.refreshSoon();
     tags.value = tags.value.filter((t) => t.id !== id);
     await catalogsUsageStore.refresh();
     toast(t("success"));
@@ -86,54 +106,57 @@ async function removeTag(id: string) {
 function toggleFavorite(id: string) {
   const tag = tags.value.find((t) => t.id === id);
   if (!tag) return;
-  void updateTag(id, { favorite: !tag.favorite });
+  void run(() => updateTag(id, { favorite: !tag.favorite }));
 }
 function moveUp(id: string) {
   const ids = sortedTags.value.map((t) => t.id);
   const idx = ids.indexOf(id);
   if (idx <= 0) return;
   [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
-  void reorderTags(ids);
+  void run(() => reorderTags(ids));
 }
 function moveDown(id: string) {
   const ids = sortedTags.value.map((t) => t.id);
   const idx = ids.indexOf(id);
   if (idx < 0 || idx >= ids.length - 1) return;
   [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
-  void reorderTags(ids);
+  void run(() => reorderTags(ids));
 }
 </script>
 
 <template>
-  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-    <div class="flex items-center justify-between gap-2 mb-3">
-      <div class="flex items-center gap-2 shrink-0">
-        <Hash :size="16" class="text-primary" />
-        <h2 :class="ui.sectionTitle()">{{ t('manage_tags') }}</h2>
-      </div>
-      <div class="relative w-32 sm:w-44">
-        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input v-model="tagSearch" type="text" :placeholder="t('search')" class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow" />
-      </div>
-    </div>
+  <UiCard :title="t('manage_tags')" :icon="Hash" icon-tone="text-primary">
+    <template #actions>
+      <SavedIndicator :at="savedAt" />
+      <SettingsSearch v-model="tagSearch" class="w-32 sm:w-44" />
+    </template>
 
     <!-- Tags list -->
-    <div class="space-y-1.5 max-h-72 overflow-y-auto overflow-x-hidden">
+    <div class="space-y-1 max-h-72 overflow-y-auto overflow-x-hidden">
       <div
         v-for="(tag, idx) in filteredTags"
         :key="tag.id"
-        class="flex items-center gap-2 rounded-lg px-2 py-1 group"
+        class="flex items-center gap-1.5 rounded-lg px-1.5 py-1 group"
         :class="[tag.favorite ? 'bg-primary-light/50' : '']"
       >
         <!-- Move buttons -->
-        <div v-if="!isSearching" class="flex flex-row sm:flex-col shrink-0">
-          <Tooltip :text="t('move_up')"><button @click="moveUp(tag.id)" :disabled="idx === 0" class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronUp :size="14" /></button></Tooltip>
-          <Tooltip :text="t('move_down')"><button @click="moveDown(tag.id)" :disabled="idx === sortedTags.length - 1" class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronDown :size="14" /></button></Tooltip>
-        </div>
+        <ReorderButtons
+          v-if="!isSearching"
+          :up-disabled="idx === 0"
+          :down-disabled="idx === sortedTags.length - 1"
+          @up="moveUp(tag.id)"
+          @down="moveDown(tag.id)"
+        />
 
         <!-- Favorite star -->
         <Tooltip :text="t('favorites')">
-          <button @click="toggleFavorite(tag.id)" class="p-1 rounded-lg transition-colors shrink-0" :class="tag.favorite ? 'text-yellow-500' : 'text-text-muted hover:text-yellow-500'">
+          <button
+            type="button"
+            :aria-pressed="tag.favorite"
+            :aria-label="t('favorites')"
+            @click="toggleFavorite(tag.id)"
+            :class="[iconBtn, tag.favorite ? 'text-warning hover:text-warning' : 'text-text-muted hover:text-warning']"
+          >
             <Star :size="14" :fill="tag.favorite ? 'currentColor' : 'none'" />
           </button>
         </Tooltip>
@@ -143,28 +166,35 @@ function moveDown(id: string) {
 
         <!-- Name: read-only for default, editable inline for user-added -->
         <div class="flex-1 min-w-0">
-          <span v-if="isDefaultItem(tag)" class="text-sm text-text-primary truncate block px-2 py-1">{{ tag.name }}</span>
-          <AppInput v-else :modelValue="tag.name" @update:modelValue="(v: string | number) => saveTagName(tag.id, String(v))" size="sm" />
+          <span v-if="isDefaultItem(tag)" class="text-xs text-text-primary truncate block px-2.5 py-1 border border-transparent">{{ tag.name }}</span>
+          <AppInput v-else :modelValue="tag.name" @update:modelValue="(v: string | number) => saveTagName(tag.id, String(v))" size="sm" variant="inline" />
         </div>
 
         <!-- Usage count -->
-        <span class="text-[10px] text-text-muted shrink-0">
+        <span class="text-[10px] text-text-muted shrink-0 tabular-nums">
           {{ tagUsage[tag.name] ?? 0 }}
         </span>
 
         <!-- Delete -->
-        <Tooltip :text="t('delete')"><button @click="removeTag(tag.id)" :disabled="isUsedTag(tag.name)" class="p-1.5 rounded-lg transition-colors shrink-0" :class="isUsedTag(tag.name) ? 'text-text-muted cursor-not-allowed' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'">
-          <Trash2 :size="14" />
-        </button></Tooltip>
+        <Tooltip :text="t('delete')">
+          <button
+            type="button"
+            :aria-label="t('delete')"
+            @click="removeTag(tag.id)"
+            :disabled="isUsedTag(tag.name)"
+            :class="[iconBtn, 'text-danger hover:bg-danger/12 hover:text-danger disabled:text-text-muted']"
+          >
+            <Trash2 :size="14" />
+          </button>
+        </Tooltip>
       </div>
     </div>
     <p v-if="filteredTags.length === 0" class="text-sm text-text-muted text-center py-3">{{ t('no_tags') }}</p>
 
-    <!-- Add button (same style as Categories) -->
-    <button @click="addTag" class="mt-3 px-3 py-1.5 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover transition-colors">
-      <Plus :size="14" class="inline mr-1" /> {{ t('add') }}
+    <button type="button" @click="addTag" :class="button({ intent: 'secondary', size: 'sm', class: 'mt-3' })">
+      <Plus :size="14" /> {{ t('add') }}
     </button>
 
     <Toast :show="showToast" :message="toastMsg" :type="toastType" @close="closeToast" />
-  </section>
+  </UiCard>
 </template>

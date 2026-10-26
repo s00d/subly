@@ -172,10 +172,16 @@ fn import_apply_subly_bytes(
     };
     let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     apply_imported_snapshot(&mut guard, &data, &cfg)?;
+    drop(guard);
     let _ = app.emit(
         "app:data-changed",
         serde_json::json!({ "entity": "appData", "action": "import" }),
     );
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    {
+        crate::widget_snapshot::export_widget_snapshot_from_app(app);
+        crate::commands::notifications::reschedule_from_app(app);
+    }
     Ok(ExportResult {
         ok: true,
         message: None,
@@ -217,8 +223,10 @@ fn bytes_to_data_uri(bytes: &[u8], filename: &str) -> String {
 #[tauri::command]
 #[allow(dead_code)]
 pub fn export_build_subly_archive(data: AppDataDoc) -> Result<Vec<u8>, crate::errors::AppError> {
-    let mut cfg = AppConfigDoc::default();
-    cfg.initialized = true;
+    let cfg = AppConfigDoc {
+        initialized: true,
+        ..Default::default()
+    };
     export_build_subly_archive_with_config(data, cfg)
 }
 
@@ -418,10 +426,12 @@ mod tests {
     fn subly_archive_roundtrip_preserves_sensitive_fields_after_restart_load() {
         let (_dir, db) = crate::test_support::temp_db().expect("temp db");
         let before = crate::test_support::doc_with_restart_sensitive_fields().expect("doc");
-        let mut cfg = crate::models::AppConfigDoc::default();
-        cfg.initialized = true;
-        cfg.telegram_enabled = true;
-        cfg.telegram_chat_id = "12345".to_string();
+        let cfg = crate::models::AppConfigDoc {
+            initialized: true,
+            telegram_enabled: true,
+            telegram_chat_id: "12345".to_string(),
+            ..Default::default()
+        };
         let archive = export_build_subly_archive_with_config(before.clone(), cfg).expect("build archive");
         let parsed = import_parse_subly_archive(archive)
             .expect("parse archive")

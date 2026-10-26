@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiCard from "@/components/ui/UiCard.vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import type { CategoryAverage } from "@/services/dashboardClient";
@@ -22,11 +23,7 @@ function getCatIcon(id: string): string {
 </script>
 
 <template>
-  <div class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
-    <div class="flex items-center gap-2 mb-2.5 sm:mb-3">
-      <Tag :size="14" class="text-primary shrink-0" />
-      <h3 class="text-xs sm:text-sm font-semibold text-text-primary">{{ t('category_averages') }}</h3>
-    </div>
+  <UiCard :title="t('category_averages')" :icon="Tag" tone="pink">
 
     <div class="space-y-2.5 sm:space-y-3">
       <div
@@ -73,5 +70,5 @@ function getCatIcon(id: string): string {
     <div v-if="averages.length === 0" class="text-center py-4 text-sm text-text-muted">
       {{ t('no_data') }}
     </div>
-  </div>
+  </UiCard>
 </template>

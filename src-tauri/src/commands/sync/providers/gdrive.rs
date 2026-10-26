@@ -28,6 +28,11 @@ pub fn auth_url() -> Option<String> {
 
 pub(crate) fn gdrive_sync_message_key(err: &crate::errors::AppError) -> Option<&'static str> {
     let msg = err.to_string().to_lowercase();
+    // Own errors only: keys are tried in a chain, and a bare "401" match here used to label
+    // other providers' auth failures as this provider's.
+    if !msg.contains("gdrive") {
+        return None;
+    }
     if msg.contains("401") || msg.contains("unauthorized") {
         return Some("sync_gdrive_unauthorized");
     }
@@ -37,16 +42,30 @@ pub(crate) fn gdrive_sync_message_key(err: &crate::errors::AppError) -> Option<&
     None
 }
 
+/// `files.list` for the sync file: skip trashed copies (they still match by name) and sort newest
+/// first, since without `orderBy` Drive returns matches in arbitrary order and `.first()` could pick
+/// a stale duplicate (two devices creating the file at once leave two with the same name).
+fn sync_file_list_url() -> String {
+    url::Url::parse_with_params(
+        "https://www.googleapis.com/drive/v3/files",
+        &[
+            ("spaces", "appDataFolder"),
+            ("q", &format!("name='{SYNC_FILENAME}' and trashed=false")),
+            ("orderBy", "modifiedTime desc"),
+            ("fields", "files(id)"),
+        ],
+    )
+    .map(|u| u.to_string())
+    .unwrap_or_default()
+}
+
 fn gdrive_http_err(context: &str, status: tauri_plugin_http::reqwest::StatusCode) -> crate::errors::AppError {
     crate::errors::AppError::from(format!("gdrive {} failed: {}", context, status))
 }
 
 pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<SyncPayload>, crate::errors::AppError> {
-    let client = tauri_plugin_http::reqwest::Client::new();
-    let list_url = format!(
-        "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='{}'&fields=files(id)",
-        SYNC_FILENAME
-    );
+    let client = super::http_client();
+    let list_url = sync_file_list_url();
     let list_resp = client
         .get(list_url)
         .bearer_auth(access_token)
@@ -54,10 +73,7 @@ pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<Sy
         .await
         .map_err(|e| e.to_string())?;
     if !list_resp.status().is_success() {
-        if list_resp.status() == tauri_plugin_http::reqwest::StatusCode::UNAUTHORIZED {
-            return Err(gdrive_http_err("list", list_resp.status()));
-        }
-        return Ok(None);
+        return Err(gdrive_http_err("list", list_resp.status()));
     }
     let list_json: GdriveFilesListResponse = list_resp.json().await.map_err(|e| e.to_string())?;
     let file_id = list_json.files.first().map(|f| f.id.clone());
@@ -69,33 +85,31 @@ pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<Sy
         .await
         .map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
-        if resp.status() == tauri_plugin_http::reqwest::StatusCode::UNAUTHORIZED {
-            return Err(gdrive_http_err("download", resp.status()));
+        if super::download_status_means_missing(resp.status().as_u16()) {
+            return Ok(None);
         }
-        return Ok(None);
+        return Err(gdrive_http_err("download", resp.status()));
     }
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
     Ok(Some(decode_sync_payload(&bytes)?))
 }
 
 pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str) -> Result<(), crate::errors::AppError> {
-    let client = tauri_plugin_http::reqwest::Client::new();
-    let list_url = format!(
-        "https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&q=name='{}'&fields=files(id)",
-        SYNC_FILENAME
-    );
+    let client = super::http_client();
+    let list_url = sync_file_list_url();
     let list_resp = client
         .get(list_url)
         .bearer_auth(access_token)
         .send()
         .await
         .map_err(|e| e.to_string())?;
-    let file_id = if list_resp.status().is_success() {
-        let list_json: GdriveFilesListResponse = list_resp.json().await.map_err(|e| e.to_string())?;
-        list_json.files.first().map(|f| f.id.clone())
-    } else {
-        None
-    };
+    // A failed list must not fall through to "create": that leaves two sync files with the same
+    // name and later downloads may pick the stale one.
+    if !list_resp.status().is_success() {
+        return Err(gdrive_http_err("list", list_resp.status()));
+    }
+    let list_json: GdriveFilesListResponse = list_resp.json().await.map_err(|e| e.to_string())?;
+    let file_id = list_json.files.first().map(|f| f.id.clone());
     let compressed = encode_sync_payload(payload)?;
     let boundary = format!("subly_boundary_{}", chrono::Utc::now().timestamp_millis());
     let metadata = if file_id.is_some() {
@@ -131,4 +145,16 @@ pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str
         return Err(gdrive_http_err("upload", resp.status()));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn list_url_skips_trash_and_orders_newest_first() {
+        let u = url::Url::parse(&super::sync_file_list_url()).unwrap();
+        let q: std::collections::HashMap<_, _> = u.query_pairs().into_owned().collect();
+        assert!(q["q"].ends_with("and trashed=false"));
+        assert_eq!(q["orderBy"], "modifiedTime desc");
+        assert_eq!(q["spaces"], "appDataFolder");
+    }
 }

@@ -3,7 +3,7 @@
 //! We expose **two** providers in the UI:
 //! * `openrouter`     — proxies to OpenRouter (single key, 200+ models).
 //! * `openai_compat`  — any user-supplied OpenAI Chat-Completions endpoint
-//!                      (Ollama, LM Studio, vLLM, corporate gateways).
+//!   (Ollama, LM Studio, vLLM, corporate gateways).
 //!
 //! Both are routed through the same `aisdk::providers::OpenAICompatible<DynamicModel>`
 //! under the hood. The only difference is the default `base_url` and whether
@@ -274,8 +274,8 @@ fn build_provider(active: &ActiveProvider) -> Result<OpenAICompatible<DynamicMod
 fn friendly_provider_error(raw: &str) -> String {
     let mut msg = raw.replace('\n', " ");
     if msg.len() > 240 {
-        msg.truncate(240);
-        msg.push_str("…");
+        msg.truncate(msg.floor_char_boundary(240));
+        msg.push('…');
     }
     msg
 }
@@ -327,5 +327,16 @@ pub async fn ai_test_connection() -> Result<AiTestResultDto, AppError> {
             model,
             error: Some(err.to_string()),
         }),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn friendly_provider_error_truncates_on_char_boundary() {
+        let raw = "ошибка ".repeat(100);
+        let out = super::friendly_provider_error(&raw);
+        assert!(out.ends_with('…'));
+        assert!(out.len() <= 240 + '…'.len_utf8());
     }
 }

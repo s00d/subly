@@ -1,6 +1,7 @@
 use super::super::{SyncConfig, SyncPayload};
 #[cfg(any(target_os = "macos", target_os = "ios"))]
 use super::super::{decode_sync_payload, encode_sync_payload, SYNC_FILENAME, SYNC_ICLOUD_FOLDER};
+#[cfg(any(target_os = "macos", target_os = "ios"))]
 use std::path::PathBuf;
 
 #[cfg(any(target_os = "macos", target_os = "ios"))]

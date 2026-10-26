@@ -128,6 +128,34 @@ pub async fn provider_upload(
     }
 }
 
+/// HTTP client for sync and OAuth. reqwest has no timeout by default, and every sync request runs
+/// under `GLOBAL_SYNC_LOCK`: one stalled connection used to block all later syncs and app exit.
+pub(crate) fn http_client() -> tauri_plugin_http::reqwest::Client {
+    http_client_builder().build().unwrap_or_default()
+}
+
+/// Same, without following redirects. For WebDAV a 301/302 silently turns PUT/MOVE/DELETE into GET
+/// (reporting "uploaded" while nothing was written), so a redirect must surface as an error.
+pub(crate) fn http_client_no_redirect() -> tauri_plugin_http::reqwest::Client {
+    http_client_builder()
+        .redirect(tauri_plugin_http::reqwest::redirect::Policy::none())
+        .build()
+        .unwrap_or_default()
+}
+
+fn http_client_builder() -> tauri_plugin_http::reqwest::ClientBuilder {
+    tauri_plugin_http::reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .timeout(std::time::Duration::from_secs(60))
+}
+
+/// Only "the sync file does not exist" may turn into `Ok(None)` from a download: the orchestrator
+/// reads `None` as "no remote copy" and pushes the local snapshot over the cloud file without
+/// merging, so a 429/5xx/403 mapped to `None` silently wipes other devices' data.
+pub(crate) fn download_status_means_missing(status: u16) -> bool {
+    status == 404 || status == 410
+}
+
 pub(crate) fn provider_io_message_key(err: &crate::errors::AppError) -> Option<&'static str> {
     icloud::icloud_sync_message_key(err)
         .or_else(|| gdrive::gdrive_sync_message_key(err))
@@ -138,4 +166,26 @@ pub(crate) fn provider_io_message_key(err: &crate::errors::AppError) -> Option<&
 
 pub async fn webdav_test_connection(cfg: &SyncConfig) -> Result<(), crate::errors::AppError> {
     webdav::test_connection(cfg).await
+}
+
+#[cfg(test)]
+mod tests {
+    /// Throttling / server / permission errors must surface as errors, never as "no remote file".
+    #[test]
+    fn auth_errors_map_to_their_own_provider() {
+        let key = |m: &str| super::provider_io_message_key(&crate::errors::AppError::from(m.to_string()));
+        assert_eq!(key("gdrive download failed: 401 Unauthorized"), Some("sync_gdrive_unauthorized"));
+        assert_eq!(key("onedrive download failed: 401 Unauthorized"), Some("sync_oauth_required"));
+        assert_eq!(key("dropbox download failed: 401 Unauthorized"), Some("sync_oauth_required"));
+        assert_eq!(key("webdav download failed: 401 Unauthorized"), Some("sync_webdav_auth_failed"));
+        assert_eq!(key("webdav download failed: 503 Service Unavailable"), Some("sync_webdav_unreachable"));
+    }
+
+    #[test]
+    fn only_not_found_means_missing_remote() {
+        assert!(super::download_status_means_missing(404));
+        for s in [401, 403, 409, 429, 500, 503] {
+            assert!(!super::download_status_means_missing(s), "{s}");
+        }
+    }
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { button } from "@/lib/tv";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
@@ -137,7 +138,7 @@ watch(
           <p class="text-xs text-text-muted">{{ fmtDateFull(expenseToIsoDate(exp)) }}</p>
         </div>
         <div class="text-right shrink-0">
-          <p class="text-lg font-bold text-text-primary">{{ fmt(exp.amount, exp.currencyId) }}</p>
+          <p class="text-lg font-semibold text-text-primary">{{ fmt(exp.amount, exp.currencyId) }}</p>
           <div v-if="convertedPrices.length > 0" class="mt-0.5 space-y-0">
             <p v-for="cp in convertedPrices" :key="cp.currency.id" class="text-[11px] text-text-muted tabular-nums">
               ≈ {{ fmtInCurrency(cp.amount, cp.currency) }}
@@ -230,37 +231,26 @@ watch(
 
     <template #footer>
       <div class="w-full flex items-center gap-1.5">
-        <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-          <Tooltip v-if="exp && exp.url" :text="t('url')" position="top">
-            <button
-              @click="handleOpenUrl(exp!.url)"
-              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
-            >
-              <ExternalLink :size="16" />
-            </button>
-          </Tooltip>
-          <Tooltip v-if="exp" :text="t('edit_expense')" position="top">
-            <button
-              @click="emit('edit', exp!)"
-              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
-            >
-              <Pencil :size="16" />
-            </button>
-          </Tooltip>
-          <Tooltip v-if="exp" :text="t('delete')" position="top">
-            <button
-              @click="emit('delete', exp!.id)"
-              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
-            >
-              <Trash2 :size="16" />
-            </button>
-          </Tooltip>
-        </div>
+        <button v-if="exp" :class="button()" @click="emit('edit', exp!)">
+          <Pencil :size="14" /> {{ t('edit') }}
+        </button>
+        <Tooltip v-if="exp && exp.url" :text="t('url')" position="top">
+          <button :class="button({ intent: 'ghost', size: 'icon' })" :aria-label="t('url')" @click="handleOpenUrl(exp!.url)">
+            <ExternalLink :size="15" />
+          </button>
+        </Tooltip>
+        <Tooltip v-if="exp" :text="t('delete')" position="top">
+          <button
+            :class="button({ intent: 'ghost', size: 'icon' })"
+            class="hover:text-danger"
+            :aria-label="t('delete')"
+            @click="emit('delete', exp!.id)"
+          >
+            <Trash2 :size="15" />
+          </button>
+        </Tooltip>
         <div class="flex-1" />
-        <button
-          @click="emit('close')"
-          class="h-9 px-3 sm:px-4 rounded-xl border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors shrink-0"
-        >{{ t('cancel') }}</button>
+        <button :class="button({ intent: 'ghost' })" @click="emit('close')">{{ t('close') }}</button>
       </div>
     </template>
   </Modal>

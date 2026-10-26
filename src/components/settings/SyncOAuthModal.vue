@@ -2,6 +2,7 @@
 import { useI18n } from "vue-i18n";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import Modal from "@/components/ui/Modal.vue";
+import { button } from "@/lib/tv";
 import { oauthPending, closeOAuthModal, disableProvider } from "@/services/syncClient";
 import type { SyncProviderType } from "@/services/syncClient";
 
@@ -33,22 +34,14 @@ async function cancelOAuth() {
     <p class="text-sm text-text-primary mb-2">
       {{ t("sync_oauth_pending_body", { provider: oauthPending.provider ? props.providerLabel(oauthPending.provider) : "" }) }}
     </p>
-    <p class="text-xs text-text-muted mb-4">{{ t("sync_oauth_pending_hint") }}</p>
-    <div class="flex flex-col sm:flex-row gap-2 justify-end">
-      <button
-        type="button"
-        class="px-3 py-2 rounded-lg text-xs border border-border order-2 sm:order-1"
-        @click="cancelOAuth"
-      >
+    <p class="text-xs text-text-muted">{{ t("sync_oauth_pending_hint") }}</p>
+    <template #footer>
+      <button type="button" :class="button()" @click="cancelOAuth">
         {{ t("sync_oauth_cancel") }}
       </button>
-      <button
-        type="button"
-        class="px-3 py-2 rounded-lg text-xs bg-primary text-white order-1 sm:order-2"
-        @click="openBrowser"
-      >
+      <button type="button" :class="button({ intent: 'primary' })" @click="openBrowser">
         {{ t("sync_oauth_open_browser") }}
       </button>
-    </div>
+    </template>
   </Modal>
 </template>

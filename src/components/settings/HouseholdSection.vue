@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useAppMetaStore } from "@/stores/appMetaStore";
 import { computed, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
@@ -6,13 +7,17 @@ import { upsertHouseholdMember, deleteHouseholdMember as deleteHouseholdMemberAp
 import type { HouseholdMember } from "@/schemas/appData";
 import { formatErrorForToast } from "@/utils/formatError";
 import AppInput from "@/components/ui/AppInput.vue";
+import UiCard from "@/components/ui/UiCard.vue";
+import SavedIndicator, { useAutoSave } from "@/components/settings/SavedIndicator.vue";
 import { Trash2, Plus } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
-import { ui } from "@/lib/tv";
+import { button } from "@/lib/tv";
 
 const props = defineProps<{ lookupHousehold: HouseholdMember[] | null }>();
+const metaStore = useAppMetaStore();
 const { t } = useI18n();
 const { toast } = useToast();
+const { savedAt, run, debounce } = useAutoSave();
 const household = ref<HouseholdMember[]>([]);
 watch(
   () => props.lookupHousehold,
@@ -28,19 +33,21 @@ watch(
 
 const sortedHousehold = computed(() => household.value);
 
-async function addMember() {
-  const order = await maxSortOrder("householdMembers");
-  const member: HouseholdMember = { id: crypto.randomUUID(), name: "Member", email: "", sortOrder: order + 1 };
-  await upsertHouseholdMember(member);
-  household.value.push(member);
+function addMember() {
+  void run(async () => {
+    const order = await maxSortOrder("householdMembers");
+    const member: HouseholdMember = { id: crypto.randomUUID(), name: "Member", email: "", sortOrder: order + 1 };
+    await upsertHouseholdMember(member);
+    metaStore.refreshSoon();
+    household.value.push(member);
+  });
 }
-async function saveMember(id: string, name: string, email: string) {
+/** Field edits: update the row now, persist once typing pauses. */
+function saveMember(id: string, field: "name" | "email", value: string) {
   const member = household.value.find((m) => m.id === id);
   if (!member) return;
-  const next = { ...member, name, email };
-  await upsertHouseholdMember(next);
-  Object.assign(member, next);
-  toast(t("success"));
+  member[field] = value;
+  debounce(`member:${id}`, () => upsertHouseholdMember({ ...member }).then(() => metaStore.refreshSoon()));
 }
 async function removeMember(id: string) {
   if (household.value.length <= 1) {
@@ -49,6 +56,7 @@ async function removeMember(id: string) {
   }
   try {
     await deleteHouseholdMemberApi(id);
+    metaStore.refreshSoon();
     household.value = household.value.filter((m) => m.id !== id);
     toast(t("success"));
   } catch (e) {
@@ -58,23 +66,30 @@ async function removeMember(id: string) {
 </script>
 
 <template>
-  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-    <h2 :class="[ui.sectionTitle(), 'mb-3 sm:mb-4']">{{ t('household') }}</h2>
+  <UiCard :title="t('household')">
+    <template #actions>
+      <SavedIndicator :at="savedAt" />
+    </template>
     <div class="space-y-2">
       <div v-for="m in sortedHousehold" :key="m.id" class="flex gap-2 items-center">
         <div class="flex-1 min-w-0">
-          <AppInput :modelValue="m.name" @update:modelValue="(v: string | number) => saveMember(m.id, String(v), m.email ?? '')" />
+          <AppInput :modelValue="m.name" @update:modelValue="(v: string | number) => saveMember(m.id, 'name', String(v))" />
         </div>
         <div class="flex-1 min-w-0">
-          <AppInput :modelValue="m.email ?? ''" @update:modelValue="(v: string | number) => saveMember(m.id, m.name, String(v))" :placeholder="t('email')" />
+          <AppInput :modelValue="m.email ?? ''" @update:modelValue="(v: string | number) => saveMember(m.id, 'email', String(v))" :placeholder="t('email')" />
         </div>
         <Tooltip v-if="sortedHousehold.length > 1" :text="t('delete')">
-          <button @click="removeMember(m.id)" class="p-2 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"><Trash2 :size="16" /></button>
+          <button
+            type="button"
+            :aria-label="t('delete')"
+            @click="removeMember(m.id)"
+            :class="button({ intent: 'ghost', size: 'icon', class: 'text-danger hover:bg-danger/12 hover:text-danger' })"
+          ><Trash2 :size="16" /></button>
         </Tooltip>
       </div>
     </div>
-    <button @click="addMember" class="mt-3 px-3 py-1.5 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover transition-colors">
-      <Plus :size="14" class="inline mr-1" /> {{ t('add') }}
+    <button type="button" @click="addMember" :class="button({ intent: 'secondary', size: 'sm', class: 'mt-3' })">
+      <Plus :size="14" /> {{ t('add') }}
     </button>
-  </section>
+  </UiCard>
 </template>

@@ -76,7 +76,7 @@ pub fn detect_format(mime: &str, bytes: &[u8]) -> &'static str {
         // XLSX is a ZIP-archive; XLS would start with D0 CF 11 E0.
         return "xlsx";
     }
-    if bytes.len() >= 8 && &bytes[..8] == [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1] {
+    if bytes.len() >= 8 && bytes[..8] == [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1] {
         return "xlsx";
     }
     if bytes.starts_with(b"{") || bytes.starts_with(b"[") {
@@ -100,7 +100,7 @@ pub fn decode_text(bytes: &[u8]) -> String {
 /// Pick the delimiter that yields the most consistent column count.
 fn detect_delimiter(text: &str) -> u8 {
     let sample: Vec<&str> = text.lines().take(20).collect();
-    let candidates: [u8; 4] = [b',', b';', b'\t', b'|'];
+    let candidates: [u8; 4] = *b",;\t|";
     let mut best = b',';
     let mut best_score = -1i32;
     for &delim in &candidates {

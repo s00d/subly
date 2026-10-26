@@ -32,7 +32,7 @@ const toggleTv = tv({
         thumb: "translate-x-[18px]",
       },
       false: {
-        track: "bg-border",
+        track: "bg-border-strong dark:bg-white/15",
       },
     },
   },

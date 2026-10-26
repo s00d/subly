@@ -29,6 +29,21 @@ export function getLocaleTag(lang: string): string {
 /**
  * Reactive composable that provides locale-aware date & number formatting.
  */
+/**
+ * `new Date("YYYY-MM-DD")` is midnight **UTC**, which shows the previous day west of Greenwich.
+ * Plain calendar dates are parsed as local midnight; anything else goes through `Date`.
+ */
+export function parseLocalDate(dateStr: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr.trim());
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(dateStr);
+}
+
+/** Today (or `d`) as a local `YYYY-MM-DD`. `toISOString().slice(0, 10)` gives the UTC date instead. */
+export function localYmd(d: Date = new Date()): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
 export function useLocaleFormat() {
   const { locale } = useI18n();
 
@@ -44,7 +59,7 @@ export function useLocaleFormat() {
         month: "long",
         day: "numeric",
         year: "numeric",
-      }).format(new Date(dateStr));
+      }).format(parseLocalDate(dateStr));
     } catch {
       return dateStr;
     }
@@ -57,7 +72,7 @@ export function useLocaleFormat() {
         month: "short",
         day: "numeric",
         year: "numeric",
-      }).format(new Date(dateStr));
+      }).format(parseLocalDate(dateStr));
     } catch {
       return dateStr;
     }
@@ -69,7 +84,7 @@ export function useLocaleFormat() {
       return new Intl.DateTimeFormat(localeTag.value, {
         month: "short",
         day: "numeric",
-      }).format(new Date(dateStr));
+      }).format(parseLocalDate(dateStr));
     } catch {
       return dateStr;
     }
@@ -166,7 +181,7 @@ export function formatCurrencyLocale(amount: number, currencyCode: string, _symb
 export function formatDateShortNonReactive(dateStr: string): string {
   const tag = getLocaleTagNonReactive();
   try {
-    return new Intl.DateTimeFormat(tag, { month: "short", day: "numeric" }).format(new Date(dateStr));
+    return new Intl.DateTimeFormat(tag, { month: "short", day: "numeric" }).format(parseLocalDate(dateStr));
   } catch {
     return dateStr;
   }

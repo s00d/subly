@@ -33,7 +33,7 @@ const textareaTv = tv({
   variants: {
     status: {
       error: {
-        textareaEl: "border-red-500 hover:border-red-500 focus:ring-red-500/20 focus:border-red-500",
+        textareaEl: "border-danger hover:border-danger focus:ring-danger/20 focus:border-danger",
       },
       normal: {},
     },

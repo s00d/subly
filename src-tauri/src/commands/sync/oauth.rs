@@ -66,7 +66,7 @@ pub async fn exchange_oauth_code(
     cfg: &SyncConfig,
     code: &str,
 ) -> Result<OAuthTokens, crate::errors::AppError> {
-    let client = tauri_plugin_http::reqwest::Client::new();
+    let client = super::providers::http_client();
     let redirect_uri = OAUTH_REDIRECT_URI;
     let (url, body) = match provider {
         SyncProviderType::Gdrive => {
@@ -143,7 +143,7 @@ pub async fn refresh_oauth_token(
     cfg: &SyncConfig,
     tokens: &OAuthTokens,
 ) -> Result<OAuthTokens, crate::errors::AppError> {
-    let client = tauri_plugin_http::reqwest::Client::new();
+    let client = super::providers::http_client();
     let (url, body) = match provider {
         SyncProviderType::Gdrive => (
             "https://oauth2.googleapis.com/token",

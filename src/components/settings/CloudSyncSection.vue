@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, reactive, watch } from "vue";
+import { ref, computed, onMounted, onBeforeUnmount, reactive, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import {
@@ -20,16 +20,37 @@ import {
 } from "@/services/syncClient";
 import type { SyncProviderType, SyncProviderSchema } from "@/services/syncClient";
 import Modal from "@/components/ui/Modal.vue";
+import UiCard from "@/components/ui/UiCard.vue";
+import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
+import { getLocaleTag } from "@/composables/useLocaleFormat";
 import SyncOAuthModal from "@/components/settings/SyncOAuthModal.vue";
 import SecretInput from "@/components/ui/SecretInput.vue";
-import { ChevronRight, Cloud, CloudOff, Download, Save, Upload } from "@lucide/vue";
-import { ui } from "@/lib/tv";
+import { ChevronRight, Cloud, CloudOff, Download, RefreshCw, Save, Upload } from "@lucide/vue";
+import { ui, button } from "@/lib/tv";
 import { formatErrorForToast } from "@/utils/formatError";
 import { buildSyncCredentialsSchema } from "@/schemas/zod/syncCredentials";
 import { zodIssueToMessageKey, type ZodFieldMeta } from "@/composables/useZodErrors";
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 const { toast } = useToast();
+const isChecking = ref(false);
+const confirmAction = ref<"disconnect" | "pull" | null>(null);
+
+// "Last synced" label: relative time, re-rendered every 30s.
+const now = ref(Date.now());
+const nowTimer = setInterval(() => (now.value = Date.now()), 30_000);
+onBeforeUnmount(() => clearInterval(nowTimer));
+const lastSyncedLabel = computed(() => {
+  const ts = syncStatus.lastSynced;
+  if (!ts) return t("sync_never");
+  const sec = Math.round((ts - now.value) / 1000);
+  const abs = Math.abs(sec);
+  const rtf = new Intl.RelativeTimeFormat(getLocaleTag(locale.value), { numeric: "auto" });
+  if (abs < 60) return rtf.format(0, "second");
+  if (abs < 3600) return rtf.format(Math.round(sec / 60), "minute");
+  if (abs < 86400) return rtf.format(Math.round(sec / 3600), "hour");
+  return rtf.format(Math.round(sec / 86400), "day");
+});
 const allProviders = computed(() => getProviders());
 const expandedProvider = ref<SyncProviderType | null>(null);
 const isConnecting = ref(false);
@@ -160,8 +181,14 @@ function buildSaveCredentials(provider: SyncProviderSchema): Record<string, stri
 async function saveProvider(provider: SyncProviderSchema) {
   if (!validateProviderFields(provider)) return;
   isSaving.value = provider.type;
-  await saveProviderSettings(provider.type, buildSaveCredentials(provider));
-  isSaving.value = null;
+  try {
+    await saveProviderSettings(provider.type, buildSaveCredentials(provider));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+    return;
+  } finally {
+    isSaving.value = null;
+  }
   toast(t("sync_credentials_saved"));
   // Clear any secret inputs the user typed — `saveProviderSettings` already
   // refreshed `providersSchema`, so the corresponding `hasSavedValue` flag
@@ -216,17 +243,32 @@ async function handleTestWebdav() {
 }
 
 async function handleDisconnect() {
-  await disableProvider();
-  toast(t("sync_disabled"));
-}
-
-async function handleCheckRemote() {
   try {
-    const hasUpdate = await checkRemote();
-    toast(hasUpdate ? t("sync_remote_newer") : t("sync_success"));
+    await disableProvider();
+    toast(t("sync_disabled"));
   } catch (e) {
     toast(formatErrorForToast(e, t), "error");
   }
+}
+
+/** Only checks the cloud copy — report what was found, not a fake "synced". */
+async function handleCheckRemote() {
+  isChecking.value = true;
+  try {
+    const hasUpdate = await checkRemote();
+    toast(hasUpdate ? t("sync_remote_newer") : t("sync_up_to_date"), "info");
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  } finally {
+    isChecking.value = false;
+  }
+}
+
+function onConfirmAction() {
+  const action = confirmAction.value;
+  confirmAction.value = null;
+  if (action === "disconnect") void handleDisconnect();
+  else if (action === "pull") void handlePull();
 }
 
 function toastSyncFailure(res: { messageKey?: string }) {
@@ -276,60 +318,89 @@ async function handleConflictForcePush() {
 </script>
 
 <template>
-  <section class="bg-surface rounded-xl border border-border p-4 sm:p-5">
-    <div class="flex items-center gap-2 mb-1">
-      <Cloud :size="18" class="text-primary" />
-      <h2 :class="ui.sectionTitle()">{{ t("cloud_sync") }}</h2>
-    </div>
+  <UiCard :title="t('cloud_sync')" :icon="Cloud" icon-tone="text-primary">
     <p class="text-xs sm:text-sm text-text-muted mb-4">{{ t("cloud_sync_desc") }}</p>
 
     <div
       v-if="syncStatus.oauthPending && oauthPendingProvider"
-      class="mb-4 p-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800"
+      class="mb-4 p-3 rounded-xl bg-warning/12 border border-warning/30"
     >
-      <p class="text-xs text-amber-900 dark:text-amber-100 mb-2">
+      <p class="text-xs text-text-primary mb-2">
         {{ t("sync_oauth_pending_banner", { provider: providerLabel(oauthPendingProvider.type) }) }}
       </p>
       <div class="flex gap-2">
-        <button type="button" class="px-3 py-1.5 rounded-lg text-xs bg-primary text-white" @click="resumeOAuthModal">
+        <button type="button" :class="button({ intent: 'primary', size: 'sm' })" @click="resumeOAuthModal">
           {{ t("sync_oauth_open_browser") }}
         </button>
-        <button type="button" class="px-3 py-1.5 rounded-lg text-xs border border-border" @click="cancelOAuthPending">
+        <button type="button" :class="button({ size: 'sm' })" @click="cancelOAuthPending">
           {{ t("sync_oauth_cancel") }}
         </button>
       </div>
     </div>
 
-    <div v-if="activeProvider" class="mb-4 p-4 rounded-xl bg-surface-secondary border border-border">
-      <div class="flex items-center justify-between">
-        <div class="text-sm text-text-primary font-medium">{{ providerLabel(activeProvider.type) }}</div>
-        <button @click="handleDisconnect" class="px-3 py-1.5 rounded-lg text-xs border border-red-300 text-red-600">
-          <CloudOff :size="12" class="inline-block mr-1" />{{ t("sync_disconnect") }}
+    <div v-if="activeProvider" class="mb-4 p-3 sm:p-4 rounded-xl bg-surface-secondary border border-border">
+      <div class="flex items-center justify-between gap-2">
+        <div class="min-w-0">
+          <div class="text-sm text-text-primary font-medium truncate">{{ providerLabel(activeProvider.type) }}</div>
+          <div class="text-xs text-text-muted">
+            {{ t("sync_last_synced") }}: {{ syncStatus.syncing ? t("sync_syncing") : lastSyncedLabel }}
+          </div>
+        </div>
+        <button
+          type="button"
+          @click="confirmAction = 'disconnect'"
+          :class="button({ intent: 'ghost', size: 'sm', class: 'text-danger hover:bg-danger/12 hover:text-danger' })"
+        >
+          <CloudOff :size="12" />{{ t("sync_disconnect") }}
         </button>
       </div>
-      <div class="mt-3 flex gap-2">
-        <button @click="handleCheckRemote" class="px-3 py-1.5 rounded-lg text-xs border border-border">{{ t("sync_now") }}</button>
-        <button @click="handlePull" class="px-3 py-1.5 rounded-lg text-xs border border-blue-300 text-blue-700">
-          <Download :size="12" class="inline-block mr-1" />{{ t("sync_pull") }}
-        </button>
-        <button @click="handlePush" class="px-3 py-1.5 rounded-lg text-xs border border-green-300 text-green-700">
-          <Upload :size="12" class="inline-block mr-1" />{{ t("sync_push") }}
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          @click="handleCheckRemote"
+          :disabled="isChecking || syncStatus.syncing"
+          :class="button({ size: 'sm' })"
+        >
+          <RefreshCw :size="12" :class="{ 'animate-spin': isChecking }" />
+          {{ isChecking ? t("sync_checking") : t("sync_check_remote") }}
         </button>
       </div>
-      <p v-if="activeProvider" class="mt-2 text-[11px] text-text-muted leading-snug">
-        {{ t("sync_connected_push_hint") }}
-      </p>
-      <div v-if="syncStatus.pendingUpdate" class="mt-3 text-xs text-blue-700">
-        {{ t("sync_remote_newer_desc") }}
-        <button @click="dismissPendingUpdate()" class="ml-2 underline">{{ t("sync_dismiss") }}</button>
+      <p v-if="syncStatus.error" class="mt-2 text-xs text-danger wrap-break-word">{{ syncStatus.error }}</p>
+      <div v-if="syncStatus.pendingUpdate" class="mt-3 rounded-lg bg-info/12 p-2.5 text-xs text-text-primary">
+        <p>{{ t("sync_remote_newer_desc") }}</p>
+        <div class="mt-2 flex gap-2">
+          <button type="button" :class="button({ intent: 'primary', size: 'sm' })" :disabled="syncStatus.syncing" @click="confirmAction = 'pull'">
+            <Download :size="12" />{{ t("sync_pull") }}
+          </button>
+          <button type="button" :class="button({ intent: 'ghost', size: 'sm' })" @click="dismissPendingUpdate()">{{ t("sync_dismiss") }}</button>
+        </div>
       </div>
+
+      <details class="group mt-3">
+        <summary class="flex cursor-pointer select-none list-none items-center gap-1 text-xs font-medium text-text-secondary hover:text-text-primary [&::-webkit-details-marker]:hidden">
+          <ChevronRight :size="14" class="transition-transform group-open:rotate-90" />
+          {{ t("sync_advanced") }}
+        </summary>
+        <div class="mt-2 space-y-2">
+          <div class="flex flex-wrap gap-2">
+            <button type="button" :disabled="syncStatus.syncing" :class="button({ size: 'sm' })" @click="confirmAction = 'pull'">
+              <Download :size="12" />{{ t("sync_pull") }}
+            </button>
+            <button type="button" :disabled="syncStatus.syncing" :class="button({ size: 'sm' })" @click="handlePush">
+              <Upload :size="12" />{{ t("sync_push") }}
+            </button>
+          </div>
+          <p class="text-[11px] text-text-muted leading-snug">{{ t("sync_connected_push_hint") }}</p>
+        </div>
+      </details>
     </div>
 
     <div class="space-y-3">
       <div v-for="provider in visibleProviders" :key="provider.type" class="rounded-xl border border-border">
         <button
           type="button"
-          class="w-full p-3 text-left flex items-center justify-between gap-2"
+          class="w-full p-3 text-left flex items-center justify-between gap-2 rounded-xl hover:bg-surface-hover transition-colors"
+          :aria-expanded="expandedProvider === provider.type"
           @click="expandedProvider = expandedProvider === provider.type ? null : provider.type"
         >
           <span class="text-sm font-medium text-text-primary">{{ providerLabel(provider.type) }}</span>
@@ -346,7 +417,7 @@ async function handleConflictForcePush() {
           </p>
           <template v-for="field in (provider.fields ?? [])" :key="field.key">
             <div>
-              <label class="block text-[10px] text-text-muted mb-1">{{ t(field.label) }}</label>
+              <label :class="ui.fieldLabel()">{{ t(field.label) }}</label>
               <SecretInput
                 v-if="field.secret"
                 v-model="formValues[provider.type][field.key]"
@@ -359,39 +430,42 @@ async function handleConflictForcePush() {
                 v-model="formValues[provider.type][field.key]"
                 :type="field.inputType || 'text'"
                 :placeholder="field.placeholder ? t(field.placeholder) : ''"
-                class="w-full px-2.5 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary"
+                :class="ui.field({ class: 'h-8 py-1 text-xs' })"
               />
               <p v-if="field.secret && field.hasSavedValue && !(formValues[provider.type][field.key] ?? '').trim()"
-                class="mt-1 text-[10px] text-green-600 dark:text-green-400">
+                class="mt-1 text-[11px] text-success">
                 {{ t('ai_api_key_configured') }}
               </p>
-              <p v-if="field.helpText" class="mt-1 text-[10px] text-text-muted">{{ t(field.helpText) }}</p>
-              <p v-if="fieldErrors[`${provider.type}:${field.key}`]" class="mt-1 text-[10px] text-red-500">
+              <p v-if="field.helpText" class="mt-1 text-[11px] text-text-muted">{{ t(field.helpText) }}</p>
+              <p v-if="fieldErrors[`${provider.type}:${field.key}`]" :class="ui.fieldError()">
                 {{ fieldErrors[`${provider.type}:${field.key}`] }}
               </p>
             </div>
           </template>
-          <div class="flex gap-2 pt-1">
+          <div class="flex flex-wrap gap-2 pt-1">
             <button
               v-if="(provider.fields ?? []).length > 0"
+              type="button"
               @click="saveProvider(provider)"
               :disabled="isSaving === provider.type || !canSave(provider)"
-              class="px-3 py-1.5 rounded-lg text-xs border border-border disabled:opacity-50"
+              :class="button({ size: 'sm' })"
             >
-              <Save :size="12" class="inline-block mr-1" />{{ isSaving === provider.type ? t("sync_saving") : t("sync_save_credentials") }}
+              <Save :size="12" />{{ isSaving === provider.type ? t("sync_saving") : t("sync_save_credentials") }}
             </button>
             <button
               v-if="provider.type === 'webdav'"
+              type="button"
               @click="handleTestWebdav"
               :disabled="isTestingWebdav || !canSave(provider)"
-              class="px-3 py-1.5 rounded-lg text-xs border border-border disabled:opacity-50"
+              :class="button({ size: 'sm' })"
             >
               {{ isTestingWebdav ? t("sync_checking") : t("sync_webdav_test_connection") }}
             </button>
             <button
+              type="button"
               @click="connectProvider(provider.type)"
               :disabled="isConnecting || !canConnect(provider)"
-              class="px-3 py-1.5 rounded-lg text-xs bg-primary text-white disabled:opacity-50"
+              :class="button({ intent: 'primary', size: 'sm' })"
             >
               {{ t("sync_connect") }}
             </button>
@@ -406,32 +480,29 @@ async function handleConflictForcePush() {
       maxWidth="24rem"
       @close="showRevisionConflict = false"
     >
-      <p class="text-sm text-text-primary mb-4">{{ t("sync_push_revision_body") }}</p>
-      <div class="flex flex-col sm:flex-row gap-2 justify-end">
-        <button
-          type="button"
-          class="px-3 py-2 rounded-lg text-xs border border-border order-2 sm:order-1"
-          @click="showRevisionConflict = false"
-        >
+      <p class="text-sm text-text-secondary">{{ t("sync_push_revision_body") }}</p>
+      <template #footer>
+        <button type="button" :class="button()" @click="showRevisionConflict = false">
           {{ t("cancel") }}
         </button>
-        <button
-          type="button"
-          class="px-3 py-2 rounded-lg text-xs border border-blue-300 text-blue-700 order-1 sm:order-2"
-          @click="handleConflictPullMerge"
-        >
+        <button type="button" :class="button()" @click="handleConflictPullMerge">
           {{ t("sync_conflict_pull_merge") }}
         </button>
-        <button
-          type="button"
-          class="px-3 py-2 rounded-lg text-xs bg-amber-600 text-white order-3"
-          @click="handleConflictForcePush"
-        >
+        <button type="button" :class="button({ intent: 'danger' })" @click="handleConflictForcePush">
           {{ t("sync_conflict_force_push") }}
         </button>
-      </div>
+      </template>
     </Modal>
 
+    <ConfirmDialog
+      :show="confirmAction !== null"
+      :title="confirmAction === 'pull' ? t('sync_pull') : t('sync_disconnect')"
+      :message="confirmAction === 'pull' ? t('sync_pull_confirm') : t('sync_disconnect_confirm')"
+      :confirm-label="confirmAction === 'pull' ? t('sync_pull') : t('sync_disconnect')"
+      @confirm="onConfirmAction"
+      @cancel="confirmAction = null"
+    />
+
     <SyncOAuthModal :provider-label="providerLabel" />
-  </section>
+  </UiCard>
 </template>

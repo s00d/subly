@@ -1,10 +1,17 @@
 <script setup lang="ts">
+import AppCheckbox from "@/components/ui/AppCheckbox.vue";
+import UiViewSwitch from "@/components/ui/UiViewSwitch.vue";
+import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
+import AppDatePicker from "@/components/ui/AppDatePicker.vue";
+import UiEmptyState from "@/components/ui/UiEmptyState.vue";
+import { localYmd } from "@/composables/useLocaleFormat";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 import { useI18n } from "vue-i18n";
 import {
   deleteExpense,
   deleteExpensesBatch,
+  getExpenseCount,
   insertExpense,
   type ExpenseFilter,
 } from "@/services/expensesClient";
@@ -31,49 +38,34 @@ import type { SelectOption } from "@/components/ui/AppSelect.vue";
 import Toast from "@/components/ui/Toast.vue";
 import {
   convertAmountToCurrency,
+  convertToMain,
+  moneyFromDecimal,
   moneyGt,
+  sumMoney,
   type MoneyString,
 } from "@/lib/money";
-import {
-  Plus,
-  Search,
-  Pencil,
-  Trash2,
-  ExternalLink,
-  CopyPlus,
-  ClipboardCopy,
-  CheckSquare,
-  Square,
-  Wallet,
-  AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
-  Rows3,
-  LayoutList,
-  LayoutGrid,
-  Filter,
-  Sparkles,
-} from "@lucide/vue";
+import { Plus, Search, Pencil, Trash2, ExternalLink, CopyPlus, ClipboardCopy, CheckSquare, Square, Wallet, ChevronLeft, ChevronRight, Filter, Sparkles } from "@lucide/vue";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { formatErrorForToast } from "@/utils/formatError";
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
 import { useExpensesStore } from "@/stores/expensesStore";
-import { ui } from "@/lib/tv";
+import { ui, avatarTone, button } from "@/lib/tv";
 import { useAiConfigStore } from "@/stores/aiConfigStore";
 
 const PAGE_SIZE = 10;
-const subscriptions = ref<Subscription[]>([]);
-const categories = ref<Category[]>([]);
-const paymentMethods = ref<PaymentMethod[]>([]);
-const currencies = ref<Currency[]>([]);
-const tags = ref<Tag[]>([]);
-const household = ref<HouseholdMember[]>([]);
-const settings = computed<Settings | null>(() => metaRefs.settings.value ?? null);
 const metaStore = useAppMetaStore();
 const subscriptionsStore = useSubscriptionsStore();
 const expensesStore = useExpensesStore();
 const metaRefs = storeToRefs(metaStore);
+// Live views of the stores (sync pulls / AI imports / catalog edits show up without a remount).
+const subscriptions = computed<Subscription[]>(() => subscriptionsStore.items);
+const categories = computed<Category[]>(() => metaRefs.categories.value);
+const paymentMethods = computed<PaymentMethod[]>(() => metaRefs.paymentMethods.value);
+const currencies = computed<Currency[]>(() => metaRefs.currencies.value);
+const tags = computed<Tag[]>(() => metaRefs.tags.value);
+const household = computed<HouseholdMember[]>(() => metaRefs.household.value);
+const settings = computed<Settings | null>(() => metaRefs.settings.value ?? null);
 const expensesRefs = storeToRefs(expensesStore);
 const items = expensesRefs.items;
 const totalCount = expensesRefs.total;
@@ -152,16 +144,7 @@ function onAiImported() {
 }
 
 function updateHeaderActions() {
-  const viewIcon = viewMode.value === "compact" ? Rows3 : viewMode.value === "expanded" ? LayoutGrid : LayoutList;
-  const nextViewMode = viewMode.value === "compact" ? "default" : viewMode.value === "default" ? "expanded" : "compact";
-  const currentViewTitle = viewMode.value === "compact" ? t("view_compact") : viewMode.value === "expanded" ? t("view_expanded") : t("view_default");
-  const nextViewTitle = nextViewMode === "compact" ? t("view_compact") : nextViewMode === "expanded" ? t("view_expanded") : t("view_default");
-
-  const actions: HeaderAction[] = [
-    { id: "toggle-expense-filters", icon: Filter, title: showFilters.value ? `${t("filter")} ✓` : `${t("filter")} ✕`, onClick: () => { showFilters.value = !showFilters.value; }, style: showFilters.value ? "warning" : "neutral" },
-    { id: "cycle-expense-view", icon: viewIcon, title: `${currentViewTitle} → ${nextViewTitle}`, onClick: () => setViewMode(nextViewMode), style: "accent" },
-    { id: "expense-selection-mode", icon: CheckSquare, title: selectionMode.value ? `${t("select")} ✓` : `${t("select")} ✕`, onClick: toggleSelectionMode, style: selectionMode.value ? "success" : "neutral" },
-  ];
+  const actions: HeaderAction[] = [];
   if (showAiHeaderButton.value) {
     actions.push({
       id: "ai-smart-expense",
@@ -173,7 +156,7 @@ function updateHeaderActions() {
       style: "accent",
     });
   }
-  actions.push({ id: "add-expense", icon: Plus, title: t("add_expense"), onClick: openAdd, style: "primary" });
+  actions.push({ id: "add-expense", icon: Plus, title: t("add_expense"), label: t("add"), onClick: openAdd, style: "primary" });
   setActions(actions);
 }
 
@@ -187,6 +170,18 @@ onUnmounted(() => clearActions());
 
 // ---- View mode ----
 const viewMode = computed(() => settings.value?.expenseViewMode || "default");
+
+/** Non-default filters in effect (drives the badge on the Filter button and "no results" state). */
+const activeFilterCount = computed(() => (filterCategory.value ? 1 : 0) + (filterPayment.value ? 1 : 0) + (filterTag.value ? 1 : 0) + (dateFrom.value ? 1 : 0) + (dateTo.value ? 1 : 0) + (searchQuery.value.trim() ? 1 : 0));
+
+function resetFilters() {
+  searchQuery.value = "";
+  filterCategory.value = "";
+  filterPayment.value = "";
+  filterTag.value = "";
+  dateFrom.value = "";
+  dateTo.value = "";
+}
 
 function setViewMode(mode: "default" | "compact" | "expanded") {
   if (!settings.value) return;
@@ -218,6 +213,7 @@ function buildFilter(): ExpenseFilter {
 }
 
 function applyFilters() {
+  selectedIds.value = new Set();
   const filter = buildFilter();
   fetchPage(1, filter).catch((e) => {
     logPageError("fetchPage failed", e, { filter, page: 1 });
@@ -239,6 +235,7 @@ const totalPages = computed(() => Math.max(1, Math.ceil(totalCount.value / PAGE_
 
 function goPage(p: number) {
   if (p < 1 || p > totalPages.value) return;
+  selectedIds.value = new Set();
   fetchPage(p).catch((e) => {
     logPageError("goPage failed", e, { page: p });
     toast(formatErrorForToast(e, t), "error");
@@ -330,7 +327,7 @@ async function confirmBatchDelete() {
     if (batchDeleteConfirmIds.value.length > 0) {
       await deleteExpensesBatch(batchDeleteConfirmIds.value);
       await fetchPage(currentPage.value, activeFilter.value);
-      toast(t("batch_deleted_expenses").replace("{count}", String(batchDeleteConfirmIds.value.length)));
+      toast(t("batch_deleted_expenses", { count: batchDeleteConfirmIds.value.length }));
       selectedIds.value = new Set();
       selectionMode.value = false;
       await updateTotal();
@@ -378,6 +375,32 @@ function getExpenseIcon(exp: Expense): string {
 }
 function formatDate(d: string) { return fmtDateMedium(d); }
 function formatExpenseDate(e: Expense) { return fmtDateMedium(expenseToIsoDate(e)); }
+
+/** Default mode groups rows under day headers (Today / Yesterday / date); compact and grid stay flat. */
+const dayGroups = computed(() => {
+  if (viewMode.value !== "default") return [{ key: "all", label: "", items: items.value }];
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  const groups: { key: string; label: string; items: Expense[]; total?: MoneyString }[] = [];
+  for (const exp of items.value) {
+    const key = expenseToIsoDate(exp);
+    let g = groups[groups.length - 1];
+    if (!g || g.key !== key) {
+      const label =
+        key === localYmd(today) ? t("today") : key === localYmd(yesterday) ? t("yesterday") : fmtDateMedium(key);
+      g = { key, label, items: [] };
+      groups.push(g);
+    }
+    g.items.push(exp);
+  }
+  const rates = ratesRecord();
+  for (const g of groups) {
+    g.total = moneyFromDecimal(
+      sumMoney(g.items.map((e) => moneyFromDecimal(convertToMain(e.amount, e.currencyId, rates)))),
+    );
+  }
+  return groups;
+});
 function formatAmount(amount: MoneyString, currencyId: string) {
   return fmt(amount, currencyId);
 }
@@ -410,7 +433,7 @@ const expenseFormLookupData = computed(() => {
     household: household.value,
     categories: categories.value,
     tags: tags.value,
-    expensesCount: totalCount.value,
+    expensesCount: allExpensesCount.value,
   };
 });
 const mainCurrencyCode = computed(() => {
@@ -488,7 +511,8 @@ async function handleDuplicateExpense(exp: Expense) {
     ...rest,
     id: crypto.randomUUID(),
     name: `${exp.name} (copy)`,
-    createdAt: new Date().toISOString(),
+    // Today's local date at noon UTC (as ExpenseForm stores it); a raw UTC "now" can land on another day.
+    createdAt: `${localYmd()}T12:00:00.000Z`,
     subscriptionId: "",
     paymentRecordId: "",
   });
@@ -591,15 +615,15 @@ function showContextMenu(exp: Expense, event: MouseEvent, anchorRect?: DOMRect |
   contextMenuOpen.value = true;
 }
 
+/** Unfiltered count: seeds the "Expense #N" default name (the filtered total gave duplicates). */
+const allExpensesCount = ref(0);
+watch(totalCount, () => {
+  getExpenseCount().then((n) => (allExpensesCount.value = n)).catch(() => {});
+}, { immediate: true });
+
 async function loadInitial() {
   await metaStore.ensureLoaded();
-  categories.value = metaRefs.categories.value;
-  paymentMethods.value = metaRefs.paymentMethods.value;
-  currencies.value = metaRefs.currencies.value;
-  tags.value = metaRefs.tags.value;
-  household.value = metaRefs.household.value;
-  await subscriptionsStore.loadBrief();
-  subscriptions.value = subscriptionsStore.items;
+  await subscriptionsStore.loadBrief({});
 }
 
 async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
@@ -613,52 +637,77 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
 <template>
   <div class="max-w-5xl mx-auto">
     <!-- Filters -->
+    <!-- List toolbar: search always visible; filter / select / layout as labelled controls -->
+    <div class="mb-3 flex items-center gap-2">
+      <div class="relative min-w-0 flex-1">
+        <Search :size="14" class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+        <input v-model="searchQuery" type="search" :placeholder="t('search')" :class="[ui.field(), 'pl-8 text-[13px]']" />
+      </div>
+      <button
+        type="button"
+        :class="button({ pressed: showFilters })"
+        :aria-pressed="showFilters"
+        @click="showFilters = !showFilters"
+      >
+        <Filter :size="14" />
+        <span class="max-sm:hidden">{{ t('filter') }}</span>
+        <span
+          v-if="activeFilterCount > 0"
+          class="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-white tabular-nums"
+        >{{ activeFilterCount }}</span>
+      </button>
+      <button
+        type="button"
+        :class="button({ pressed: selectionMode })"
+        :aria-pressed="selectionMode"
+        @click="toggleSelectionMode"
+      >
+        <CheckSquare :size="14" />
+        <span class="max-sm:hidden">{{ t('select') }}</span>
+      </button>
+      <UiViewSwitch :model-value="viewMode" @update:model-value="setViewMode" />
+    </div>
+
     <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 -translate-y-2">
-      <div v-if="showFilters" class="mb-3 p-2.5 sm:p-4 rounded-xl border border-border bg-surface space-y-2">
-        <div class="relative min-w-0">
-          <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-          <input
-            v-model="searchQuery"
-            type="text"
-            :placeholder="t('search')"
-            class="w-full pl-8 pr-3 py-2 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted hover:border-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
-          />
+      <div v-if="showFilters" class="mb-3 p-3 rounded-xl border border-border bg-surface shadow-sm space-y-2">
+        <div v-if="activeFilterCount > 0" class="flex justify-end -mb-1">
+          <button type="button" class="text-xs font-medium text-primary hover:text-primary-hover" @click="resetFilters">{{ t('reset_filters') }}</button>
         </div>
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
-          <div class="w-28 shrink-0"><AppSelect v-model="sortBy" :options="sortOptions" size="sm" /></div>
-          <div class="w-28 shrink-0"><AppSelect v-model="filterCategory" :options="categoryOptions" size="sm" /></div>
-          <div class="w-28 shrink-0"><AppSelect v-model="filterPayment" :options="paymentOptions" size="sm" /></div>
-          <div v-if="tags.length > 0" class="w-28 shrink-0"><AppSelect v-model="filterTag" :options="tagOptions" size="sm" /></div>
-          <input v-model="dateFrom" type="date" class="shrink-0 w-28 px-2 py-1 text-[11px] rounded-lg bg-surface border border-border text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
-          <input v-model="dateTo" type="date" class="shrink-0 w-28 px-2 py-1 text-[11px] rounded-lg bg-surface border border-border text-text-primary focus:outline-none focus:ring-2 focus:ring-primary" />
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div class="min-w-0"><AppSelect v-model="sortBy" :options="sortOptions" /></div>
+          <div class="min-w-0"><AppSelect v-model="filterCategory" :options="categoryOptions" /></div>
+          <div class="min-w-0"><AppSelect v-model="filterPayment" :options="paymentOptions" /></div>
+          <div v-if="tags.length > 0" class="min-w-0"><AppSelect v-model="filterTag" :options="tagOptions" /></div>
+          <div class="min-w-0"><AppDatePicker v-model="dateFrom" :max="dateTo || undefined" /></div>
+          <div class="min-w-0"><AppDatePicker v-model="dateTo" :min="dateFrom || undefined" /></div>
         </div>
       </div>
     </Transition>
 
     <!-- Batch toolbar -->
     <Transition enter-active-class="transition ease-out duration-200" enter-from-class="opacity-0 -translate-y-2" enter-to-class="opacity-100 translate-y-0" leave-active-class="transition ease-in duration-150" leave-from-class="opacity-100 translate-y-0" leave-to-class="opacity-0 -translate-y-2">
-      <div v-if="selectionMode" class="flex items-center gap-1.5 sm:gap-2 mb-3 px-2 sm:px-3 py-2 rounded-lg bg-surface-secondary border border-border overflow-x-auto">
-        <span class="text-xs font-medium text-text-primary">{{ selectedIds.size }} {{ t('selected_count') }}</span>
-        <button @click="selectAll" class="p-1 rounded text-text-secondary hover:bg-surface transition-colors" :title="t('select_all')">
+      <div v-if="selectionMode" class="sticky top-2 z-10 flex items-center gap-1.5 mb-3 px-3 py-2 rounded-xl border border-border-strong bg-surface shadow-md overflow-x-auto">
+        <span class="text-xs font-semibold text-text-primary tabular-nums whitespace-nowrap">{{ selectedIds.size }} {{ t('selected_count') }}</span>
+        <button :class="button({ intent: 'ghost', size: 'iconSm' })" @click="selectAll" :title="t('select_all')">
           <CheckSquare :size="13" />
         </button>
-        <button @click="deselectAll" class="p-1 rounded text-text-muted hover:bg-surface-hover transition-colors" :title="t('deselect_all')">
+        <button :class="button({ intent: 'ghost', size: 'iconSm' })" @click="deselectAll" :title="t('deselect_all')">
           <Square :size="13" />
         </button>
         <div class="flex-1" />
         <button @click="batchDeleteSelected" :disabled="selectedIds.size === 0"
-          class="px-2.5 py-1 rounded-md text-[11px] font-medium border border-border text-text-secondary hover:bg-surface disabled:opacity-30 transition-colors"
+          :class="button({ size: 'sm' })"
         >{{ t('batch_delete') }}</button>
       </div>
     </Transition>
 
     <!-- Summary bar -->
-    <div class="flex items-center justify-between px-3 py-2 mb-3 rounded-lg bg-surface border border-border">
-      <div class="flex items-center gap-2 text-xs text-text-muted">
+    <div class="flex items-end justify-between px-1 pb-3">
+      <div class="flex items-center gap-1.5 text-xs text-text-muted">
         <Wallet :size="14" />
         <span>{{ totalCount }} {{ t('expenses').toLowerCase() }}</span>
       </div>
-      <div class="text-sm font-semibold text-text-primary">
+      <div class="text-xl font-semibold text-text-primary tabular-nums tracking-[-0.02em]">
         {{ fmtCurrency(totalFiltered, mainCurrencyCode) }}
       </div>
     </div>
@@ -669,23 +718,40 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
     </div>
 
     <!-- Empty state -->
-    <div v-else-if="items.length === 0" class="text-center py-16">
-      <div class="w-20 h-20 mx-auto mb-4 rounded-full bg-surface-hover flex items-center justify-center">
-        <Wallet :size="36" class="text-text-muted" />
-      </div>
-      <p class="text-text-muted mb-4">{{ t('no_expenses_yet') }}</p>
-      <button @click="openAdd"
-        class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover"
-      ><Plus :size="18" /> {{ t('add_expense') }}</button>
+    <div v-else-if="items.length === 0" :class="ui.panel()">
+      <UiEmptyState v-if="activeFilterCount > 0" :icon="Search" :title="t('nothing_found')">
+        <button :class="button()" @click="resetFilters">{{ t('reset_filters') }}</button>
+      </UiEmptyState>
+      <UiEmptyState v-else :icon="Wallet" :title="t('no_expenses_yet')">
+        <button :class="button({ intent: 'primary' })" @click="openAdd">
+          <Plus :size="15" /> {{ t('add_expense') }}
+        </button>
+      </UiEmptyState>
     </div>
 
     <!-- Expense list -->
-    <div v-if="!loading && items.length > 0" :class="viewMode === 'expanded' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3' : 'space-y-1.5 sm:space-y-2'">
+    <div
+      v-if="!loading && items.length > 0"
+      :class="viewMode === 'expanded' ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3' : `${ui.listContainer()} shadow-sm`"
+    >
+    <template v-for="group in dayGroups" :key="group.key">
+      <!-- Day header as a separator row inside the one list (default mode only) -->
       <div
-        v-for="exp in items"
+        v-if="group.label"
+        class="sticky top-0 z-[1] flex items-center justify-between gap-3 px-4 py-1.5 bg-surface-secondary/95 backdrop-blur border-b border-border text-[11px] font-semibold uppercase tracking-wide text-text-secondary"
+      >
+        <span>{{ group.label }}</span>
+        <span class="normal-case tracking-normal tabular-nums text-text-muted">{{ fmt(group.total ?? "0", settings?.mainCurrencyId ?? "") }}</span>
+      </div>
+      <div
+        v-for="exp in group.items"
         :key="exp.id"
-        class="bg-surface rounded-xl border overflow-hidden transition-colors cursor-pointer"
-        :class="selectedIds.has(exp.id) ? 'border-primary ring-1 ring-primary/30' : 'border-border'"
+        class="overflow-hidden transition-colors cursor-pointer"
+        :class="[
+ viewMode === 'expanded' ? 'bg-surface rounded-xl border shadow-sm hover:shadow-md' : '',
+          viewMode === 'expanded' && !selectedIds.has(exp.id) ? 'border-border' : '',
+          selectedIds.has(exp.id) ? (viewMode === 'expanded' ? 'border-primary ring-1 ring-primary/30' : 'bg-primary-light') : '',
+        ]"
       >
         <UniversalListRow
           :mode="viewMode as 'compact' | 'default' | 'expanded'"
@@ -696,24 +762,19 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
             <div
               v-if="selectionMode && viewMode !== 'expanded'"
               class="shrink-0"
-              @click.stop="toggleSelect(exp.id)"
-            >
-              <div
-                class="rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
-                :class="[
-                  viewMode === 'compact' ? 'w-4 h-4' : 'w-5 h-5',
-                  selectedIds.has(exp.id) ? 'bg-primary border-primary text-white' : 'border-border hover:border-primary',
-                ]"
+              @click.stop
               >
-                <svg v-if="selectedIds.has(exp.id)" :width="viewMode === 'compact' ? 10 : 12" :height="viewMode === 'compact' ? 10 : 12" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </div>
+                <AppCheckbox :model-value="selectedIds.has(exp.id)" :aria-label="t('select')" @update:model-value="toggleSelect(exp.id)" />
             </div>
           </template>
           <template #leading>
             <div
               v-if="viewMode !== 'expanded'"
-              class="rounded bg-primary-light flex items-center justify-center font-bold text-primary shrink-0 overflow-hidden"
-              :class="viewMode === 'compact' ? 'w-6 h-6 text-[10px]' : 'w-9 h-9 sm:w-10 sm:h-10 text-xs sm:text-sm'"
+              class="flex items-center justify-center font-semibold shrink-0 overflow-hidden"
+              :class="[
+ viewMode === 'compact' ? 'w-6 h-6 rounded-md text-[10px]' : 'w-9 h-9 rounded-[10px] text-sm',
+                getExpenseIcon(exp) ? 'bg-surface-hover' : avatarTone(exp.name),
+              ]"
             >
               <IconDisplay v-if="getExpenseIcon(exp)" :icon="getExpenseIcon(exp)" :size="viewMode === 'compact' ? 12 : 18" />
               <span v-else>{{ exp.name.charAt(0).toUpperCase() }}</span>
@@ -722,26 +783,22 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
           <template #main>
             <p v-if="viewMode === 'compact'" class="text-xs font-medium text-text-primary truncate">{{ exp.name }}</p>
             <div v-else-if="viewMode === 'default'" class="min-w-0">
-              <p class="text-xs sm:text-sm font-medium text-text-primary truncate">{{ exp.name }}</p>
+              <p class="text-sm font-semibold text-text-primary truncate">{{ exp.name }}</p>
               <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="text-[10px] sm:text-xs text-text-muted">{{ getCategory(exp.categoryId)?.name || '' }}</span>
+                <span class="text-xs text-text-muted">{{ getCategory(exp.categoryId)?.name || '' }}</span>
                 <span v-for="tag in (exp.tags || []).slice(0, 3)" :key="tag" class="hidden sm:inline-flex items-center px-1.5 py-0 rounded text-[9px] font-medium bg-surface-hover text-text-muted border border-border">#{{ tag }}</span>
               </div>
             </div>
           </template>
           <template #meta>
-            <span v-if="viewMode === 'compact'" class="text-[10px] text-text-muted shrink-0 w-[86px] text-right tabular-nums">{{ formatExpenseDate(exp) }}</span>
-            <div v-else-if="viewMode === 'default'" class="text-right shrink-0 w-[104px] sm:w-[120px]">
-              <p class="text-xs sm:text-sm font-medium text-text-primary">
-                <span class="hidden sm:inline tabular-nums">{{ formatExpenseDate(exp) }}</span>
-                <span class="sm:hidden text-[10px] text-text-muted tabular-nums">{{ formatExpenseDate(exp) }}</span>
-              </p>
-            </div>
+            <span v-if="viewMode === 'compact'" class="text-[11px] text-text-muted shrink-0 w-[92px] text-right tabular-nums">{{ formatExpenseDate(exp) }}</span>
+
+
           </template>
           <template #value>
             <p v-if="viewMode === 'compact'" class="text-xs font-semibold text-text-primary shrink-0 w-[108px] text-right tabular-nums">{{ formatAmount(exp.amount, exp.currencyId) }}</p>
             <div v-else-if="viewMode === 'default'" class="text-right shrink-0 w-[112px] sm:w-[132px]">
-              <p class="text-xs sm:text-sm font-semibold text-text-primary tabular-nums">{{ formatAmount(exp.amount, exp.currencyId) }}</p>
+              <p class="text-[15px] font-semibold text-text-primary tabular-nums tracking-[-0.01em]">{{ formatAmount(exp.amount, exp.currencyId) }}</p>
               <div v-if="getConvertedAmounts(exp.amount, exp.currencyId).length > 0" class="mt-0.5 space-y-0">
                 <p v-for="cv in getConvertedAmounts(exp.amount, exp.currencyId)" :key="cv.currency.id"
                   class="text-[10px] text-text-muted tabular-nums">≈ {{ fmtInCurrency(cv.amount, cv.currency) }}</p>
@@ -755,12 +812,10 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
           </template>
           <template #expanded>
             <div class="flex items-start gap-3 mb-3">
-              <div v-if="selectionMode" class="shrink-0 mt-1" @click.stop="toggleSelect(exp.id)">
-                <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
-                  :class="selectedIds.has(exp.id) ? 'bg-primary border-primary text-white' : 'border-border hover:border-primary'"
-                ><svg v-if="selectedIds.has(exp.id)" width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6L5 9L10 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+              <div v-if="selectionMode" class="shrink-0 mt-1" @click.stop>
+                <AppCheckbox :model-value="selectedIds.has(exp.id)" :aria-label="t('select')" @update:model-value="toggleSelect(exp.id)" />
               </div>
-              <div class="w-12 h-12 rounded-lg bg-primary-light flex items-center justify-center text-lg font-bold text-primary shrink-0 overflow-hidden">
+              <div class="w-11 h-11 rounded-xl flex items-center justify-center text-base font-semibold shrink-0 overflow-hidden" :class="getExpenseIcon(exp) ? 'bg-surface-hover' : avatarTone(exp.name)">
                 <IconDisplay v-if="getExpenseIcon(exp)" :icon="getExpenseIcon(exp)" :size="22" />
                 <span v-else>{{ exp.name.charAt(0).toUpperCase() }}</span>
               </div>
@@ -774,7 +829,7 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
             </div>
             <div class="flex items-end justify-between">
               <div>
-                <p class="text-lg font-bold text-text-primary">{{ formatAmount(exp.amount, exp.currencyId) }}</p>
+                <p class="text-lg font-semibold text-text-primary">{{ formatAmount(exp.amount, exp.currencyId) }}</p>
                 <div v-if="getConvertedAmounts(exp.amount, exp.currencyId).length > 0" class="mt-0.5 space-y-0">
                   <p v-for="cv in getConvertedAmounts(exp.amount, exp.currencyId)" :key="cv.currency.id"
                     class="text-[10px] text-text-muted tabular-nums">≈ {{ fmtInCurrency(cv.amount, cv.currency) }}</p>
@@ -794,24 +849,24 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
           </template>
         </UniversalListRow>
       </div>
+    </template>
     </div>
 
     <!-- Pagination -->
     <div v-if="totalPages > 1" class="flex items-center justify-center gap-1 mt-4">
-      <button @click="goPage(currentPage - 1)" :disabled="currentPage <= 1"
-        class="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-hover disabled:opacity-30 transition-colors">
+      <button :class="button({ size: 'icon' })" :aria-label="t('previous_page')" :disabled="currentPage <= 1" @click="goPage(currentPage - 1)">
         <ChevronLeft :size="16" />
       </button>
       <template v-for="p in totalPages" :key="p">
-        <button v-if="p === 1 || p === totalPages || (p >= currentPage - 1 && p <= currentPage + 1)"
+        <button
+          v-if="p === 1 || p === totalPages || (p >= currentPage - 1 && p <= currentPage + 1)"
+          :class="button({ intent: p === currentPage ? 'primary' : 'ghost', size: 'icon', class: 'tabular-nums' })"
+          :aria-current="p === currentPage ? 'page' : undefined"
           @click="goPage(p)"
-          class="min-w-8 h-8 rounded-lg text-xs font-medium transition-colors"
-          :class="p === currentPage ? 'bg-primary text-white' : 'text-text-secondary hover:bg-surface-hover'"
         >{{ p }}</button>
-        <span v-else-if="p === currentPage - 2 || p === currentPage + 2" class="text-xs text-text-muted">…</span>
+        <span v-else-if="p === currentPage - 2 || p === currentPage + 2" class="px-1 text-xs text-text-muted">…</span>
       </template>
-      <button @click="goPage(currentPage + 1)" :disabled="currentPage >= totalPages"
-        class="p-1.5 rounded-lg border border-border text-text-muted hover:bg-surface-hover disabled:opacity-30 transition-colors">
+      <button :class="button({ size: 'icon' })" :aria-label="t('next_page')" :disabled="currentPage >= totalPages" @click="goPage(currentPage + 1)">
         <ChevronRight :size="16" />
       </button>
     </div>
@@ -833,45 +888,21 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
       @imported="onAiImported"
     />
 
-    <!-- Delete Confirmation -->
-    <Teleport to="body">
-      <Transition name="app-modal">
-        <div v-if="deleteConfirmId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="cancelDelete" />
-          <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
-            <div class="flex items-center gap-3 mb-3 sm:mb-4">
-              <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0"><AlertTriangle :size="18" class="text-red-500" /></div>
-              <h3 :class="ui.sectionTitle()">{{ t('delete') }}</h3>
-            </div>
-            <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('confirm_delete_expense') }}</p>
-            <div class="flex justify-end gap-2 sm:gap-3">
-              <button @click="cancelDelete" class="px-3 sm:px-4 py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover">{{ t('cancel') }}</button>
-              <button @click="confirmDelete" class="px-3 sm:px-4 py-2 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-medium hover:bg-red-700">{{ t('delete') }}</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <ConfirmDialog
+      :show="Boolean(deleteConfirmId)"
+      :title="t('delete')"
+      :message="t('confirm_delete_expense')"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
 
-    <!-- Batch Delete Confirmation -->
-    <Teleport to="body">
-      <Transition name="app-modal">
-        <div v-if="batchDeleteConfirmIds.length > 0" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="batchDeleteConfirmIds = []" />
-          <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
-            <div class="flex items-center gap-3 mb-3 sm:mb-4">
-              <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0"><AlertTriangle :size="18" class="text-red-500" /></div>
-              <h3 :class="ui.sectionTitle()">{{ t('batch_delete') }}</h3>
-            </div>
-            <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('batch_confirm_delete_expenses').replace('{count}', String(batchDeleteConfirmIds.length)) }}</p>
-            <div class="flex justify-end gap-2 sm:gap-3">
-              <button @click="batchDeleteConfirmIds = []" class="px-3 sm:px-4 py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover">{{ t('cancel') }}</button>
-              <button @click="confirmBatchDelete" class="px-3 sm:px-4 py-2 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-medium hover:bg-red-700">{{ t('delete') }}</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <ConfirmDialog
+      :show="batchDeleteConfirmIds.length > 0"
+      :title="t('batch_delete')"
+      :message="t('batch_confirm_delete_expenses', { count: batchDeleteConfirmIds.length })"
+      @confirm="confirmBatchDelete"
+      @cancel="batchDeleteConfirmIds = []"
+    />
 
     <ContextActionMenu
       v-model:open="contextMenuOpen"

@@ -10,7 +10,7 @@ export type ZodFieldMeta = Record<string, ZodFieldKind | undefined>;
 /**
  * Convert a Zod v4 issue to a translation key (caller applies `t()`).
  */
-export function zodIssueToMessageKey(issue: ZodIssue, meta: ZodFieldMeta, t: (key: string) => string): string {
+export function zodIssueToMessageKey(issue: ZodIssue, meta: ZodFieldMeta, t: (key: string, params?: Record<string, unknown>) => string): string {
   const field = issue.path[0];
   const fieldKey = typeof field === "string" ? field : undefined;
   const kind = fieldKey ? meta[fieldKey] : undefined;
@@ -29,7 +29,7 @@ export function zodIssueToMessageKey(issue: ZodIssue, meta: ZodFieldMeta, t: (ke
   if (code === "too_small") {
     if (kind === "number") {
       const min = (issue as { minimum?: unknown }).minimum;
-      return t("field_min_value").replace("{min}", String(min ?? 1));
+      return t("field_min_value", { min: min ?? 1 });
     }
     return t("field_required");
   }

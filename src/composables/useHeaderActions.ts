@@ -4,6 +4,8 @@ export interface HeaderAction {
   id: string;
   icon: Component;
   title: string;
+  /** Short button text for labelled (primary / accent) actions; defaults to `title`. */
+  label?: string;
   onClick: () => void;
   style?: "primary" | "neutral" | "accent" | "success" | "warning" | "danger";
 }

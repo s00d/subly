@@ -31,8 +31,8 @@ function alertIcon(type: InAppAlert["type"]) {
 
 function alertLabel(alert: InAppAlert): string {
   if (alert.type === "due_today") return t("due_today_alert");
-  if (alert.type === "upcoming") return t("in_days_alert").replace("{days}", String(alert.daysUntil));
-  return t("overdue_by_alert").replace("{days}", String(Math.abs(alert.daysUntil)));
+  if (alert.type === "upcoming") return t("in_days_alert", { days: alert.daysUntil }, alert.daysUntil);
+  return t("overdue_by_alert", { days: Math.abs(alert.daysUntil) }, Math.abs(alert.daysUntil));
 }
 
 function alertText(alert: InAppAlert): string {
@@ -50,18 +50,21 @@ async function copyAlert(alert: InAppAlert) {
 
 const alertsTv = tv({
   slots: {
-    root: "space-y-2 mb-4",
-    headerRow: "flex items-center justify-between mb-1",
-    headerLabel: "text-xs font-medium text-text-muted uppercase tracking-wider",
-    dismissAllBtn: "text-xs text-text-muted hover:text-text-primary transition-colors",
-    alertRow: "flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3 py-2 rounded-lg border text-xs sm:text-sm",
-    actionBtn: "p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0",
+    root: "rounded-xl border border-border bg-surface shadow-sm overflow-hidden",
+    headerRow: "flex items-center justify-between px-4 pt-3 pb-1.5",
+    headerLabel: "text-xs font-semibold text-text-secondary",
+    dismissAllBtn: "text-xs font-medium text-text-muted hover:text-text-primary transition-colors",
+    alertRow:
+      "group flex items-center gap-3 px-4 py-2 text-[13px] text-text-primary border-t border-border first:border-t-0",
+    alertIcon: "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
+    actionBtn:
+      "p-1 rounded-md text-text-muted opacity-0 group-hover:opacity-100 hover:text-text-primary hover:bg-surface-hover transition shrink-0",
   },
   variants: {
     alertType: {
-      due_today: { alertRow: "text-orange-600 bg-orange-50 border-orange-200 dark:bg-orange-900/20 dark:border-orange-800" },
-      upcoming: { alertRow: "text-blue-600 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800" },
-      overdue: { alertRow: "text-red-600 bg-red-50 border-red-200 dark:bg-red-900/20 dark:border-red-800" },
+      due_today: { alertIcon: "bg-warning/14 text-warning" },
+      upcoming: { alertIcon: "bg-primary/12 text-primary" },
+      overdue: { alertIcon: "bg-danger/12 text-danger" },
     },
   },
 });
@@ -92,22 +95,20 @@ const slots = alertsTv();
       leave-from-class="opacity-100"
       leave-to-class="opacity-0 -translate-x-4"
       tag="div"
-      class="space-y-1.5"
     >
       <div
         v-for="alert in alerts"
         :key="alert.id"
         :class="alertsTv({ alertType: alert.type }).alertRow()"
       >
-        <component :is="alertIcon(alert.type)" :size="14" class="shrink-0 sm:[&]:w-4 sm:[&]:h-4" />
-        <div class="flex-1 min-w-0">
-          <span class="font-medium truncate block sm:inline">{{ alert.subscriptionName }}</span>
-          <span class="hidden sm:inline mx-1.5 opacity-50">·</span>
-          <span class="opacity-80 block sm:inline text-[10px] sm:text-sm">{{ alertLabel(alert) }}</span>
-          <span class="mx-1 sm:mx-1.5 opacity-50 hidden sm:inline">·</span>
-          <span class="font-semibold sm:inline hidden">{{ fmt(alert.price, alert.currencyId) }}</span>
+        <span :class="alertsTv({ alertType: alert.type }).alertIcon()">
+          <component :is="alertIcon(alert.type)" :size="13" />
+        </span>
+        <div class="flex-1 min-w-0 sm:flex sm:items-baseline sm:gap-2">
+          <p class="font-medium truncate">{{ alert.subscriptionName }}</p>
+          <p class="text-xs sm:text-[13px] text-text-muted truncate">{{ alertLabel(alert) }}</p>
         </div>
-        <span class="font-semibold sm:hidden text-[11px] shrink-0">{{ fmt(alert.price, alert.currencyId) }}</span>
+        <span class="font-semibold tabular-nums shrink-0">{{ fmt(alert.price, alert.currencyId) }}</span>
         <button @click="copyAlert(alert)" :class="slots.actionBtn()" :title="t('copy')">
           <Copy :size="13" />
         </button>

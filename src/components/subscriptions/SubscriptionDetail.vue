@@ -8,7 +8,7 @@ import Modal from "@/components/ui/Modal.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import PaymentHistory from "@/components/subscriptions/PaymentHistory.vue";
-import { Pencil, Copy, RefreshCw, Trash2, Calendar, CreditCard, Tag, User, Bell, BellOff, Link, FileText, Clock, AlertTriangle, Power, Star, Hash, CircleDollarSign, KeyRound, Eye, EyeOff } from "@lucide/vue";
+import { Pencil, Copy, Trash2, Calendar, CreditCard, Tag, User, Bell, BellOff, Link, FileText, Clock, AlertTriangle, Power, Star, Hash, CircleDollarSign, KeyRound, Eye, EyeOff } from "@lucide/vue";
 import {
   subscriptionCredentialsGet,
   subscriptionTotpCurrent,
@@ -16,7 +16,7 @@ import {
 } from "@/services/subscriptionCredentialsClient";
 import { useClipboard } from "@/composables/useClipboard";
 import { useToast } from "@/composables/useToast";
-import { ui, statValue } from "@/lib/tv";
+import { ui, statValue, avatarTone, button } from "@/lib/tv";
 import {
   convertAmountToCurrency,
   moneyGt,
@@ -311,7 +311,7 @@ onUnmounted(() => clearOtpPoll());
     <div v-if="sub" class="space-y-4 sm:space-y-5">
       <!-- Header: Logo + Name + Price -->
       <div class="flex items-center gap-2.5 sm:gap-4">
-        <div class="w-11 h-11 sm:w-14 sm:h-14 rounded-xl bg-primary-light flex items-center justify-center text-base sm:text-lg font-bold text-primary shrink-0 overflow-hidden">
+        <div class="w-11 h-11 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center text-base sm:text-xl font-semibold shrink-0 overflow-hidden" :class="sub.logo ? 'bg-surface ring-1 ring-border' : avatarTone(sub.name)">
           <img v-if="sub.logo" :src="sub.logo" class="w-full h-full object-contain" />
           <span v-else>{{ sub.name.charAt(0).toUpperCase() }}</span>
         </div>
@@ -319,7 +319,7 @@ onUnmounted(() => clearOtpPoll());
           <h3 :class="[ui.sectionTitle(), 'truncate']">{{ sub.name }}</h3>
           <p class="text-[10px] sm:text-xs text-text-muted">
             {{ billingCycleText(sub.cycle, sub.frequency) }}
-            <span v-if="!sub.autoRenew" class="ml-1 text-orange-500">({{ t('manual_renewal') }})</span>
+            <span v-if="!sub.autoRenew" class="ml-1 text-warning">({{ t('manual_renewal') }})</span>
           </p>
         </div>
         <div class="text-right shrink-0">
@@ -344,23 +344,23 @@ onUnmounted(() => clearOtpPoll());
           @click="emit('toggleFavorite', sub.id)"
           class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer border"
           :class="sub.favorite
-            ? 'bg-surface-hover border-border text-text-primary'
+ ? 'bg-surface-hover border-border text-text-primary'
             : 'bg-surface-hover border-border text-text-secondary hover:text-text-primary hover:bg-surface-secondary'"
           :title="sub.favorite ? t('remove_from_favorites') : t('add_to_favorites')"
         >
-          <Star :size="12" :fill="sub.favorite ? 'currentColor' : 'none'" class="text-amber-500" />
+          <Star :size="12" :fill="sub.favorite ? 'currentColor' : 'none'" class="text-warning" />
           {{ t('favorite') }}
         </button>
         <span v-if="sub.inactive" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">
           <Power :size="12" /> {{ t('inactive') }}
         </span>
-        <span v-if="overdue" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+        <span v-if="overdue" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-100 text-danger dark:bg-red-900/30 dark:text-danger">
           <AlertTriangle :size="12" /> {{ t('overdue') }}
         </span>
         <span v-if="!sub.inactive"
           class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-surface-hover text-text-primary border"
           :class="daysLeft <= 3
-            ? 'border-red-200 dark:border-red-800'
+ ? 'border-red-200 dark:border-red-800'
             : daysLeft <= 7
               ? 'border-orange-200 dark:border-orange-800'
               : 'border-border'"
@@ -368,12 +368,14 @@ onUnmounted(() => clearOtpPoll());
           <Clock
             :size="12"
             :class="daysLeft <= 3
-              ? 'text-red-500 dark:text-red-400'
+ ? 'text-danger dark:text-danger'
               : daysLeft <= 7
-                ? 'text-orange-500 dark:text-orange-400'
+                ? 'text-warning dark:text-warning'
                 : 'text-primary'"
           />
-          {{ daysLeft }}{{ t('days_short') }} {{ t('next_payment').toLowerCase() }}
+          <template v-if="daysLeft < 0">{{ t('overdue_by_alert', { days: -daysLeft }, -daysLeft) }}</template>
+          <template v-else-if="daysLeft === 0">{{ t('due_today_alert') }}</template>
+          <template v-else>{{ t('in_days_alert', { days: daysLeft }, daysLeft) }}</template>
         </span>
       </div>
 
@@ -397,9 +399,8 @@ onUnmounted(() => clearOtpPoll());
             <KeyRound :size="15" class="text-primary shrink-0" />
             <span class="text-xs font-semibold text-text-primary uppercase tracking-wide">{{ t("credentials_section") }}</span>
           </div>
-          <button
+          <button :class="button({ size: 'sm', class: 'shrink-0' })"
             type="button"
-            class="shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover"
             @click="emit('edit', sub)"
           >
             <Pencil :size="12" />
@@ -410,18 +411,16 @@ onUnmounted(() => clearOtpPoll());
           <!-- Login row: Reveal button toggles plaintext display; Copy pulls from in-memory cache (or fetches it once). -->
           <div v-if="meta?.hasLogin" class="space-y-1">
             <div class="flex flex-wrap gap-2">
-              <button
+              <button :class="button({ size: 'sm' })"
                 type="button"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
                 :disabled="revealLoading"
                 @click="toggleLogin"
               >
                 <component :is="loginVisible ? EyeOff : Eye" :size="12" />
                 {{ loginVisible ? t("credentials_hide") : t("credentials_show_login") }}
               </button>
-              <button
+              <button :class="button({ size: 'sm' })"
                 type="button"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
                 :disabled="revealLoading"
                 @click="copyLoginField"
               >
@@ -436,18 +435,16 @@ onUnmounted(() => clearOtpPoll());
 
           <div v-if="meta?.hasPassword" class="space-y-1">
             <div class="flex flex-wrap gap-2">
-              <button
+              <button :class="button({ size: 'sm' })"
                 type="button"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
                 :disabled="revealLoading"
                 @click="togglePassword"
               >
                 <component :is="passwordVisible ? EyeOff : Eye" :size="12" />
                 {{ passwordVisible ? t("credentials_hide") : t("credentials_show_password") }}
               </button>
-              <button
+              <button :class="button({ size: 'sm' })"
                 type="button"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
                 :disabled="revealLoading"
                 @click="copyPasswordField"
               >
@@ -463,9 +460,8 @@ onUnmounted(() => clearOtpPoll());
           <!-- TOTP row: clicking starts the 2.5 s polling loop; clicking again stops it. -->
           <div v-if="meta?.hasTotp" class="space-y-1">
             <div class="flex flex-wrap gap-2">
-              <button
+              <button :class="button({ size: 'sm' })"
                 type="button"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
                 :disabled="revealLoading"
                 @click="toggleOtp"
               >
@@ -477,9 +473,8 @@ onUnmounted(() => clearOtpPoll());
               <p class="text-[10px] text-text-muted mb-1">{{ t("current_otp") }}</p>
               <p class="font-mono text-lg tracking-widest text-center">{{ totpCurrent.code }}</p>
               <p class="text-[11px] text-center text-text-muted mt-1">{{ t("otp_expires_in", { s: otpSecondsLeft }) }}</p>
-              <button
+              <button :class="button({ intent: 'ghost', size: 'sm', class: 'mt-2 w-full bg-surface-hover' })"
                 type="button"
-                class="mt-2 w-full inline-flex items-center justify-center gap-1 px-2 py-1.5 rounded-md bg-surface-hover text-xs font-medium"
                 @click="copyOtpField"
               >
                 <Copy :size="12" /> {{ t("copy_otp") }}
@@ -498,7 +493,7 @@ onUnmounted(() => clearOtpPoll());
             <Calendar :size="13" class="text-text-muted" />
             <span class="text-[10px] uppercase tracking-wide font-medium text-text-muted">{{ t('next_payment') }}</span>
           </div>
-          <p class="text-sm font-medium text-text-primary" :class="{ 'text-red-500': overdue }">{{ formatDate(sub.nextPayment) }}</p>
+          <p class="text-sm font-medium text-text-primary" :class="{ 'text-danger': overdue }">{{ formatDate(sub.nextPayment) }}</p>
         </div>
 
         <!-- Start Date -->
@@ -589,7 +584,7 @@ onUnmounted(() => clearOtpPoll());
 
       <!-- Cancellation -->
       <div v-if="sub.cancellationDate" class="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3 border border-orange-200 dark:border-orange-800">
-        <p class="text-xs font-medium text-orange-600 dark:text-orange-400">
+        <p class="text-xs font-medium text-warning dark:text-warning">
           {{ t('cancellation_notification') }}: {{ formatDateShort(sub.cancellationDate) }}
         </p>
       </div>
@@ -597,54 +592,34 @@ onUnmounted(() => clearOtpPoll());
 
     <template #footer>
       <div class="w-full flex items-center gap-1.5">
-        <div class="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-          <Tooltip v-if="sub && !sub.inactive" :text="t('record_payment')" position="top">
-            <button
-              @click="emit('recordPayment', sub!.id)"
-              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
-            >
-              <CircleDollarSign :size="16" />
-            </button>
-          </Tooltip>
-          <Tooltip v-if="sub" :text="t('renew')" position="top">
-            <button
-              @click="emit('renew', sub!.id)"
-              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
-            >
-              <RefreshCw :size="16" />
-            </button>
-          </Tooltip>
-          <Tooltip v-if="sub" :text="t('clone')" position="top">
-            <button
-              @click="emit('clone', sub!.id)"
-              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
-            >
-              <Copy :size="16" />
-            </button>
-          </Tooltip>
-          <Tooltip v-if="sub" :text="t('edit_subscription')" position="top">
-            <button
-              @click="emit('edit', sub!)"
-              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
-            >
-              <Pencil :size="16" />
-            </button>
-          </Tooltip>
-          <Tooltip v-if="sub" :text="t('delete')" position="top">
-            <button
-              @click="emit('delete', sub!.id)"
-              class="w-9 h-9 rounded-xl border border-border text-text-secondary bg-surface-hover hover:text-text-primary hover:bg-surface-secondary transition-colors inline-flex items-center justify-center shrink-0"
-            >
-              <Trash2 :size="16" />
-            </button>
-          </Tooltip>
-        </div>
-
-        <div class="flex-1" />
+        <!-- Main actions labelled; secondary ones as icon buttons with tooltips -->
         <button
-          @click="emit('close')"
-          class="h-9 px-3 sm:px-4 rounded-xl border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors shrink-0"
-        >{{ t('cancel') }}</button>
+          v-if="sub && !sub.inactive"
+          :class="button({ intent: 'primary' })"
+          @click="emit('recordPayment', sub!.id)"
+        >
+          <CircleDollarSign :size="15" /> {{ t('record_payment') }}
+        </button>
+        <button v-if="sub" :class="button()" @click="emit('edit', sub!)">
+          <Pencil :size="14" /> {{ t('edit') }}
+        </button>
+        <Tooltip v-if="sub" :text="t('clone')" position="top">
+          <button :class="button({ intent: 'ghost', size: 'icon' })" :aria-label="t('clone')" @click="emit('clone', sub!.id)">
+            <Copy :size="15" />
+          </button>
+        </Tooltip>
+        <Tooltip v-if="sub" :text="t('delete')" position="top">
+          <button
+            :class="button({ intent: 'ghost', size: 'icon' })"
+            class="hover:text-danger"
+            :aria-label="t('delete')"
+            @click="emit('delete', sub!.id)"
+          >
+            <Trash2 :size="15" />
+          </button>
+        </Tooltip>
+        <div class="flex-1" />
+        <button :class="button({ intent: 'ghost' })" @click="emit('close')">{{ t('close') }}</button>
       </div>
     </template>
   </Modal>

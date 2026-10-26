@@ -1,18 +1,15 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
-import { parseExpense, parseSubscription, parseSubscriptionListItem, type PaymentRecord, type Subscription, type SubscriptionListItem } from "@/schemas/appData";
+import { parseSubscription, parseSubscriptionListItem, type Subscription, type SubscriptionListItem } from "@/schemas/appData";
 import type { SubscriptionFilter } from "@/services/subscriptionsClient";
 import {
   deleteSubscription,
   deleteSubscriptionsBatch,
-  getNextCycleDate,
-  insertPaymentRecord,
   insertSubscription,
   listSubscriptionsFiltered,
-  listSubscriptionsPage,
+  recordSubscriptionPayment,
   updateSubscription,
 } from "@/services/subscriptionsClient";
-import { insertExpense } from "@/services/expensesClient";
 
 export const useSubscriptionsStore = defineStore("subscriptions", () => {
   function requireSubscription(id: string): SubscriptionListItem {
@@ -29,11 +26,15 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
   const initialListLoaded = ref(false);
   const currentFilter = ref<SubscriptionFilter>({});
 
+  /**
+   * `filter` replaces the active filter (`{}` = full list, as Calendar/Expenses need);
+   * omitted = reload with the current one (after clone / record payment / data-changed).
+   */
   async function loadBrief(filter?: SubscriptionFilter) {
-    if (filter) currentFilter.value = filter;
+    if (filter !== undefined) currentFilter.value = filter;
     loading.value = true;
     try {
-      const rows = filter ? await listSubscriptionsFiltered(currentFilter.value) : await listSubscriptionsPage();
+      const rows = await listSubscriptionsFiltered(currentFilter.value);
       items.value = rows.map((raw) => parseSubscriptionListItem(raw));
     } finally {
       loading.value = false;
@@ -75,38 +76,11 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
   }
 
   async function recordPayment(id: string) {
-    const sub = requireSubscription(id);
-    const record: PaymentRecord = {
-      id: crypto.randomUUID(),
-      date: new Date().toISOString().split("T")[0],
-      amount: sub.price,
-      currencyId: sub.currencyId,
-      note: "",
-    };
-    const nextPayment = await getNextCycleDate(sub.nextPayment, sub.cycle, sub.frequency);
-    const updated: Subscription = {
-      ...sub,
-      nextPayment,
-      paymentHistory: [record, ...(sub.paymentHistory || [])],
-    };
-    await updateSubscription(updated);
-    await insertPaymentRecord(sub.id, record);
-    const expense = parseExpense({
-      id: crypto.randomUUID(),
-      name: sub.name,
-      amount: record.amount,
-      currencyId: record.currencyId,
-      date: record.date,
-      categoryId: sub.categoryId,
-      paymentMethodId: sub.paymentMethodId,
-      payerUserId: sub.payerUserId,
-      tags: [...sub.tags],
-      notes: record.note,
-      subscriptionId: sub.id,
-      paymentRecordId: record.id,
-    });
-    await insertExpense(expense);
-    await updateOne(updated);
+    const updated = parseSubscription(await recordSubscriptionPayment(id));
+    const idx = items.value.findIndex((s) => s.id === id);
+    if (idx >= 0) items.value[idx] = { ...items.value[idx], ...updated };
+    // List-only fields (daysLeft, cycleProgress, urgency) are backend-computed: refresh the row set.
+    await loadBrief();
   }
 
   async function batchDelete(ids: string[]) {

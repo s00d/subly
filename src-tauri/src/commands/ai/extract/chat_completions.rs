@@ -135,6 +135,7 @@ pub async fn call_text_chat(
 }
 
 /// Multimodal chat completion (image + instruction).
+#[allow(clippy::too_many_arguments)]
 pub async fn call_vision_chat(
     active: &ActiveProvider,
     system: &str,

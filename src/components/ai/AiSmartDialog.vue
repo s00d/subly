@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { localYmd } from "@/composables/useLocaleFormat";
 import { computed, onBeforeUnmount, reactive, ref, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { storeToRefs } from "pinia";
@@ -15,7 +16,9 @@ import {
   X,
   Send,
   ClipboardPaste,
+  ArrowLeft,
 } from "@lucide/vue";
+import { button, ui } from "@/lib/tv";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import { platform } from "@tauri-apps/plugin-os";
@@ -447,11 +450,13 @@ function toggleSubscriptionRow(idx: number) {
   if (s) s.selected = !s.selected;
 }
 
-function removeExpenseRow(idx: number) {
-  expenseRows.splice(idx, 1);
-}
-function removeSubscriptionRow(idx: number) {
-  subscriptionRows.splice(idx, 1);
+/** Back to the input step; text and attached file are kept so the user can tweak and resubmit. */
+function backToInput() {
+  result.value = null;
+  expenseRows.splice(0, expenseRows.length);
+  subscriptionRows.splice(0, subscriptionRows.length);
+  progressText.value = "";
+  progressPercent.value = null;
 }
 
 function selectAll() {
@@ -589,7 +594,7 @@ async function confirmImport() {
         }
       }
     } else if (result.value?.surface === "subscription") {
-      const today = new Date().toISOString().split("T")[0];
+      const today = localYmd();
       const householdId = metaRefs.household.value?.[0]?.id ?? "";
       for (const state of subscriptionRows) {
         if (!state.selected) continue;
@@ -681,7 +686,7 @@ function onTextareaKeydown(ev: KeyboardEvent) {
             :placeholder="placeholderText"
             :disabled="isParsing"
             rows="3"
-            class="w-full px-3 py-2.5 rounded-lg border border-border bg-surface text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 resize-y min-h-[96px] max-h-[240px]"
+            :class="ui.field({ class: 'py-2.5 resize-y min-h-[96px] max-h-[240px]' })"
             @keydown="onTextareaKeydown"
             @paste="onTextareaPaste"
           />
@@ -713,7 +718,7 @@ function onTextareaKeydown(ev: KeyboardEvent) {
             :disabled="isParsing"
             class="w-full flex flex-col items-center justify-center gap-2 px-4 rounded-xl transition-colors text-center disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40"
             :class="
-              dragDropFromFilesystem
+ dragDropFromFilesystem
                 ? isDragOver
                   ? 'py-6 sm:py-8 border-2 border-dashed border-primary bg-primary-light/50 text-primary'
                   : 'py-6 sm:py-8 border-2 border-dashed border-border bg-surface-secondary/40 hover:border-primary hover:bg-primary-light/30 text-text-secondary hover:text-primary'
@@ -756,7 +761,7 @@ function onTextareaKeydown(ev: KeyboardEvent) {
               <button
                 type="button"
                 :disabled="isParsing"
-                class="absolute top-2 right-2 inline-flex items-center justify-center w-9 h-9 rounded-full bg-slate-900/70 text-white hover:bg-slate-900/90 disabled:opacity-50 backdrop-blur-sm"
+                :class="button({ intent: 'secondary', size: 'icon', class: 'absolute top-2 right-2 h-9 w-9 bg-surface/85 backdrop-blur-sm' })"
                 :aria-label="t('ai_smart_clear_file')"
                 @click="clearFile"
               >
@@ -792,11 +797,11 @@ function onTextareaKeydown(ev: KeyboardEvent) {
               <button
                 type="button"
                 :disabled="isParsing"
-                class="shrink-0 inline-flex items-center justify-center w-10 h-10 rounded-full text-text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50"
+                :class="button({ intent: 'ghost', size: 'icon', class: 'shrink-0 h-9 w-9 text-text-muted hover:text-danger hover:bg-danger/12' })"
                 :aria-label="t('ai_smart_clear_file')"
                 @click="clearFile"
               >
-                <X :size="18" />
+                <X :size="16" />
               </button>
             </div>
 
@@ -831,7 +836,7 @@ function onTextareaKeydown(ev: KeyboardEvent) {
             <button
               v-if="!cancelRequested"
               type="button"
-              class="text-[10px] text-text-muted hover:text-red-500 min-h-[32px] px-2 -mr-2"
+              :class="button({ intent: 'ghost', size: 'sm', class: 'h-8 -mr-2 hover:text-danger' })"
               @click="requestCancel"
             >
               {{ t("ai_import_cancel") }}
@@ -842,7 +847,7 @@ function onTextareaKeydown(ev: KeyboardEvent) {
         <!-- Drag overlay (desktop only — phones use tap-to-upload) -->
         <div
           v-if="dragDropFromFilesystem && isDragOver && !isParsing"
-          class="pointer-events-none absolute inset-0 -m-2 rounded-2xl border-2 border-dashed border-primary bg-primary-light/70 backdrop-blur-sm flex items-center justify-center"
+          class="pointer-events-none absolute inset-0 -m-2 rounded-xl border-2 border-dashed border-primary bg-primary-light/70 backdrop-blur-sm flex items-center justify-center"
         >
           <div class="flex flex-col items-center gap-2 text-primary">
             <UploadCloud :size="48" />
@@ -898,7 +903,7 @@ function onTextareaKeydown(ev: KeyboardEvent) {
                 result.surface === 'expense' &&
                 result.stats.matchedByHeuristic > 0
               "
-              class="text-emerald-600 dark:text-emerald-400"
+              class="text-success"
             >
               {{ result.stats.matchedByHeuristic }}
             </span>
@@ -909,12 +914,12 @@ function onTextareaKeydown(ev: KeyboardEvent) {
               "
               >+</span
             >
-            <span class="text-blue-600 dark:text-blue-400">
+            <span class="text-info">
               {{ result.stats.matchedByLlm }}
             </span>
             <span v-if="result.stats.failed > 0">
               ·
-              <span class="text-amber-600 dark:text-amber-400">
+              <span class="text-warning">
                 {{ result.stats.failed }} {{ t("ai_import_failed_short") }}
               </span>
             </span>
@@ -968,7 +973,6 @@ function onTextareaKeydown(ev: KeyboardEvent) {
           :payment-methods="metaRefs.paymentMethods.value ?? []"
           @update:row="onExpenseRowUpdate"
           @toggle-selection="toggleExpenseRow"
-          @remove="removeExpenseRow"
           @select-all="selectAll"
           @deselect-all="deselectAll"
         />
@@ -980,7 +984,6 @@ function onTextareaKeydown(ev: KeyboardEvent) {
           :payment-methods="metaRefs.paymentMethods.value ?? []"
           @update:row="onSubscriptionRowUpdate"
           @toggle-selection="toggleSubscriptionRow"
-          @remove="removeSubscriptionRow"
           @select-all="selectAll"
           @deselect-all="deselectAll"
         />
@@ -989,9 +992,19 @@ function onTextareaKeydown(ev: KeyboardEvent) {
 
     <template #footer>
       <button
+        v-if="result"
+        type="button"
+        :disabled="isImporting"
+        :class="button({ intent: 'ghost', class: 'mr-auto' })"
+        @click="backToInput"
+      >
+        <ArrowLeft :size="14" />
+        {{ t("back") }}
+      </button>
+      <button
         type="button"
         :disabled="isParsing || isImporting"
-        class="px-3 sm:px-4 py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
+        :class="button({ intent: 'ghost' })"
         @click="emit('close')"
       >
         {{ t("cancel") }}
@@ -1000,7 +1013,7 @@ function onTextareaKeydown(ev: KeyboardEvent) {
         v-if="!result"
         type="button"
         :disabled="!canSubmit"
-        class="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg bg-primary text-white text-xs sm:text-sm font-medium hover:bg-primary-hover disabled:opacity-50"
+        :class="button({ intent: 'primary' })"
         @click="submit"
       >
         <Loader2 v-if="isParsing" :size="14" class="animate-spin" />
@@ -1011,7 +1024,7 @@ function onTextareaKeydown(ev: KeyboardEvent) {
         v-else
         type="button"
         :disabled="isImporting || selectedCount === 0"
-        class="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg bg-primary text-white text-xs sm:text-sm font-medium hover:bg-primary-hover disabled:opacity-50"
+        :class="button({ intent: 'primary' })"
         @click="confirmImport"
       >
         <Loader2 v-if="isImporting" :size="14" class="animate-spin" />

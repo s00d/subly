@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import UiViewSwitch from "@/components/ui/UiViewSwitch.vue";
+import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
 import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useHeaderActions } from "@/composables/useHeaderActions";
@@ -20,18 +22,17 @@ import Toast from "@/components/ui/Toast.vue";
 import { type Subscription, type Expense, type Settings, type Category, type PaymentMethod, type Currency, type HouseholdMember, type Tag } from "@/schemas/appData";
 import { deleteExpense } from "@/services/expensesClient";
 import { storeToRefs } from "pinia";
-import { AlertTriangle, LayoutList, LayoutGrid, Rows3, CreditCard, Wallet, Calendar } from "@lucide/vue";
+import { AlertTriangle, CreditCard, Wallet, Calendar } from "@lucide/vue";
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useSubscriptionsStore } from "@/stores/subscriptionsStore";
 import { useCalendarStore } from "@/stores/calendarStore";
 import { useNowStore } from "@/stores/nowStore";
 import { ui } from "@/lib/tv";
 import { formatErrorForToast } from "@/utils/formatError";
-import Decimal from "decimal.js";
 
 const { t } = useI18n();
 const { setActions, clearActions } = useHeaderActions();
-const { fmt: fmtMain, toMainCurrency } = useCurrencyFormat();
+const { fmt: fmtMain } = useCurrencyFormat();
 const { fmtMonthYear, fmtDateMedium } = useLocaleFormat();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 const pageLogPrefix = "[CalendarPage]";
@@ -71,6 +72,8 @@ onUnmounted(() => {
 const currentMonth = ref(reactiveNow.value.getMonth());
 const currentYear = ref(reactiveNow.value.getFullYear());
 const compactWeekIndex = ref(0);
+/** Week to land on after a week-view step crosses a month; the month watcher would otherwise reset it. */
+let pendingWeekIndex: "first" | "last" | null = null;
 
 const currentMonthLabel = computed(() => {
   if (isCompactView.value) {
@@ -111,7 +114,7 @@ function prevMonth() {
     } else {
       currentMonth.value -= 1;
     }
-    compactWeekIndex.value = Math.max(monthWeeks.value.length - 1, 0);
+    pendingWeekIndex = "last";
     return;
   }
 
@@ -135,7 +138,7 @@ function nextMonth() {
     } else {
       currentMonth.value++;
     }
-    compactWeekIndex.value = 0;
+    pendingWeekIndex = "first";
     return;
   }
 
@@ -158,18 +161,18 @@ function setViewMode(mode: "default" | "compact" | "expanded") {
   updateSettings({ calendarViewMode: mode });
 }
 
+/** Week view: entries shown per day before collapsing the rest into "+N" (subscriptions first). */
+const WEEK_CELL_LIMIT = 4;
+
+const viewLabels = computed(() => ({
+  compact: t("calendar_view_week"),
+  default: t("calendar_view_month"),
+  expanded: t("calendar_view_list"),
+}));
+
 function updateHeaderActions() {
-  const viewIcon = viewMode.value === "compact" ? Rows3 : viewMode.value === "expanded" ? LayoutGrid : LayoutList;
-  const nextViewMode = viewMode.value === "compact" ? "default" : viewMode.value === "default" ? "expanded" : "compact";
-  const currentViewTitle = viewMode.value === "compact" ? t("view_compact") : viewMode.value === "expanded" ? t("view_expanded") : t("view_default");
-  const nextViewTitle = nextViewMode === "compact" ? t("view_compact") : nextViewMode === "expanded" ? t("view_expanded") : t("view_default");
-
-  setActions([
-    { id: "cycle-calendar-view", icon: viewIcon, title: `${currentViewTitle} → ${nextViewTitle}`, onClick: () => setViewMode(nextViewMode), style: "accent" },
-  ]);
+  setActions([]);
 }
-
-watch(viewMode, updateHeaderActions);
 
 // --- Grid ---
 const monthExpenses = computed(() => calendarStore.monthExpenses);
@@ -269,6 +272,16 @@ const weekDayLabels = computed(() => [
   t("sun"),
 ]);
 watch([currentYear, currentMonth], () => {
+  const pending = pendingWeekIndex;
+  pendingWeekIndex = null;
+  if (pending === "last") {
+    compactWeekIndex.value = Math.max(monthWeeks.value.length - 1, 0);
+    return;
+  }
+  if (pending === "first") {
+    compactWeekIndex.value = 0;
+    return;
+  }
   const today = reactiveNow.value;
   compactWeekIndex.value = currentMonth.value === today.getMonth() && currentYear.value === today.getFullYear()
     ? Math.max(currentWeekMonthIndex.value, 0)
@@ -276,31 +289,9 @@ watch([currentYear, currentMonth], () => {
 }, { immediate: true });
 
 // --- Stats ---
-const monthStats = computed(() => {
-  let totalCost = new Decimal(0);
-  let totalDue = new Decimal(0);
-  let count = 0;
-  const today = reactiveNow.value;
-
-  for (const cell of calendarGrid.value) {
-    if (cell.isEmpty) continue;
-    for (const sub of cell.subs) {
-      const converted = toMainCurrency(sub.price, sub.currencyId);
-      totalCost = totalCost.plus(converted);
-      count++;
-      const cellDate = new Date(currentYear.value, currentMonth.value, cell.day);
-      if (cellDate > today) {
-        totalDue = totalDue.plus(converted);
-      }
-    }
-    for (const exp of (cell.expenses || [])) {
-      const converted = toMainCurrency(exp.amount, exp.currencyId);
-      totalCost = totalCost.plus(converted);
-      count++;
-    }
-  }
-  return { totalCost: totalCost.toFixed(), totalDue: totalDue.toFixed(), count };
-});
+// Month totals come from the backend (`calendar_month_stats`): converted to the main currency,
+// active subscriptions only, today's payments counted as due.
+const monthStats = computed(() => calendarStore.stats);
 
 // --- Day detail modal ---
 const selectedDay = ref<CalendarCell | null>(null);
@@ -530,7 +521,7 @@ async function updateSettings(updates: Partial<Settings>) {
 
 async function loadInitial() {
   await metaStore.ensureLoaded();
-  await subscriptionsStore.loadBrief();
+  await subscriptionsStore.loadBrief({});
 }
 
 async function onDetailToggleFavorite(id: string) {
@@ -547,21 +538,24 @@ async function onDetailRecordPayment(id: string) {
 
 <template>
   <div class="max-w-5xl">
-    <CalendarHeader
-      :monthName="currentMonthLabel"
-      :year="currentYear"
-      :isCurrentMonth="isCurrentMonth"
-      :compact="isCompactView"
-      @prevMonth="prevMonth"
-      @nextMonth="nextMonth"
-      @resetMonth="resetMonth"
-    />
+    <div class="flex items-center justify-between gap-2">
+      <CalendarHeader
+        :monthName="currentMonthLabel"
+        :year="currentYear"
+        :isCurrentMonth="isCurrentMonth"
+        :compact="isCompactView"
+        @prevMonth="prevMonth"
+        @nextMonth="nextMonth"
+        @resetMonth="resetMonth"
+      />
+      <UiViewSwitch :model-value="viewMode" :labels="viewLabels" @update:model-value="setViewMode" />
+    </div>
 
     <div v-if="viewMode === 'expanded'" class="grid grid-cols-1 md:grid-cols-2 gap-3">
       <div
         v-for="cell in expandedDays"
         :key="`expanded-day-${cell.day}`"
-        class="bg-surface rounded-xl border border-border p-3 sm:p-4 cursor-pointer hover:bg-surface-hover transition-colors"
+        class="bg-surface rounded-xl border border-border shadow-sm p-3 sm:p-4 cursor-pointer hover:bg-surface-hover transition-colors"
         @click="openDayDetail(cell)"
       >
         <div class="flex items-center justify-between mb-2">
@@ -573,7 +567,7 @@ async function onDetailRecordPayment(id: string) {
             v-for="sub in cell.subs"
             :key="sub.id"
             @click.stop="openSubDetail(sub.id)"
-            class="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 transition-colors"
+            class="w-full flex items-center justify-between gap-2 pl-2.5 pr-2 py-1.5 rounded-lg bg-primary/12 text-primary border-l-2 border-primary text-xs font-medium hover:bg-primary/18 transition-colors"
           >
             <span class="inline-flex items-center gap-1.5 min-w-0">
               <CreditCard :size="12" class="shrink-0" />
@@ -587,7 +581,7 @@ async function onDetailRecordPayment(id: string) {
             v-for="exp in cell.expenses"
             :key="exp.id"
             @click.stop="openExpDetail(exp.id)"
-            class="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg bg-amber-500 text-white text-xs font-medium hover:bg-amber-600 transition-colors"
+            class="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-surface-hover text-text-secondary text-xs font-medium hover:text-text-primary transition-colors"
           >
             <span class="inline-flex items-center gap-1.5 min-w-0">
               <Wallet :size="12" class="shrink-0" />
@@ -599,10 +593,10 @@ async function onDetailRecordPayment(id: string) {
       </div>
       <div
         v-if="expandedDays.length === 0"
-        class="md:col-span-2 flex flex-col items-center justify-center rounded-2xl border border-border bg-surface px-6 py-12 text-center"
+        class="md:col-span-2 flex flex-col items-center justify-center rounded-xl border border-border bg-surface px-6 py-12 text-center"
       >
         <div
-          class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-surface-secondary text-text-muted [&_svg]:opacity-60"
+          class="mb-4 flex h-16 w-16 items-center justify-center rounded-xl bg-surface-secondary text-text-muted [&_svg]:opacity-60"
         >
           <Calendar :size="32" stroke-width="1.75" />
         </div>
@@ -614,9 +608,9 @@ async function onDetailRecordPayment(id: string) {
       <button
         v-for="(cell, idx) in compactWeekCells"
         :key="`compact-week-${idx}-${cell.day}`"
-        class="w-full text-left bg-surface rounded-xl border border-border px-3 py-2.5 transition-colors"
+        class="w-full text-left bg-surface rounded-xl border border-border shadow-sm px-3 py-2.5 transition-colors"
         :class="[
-          cell.isToday ? 'border-primary/40 bg-primary-light/30' : 'hover:bg-surface-hover',
+ cell.isToday ? 'border-primary/40 bg-primary-light/30' : 'hover:bg-surface-hover',
           !cell.isEmpty && (cell.subs.length > 0 || (cell.expenses?.length || 0) > 0) ? 'cursor-pointer' : 'cursor-default',
         ]"
         @click="!cell.isEmpty && (cell.subs.length > 0 || (cell.expenses?.length || 0) > 0) && openDayDetail(cell)"
@@ -627,31 +621,32 @@ async function onDetailRecordPayment(id: string) {
             <span v-if="!cell.isEmpty" class="text-sm font-semibold text-text-primary">{{ cell.day }}</span>
             <span v-else class="text-sm text-text-muted">-</span>
           </div>
-          <div class="text-[11px] text-text-muted shrink-0">
-            {{ cell.subs.length }} / {{ cell.expenses?.length || 0 }}
+          <div class="flex items-center gap-2 text-[11px] text-text-muted shrink-0 tabular-nums">
+            <span v-if="cell.subs.length" class="inline-flex items-center gap-0.5"><CreditCard :size="11" />{{ cell.subs.length }}</span>
+            <span v-if="cell.expenses?.length" class="inline-flex items-center gap-0.5"><Wallet :size="11" />{{ cell.expenses.length }}</span>
           </div>
         </div>
         <div v-if="!cell.isEmpty && (cell.subs.length > 0 || (cell.expenses?.length || 0) > 0)" class="mt-1.5 space-y-1">
           <div
-            v-for="sub in cell.subs.slice(0, 2)"
+            v-for="sub in cell.subs.slice(0, WEEK_CELL_LIMIT)"
             :key="`compact-sub-${sub.id}`"
-            class="flex items-center gap-1.5 px-2 py-1 rounded bg-blue-600 text-white text-[11px] font-medium"
+            class="flex items-center gap-1.5 pl-2 pr-1.5 py-1 rounded-md bg-primary/12 text-primary border-l-2 border-primary text-[11px] font-medium"
           >
             <CreditCard :size="11" class="shrink-0" />
             <span class="truncate">{{ sub.name }}</span>
             <span class="ml-auto shrink-0 opacity-90">{{ fmtMain(sub.price, sub.currencyId) }}</span>
           </div>
           <div
-            v-for="exp in (cell.expenses || []).slice(0, 2)"
+            v-for="exp in (cell.expenses || []).slice(0, Math.max(0, WEEK_CELL_LIMIT - cell.subs.length))"
             :key="`compact-exp-${exp.id}`"
-            class="flex items-center gap-1.5 px-2 py-1 rounded bg-amber-500 text-white text-[11px] font-medium"
+            class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface-hover text-text-secondary text-[11px] font-medium"
           >
             <Wallet :size="11" class="shrink-0" />
             <span class="truncate">{{ exp.name }}</span>
             <span class="ml-auto shrink-0 opacity-90">{{ fmtMain(exp.amount, exp.currencyId) }}</span>
           </div>
-          <div v-if="cell.subs.length + (cell.expenses?.length || 0) > 4" class="text-[10px] text-text-muted pl-1">
-            +{{ cell.subs.length + (cell.expenses?.length || 0) - 4 }}
+          <div v-if="cell.subs.length + (cell.expenses?.length || 0) > WEEK_CELL_LIMIT" class="text-[11px] text-text-muted pl-1">
+            +{{ cell.subs.length + (cell.expenses?.length || 0) - WEEK_CELL_LIMIT }}
           </div>
         </div>
       </button>
@@ -663,9 +658,9 @@ async function onDetailRecordPayment(id: string) {
     />
 
     <CalendarMonthStats
-      :count="monthStats.count"
+      :count="monthStats.activeSubscriptions"
       :totalCost="fmtMain(monthStats.totalCost)"
-      :totalDue="fmtMain(monthStats.totalDue)"
+      :totalDue="fmtMain(monthStats.amountDue)"
       :compact="isCompactView"
     />
 
@@ -706,27 +701,13 @@ async function onDetailRecordPayment(id: string) {
       @saved="onSaved"
     />
 
-    <!-- Delete confirmation modal -->
-    <Teleport to="body">
-      <Transition name="app-modal">
-        <div v-if="deleteConfirmId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="cancelDelete" />
-          <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
-            <div class="flex items-center gap-3 mb-3 sm:mb-4">
-              <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
-                <AlertTriangle :size="18" class="text-red-500" />
-              </div>
-              <h3 :class="ui.sectionTitle()">{{ t('delete') }}</h3>
-            </div>
-            <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('confirm_delete_subscription') }}</p>
-            <div class="flex justify-end gap-2 sm:gap-3">
-              <button @click="cancelDelete" class="px-3 sm:px-4 py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover">{{ t('cancel') }}</button>
-              <button @click="confirmDelete" class="px-3 sm:px-4 py-2 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-medium hover:bg-red-700">{{ t('delete') }}</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <ConfirmDialog
+      :show="Boolean(deleteConfirmId)"
+      :title="t('delete')"
+      :message="t('confirm_delete_subscription')"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
 
     <!-- Expense detail -->
     <ExpenseDetail
@@ -750,27 +731,13 @@ async function onDetailRecordPayment(id: string) {
       @saved="onExpSaved"
     />
 
-    <!-- Expense delete confirmation -->
-    <Teleport to="body">
-      <Transition name="app-modal">
-        <div v-if="deleteExpConfirmId" class="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4">
-          <div class="app-modal-backdrop absolute inset-0 bg-black/50" @click="cancelExpDelete" />
-          <div class="app-modal-panel relative bg-surface w-full rounded-t-2xl sm:rounded-xl shadow-2xl sm:max-w-sm p-4 sm:p-6">
-            <div class="flex items-center gap-3 mb-3 sm:mb-4">
-              <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
-                <AlertTriangle :size="18" class="text-red-500" />
-              </div>
-              <h3 :class="ui.sectionTitle()">{{ t('delete') }}</h3>
-            </div>
-            <p class="text-xs sm:text-sm text-text-secondary mb-4 sm:mb-6">{{ t('confirm_delete_expense') }}</p>
-            <div class="flex justify-end gap-2 sm:gap-3">
-              <button @click="cancelExpDelete" class="px-3 sm:px-4 py-2 rounded-lg border border-border text-xs sm:text-sm font-medium text-text-secondary hover:bg-surface-hover">{{ t('cancel') }}</button>
-              <button @click="confirmExpDelete" class="px-3 sm:px-4 py-2 rounded-lg bg-red-600 text-white text-xs sm:text-sm font-medium hover:bg-red-700">{{ t('delete') }}</button>
-            </div>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
+    <ConfirmDialog
+      :show="Boolean(deleteExpConfirmId)"
+      :title="t('delete')"
+      :message="t('confirm_delete_expense')"
+      @confirm="confirmExpDelete"
+      @cancel="cancelExpDelete"
+    />
 
     <Toast :show="showToast" :message="toastMsg" :type="toastType" @close="closeToast" />
   </div>

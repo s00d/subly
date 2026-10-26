@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { localYmd } from "@/composables/useLocaleFormat";
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
@@ -13,10 +14,12 @@ import {
   toDisplayNumber,
 } from "@/lib/money";
 import { insertPaymentRecord, deletePaymentRecord } from "@/services/subscriptionsClient";
-import { History, Plus, Trash2, ChevronDown, ChevronUp, Receipt, RefreshCw } from "@lucide/vue";
+import { History, Plus, Trash2, ChevronDown, ChevronUp, Receipt } from "@lucide/vue";
+import { button } from "@/lib/tv";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import AppDatePicker from "@/components/ui/AppDatePicker.vue";
 import AppInput from "@/components/ui/AppInput.vue";
+import { formatErrorForToast } from "@/utils/formatError";
 
 const props = defineProps<{
   subscriptionId: string;
@@ -30,7 +33,9 @@ const props = defineProps<{
   };
 }>();
 
-const emit = defineEmits<{
+// `recordPayment` stays in the contract (SubscriptionDetail listens), but the in-list "renew"
+// button was removed: the detail footer already has "Record payment".
+defineEmits<{
   recordPayment: [id: string];
 }>();
 
@@ -46,7 +51,7 @@ const showAddForm = ref(false);
 const localHistory = ref<PaymentRecord[]>([]);
 
 // Add form
-const addDate = ref(new Date().toISOString().split("T")[0]);
+const addDate = ref(localYmd());
 const addAmount = ref(props.price);
 const addNote = ref("");
 watch(() => props.history, (value) => { localHistory.value = [...value]; }, { immediate: true });
@@ -74,10 +79,21 @@ const visibleRecords = computed(() =>
   expanded.value ? localHistory.value : localHistory.value.slice(0, 5),
 );
 
-const totalPaid = computed(() => sumMoney(localHistory.value.map((r) => r.amount)));
+/** Records may be in older currencies (the subscription's currency can change): convert before summing. */
+const totalPaid = computed(() => {
+  const target = currencies.value.find((c) => c.id === props.currencyId);
+  if (!target) return sumMoney(localHistory.value.map((r) => r.amount));
+  return localHistory.value.reduce(
+    (acc, r) => acc.plus(convertAmountToCurrency(r.amount, r.currencyId || props.currencyId, target, ratesMap.value)),
+    sumMoney([]),
+  );
+});
+
+const actionError = ref("");
 
 async function addRecord() {
   if (!addDate.value) return;
+  actionError.value = "";
   const record: PaymentRecord = {
     id: crypto.randomUUID(),
     date: addDate.value,
@@ -85,16 +101,27 @@ async function addRecord() {
     currencyId: props.currencyId,
     note: addNote.value,
   };
-  await insertPaymentRecord(props.subscriptionId, record);
+  try {
+    await insertPaymentRecord(props.subscriptionId, record);
+  } catch (e) {
+    actionError.value = formatErrorForToast(e, t);
+    return;
+  }
   localHistory.value = [record, ...localHistory.value];
   showAddForm.value = false;
-  addDate.value = new Date().toISOString().split("T")[0];
+  addDate.value = localYmd();
   addAmount.value = props.price;
   addNote.value = "";
 }
 
 async function deleteRecord(recordId: string) {
-  await deletePaymentRecord(recordId);
+  actionError.value = "";
+  try {
+    await deletePaymentRecord(recordId);
+  } catch (e) {
+    actionError.value = formatErrorForToast(e, t);
+    return;
+  }
   localHistory.value = localHistory.value.filter((item) => item.id !== recordId);
 }
 
@@ -112,10 +139,11 @@ watch(
 
 <template>
   <div class="rounded-lg border border-border bg-surface-secondary overflow-hidden divide-y divide-border">
+    <p v-if="actionError" role="alert" class="px-3 py-2 text-xs text-danger">{{ actionError }}</p>
     <!-- Header -->
     <div class="flex items-center justify-between px-3 py-2.5">
       <div class="flex items-center gap-1.5">
-        <History :size="13" class="text-text-muted" />
+        <History :size="14" class="text-text-muted" />
         <span class="text-[10px] uppercase tracking-wide font-medium text-text-muted">{{ t('payment_history') }}</span>
         <span v-if="localHistory.length > 0" class="text-[10px] text-text-muted ml-1">({{ localHistory.length }})</span>
       </div>
@@ -132,20 +160,15 @@ watch(
             >≈ {{ fmt(convertAmount(totalPaid.toFixed(), currencyId, tc).toFixed(), tc.id) }}</span>
           </div>
         </div>
-        <Tooltip :text="t('record_payment')" position="bottom">
-          <button
-            @click="emit('recordPayment', subscriptionId)"
-            class="p-1 rounded hover:bg-green-100 dark:hover:bg-green-900/30 text-text-muted hover:text-green-600 transition-colors"
-          >
-            <RefreshCw :size="13" />
-          </button>
-        </Tooltip>
         <Tooltip :text="t('add_payment')" position="bottom">
           <button
+            type="button"
+            :aria-label="t('add_payment')"
+            :aria-expanded="showAddForm"
             @click="showAddForm = !showAddForm"
-            class="p-1 rounded hover:bg-surface-hover text-text-muted hover:text-primary transition-colors"
+            :class="button({ intent: 'ghost', size: 'icon', class: 'hover:text-primary' })"
           >
-            <Plus :size="13" />
+            <Plus :size="15" />
           </button>
         </Tooltip>
       </div>
@@ -176,7 +199,7 @@ watch(
             class="w-24"
           />
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
           <AppInput
             :modelValue="addNote"
             @update:modelValue="(v) => addNote = String(v)"
@@ -185,8 +208,9 @@ watch(
             class="flex-1"
           />
           <button
+            type="button"
             @click="addRecord"
-            class="px-3 py-1 rounded-lg bg-primary text-white text-xs font-medium hover:bg-primary-hover transition-colors"
+            :class="button({ intent: 'primary', size: 'md' })"
           >{{ t('add') }}</button>
         </div>
       </div>
@@ -197,9 +221,9 @@ watch(
       <div
         v-for="record in visibleRecords"
         :key="record.id"
-        class="flex items-center gap-2.5 px-3 py-2.5 group hover:bg-surface dark:hover:bg-white/6 transition-colors"
+        class="flex items-center gap-2.5 px-3 py-2.5 group hover:bg-surface-hover transition-colors"
       >
-        <Receipt :size="12" class="text-text-muted shrink-0" />
+        <Receipt :size="14" class="text-text-muted shrink-0" />
         <span class="text-xs text-text-muted whitespace-nowrap">{{ formatDate(record.date) }}</span>
         <div class="min-w-0">
           <span class="text-xs font-semibold text-text-primary">{{ fmt(record.amount, record.currencyId) }}</span>
@@ -215,10 +239,12 @@ watch(
         <div v-else class="flex-1" />
         <Tooltip :text="t('delete')" position="left">
           <button
+            type="button"
+            :aria-label="t('delete')"
             @click="deleteRecord(record.id)"
-            class="p-0.5 rounded hover:bg-red-100 dark:hover:bg-red-900/30 text-red-400 hover:text-red-600 transition-all shrink-0"
+            :class="button({ intent: 'ghost', size: 'icon', class: 'shrink-0 text-text-muted hover:text-danger hover:bg-danger/12' })"
           >
-            <Trash2 :size="11" />
+            <Trash2 :size="14" />
           </button>
         </Tooltip>
       </div>
@@ -233,9 +259,10 @@ watch(
     <button
       v-if="localHistory.length > 5"
       @click="expanded = !expanded"
-      class="w-full flex items-center justify-center gap-1 py-1.5 text-[10px] text-primary hover:bg-surface-hover transition-colors"
+      type="button"
+      :class="button({ intent: 'ghost', size: 'sm', class: 'w-full rounded-none text-primary hover:text-primary' })"
     >
-      <component :is="expanded ? ChevronUp : ChevronDown" :size="12" />
+      <component :is="expanded ? ChevronUp : ChevronDown" :size="14" />
       {{ expanded ? t('show_less') : t('show_all') }} ({{ localHistory.length }})
     </button>
   </div>

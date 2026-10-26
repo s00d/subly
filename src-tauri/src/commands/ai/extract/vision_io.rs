@@ -50,7 +50,7 @@ pub fn truncate(s: &str, max: usize) -> String {
     if s.len() <= max {
         s.to_string()
     } else {
-        let mut out = s[..max].to_string();
+        let mut out = s[..s.floor_char_boundary(max)].to_string();
         out.push('…');
         out
     }
@@ -86,6 +86,11 @@ pub async fn call_vision_chat(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn truncate_handles_multibyte_cut() {
+        assert_eq!(truncate("абв", 3), "а…");
+    }
 
     #[test]
     fn is_image_mime_covers_direct_and_heic() {

@@ -34,8 +34,9 @@ export function coerceSubscriptionFormForValidation(
   return {
     name: String(base.name ?? ""),
     price: typeof base.price === "string" ? base.price : String(Number(base.price) || 0),
-    frequency: Number(base.frequency) || 1,
-    notifyDaysBefore: Number(base.notifyDaysBefore ?? 1),
+    // Raw value: `|| 1` here hid 0 / blank from the schema and saved them as 1.
+    frequency: base.frequency,
+    notifyDaysBefore: Number(base.notifyDaysBefore ?? -1),
     cycle: Number(base.cycle) || 3,
     currencyId: String(base.currencyId ?? ""),
     nextPayment: String(base.nextPayment ?? ""),

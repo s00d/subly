@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { ref, watch, computed, onMounted, onUnmounted, nextTick } from "vue";
 import { ChevronDown, Check, Search } from "@lucide/vue";
 import { tv, ui } from "@/lib/tv";
@@ -126,16 +127,16 @@ const selectTv = tv({
     ],
     list: "max-h-56 overflow-y-auto py-1",
     emptyEl: "px-3 py-2 text-xs text-text-muted text-center",
-    optionEl: "w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors disabled:opacity-40",
+    optionEl: "w-full flex items-center gap-2 px-3 py-2 text-[13px] transition-colors disabled:opacity-40",
     errorEl: ui.fieldError(),
   },
   variants: {
     size: {
-      sm: { trigger: "px-2.5 py-1.5 text-xs" },
-      md: { trigger: "px-3 py-2 text-sm" },
+      sm: { trigger: "min-h-8 px-2.5 py-1 text-xs" },
+      md: { trigger: "px-3 py-1.5 text-[13px]" },
     },
     status: {
-      error: { trigger: "border-red-500 ring-2 ring-red-500/20" },
+      error: { trigger: "border-danger ring-2 ring-danger/20" },
       open: { trigger: "border-primary ring-2 ring-primary/20" },
       normal: {},
     },
@@ -162,6 +163,7 @@ const slots = computed(() =>
     selected: !!selected.value || undefined,
   }),
 );
+const { t } = useI18n();
 </script>
 
 <template>
@@ -213,7 +215,7 @@ const slots = computed(() =>
           </div>
         </div>
         <div :class="slots.list()">
-          <div v-if="filtered.length === 0" :class="slots.emptyEl()">No results</div>
+          <div v-if="filtered.length === 0" :class="slots.emptyEl()">{{ t('no_results') }}</div>
           <button
             v-for="opt in filtered"
             :key="String(opt.value)"

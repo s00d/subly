@@ -28,7 +28,7 @@ const weekDays = () => [t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat
 </script>
 
 <template>
-  <div class="bg-surface rounded-xl border border-border overflow-hidden">
+  <div class="bg-surface rounded-xl border border-border shadow-sm overflow-hidden">
     <!-- Day headers -->
     <div class="grid grid-cols-7 border-b border-border">
       <div
@@ -46,10 +46,10 @@ const weekDays = () => [t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat
         :key="idx"
         class="border-b border-r border-border"
         :class="[
-          compact ? 'min-h-[42px] sm:min-h-[64px] p-0.5 sm:p-1' : 'min-h-[48px] sm:min-h-[80px] p-0.5 sm:p-1.5',
+ compact ? 'min-h-[42px] sm:min-h-[64px] p-0.5 sm:p-1' : 'min-h-[48px] sm:min-h-[80px] p-0.5 sm:p-1.5',
           {
-            'bg-surface-hover/50': cell.isEmpty,
-            'bg-primary-light/40': cell.isToday,
+            'bg-surface-secondary/70': cell.isEmpty,
+            'bg-primary-light/50': cell.isToday,
             'cursor-pointer hover:bg-surface-hover': !cell.isEmpty && (cell.subs.length > 0 || (cell.expenses && cell.expenses.length > 0)),
           },
         ]"
@@ -58,7 +58,7 @@ const weekDays = () => [t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat
         <div v-if="!cell.isEmpty">
           <span
             class="text-[10px] sm:text-xs font-medium inline-block mb-0.5 sm:mb-1 w-5 h-5 sm:w-6 sm:h-6 rounded-full text-center leading-5 sm:leading-6"
-            :class="cell.isToday ? 'bg-primary text-white' : 'text-text-secondary'"
+            :class="cell.isToday ? 'bg-primary text-white font-semibold shadow-sm' : 'text-text-secondary'"
           >{{ cell.day }}</span>
           <!-- Mobile: just show dot indicators -->
           <div class="sm:hidden flex gap-0.5 flex-wrap">
@@ -69,14 +69,14 @@ const weekDays = () => [t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat
           <!-- Desktop: show names + amounts -->
           <div class="hidden sm:block">
             <div v-for="sub in cell.subs.slice(0, 2)" :key="sub.id"
-              class="flex items-center gap-0.5 text-[10px] leading-tight px-1 py-0.5 rounded bg-primary text-white font-medium mb-0.5">
+              class="flex items-center gap-1 text-[10.5px] leading-tight pl-1.5 pr-1 py-[3px] rounded-md bg-primary/14 text-primary font-medium mb-0.5 border-l-2 border-primary">
               <span class="truncate">{{ sub.name }}</span>
-              <span class="ml-auto shrink-0 opacity-80">{{ fmt(sub.price, sub.currencyId) }}</span>
+              <span class="ml-auto shrink-0 tabular-nums font-semibold">{{ fmt(sub.price, sub.currencyId) }}</span>
             </div>
             <div v-for="exp in (cell.expenses || []).slice(0, 2)" :key="exp.id"
-              class="flex items-center gap-0.5 text-[10px] leading-tight px-1 py-0.5 rounded bg-surface-secondary border border-border text-text-primary font-medium mb-0.5">
+              class="flex items-center gap-1 text-[10.5px] leading-tight px-1.5 py-[3px] rounded-md text-text-secondary mb-0.5 hover:bg-surface-hover">
               <span class="truncate">{{ exp.name }}</span>
-              <span class="ml-auto shrink-0 opacity-80">{{ fmt(exp.amount, exp.currencyId) }}</span>
+              <span class="ml-auto shrink-0 tabular-nums text-text-muted">{{ fmt(exp.amount, exp.currencyId) }}</span>
             </div>
             <div v-if="cell.subs.length + (cell.expenses?.length || 0) > 4" class="text-[10px] text-text-muted">
               +{{ cell.subs.length + (cell.expenses?.length || 0) - 4 }}

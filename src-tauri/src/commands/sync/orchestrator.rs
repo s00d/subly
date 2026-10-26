@@ -57,7 +57,7 @@ fn persist_merged_snapshot(
     merged: &crate::models::AppDataDoc,
     app_config: &crate::models::AppConfigDoc,
 ) -> Result<(), crate::errors::AppError> {
-    guard.apply_snapshot_typed_with_config(merged, app_config)
+    guard.apply_merged_snapshot_with_config(merged, app_config)
 }
 
 fn load_local_sync_snapshot(
@@ -156,6 +156,8 @@ impl SyncDispatchCommand {
     }
 }
 
+const SYNC_SCHEDULER_TICK: std::time::Duration = std::time::Duration::from_secs(120);
+
 pub fn ensure_sync_scheduler_started(app: tauri::AppHandle) {
     static STARTED: OnceLock<()> = OnceLock::new();
     STARTED.get_or_init(|| {
@@ -163,7 +165,10 @@ pub fn ensure_sync_scheduler_started(app: tauri::AppHandle) {
             loop {
                 if let Ok(cfg) = load_sync_config() {
                     if cfg.enabled {
+                        // Busy (manual sync holds the lock): wait out the tick. A bare `continue`
+                        // skipped the sleep below and spun a runtime worker at 100% CPU.
                         let Ok(_guard) = sync_lock().try_lock() else {
+                            tokio::time::sleep(SYNC_SCHEDULER_TICK).await;
                             continue;
                         };
                         if let Some(provider) = cfg.provider.clone() {
@@ -196,7 +201,7 @@ pub fn ensure_sync_scheduler_started(app: tauri::AppHandle) {
                         }
                     }
                 }
-                tokio::time::sleep(std::time::Duration::from_secs(120)).await;
+                tokio::time::sleep(SYNC_SCHEDULER_TICK).await;
             }
         });
     });
@@ -476,6 +481,7 @@ pub async fn sync_dispatch_internal(
                 #[cfg(any(target_os = "ios", target_os = "android"))]
                 {
                     crate::widget_snapshot::export_widget_snapshot_from_app(&app);
+                    crate::commands::notifications::reschedule_from_app(&app);
                 }
                 SyncDispatchData::Ok(SyncOkDto::success())
             } else {
@@ -608,24 +614,16 @@ pub async fn sync_dispatch_internal(
             }
         }
         SyncDispatchCommand::FlushBeforeExit { timeout_ms } => {
-            let start = std::time::Instant::now();
+            // Runs while the window is closing: bounded by `timeout_ms` for real (it used to be
+            // measured only after the fact), and any error just means "not flushed" so the window
+            // still closes.
             let result = if let Some(provider) = cfg.provider.clone() {
-                let token = match provider_access_token(&provider, &cfg).await {
-                    Ok(t) => t,
-                    Err(_) => return Ok(SyncDispatchResponse {
-                        ok: true,
-                        event,
-                        data: SyncDispatchData::Ok(SyncOkDto {
-                            ok: false,
-                            pending_update: None,
-                            message_key: Some("sync_oauth_required".to_string()),
-                        }),
-                    }),
-                };
-                let remote_opt = provider_download(&app, &provider, &cfg, token.as_deref()).await?;
-                if sync_push_revision_mismatch(&cfg.remote_revision, remote_opt.as_ref()) {
-                    false
-                } else {
+                let flush = async {
+                    let token = provider_access_token(&provider, &cfg).await?;
+                    let remote_opt = provider_download(&app, &provider, &cfg, token.as_deref()).await?;
+                    if sync_push_revision_mismatch(&cfg.remote_revision, remote_opt.as_ref()) {
+                        return Ok::<bool, crate::errors::AppError>(false);
+                    }
                     let (local_data, app_config, tombstones) = {
                         let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
                         load_local_sync_snapshot(&guard)?
@@ -637,14 +635,25 @@ pub async fn sync_dispatch_internal(
                         meta,
                         tombstones,
                     };
-                    provider_upload(&app, &provider, &cfg, &payload, token.as_deref()).await.is_ok()
+                    if !sync_payload_fits_limit(payload.clone(), MAX_SYNC_PAYLOAD_BYTES)? {
+                        return Ok(false);
+                    }
+                    provider_upload(&app, &provider, &cfg, &payload, token.as_deref()).await?;
+                    Ok(true)
+                };
+                match tokio::time::timeout(std::time::Duration::from_millis(timeout_ms), flush).await {
+                    Ok(Ok(flushed)) => flushed,
+                    Ok(Err(e)) => {
+                        eprintln!("[subly][sync] flush before exit failed: {}", e);
+                        false
+                    }
+                    Err(_) => false,
                 }
             } else {
                 true
             };
-            let timed_out = start.elapsed().as_millis() > timeout_ms as u128;
             SyncDispatchData::Ok(SyncOkDto {
-                ok: result && !timed_out,
+                ok: result,
                 pending_update: None,
                 message_key: None,
             })

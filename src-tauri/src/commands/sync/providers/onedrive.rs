@@ -7,9 +7,6 @@ fn enc_query(s: &str) -> String {
     utf8_percent_encode(s, NON_ALPHANUMERIC).to_string()
 }
 
-/// Temporary upload name inside OneDrive `approot` for atomic replace.
-const ONEDRIVE_TMP_NAME: &str = "subly-sync-v2.sublysync.upload.tmp";
-
 pub fn descriptor() -> super::ProviderInfo {
     super::ProviderInfo {
         r#type: super::SyncProviderType::Onedrive,
@@ -47,6 +44,11 @@ pub fn auth_url(cfg: &SyncConfig) -> Option<String> {
 
 pub(crate) fn onedrive_sync_message_key(err: &crate::errors::AppError) -> Option<&'static str> {
     let msg = err.to_string().to_lowercase();
+    // Own errors only: keys are tried in a chain, and a bare "401" match here used to label
+    // other providers' auth failures as this provider's.
+    if !msg.contains("onedrive") {
+        return None;
+    }
     if msg.contains("401") || msg.contains("unauthorized") {
         return Some("sync_oauth_required");
     }
@@ -57,31 +59,37 @@ pub(crate) fn onedrive_sync_message_key(err: &crate::errors::AppError) -> Option
 }
 
 pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<SyncPayload>, crate::errors::AppError> {
-    let resp = tauri_plugin_http::reqwest::Client::new()
-        .get(format!(
-            "https://graph.microsoft.com/v1.0/me/drive/special/approot:/{}:/content",
-            SYNC_FILENAME
-        ))
+    let resp = super::http_client()
+        .get(sync_file_content_url())
         .bearer_auth(access_token)
         .send()
         .await
         .map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
-        return Ok(None);
+        if super::download_status_means_missing(resp.status().as_u16()) {
+            return Ok(None);
+        }
+        return Err(crate::errors::AppError::from(format!("onedrive download failed: {}", resp.status())));
     }
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
     Ok(Some(decode_sync_payload(&bytes)?))
 }
 
-pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str) -> Result<(), crate::errors::AppError> {
-    let client = tauri_plugin_http::reqwest::Client::new();
-    let raw = encode_sync_payload(payload)?;
-    let put_url = format!(
+/// Simple-upload URL of the sync file in the app folder (Graph allows up to 250 MB this way).
+fn sync_file_content_url() -> String {
+    format!(
         "https://graph.microsoft.com/v1.0/me/drive/special/approot:/{}:/content",
-        ONEDRIVE_TMP_NAME
-    );
-    let put = client
-        .put(&put_url)
+        SYNC_FILENAME
+    )
+}
+
+pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str) -> Result<(), crate::errors::AppError> {
+    // One PUT to the final path: Graph replaces the content atomically and keeps version history.
+    // The old tmp + PATCH rename relied on `@microsoft.graph.conflictBehavior` in a PATCH body,
+    // which driveitem-update does not document (rename onto an existing name fails with 409).
+    let raw = encode_sync_payload(payload)?;
+    let put = super::http_client()
+        .put(sync_file_content_url())
         .bearer_auth(access_token)
         .header("Content-Type", "application/octet-stream")
         .body(raw)
@@ -90,38 +98,19 @@ pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str
         .map_err(|e| e.to_string())?;
     if !put.status().is_success() {
         return Err(crate::errors::AppError::from(format!(
-            "onedrive upload (tmp) failed: {}",
+            "onedrive upload failed: {}",
             put.status()
         )));
     }
-
-    let patch_url = format!(
-        "https://graph.microsoft.com/v1.0/me/drive/special/approot:/{}:",
-        ONEDRIVE_TMP_NAME
-    );
-    let patch = client
-        .patch(&patch_url)
-        .bearer_auth(access_token)
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({
-            "name": SYNC_FILENAME,
-            "@microsoft.graph.conflictBehavior": "replace"
-        }))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-
-    if !patch.status().is_success() {
-        let _ = client
-            .delete(patch_url)
-            .bearer_auth(access_token)
-            .send()
-            .await;
-        return Err(crate::errors::AppError::from(format!(
-            "onedrive rename (tmp→final) failed: {}",
-            patch.status()
-        )));
-    }
-
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn upload_and_download_share_the_final_path() {
+        let url = super::sync_file_content_url();
+        assert!(url.ends_with(&format!("approot:/{}:/content", super::SYNC_FILENAME)));
+        assert!(!url.contains(".tmp"));
+    }
 }

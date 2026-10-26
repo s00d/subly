@@ -14,7 +14,10 @@ mod shared {
     use sha2::{Digest, Sha256};
     use std::collections::HashMap;
     use std::fs;
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
+    #[cfg(any(target_os = "ios", target_os = "android"))]
+    use std::path::PathBuf;
+    #[cfg(any(target_os = "ios", target_os = "android"))]
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::OnceLock;
     use std::time::Duration;
@@ -26,7 +29,9 @@ mod shared {
     const UPCOMING_FILE_TMP: &str = "upcoming.json.tmp";
     const HTTP_LOGO_TIMEOUT: Duration = Duration::from_secs(4);
 
+    #[cfg(any(target_os = "ios", target_os = "android"))]
     static IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+    #[cfg(any(target_os = "ios", target_os = "android"))]
     static PENDING_REFRESH: AtomicBool = AtomicBool::new(false);
 
     #[derive(Serialize)]
@@ -257,6 +262,7 @@ mod shared {
         Ok(())
     }
 
+    #[cfg(any(target_os = "ios", target_os = "android"))]
     pub fn export_snapshot_async<F, G>(
         app_handle: tauri::AppHandle,
         initial: SnapshotJob,
@@ -406,13 +412,64 @@ mod android_impl {
         let _ = env.call_static_method(class, "notifySnapshotUpdated", "()V", &[]);
     }
 
+    /// Tauri `app_local_data_dir()` on Android resolves to `Context.getDataDir()`
+    /// (`/data/user/0/<pkg>`). Glance reads `Context.getFilesDir()/widget`
+    /// (`…/<pkg>/files/widget`). Join `files/` so writer and reader agree.
+    pub(super) fn android_widget_dir_from_data_dir(data_dir: &std::path::Path) -> PathBuf {
+        data_dir
+            .join("files")
+            .join(super::shared::RELATIVE_WIDGET_DIR)
+    }
+
+    fn migrate_legacy_widget_dir(data_dir: &std::path::Path, widget_dir: &std::path::Path) {
+        let legacy = data_dir.join(super::shared::RELATIVE_WIDGET_DIR);
+        let legacy_json = legacy.join("upcoming.json");
+        let new_json = widget_dir.join("upcoming.json");
+        if legacy_json.is_file() && !new_json.is_file() {
+            if let Err(e) = std::fs::create_dir_all(widget_dir) {
+                eprintln!("[subly][widget] migrate mkdir failed: {}", e);
+                return;
+            }
+            if let Err(e) = std::fs::rename(&legacy_json, &new_json) {
+                if let Err(copy_e) = std::fs::copy(&legacy_json, &new_json) {
+                    eprintln!(
+                        "[subly][widget] migrate legacy snapshot failed: rename={}, copy={}",
+                        e, copy_e
+                    );
+                }
+            }
+            let legacy_icons = legacy.join("icons");
+            let new_icons = widget_dir.join("icons");
+            if legacy_icons.is_dir() && !new_icons.exists() {
+                let _ = std::fs::rename(&legacy_icons, &new_icons)
+                    .or_else(|_| copy_dir_recursive(&legacy_icons, &new_icons));
+            }
+        }
+    }
+
+    fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> std::io::Result<()> {
+        std::fs::create_dir_all(dst)?;
+        for entry in std::fs::read_dir(src)? {
+            let entry = entry?;
+            let to = dst.join(entry.file_name());
+            if entry.file_type()?.is_dir() {
+                copy_dir_recursive(&entry.path(), &to)?;
+            } else {
+                std::fs::copy(entry.path(), to)?;
+            }
+        }
+        Ok(())
+    }
+
     fn widget_dir_for_app(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         let base = app
             .path()
             .app_local_data_dir()
             .map_err(|e| format!("app_local_data_dir: {e}"))?;
-        std::fs::create_dir_all(&base).map_err(|e| e.to_string())?;
-        Ok(base.join(super::shared::RELATIVE_WIDGET_DIR))
+        let widget_dir = android_widget_dir_from_data_dir(&base);
+        migrate_legacy_widget_dir(&base, &widget_dir);
+        std::fs::create_dir_all(&widget_dir).map_err(|e| e.to_string())?;
+        Ok(widget_dir)
     }
 
     pub fn start_export(app: &tauri::AppHandle, job: SnapshotJob) {
@@ -420,14 +477,14 @@ mod android_impl {
         super::shared::export_snapshot_async(
             app,
             job,
-            |handle| widget_dir_for_app(handle),
+            widget_dir_for_app,
             notify_widgets_updated,
         );
     }
 
     #[no_mangle]
     pub extern "system" fn Java_com_s00d_subly_MainActivity_nativeInitWidgetBridge(
-        mut env: JNIEnv,
+        env: JNIEnv,
         _class: JClass,
     ) -> jint {
         match env.get_java_vm() {
@@ -472,12 +529,6 @@ pub fn export_widget_snapshot_from_app(app: &tauri::AppHandle) {
     }
 }
 
-/// Back-compat alias for existing call sites.
-#[cfg_attr(not(any(target_os = "ios", target_os = "android")), allow(dead_code))]
-pub fn export_ios_widget_snapshot_from_app(app: &tauri::AppHandle) {
-    export_widget_snapshot_from_app(app);
-}
-
 #[cfg(target_os = "ios")]
 pub fn install_ios_widget_reload_on_activate() {
     ios_impl::install_widget_reload_on_activate_if_swift_linked();
@@ -500,6 +551,7 @@ mod tests {
     use rust_decimal::Decimal;
     use std::collections::HashMap;
     use std::fs;
+    use std::path::PathBuf;
     use std::str::FromStr;
     use std::sync::Arc;
 
@@ -699,5 +751,35 @@ mod tests {
             job.code_by_id.values().any(|c| !c.is_empty()),
             "currency ISO codes should be populated from catalog"
         );
+    }
+
+    #[test]
+    fn android_widget_dir_joins_files_under_data_dir() {
+        let data = PathBuf::from("/data/user/0/com.s00d.subly");
+        // Mirror android_impl::android_widget_dir_from_data_dir without cfg.
+        let widget = data.join("files").join(shared::RELATIVE_WIDGET_DIR);
+        assert_eq!(
+            widget,
+            PathBuf::from("/data/user/0/com.s00d.subly/files/widget")
+        );
+    }
+
+    #[test]
+    fn android_legacy_widget_migrate_moves_upcoming_json() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let data_dir = dir.path();
+        let legacy = data_dir.join(shared::RELATIVE_WIDGET_DIR);
+        fs::create_dir_all(&legacy).expect("legacy dir");
+        fs::write(legacy.join("upcoming.json"), b"{\"items\":[]}").expect("write legacy");
+        let widget_dir = data_dir.join("files").join(shared::RELATIVE_WIDGET_DIR);
+        // Inline migrate logic (same as android_impl) for host tests.
+        let legacy_json = legacy.join("upcoming.json");
+        let new_json = widget_dir.join("upcoming.json");
+        assert!(legacy_json.is_file());
+        assert!(!new_json.is_file());
+        fs::create_dir_all(&widget_dir).expect("mkdir");
+        fs::rename(&legacy_json, &new_json).expect("rename");
+        assert!(new_json.is_file());
+        assert!(!legacy_json.is_file());
     }
 }

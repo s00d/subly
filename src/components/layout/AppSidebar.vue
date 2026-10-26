@@ -45,19 +45,26 @@ function handleNav(path: string) {
 
 const sidebarTv = tv({
   slots: {
-    root: "app-sidebar w-56 shrink-0 bg-surface border-r border-border flex flex-col h-full",
-    logoWrap: "h-16 flex items-center px-5 border-b border-border",
-    logoIcon: "w-8 h-8 rounded-lg bg-primary flex items-center justify-center",
-    logoText: "font-semibold text-sm text-text-primary tracking-tight",
-    nav: "flex-1 p-3 space-y-1 overflow-y-auto",
-    navItem: "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all cursor-pointer",
-    footer: "p-4 border-t border-border",
-    footerText: "text-xs text-text-muted",
+    root: "app-sidebar w-[232px] shrink-0 bg-sidebar border-r border-border flex flex-col h-full",
+    logoWrap: "h-14 flex items-center px-4",
+    logoIcon:
+      "w-7 h-7 rounded-[9px] bg-gradient-to-br from-primary to-accent flex items-center justify-center shadow-sm",
+    logoText: "font-semibold text-[15px] text-text-primary tracking-[-0.01em]",
+    nav: "flex-1 px-2.5 py-2 space-y-0.5 overflow-y-auto",
+    navItem:
+      "flex items-center gap-2.5 h-9 px-2.5 rounded-lg text-[13px] font-medium transition-colors cursor-pointer",
+    footer: "px-4 py-3",
+    footerText: "text-[11px] text-text-muted",
   },
   variants: {
     active: {
-      true: { navItem: "bg-primary text-white shadow-sm" },
-      false: { navItem: "text-text-secondary hover:bg-surface-hover hover:text-text-primary" },
+      true: {
+        navItem:
+          "relative bg-primary-light text-primary font-semibold before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-r-full before:bg-primary",
+      },
+      false: {
+        navItem: "text-text-secondary hover:bg-surface-hover hover:text-text-primary [&>svg]:opacity-80",
+      },
     },
   },
 });
@@ -70,7 +77,7 @@ const slots = sidebarTv();
     <div :class="slots.logoWrap()">
       <div class="flex items-center gap-2">
         <div :class="slots.logoIcon()">
-          <span class="text-white font-bold text-sm">S</span>
+          <span class="text-white font-semibold text-[13px]">S</span>
         </div>
         <span :class="slots.logoText()">Subly</span>
       </div>
@@ -85,7 +92,7 @@ const slots = sidebarTv();
           :class="sidebarTv({ active: isActive(item.name) }).navItem()"
           class="w-full text-left"
         >
-          <component :is="item.icon" :size="iconSize.nav" />
+          <component :is="item.icon" :size="iconSize.sm" :stroke-width="2" />
           <span>{{ item.label }}</span>
         </button>
       </template>
@@ -96,15 +103,14 @@ const slots = sidebarTv();
           :to="item.path"
           :class="sidebarTv({ active: isActive(item.name) }).navItem()"
         >
-          <component :is="item.icon" :size="iconSize.nav" />
+          <component :is="item.icon" :size="iconSize.sm" :stroke-width="2" />
           <span>{{ item.label }}</span>
         </router-link>
       </template>
     </nav>
 
     <div :class="slots.footer()">
-      <p :class="slots.footerText()">Subly v{{ version }}</p>
-      <p :class="slots.footerText()">&copy; {{ new Date().getFullYear() }} Subly</p>
+      <p :class="slots.footerText()">Subly {{ version }}</p>
     </div>
   </aside>
 </template>

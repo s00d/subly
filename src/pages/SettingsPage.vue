@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, defineAsyncComponent, onMounted, watch, type Component } from "vue";
 import { useI18n } from "vue-i18n";
+import { useRoute, useRouter } from "vue-router";
 import { useToast } from "@/composables/useToast";
 import { useHeaderActions } from "@/composables/useHeaderActions";
 import { tv } from "@/lib/tv";
@@ -9,8 +10,7 @@ import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useCatalogsUsageStore } from "@/stores/catalogsUsageStore";
 import Toast from "@/components/ui/Toast.vue";
 import {
-  Palette, Bell, FolderTree, Coins, CreditCard, Tags,
-  Users, Cloud, Database, ArrowRightLeft, Send, Sparkles,
+  Palette, Bell, FolderTree, Coins, Database, Sparkles,
 } from "@lucide/vue";
 
 import AppearanceSection from "@/components/settings/AppearanceSection.vue";
@@ -47,41 +47,58 @@ interface SettingsTab {
   icon: Component;
 }
 
+/** Grouped by what the user is trying to do, one topic per tab. */
 const tabs: SettingsTab[] = [
-  { id: "general", labelKey: "settings_tab_general", icon: Palette },
+  { id: "appearance", labelKey: "appearance", icon: Palette },
+  { id: "notifications", labelKey: "notifications", icon: Bell },
   { id: "catalogs", labelKey: "settings_tab_catalogs", icon: FolderTree },
-  { id: "integrations", labelKey: "settings_tab_integrations", icon: ArrowRightLeft },
+  { id: "currencies", labelKey: "currencies", icon: Coins },
+  { id: "ai", labelKey: "ai_section_title", icon: Sparkles },
   { id: "data", labelKey: "settings_tab_data", icon: Database },
 ];
 
-const activeTab = ref("general");
+const route = useRoute();
+const router = useRouter();
+const tabIds = new Set(tabs.map((t) => t.id));
+/** `/settings?section=<tab>` deep-links (e.g. "set up AI first") and keeps the tab across reloads. */
+const activeTab = ref(tabIds.has(String(route.query.section)) ? String(route.query.section) : "appearance");
+watch(activeTab, (tab) => {
+  if (route.query.section !== tab) void router.replace({ query: { ...route.query, section: tab } });
+});
+watch(
+  () => route.query.section,
+  (section) => {
+    if (typeof section === "string" && tabIds.has(section)) activeTab.value = section;
+  },
+);
 
 watch(activeTab, async (tab) => {
-  if (tab === "catalogs") {
+  // Usage counts drive the "in use" badges / delete guards in catalog and currency lists.
+  if (tab === "catalogs" || tab === "currencies") {
     await catalogsUsageStore.ensureLoaded();
   }
-});
+}, { immediate: true }); // `?section=catalogs` deep links start on that tab
 
 const ready = computed(() => !!settings.value);
 
 const tabsTv = tv({
   slots: {
-    navWrap: "settings-tabs-sticky mb-4 sm:mb-6",
-    nav: "settings-tabs-nav",
-    tab: [
-      "flex items-center gap-1.5 px-3 sm:px-4 py-2.5 text-xs sm:text-sm font-medium whitespace-nowrap",
-      "border-b-2 transition-colors cursor-pointer shrink-0",
+    layout: "md:grid md:grid-cols-[200px_minmax(0,1fr)] md:gap-6 md:items-start",
+    // Phones: horizontal scrolling tabs; desktop: sticky vertical section nav
+    nav: [
+      "flex gap-1 overflow-x-auto scrollbar-none mb-4 p-1 rounded-xl bg-surface-hover",
+      "md:sticky md:top-2 md:flex-col md:mb-0 md:p-0 md:bg-transparent md:rounded-none",
     ],
-    body: "space-y-4 sm:space-y-6",
+    tab: [
+      "flex items-center gap-2 h-9 px-3 rounded-lg text-[13px] font-medium whitespace-nowrap shrink-0",
+      "transition-colors cursor-pointer",
+    ],
+    body: "space-y-4 min-w-0",
   },
   variants: {
     active: {
-      true: {
-        tab: "border-primary text-primary",
-      },
-      false: {
-        tab: "border-transparent text-text-muted hover:text-text-secondary hover:border-border",
-      },
+      true: { tab: "bg-surface text-text-primary shadow-sm md:bg-primary-light md:text-primary md:shadow-none" },
+      false: { tab: "text-text-muted hover:text-text-primary md:hover:bg-surface-hover" },
     },
   },
 });
@@ -90,55 +107,59 @@ const slots = tabsTv();
 </script>
 
 <template>
-  <div class="max-w-3xl mx-auto">
-    <!-- Tab navigation -->
-    <div :class="slots.navWrap()">
-      <nav :class="slots.nav()">
-        <button
-          v-for="tab in tabs"
-          :key="tab.id"
-          @click="activeTab = tab.id"
-          :class="tabsTv({ active: activeTab === tab.id }).tab()"
-          data-compact
-        >
-          <component :is="tab.icon" :size="15" />
-          {{ t(tab.labelKey) }}
-        </button>
-      </nav>
-    </div>
+  <div :class="slots.layout()">
+    <nav :class="slots.nav()" :aria-label="t('settings')">
+      <button
+        v-for="tab in tabs"
+        :key="tab.id"
+        @click="activeTab = tab.id"
+        :class="tabsTv({ active: activeTab === tab.id }).tab()"
+        :aria-current="activeTab === tab.id ? 'page' : undefined"
+        data-compact
+      >
+        <component :is="tab.icon" :size="15" />
+        {{ t(tab.labelKey) }}
+      </button>
+    </nav>
 
     <!-- Tab content -->
     <div :class="slots.body()">
       <template v-if="ready">
-        <template v-if="activeTab === 'general'">
+        <template v-if="activeTab === 'appearance'">
           <AppearanceSection :lookupSettings="settings!" />
+        </template>
+
+        <template v-if="activeTab === 'notifications'">
           <BudgetNotificationsSection :lookupSettings="settings!" />
-          <HouseholdSection :lookupHousehold="household" />
+          <TelegramSection />
         </template>
 
         <template v-if="activeTab === 'catalogs'">
           <CategoriesSection :lookupData="{ categories, settings: settings!, categoryUsage: catalogsUsage?.categoryUsage ?? {} }" />
-          <CurrenciesSection :lookupData="{ currencies, settings: settings!, currencyUsage: catalogsUsage?.currencyUsage ?? {} }" />
           <PaymentMethodsSection :lookupData="{ paymentMethods, settings: settings!, paymentMethodUsage: catalogsUsage?.paymentMethodUsage ?? {} }" />
           <TagsSection :lookupData="{ tags, tagUsage: catalogsUsage?.tagUsage ?? {} }" />
+          <HouseholdSection :lookupHousehold="household" />
+        </template>
+
+        <template v-if="activeTab === 'currencies'">
+          <CurrenciesSection :lookupData="{ currencies, settings: settings!, currencyUsage: catalogsUsage?.currencyUsage ?? {} }" />
+          <ExchangeRatesSection :lookupData="{ settings: settings!, currencies }" />
+          <RateHistorySection :lookupSettings="settings!" />
           <ConverterPresetsSection :lookupSettings="settings!" />
         </template>
 
-        <template v-if="activeTab === 'integrations'">
-          <ExchangeRatesSection :lookupData="{ settings: settings!, currencies }" />
-          <RateHistorySection :lookupSettings="settings!" />
+        <template v-if="activeTab === 'ai'">
           <AiSection />
-          <TelegramSection />
-          <CloudSyncSection />
         </template>
 
         <template v-if="activeTab === 'data'">
+          <CloudSyncSection />
           <DataManagementSection />
         </template>
       </template>
       <template v-else>
         <div class="text-sm text-text-muted py-4">
-          {{ t("loading") }}...
+          {{ t("loading") }}…
         </div>
       </template>
     </div>
@@ -146,37 +167,3 @@ const slots = tabsTv();
     <Toast :show="showToast" :message="toastMsg" :type="toastType" @close="closeToast" />
   </div>
 </template>
-
-<style scoped>
-.settings-tabs-sticky {
-  position: sticky;
-  top: -0.75rem;
-  z-index: 20;
-  background: var(--color-surface-secondary);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.settings-tabs-nav {
-  display: flex;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  padding: 0 0.25rem;
-}
-
-.settings-tabs-nav::-webkit-scrollbar {
-  display: none;
-}
-
-@media (min-width: 640px) {
-  .settings-tabs-sticky {
-    top: -1rem;
-  }
-}
-
-@media (min-width: 768px) {
-  .settings-tabs-sticky {
-    top: -1.5rem;
-  }
-}
-</style>

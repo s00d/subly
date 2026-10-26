@@ -38,6 +38,7 @@ pub struct SyncStatusDto {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub struct SyncConfig {
     pub provider: Option<SyncProviderType>,
     pub enabled: bool,
@@ -51,22 +52,6 @@ pub struct SyncConfig {
     pub remote_revision: String,
 }
 
-impl Default for SyncConfig {
-    fn default() -> Self {
-        Self {
-            provider: None,
-            enabled: false,
-            last_synced: 0,
-            local_updated_at: 0,
-            device_id: String::new(),
-            dropbox_app_key: String::new(),
-            onedrive_client_id: String::new(),
-            webdav_url: String::new(),
-            webdav_username: String::new(),
-            remote_revision: String::new(),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

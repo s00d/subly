@@ -1,33 +1,40 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
+import { formatErrorForToast } from "@/utils/formatError";
 import { clearRateHistory, rateHistoryCount } from "@/services/ratesClient";
 import type { Settings } from "@/schemas/appData";
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import Toast from "@/components/ui/Toast.vue";
 import { History, Trash2 } from "@lucide/vue";
-import { ui } from "@/lib/tv";
+import { button, ui } from "@/lib/tv";
+import UiCard from "@/components/ui/UiCard.vue";
+import AppToggle from "@/components/ui/AppToggle.vue";
+import ConfirmDialog from "@/components/ui/ConfirmDialog.vue";
+import SavedIndicator, { useAutoSave } from "@/components/settings/SavedIndicator.vue";
 
 const props = defineProps<{ lookupSettings: Settings | null }>();
 const { t } = useI18n();
 const { toastMsg, toastType, showToast, toast, closeToast } = useToast();
 const metaStore = useAppMetaStore();
 const settings = ref<Settings | null>(null);
+const { savedAt, run } = useAutoSave();
 
 const recordCount = ref(0);
 const showConfirm = ref(false);
 
+watch(() => props.lookupSettings, (v) => (settings.value = v), { immediate: true, deep: true });
+
 onMounted(async () => {
-  settings.value = props.lookupSettings;
   await loadCount();
 });
 
-async function updateSettings(updates: Partial<Settings>) {
+function updateSettings(updates: Partial<Settings>) {
   if (!settings.value) return;
   const next = { ...settings.value, ...updates };
   settings.value = next;
-  await metaStore.updateSettings(next);
+  void run(() => metaStore.updateSettings(next));
 }
 
 async function loadCount() {
@@ -47,69 +54,58 @@ function setDays(val: string) {
 }
 
 async function clearHistory() {
-  await clearRateHistory();
-  recordCount.value = 0;
   showConfirm.value = false;
-  toast(t("history_cleared"));
+  try {
+    await clearRateHistory();
+    recordCount.value = 0;
+    toast(t("history_cleared"));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
+  }
 }
 
 const dayPresets = [30, 60, 90, 180, 365];
 </script>
 
 <template>
-  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-    <div class="flex items-center gap-2 mb-1">
-      <History :size="16" class="text-primary" />
-      <h2 :class="ui.sectionTitle()">{{ t('rate_history') }}</h2>
-    </div>
+  <UiCard :title="t('rate_history')" :icon="History" icon-tone="text-primary">
+    <template #actions>
+      <SavedIndicator :at="savedAt" />
+    </template>
     <p class="text-xs text-text-muted mb-4">{{ t('rate_history_desc') }}</p>
 
     <div class="space-y-4">
-      <!-- Toggle -->
-      <div class="flex items-center justify-between">
-        <span class="text-sm text-text-primary">{{ t('rate_history_enabled') }}</span>
-          <button
-          @click="toggleEnabled"
-          :class="[
-            'relative inline-flex h-6 w-11 items-center rounded-full transition-colors',
-            settings?.rateHistoryEnabled
-              ? 'bg-primary'
-              : 'bg-border',
-          ]"
-        >
-          <span
-            :class="[
-              'inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow',
-              settings?.rateHistoryEnabled ? 'translate-x-6' : 'translate-x-1',
-            ]"
-          />
-        </button>
-      </div>
+      <AppToggle
+        :modelValue="Boolean(settings?.rateHistoryEnabled)"
+        @update:modelValue="toggleEnabled"
+        :label="t('rate_history_enabled')"
+      />
 
       <!-- Days limit -->
       <div v-if="settings?.rateHistoryEnabled" class="space-y-2">
-        <div class="flex items-center justify-between">
-          <span class="text-sm text-text-primary">{{ t('rate_history_days') }}</span>
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-sm text-text-secondary">{{ t('rate_history_days') }}</span>
           <input
             type="number"
             min="7"
             max="365"
             :value="settings?.rateHistoryDays"
             @change="setDays(($event.target as HTMLInputElement).value)"
-            class="w-20 px-2 py-1 text-sm text-right rounded-lg border border-border bg-surface text-text-primary focus:outline-none focus:ring-2 focus:ring-primary tabular-nums"
+            :class="ui.field({ class: 'w-20 h-8 py-1 text-right tabular-nums' })"
           />
         </div>
         <div class="flex flex-wrap gap-1">
           <button
             v-for="d in dayPresets"
             :key="d"
+            type="button"
             @click="setDays(String(d))"
-            :class="[
-              'px-2.5 py-0.5 text-[11px] rounded border transition-colors',
-              settings?.rateHistoryDays === d
-                ? 'bg-primary text-white border-primary'
-                : 'bg-surface-secondary text-text-secondary border-border hover:border-primary hover:text-primary',
-            ]"
+            :aria-pressed="settings?.rateHistoryDays === d"
+            :class="button({
+              intent: settings?.rateHistoryDays === d ? 'primary' : 'secondary',
+              size: 'sm',
+              class: 'tabular-nums',
+            })"
           >{{ d }}d</button>
         </div>
       </div>
@@ -117,32 +113,28 @@ const dayPresets = [30, 60, 90, 180, 365];
       <!-- Stats + Clear -->
       <div class="flex items-center justify-between pt-2 border-t border-border">
         <span class="text-xs text-text-muted">
-          {{ t('rate_history_records') }}: <strong class="text-text-primary tabular-nums">{{ recordCount.toLocaleString() }}</strong>
+          {{ t('rate_history_records') }}: <strong class="font-semibold text-text-primary tabular-nums">{{ recordCount.toLocaleString() }}</strong>
         </span>
-        <div v-if="!showConfirm">
-          <button
-            @click="showConfirm = true"
-            :disabled="recordCount === 0"
-            class="flex items-center gap-1 px-2.5 py-1 text-xs rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            <Trash2 :size="13" />
-            {{ t('clear_history') }}
-          </button>
-        </div>
-        <div v-else class="flex items-center gap-2">
-          <span class="text-xs text-text-muted">{{ t('clear_history_confirm') }}</span>
-          <button
-            @click="clearHistory"
-            class="px-2.5 py-1 text-xs rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors"
-          >{{ t('confirm') }}</button>
-          <button
-            @click="showConfirm = false"
-            class="px-2.5 py-1 text-xs rounded-lg border border-border text-text-secondary hover:border-primary transition-colors"
-          >{{ t('cancel') }}</button>
-        </div>
+        <button
+          type="button"
+          @click="showConfirm = true"
+          :disabled="recordCount === 0"
+          :class="button({ intent: 'ghost', size: 'sm', class: 'text-danger hover:bg-danger/12 hover:text-danger' })"
+        >
+          <Trash2 :size="13" />
+          {{ t('clear_history') }}
+        </button>
       </div>
     </div>
 
+    <ConfirmDialog
+      :show="showConfirm"
+      :title="t('clear_history')"
+      :message="t('clear_history_confirm')"
+      :confirm-label="t('confirm')"
+      @confirm="clearHistory"
+      @cancel="showConfirm = false"
+    />
     <Toast :show="showToast" :message="toastMsg" :type="toastType" @close="closeToast" />
-  </section>
+  </UiCard>
 </template>

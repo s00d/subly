@@ -82,9 +82,9 @@ pub(crate) fn rewrite_expense_day_index_in_tx(tx: &WriteTransaction, expenses: &
     let mut to_remove: Vec<(String, String)> = Vec::new();
     if let Ok(table) = tx.open_multimap_table(T2_EXPENSE_IDS_BY_DAY) {
         for ent in table.iter().map_err(AppError::from)? {
-            let (k, mut vals) = ent.map_err(AppError::from)?;
+            let (k, vals) = ent.map_err(AppError::from)?;
             let k = k.value().to_string();
-            while let Some(v) = vals.next() {
+            for v in vals {
                 let g = v.map_err(AppError::from)?;
                 to_remove.push((k.clone(), g.value().to_string()));
             }
@@ -490,6 +490,19 @@ impl AppStateInner {
         Ok(())
     }
 
+    /// Persist a sync-merged snapshot as-is. Unlike [`Self::apply_snapshot_typed_with_config`] this
+    /// keeps every row's `updated_at`: re-stamping on pull would make untouched rows beat newer
+    /// edits and tombstones from other devices in the next LWW merge.
+    pub fn apply_merged_snapshot_with_config(
+        &mut self,
+        data: &AppDataDoc,
+        config: &AppConfigDoc,
+    ) -> AppResult<()> {
+        persist_app_data_snapshot(self.db.as_ref(), data, Some(config))?;
+        self.app_data = data.clone();
+        Ok(())
+    }
+
     #[allow(dead_code)]
     pub(crate) fn reload_from_db(&mut self) -> AppResult<()> {
         let (doc, _) = load_app_data_typed(self.db.as_ref())?;
@@ -497,8 +510,15 @@ impl AppStateInner {
         Ok(())
     }
 
+    /// Snapshot of app data. `settings` is overlaid with the UI-owned `config:settings` JSON:
+    /// the frontend only writes that key, so the legacy `SettingsDoc` copy goes stale
+    /// (budget never set, old main currency after a switch).
     pub fn doc(&self) -> AppResult<crate::AppDataDoc> {
-        Ok(self.app_data.clone())
+        let mut doc = self.app_data.clone();
+        if let Some(raw) = self.redb_get("config:settings")? {
+            overlay_config_settings(&mut doc.settings, &raw);
+        }
+        Ok(doc)
     }
 
     pub fn redb_get(&self, key: &str) -> AppResult<Option<String>> {
@@ -527,9 +547,48 @@ impl AppStateInner {
     }
 }
 
+/// Copies the fields the backend computes with from the `config:settings` JSON (unknown/invalid values are ignored).
+pub(crate) fn overlay_config_settings(settings: &mut SettingsDoc, raw: &str) {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) else { return };
+    match v.get("budget") {
+        Some(serde_json::Value::String(b)) => {
+            if let Ok(d) = crate::money::parse_money_str(b) {
+                settings.budget = d;
+            }
+        }
+        Some(serde_json::Value::Number(n)) => {
+            if let Ok(d) = crate::money::parse_money_str(&n.to_string()) {
+                settings.budget = d;
+            }
+        }
+        Some(serde_json::Value::Null) => settings.budget = rust_decimal::Decimal::ZERO,
+        _ => {}
+    }
+    if let Some(id) = v.get("mainCurrencyId").and_then(|x| x.as_str()).filter(|s| !s.trim().is_empty()) {
+        settings.main_currency_id = id.to_string();
+    }
+    if let Some(arr) = v.get("currencyUpdateTargets").and_then(|x| x.as_array()) {
+        settings.currency_update_targets = arr.iter().filter_map(|x| x.as_str().map(str::to_string)).collect();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn overlay_config_settings_takes_ui_values() {
+        let mut s = default_settings_doc();
+        s.main_currency_id = "cur-old".into();
+        overlay_config_settings(&mut s, r#"{"budget":"500","mainCurrencyId":"cur-2","currencyUpdateTargets":["cur-1"]}"#);
+        assert_eq!(s.budget, rust_decimal::Decimal::from(500));
+        assert_eq!(s.main_currency_id, "cur-2");
+        assert_eq!(s.currency_update_targets, vec!["cur-1".to_string()]);
+        overlay_config_settings(&mut s, r#"{"budget":250}"#);
+        assert_eq!(s.budget, rust_decimal::Decimal::from(250));
+        overlay_config_settings(&mut s, "not json");
+        assert_eq!(s.main_currency_id, "cur-2", "garbage leaves values alone");
+    }
 
     #[test]
     fn restart_roundtrip_keeps_restart_sensitive_fields() {
@@ -592,5 +651,28 @@ mod tests {
 
         // keep state mutable usage explicit for future command-side point updates
         state.app_data.subscriptions.clear();
+    }
+
+    #[test]
+    fn merged_snapshot_apply_keeps_row_updated_at() {
+        let (_dir, db) = crate::test_support::temp_db().expect("temp db");
+        let mut doc = crate::test_support::doc_with_restart_sensitive_fields().expect("doc");
+        let cfg = crate::test_support::default_config();
+        for s in &mut doc.subscriptions {
+            s.updated_at = 1_000;
+        }
+        for e in &mut doc.expenses {
+            e.updated_at = 2_000;
+        }
+        let mut state = AppStateInner {
+            db: std::sync::Arc::new(db),
+            app_data: doc.clone(),
+        };
+        state.apply_merged_snapshot_with_config(&doc, &cfg).expect("apply merged");
+
+        let (after, _) = load_app_data_typed(state.db.as_ref()).expect("reload");
+        assert!(!after.subscriptions.is_empty() && !after.expenses.is_empty());
+        assert!(after.subscriptions.iter().all(|s| s.updated_at == 1_000));
+        assert!(after.expenses.iter().all(|e| e.updated_at == 2_000));
     }
 }

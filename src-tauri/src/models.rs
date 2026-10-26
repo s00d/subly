@@ -139,8 +139,9 @@ fn default_notify_true() -> bool {
     true
 }
 
+/// `-1` = use the global "notify days before" setting.
 fn default_notify_days_before() -> i64 {
-    1
+    -1
 }
 
 fn is_supported_date_input(raw: &str) -> bool {
@@ -162,8 +163,7 @@ pub(crate) fn normalize_expense_timestamp(raw: &str) -> Result<String, crate::er
             .ok_or_else(|| crate::errors::AppError::from("field_invalid_date:createdAt"))?;
         return Ok(chrono::DateTime::<chrono::Utc>::from_naive_utc_and_offset(ndt, chrono::Utc).to_rfc3339());
     }
-    if trimmed.len() >= 10 {
-        let head = &trimmed[..10];
+    if let Some(head) = trimmed.get(..10) {
         if let Ok(d) = chrono::NaiveDate::parse_from_str(head, "%Y-%m-%d") {
             let ndt = d
                 .and_hms_opt(12, 0, 0)
@@ -193,8 +193,8 @@ pub(crate) fn parse_loose_date_to_ymd(raw: &str) -> Result<(i32, u32, u32), crat
         date
     } else if let Ok(date_time) = chrono::DateTime::parse_from_rfc3339(trimmed) {
         date_time.date_naive()
-    } else if trimmed.len() >= 10 {
-        chrono::NaiveDate::parse_from_str(&trimmed[..10], "%Y-%m-%d").map_err(|_| {
+    } else if let Some(head) = trimmed.get(..10) {
+        chrono::NaiveDate::parse_from_str(head, "%Y-%m-%d").map_err(|_| {
             crate::errors::AppError::from("field_invalid_date:date")
         })?
     } else {
@@ -483,10 +483,23 @@ pub(crate) struct SubscriptionListItemDto {
     pub(crate) payment_history: Vec<PaymentRecordDto>,
     #[serde(default = "default_money_zero", with = "crate::money::serde_ipc")]
     pub(crate) monthly_price: Decimal,
+    /// `price` converted to the main currency (equals `price` when already in it).
+    #[serde(default = "default_money_zero", with = "crate::money::serde_ipc")]
+    pub(crate) price_main: Decimal,
+    /// `monthly_price` converted to the main currency — sum these for list totals.
+    #[serde(default = "default_money_zero", with = "crate::money::serde_ipc")]
+    pub(crate) monthly_price_main: Decimal,
+    /// Signed days until `next_payment` (negative = overdue).
     #[serde(default)]
-    pub(crate) days_left: u64,
+    pub(crate) days_left: i64,
     #[serde(default)]
     pub(crate) overdue: bool,
+    /// Elapsed fraction of the current billing cycle, `0.0..=1.0`.
+    #[serde(default)]
+    pub(crate) cycle_progress: f32,
+    /// `overdue` | `danger` (0..=3 days) | `warn` (4..=7) | `normal`.
+    #[serde(default)]
+    pub(crate) urgency: String,
     /// Non-secret indicator of which credential fields the user has saved.
     /// Read from redb on every list call. Reading the actual secrets is a
     /// separate explicit step that goes through the OS keyring.
@@ -566,6 +579,12 @@ impl SubscriptionInputDto {
         }
         if !is_supported_date_input(&self.start_date) {
             return Err(crate::errors::AppError::from("field_invalid_date:startDate"));
+        }
+        if !(1..=4).contains(&self.cycle) {
+            return Err(crate::errors::AppError::from("field_invalid_number:cycle"));
+        }
+        if self.frequency < 1 {
+            return Err(crate::errors::AppError::from("field_invalid_number:frequency"));
         }
         Ok(())
     }
@@ -691,4 +710,33 @@ pub(crate) struct ExpensesPageRequestDto {
 pub(crate) struct ExpensesPageResponseDto {
     pub(crate) items: Vec<ExpenseDoc>,
     pub(crate) total: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    /// Multi-byte char straddling byte 10 used to panic (`panic = "abort"` kills the app).
+    #[test]
+    fn date_prefix_parsing_rejects_non_ascii_without_panic() {
+        for raw in ["2024年01月01日", "202401月01", "ééééééééé"] {
+            assert!(super::normalize_expense_timestamp(raw).is_err(), "{raw}");
+            assert!(super::parse_loose_date_to_ymd(raw).is_err(), "{raw}");
+        }
+        assert_eq!(super::parse_loose_date_to_ymd("2024-01-05 garbage").unwrap(), (2024, 1, 5));
+    }
+
+    #[test]
+    fn subscription_input_validate_rejects_bad_cycle_and_frequency() {
+        let mut input: super::SubscriptionInputDto = serde_json::from_value(serde_json::json!({
+            "name": "x", "price": "1", "currencyId": "c", "nextPayment": "2026-01-01", "startDate": "2026-01-01"
+        }))
+        .unwrap();
+        assert!(input.validate().is_ok());
+        for bad in [0_u8, 5] {
+            input.cycle = bad;
+            assert_eq!(input.validate().unwrap_err().to_string(), "field_invalid_number:cycle");
+        }
+        input.cycle = 3;
+        input.frequency = 0;
+        assert_eq!(input.validate().unwrap_err().to_string(), "field_invalid_number:frequency");
+    }
 }

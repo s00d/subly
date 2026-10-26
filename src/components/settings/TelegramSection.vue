@@ -4,7 +4,8 @@ import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import AppInput from "@/components/ui/AppInput.vue";
 import SecretInput from "@/components/ui/SecretInput.vue";
-import { ui } from "@/lib/tv";
+import { button } from "@/lib/tv";
+import UiCard from "@/components/ui/UiCard.vue";
 import AppToggle from "@/components/ui/AppToggle.vue";
 import { notificationsEvent } from "@/services/notificationsClient";
 import { getConfigValue, setConfigValue } from "@/services/configClient";
@@ -49,16 +50,20 @@ onMounted(async () => {
 });
 
 async function saveTelegram() {
-  const fresh = botToken.value.trim();
-  if (fresh.length > 0) {
-    await setSecureValue("telegramBotToken", fresh);
-    hasSavedToken.value = true;
-    botToken.value = "";
+  try {
+    const fresh = botToken.value.trim();
+    if (fresh.length > 0) {
+      await setSecureValue("telegramBotToken", fresh);
+      hasSavedToken.value = true;
+      botToken.value = "";
+    }
+    await setConfigValue("telegramChatId", chatId.value);
+    await setConfigValue("telegramProxyUrl", proxyUrl.value);
+    await setConfigValue("telegramEnabled", enabled.value);
+    toast(t("success"));
+  } catch (e) {
+    toast(formatErrorForToast(e, t), "error");
   }
-  await setConfigValue("telegramChatId", chatId.value);
-  await setConfigValue("telegramProxyUrl", proxyUrl.value);
-  await setConfigValue("telegramEnabled", enabled.value);
-  toast(t("success"));
 }
 
 async function testTelegram() {
@@ -93,8 +98,7 @@ async function testTelegram() {
 </script>
 
 <template>
-  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-    <h2 :class="[ui.sectionTitle(), 'mb-3 sm:mb-4']">{{ t('telegram_notifications') }}</h2>
+  <UiCard :title="t('telegram_notifications')">
     <div class="space-y-3">
       <AppToggle v-model="enabled" :label="t('telegram_enabled')" :description="t('telegram_enabled_info')" />
       <div>
@@ -106,7 +110,7 @@ async function testTelegram() {
         />
         <p
           v-if="hasSavedToken && !botToken"
-          class="mt-1 text-[11px] text-green-600 dark:text-green-400"
+          class="mt-1 text-[11px] text-success"
         >
           {{ t("ai_api_key_configured") }}
         </p>
@@ -114,11 +118,12 @@ async function testTelegram() {
       <AppInput v-model="chatId" :label="t('telegram_chat_id')" :placeholder="t('telegram_chat_id_placeholder')" />
       <AppInput v-model="proxyUrl" label="Telegram Proxy URL" placeholder="https://your-proxy.example.com" />
       <div class="flex gap-2">
-        <button @click="saveTelegram" class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors">{{ t('save') }}</button>
+        <button type="button" @click="saveTelegram" :class="button({ intent: 'primary' })">{{ t('save') }}</button>
         <button
+          type="button"
           @click="testTelegram"
           :disabled="isTesting || (!botToken && !hasSavedToken) || !chatId"
-          class="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border text-sm font-medium text-text-secondary hover:border-primary hover:text-primary transition-colors disabled:opacity-50"
+          :class="button({ intent: 'secondary' })"
         >
           <Send :size="14" />
           {{ t('telegram_test') }}
@@ -126,5 +131,5 @@ async function testTelegram() {
       </div>
       <p class="text-xs text-text-muted">{{ t('telegram_info') }}</p>
     </div>
-  </section>
+  </UiCard>
 </template>

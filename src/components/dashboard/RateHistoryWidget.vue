@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import UiCard from "@/components/ui/UiCard.vue";
 import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { getRateHistoryWidget, type RateHistoryPoint } from "@/services/dashboardClient";
 import { getCurrencyFlags } from "@/services/ratesClient";
 import type { Settings, Currency } from "@/schemas/appData";
-import { TrendingUp } from "@lucide/vue";
+import { TrendingUp, ArrowRight } from "@lucide/vue";
 import { useRouter } from "vue-router";
 import VChart from "@/components/ui/LazyVChart.vue";
 import type { EChartsCoreOption } from "echarts/core";
@@ -203,20 +204,13 @@ const rateChartOption = computed((): EChartsCoreOption => {
 </script>
 
 <template>
-  <div
-    v-if="settings?.rateHistoryEnabled && currencies.length > 0 && hasHistory"
-    class="bg-surface rounded-xl border border-border p-2.5 sm:p-4"
-  >
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <TrendingUp :size="16" class="text-primary" />
-        <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('rate_history') }}</h2>
-      </div>
-      <button
-        @click="router.push('/currencies')"
-        class="text-xs text-primary hover:underline"
-      >{{ t('exchange_rates') }} →</button>
-    </div>
+  <UiCard v-if="settings?.rateHistoryEnabled && currencies.length > 0 && hasHistory" :title="t('rate_history')" :icon="TrendingUp" tone="info">
+    <template #actions>
+    <button
+      @click="router.push('/currencies')"
+      class="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-hover"
+    >{{ t('exchange_rates') }} <ArrowRight :size="12" /></button>
+    </template>
 
     <!-- Mini cards -->
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-2.5 mb-3">
@@ -227,11 +221,11 @@ const rateChartOption = computed((): EChartsCoreOption => {
       >
         <div class="flex items-center gap-1.5 mb-1.5">
           <span v-if="flagFor(cur.code)" class="text-sm">{{ flagFor(cur.code) }}</span>
-          <span class="text-xs font-bold text-text-primary">{{ cur.code }}</span>
+          <span class="text-xs font-semibold text-text-primary">{{ cur.code }}</span>
           <span
             v-if="pctChange((history[cur.id] ?? []).map(p => toDisplayNumber(parseMoney(p.rate), 4)))"
             class="ml-auto text-[10px] font-semibold tabular-nums"
-            :class="trendDir((history[cur.id] ?? []).map(p => toDisplayNumber(parseMoney(p.rate), 4))) >= 0 ? 'text-green-500' : 'text-red-500'"
+            :class="trendDir((history[cur.id] ?? []).map(p => toDisplayNumber(parseMoney(p.rate), 4))) >= 0 ? 'text-success' : 'text-danger'"
           >{{ pctChange((history[cur.id] ?? []).map(p => toDisplayNumber(parseMoney(p.rate), 4))) }}</span>
         </div>
 
@@ -268,5 +262,5 @@ const rateChartOption = computed((): EChartsCoreOption => {
     <div v-if="hasHistory && rateLineSeriesCount > 0" class="h-56 sm:h-72">
       <VChart class="h-full w-full" :theme="chartTheme" :option="rateChartOption" autoresize />
     </div>
-  </div>
+  </UiCard>
 </template>

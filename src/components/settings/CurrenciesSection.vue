@@ -2,15 +2,20 @@
 import { ref, computed, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
-import { upsertCurrency, deleteCurrency as deleteCurrencyApi, maxSortOrder } from "@/services/catalogClient";
+import { upsertCurrency, deleteCurrency as deleteCurrencyApi, maxSortOrder, updateCurrencyRates } from "@/services/catalogClient";
+import { div, parseMoney } from "@/lib/money";
 import type { Currency, Settings } from "@/schemas/appData";
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useCatalogsUsageStore } from "@/stores/catalogsUsageStore";
 import { formatErrorForToast } from "@/utils/formatError";
 import AppInput from "@/components/ui/AppInput.vue";
-import { Trash2, Plus, ChevronUp, ChevronDown, Star, Search } from "@lucide/vue";
+import UiCard from "@/components/ui/UiCard.vue";
+import SavedIndicator, { useAutoSave } from "@/components/settings/SavedIndicator.vue";
+import SettingsSearch from "@/components/settings/SettingsSearch.vue";
+import ReorderButtons from "@/components/settings/ReorderButtons.vue";
+import { Trash2, Plus } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
-import { ui } from "@/lib/tv";
+import { button } from "@/lib/tv";
 
 const props = defineProps<{
   lookupData: {
@@ -23,6 +28,8 @@ const { t } = useI18n();
 const { toast } = useToast();
 const metaStore = useAppMetaStore();
 const catalogsUsageStore = useCatalogsUsageStore();
+const { savedAt, run, debounce } = useAutoSave();
+const iconBtn = button({ intent: "ghost", size: "icon", class: "h-7 w-7" });
 const currencies = ref<Currency[]>([]);
 const settings = ref<Settings | null>(null);
 const currencyUsage = ref<Record<string, number>>({});
@@ -39,6 +46,10 @@ watch(
 const curSearch = ref("");
 const isCurSearching = computed(() => curSearch.value.length > 0);
 
+/** The main currency is pinned on top by the sort: it can't move and nothing moves above it. */
+const pinnedCount = computed(() =>
+  currencies.value.some((c) => c.id === settings.value?.mainCurrencyId) ? 1 : 0,
+);
 const sortedCurrencies = computed(() => {
   const mainId = settings.value?.mainCurrencyId;
   return [...currencies.value].sort((a, b) => {
@@ -64,9 +75,10 @@ async function updateCurrency(id: string, updates: Partial<Currency>) {
   if (!cur) return;
   const next = { ...cur, ...updates };
   await upsertCurrency(next);
+  metaStore.refreshSoon();
   Object.assign(cur, next);
 }
-async function setMainCurrency(id: string) {
+function setMainCurrency(id: string) {
   if (!settings.value) return;
   const validIds = new Set(currencies.value.map((c) => c.id));
   const nextTargets = (settings.value.currencyUpdateTargets ?? []).filter(
@@ -74,7 +86,18 @@ async function setMainCurrency(id: string) {
   );
   const next = { ...settings.value, mainCurrencyId: id, currencyUpdateTargets: nextTargets };
   settings.value = next;
-  await metaStore.updateSettings(next);
+  // Rates are "units per 1 main": rebase so the new main is exactly 1, otherwise every
+  // conversion (amount / rate) keeps using the old base.
+  const newMain = currencies.value.find((c) => c.id === id);
+  const base = newMain ? parseMoney(newMain.rate) : null;
+  const rebased = base && base.gt(0)
+    ? currencies.value.map((c) => ({ id: c.id, rate: c.id === id ? "1" : div(c.rate, base).toFixed() }))
+    : [];
+  void run(async () => {
+    if (rebased.length > 0) await updateCurrencyRates(rebased);
+    await metaStore.updateSettings(next);
+    await metaStore.refresh();
+  });
 }
 async function reorderCurrencies(ids: string[]) {
   for (let i = 0; i < ids.length; i += 1) {
@@ -82,19 +105,27 @@ async function reorderCurrencies(ids: string[]) {
     if (!cur) continue;
     const next = { ...cur, sortOrder: i };
     await upsertCurrency(next);
+    metaStore.refreshSoon();
     Object.assign(cur, next);
   }
 }
-async function addCur() {
-  const order = await maxSortOrder("currencies");
-  const cur: Currency = { id: crypto.randomUUID(), name: "Currency", symbol: "$", code: "CODE", rate: "1", sortOrder: order + 1, i18nKey: "" };
-  await upsertCurrency(cur);
-  currencies.value.push(cur);
+function addCur() {
+  void run(async () => {
+    const order = await maxSortOrder("currencies");
+    const cur: Currency = { id: crypto.randomUUID(), name: "Currency", symbol: "$", code: "CODE", rate: "1", sortOrder: order + 1, i18nKey: "" };
+    await upsertCurrency(cur);
+    metaStore.refreshSoon();
+    currencies.value.push(cur);
+  });
 }
-async function saveCur(id: string, name: string, symbol: string, code: string) {
-  const normalizedCode = code.trim().toUpperCase();
-  await updateCurrency(id, { name, symbol, code: normalizedCode });
-  toast(t("success"));
+/** Field edits: update the row now, persist (with normalized code) once typing pauses. */
+function saveCur(id: string, field: "name" | "symbol" | "code", value: string) {
+  const cur = currencies.value.find((c) => c.id === id);
+  if (!cur) return;
+  cur[field] = value;
+  debounce(`cur:${id}`, () =>
+    updateCurrency(id, { name: cur.name, symbol: cur.symbol, code: cur.code.trim().toUpperCase() }),
+  );
 }
 async function removeCur(id: string) {
   if (id === settings.value?.mainCurrencyId) {
@@ -103,6 +134,7 @@ async function removeCur(id: string) {
   }
   try {
     await deleteCurrencyApi(id);
+    metaStore.refreshSoon();
     currencies.value = currencies.value.filter((c) => c.id !== id);
     await catalogsUsageStore.refresh();
     toast(t("success"));
@@ -115,35 +147,46 @@ function moveCurUp(id: string) {
   const idx = ids.indexOf(id);
   if (idx <= 0) return;
   [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
-  void reorderCurrencies(ids);
+  void run(() => reorderCurrencies(ids));
 }
 function moveCurDown(id: string) {
   const ids = sortedCurrencies.value.map((c) => c.id);
   const idx = ids.indexOf(id);
   if (idx < 0 || idx >= ids.length - 1) return;
   [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
-  void reorderCurrencies(ids);
+  void run(() => reorderCurrencies(ids));
 }
 </script>
 
 <template>
-  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-    <div class="flex items-center justify-between gap-2 mb-3">
-      <h2 :class="[ui.sectionTitle(), 'shrink-0']">{{ t('currencies') }}</h2>
-      <div class="relative w-32 sm:w-44">
-        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input v-model="curSearch" type="text" :placeholder="t('search')" class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow" />
-      </div>
-    </div>
-    <div class="space-y-1.5 max-h-72 overflow-y-auto overflow-x-hidden">
-      <div v-for="(c, idx) in filteredCurrencies" :key="c.id" class="flex gap-2 items-center rounded-lg px-2 py-1" :class="c.id === settings?.mainCurrencyId ? 'bg-primary-light/50' : ''">
-        <div v-if="!isCurSearching" class="flex flex-row sm:flex-col shrink-0">
-          <Tooltip :text="t('move_up')"><button @click="moveCurUp(c.id)" :disabled="idx === 0" class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronUp :size="14" /></button></Tooltip>
-          <Tooltip :text="t('move_down')"><button @click="moveCurDown(c.id)" :disabled="idx === sortedCurrencies.length - 1" class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronDown :size="14" /></button></Tooltip>
-        </div>
+  <UiCard :title="t('currencies')">
+    <template #actions>
+      <SavedIndicator :at="savedAt" />
+      <SettingsSearch v-model="curSearch" class="w-32 sm:w-44" />
+    </template>
+    <div class="space-y-1 max-h-72 overflow-y-auto overflow-x-hidden">
+      <div v-for="(c, idx) in filteredCurrencies" :key="c.id" class="flex gap-1.5 items-center rounded-lg px-1.5 py-1" :class="c.id === settings?.mainCurrencyId ? 'bg-primary-light/50' : ''">
+        <ReorderButtons
+          v-if="!isCurSearching && idx >= pinnedCount"
+          :up-disabled="idx <= pinnedCount"
+          :down-disabled="idx === sortedCurrencies.length - 1"
+          @up="moveCurUp(c.id)"
+          @down="moveCurDown(c.id)"
+        />
+        <div v-else-if="!isCurSearching" class="w-14 shrink-0" />
+        <!-- Main currency (radio) -->
         <Tooltip :text="t('set_as_primary')">
-          <button @click="setMainCurrency(c.id)" class="p-1 rounded-lg transition-colors shrink-0" :class="c.id === settings?.mainCurrencyId ? 'text-yellow-500' : 'text-text-muted hover:text-yellow-500'">
-            <Star :size="14" :fill="c.id === settings?.mainCurrencyId ? 'currentColor' : 'none'" />
+          <button
+            type="button"
+            role="radio"
+            :aria-checked="c.id === settings?.mainCurrencyId"
+            :aria-label="t('set_as_primary')"
+            :class="iconBtn"
+            @click="setMainCurrency(c.id)"
+          >
+            <span class="flex h-3.5 w-3.5 items-center justify-center rounded-full border-2" :class="c.id === settings?.mainCurrencyId ? 'border-primary' : 'border-border-strong'">
+              <span v-if="c.id === settings?.mainCurrencyId" class="h-1.5 w-1.5 rounded-full bg-primary" />
+            </span>
           </button>
         </Tooltip>
         <!-- Default item: read-only -->
@@ -154,17 +197,24 @@ function moveCurDown(id: string) {
         </template>
         <!-- User item: editable -->
         <template v-else>
-          <div class="w-10 shrink-0"><AppInput :modelValue="c.symbol" @update:modelValue="(v: string | number) => saveCur(c.id, c.name, String(v), c.code)" size="sm" /></div>
-          <div class="flex-1 min-w-0"><AppInput :modelValue="c.name" @update:modelValue="(v: string | number) => saveCur(c.id, String(v), c.symbol, c.code)" size="sm" /></div>
-          <div class="w-14 shrink-0"><AppInput :modelValue="c.code" @update:modelValue="(v: string | number) => saveCur(c.id, c.name, c.symbol, String(v))" size="sm" :disabled="c.id === settings?.mainCurrencyId || isUsedCurrency(c.id)" /></div>
+          <div class="w-10 shrink-0"><AppInput :modelValue="c.symbol" @update:modelValue="(v: string | number) => saveCur(c.id, 'symbol', String(v))" size="sm" /></div>
+          <div class="flex-1 min-w-0"><AppInput :modelValue="c.name" @update:modelValue="(v: string | number) => saveCur(c.id, 'name', String(v))" size="sm" /></div>
+          <div class="w-14 shrink-0"><AppInput :modelValue="c.code" @update:modelValue="(v: string | number) => saveCur(c.id, 'code', String(v))" size="sm" :disabled="c.id === settings?.mainCurrencyId || isUsedCurrency(c.id)" /></div>
         </template>
+        <span v-if="c.id === settings?.mainCurrencyId" class="shrink-0 rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] font-medium text-primary">{{ t('catalog_default') }}</span>
         <Tooltip :text="t('delete')">
-          <button @click="removeCur(c.id)" :disabled="c.id === settings?.mainCurrencyId" class="p-1.5 rounded-lg transition-colors shrink-0" :class="c.id === settings?.mainCurrencyId ? 'text-text-muted cursor-not-allowed' : 'text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20'"><Trash2 :size="14" /></button>
+          <button
+            type="button"
+            :aria-label="t('delete')"
+            @click="removeCur(c.id)"
+            :disabled="c.id === settings?.mainCurrencyId"
+            :class="[iconBtn, 'text-danger hover:bg-danger/12 hover:text-danger disabled:text-text-muted']"
+          ><Trash2 :size="14" /></button>
         </Tooltip>
       </div>
     </div>
-    <button @click="addCur" class="mt-3 px-3 py-1.5 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover transition-colors">
-      <Plus :size="14" class="inline mr-1" /> {{ t('add') }}
+    <button type="button" @click="addCur" :class="button({ intent: 'secondary', size: 'sm', class: 'mt-3' })">
+      <Plus :size="14" /> {{ t('add') }}
     </button>
-  </section>
+  </UiCard>
 </template>

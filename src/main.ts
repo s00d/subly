@@ -6,6 +6,16 @@ import { setupI18n } from "./i18n";
 import "./style.css";
 
 async function bootstrap() {
+  if (import.meta.env.DEV) {
+    // Never let dev tooling block startup.
+    try {
+      const dev = await import("./dev/ipcFixtures");
+      if ("__TAURI_INTERNALS__" in window) dev.installIpcRecorder();
+      else await dev.installIpcMock();
+    } catch (e) {
+      console.warn("[ipc-fixtures] disabled:", e);
+    }
+  }
   const app = createApp(App);
   app.use(createPinia());
 

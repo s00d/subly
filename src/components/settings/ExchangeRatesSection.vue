@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import AppToggle from "@/components/ui/AppToggle.vue";
@@ -13,8 +13,10 @@ import { getSecureValue, setSecureValue } from "@/services/secureStorageClient";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { Currency, Settings } from "@/schemas/appData";
 import { useAppMetaStore } from "@/stores/appMetaStore";
-import { RefreshCw, Check, CheckSquare, Square, ChevronDown, ArrowRightLeft, Search } from "@lucide/vue";
-import { tv, ui } from "@/lib/tv";
+import { RefreshCw, Check, CheckSquare, Square, ChevronDown, ArrowRightLeft } from "@lucide/vue";
+import { tv, button } from "@/lib/tv";
+import UiCard from "@/components/ui/UiCard.vue";
+import SettingsSearch from "@/components/settings/SettingsSearch.vue";
 import { formatErrorForToast } from "@/utils/formatError";
 
 const props = defineProps<{
@@ -59,9 +61,17 @@ async function refreshHasSavedKey() {
   }
 }
 
+// Follow the store: a one-time copy made other sections' changes (main currency) get reverted on save.
+watch(
+  () => props.lookupData,
+  (lookup) => {
+    settings.value = lookup?.settings ?? null;
+    currencies.value = lookup?.currencies ?? [];
+  },
+  { immediate: true, deep: true },
+);
+
 onMounted(async () => {
-  settings.value = props.lookupData?.settings ?? null;
-  currencies.value = props.lookupData?.currencies ?? [];
   selectedProvider.value = ((await getConfigValue<string>("ratesProvider")) || "frankfurter") as RatesProviderType;
   await refreshHasSavedKey();
   ratesGetProviders()
@@ -222,7 +232,7 @@ async function manualUpdate() {
     if (result.error) {
       toast(result.error, "error");
     } else if (result.updated > 0) {
-      toast(t("rates_updated").replace("{count}", String(result.updated)));
+      toast(t("rates_updated", { count: result.updated }));
     } else {
       toast(t("no_rates_updated"), "error");
     }
@@ -236,9 +246,6 @@ async function manualUpdate() {
 
 const sectionTv = tv({
   slots: {
-    root: "bg-surface rounded-xl border border-border p-4 sm:p-5",
-    header: "flex items-center gap-2 mb-1",
-    title: ui.sectionTitle(),
     desc: "text-xs sm:text-sm text-text-muted mb-4",
     providerCard: "rounded-xl border overflow-hidden transition-all cursor-pointer select-none",
     providerRow: "flex items-center gap-3 p-3",
@@ -248,15 +255,7 @@ const sectionTv = tv({
     credForm: "px-3 pb-3 pt-0",
     credFormInner: "space-y-2.5 p-3 rounded-lg bg-surface-secondary",
     credLabel: "block text-[10px] font-medium text-text-muted mb-1",
-    credInput: [
-      "w-full px-2.5 py-1.5 rounded-lg border border-border",
-      "bg-surface text-xs text-text-primary",
-      "focus:outline-none focus:ring-1 focus:ring-primary",
-    ],
-    saveBtn: [
-      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50",
-      "bg-primary text-white hover:bg-primary-hover",
-    ],
+    saveBtn: button({ intent: "primary", size: "sm" }),
     linkBtn: "inline-flex items-center gap-1 text-[10px] text-primary hover:underline",
     divider: "pt-4 mt-4 border-t border-border",
   },
@@ -289,11 +288,7 @@ async function openProviderDocs(type: RatesProviderType) {
 </script>
 
 <template>
-  <section :class="s.root()">
-    <div :class="s.header()">
-      <ArrowRightLeft :size="18" class="text-primary" />
-      <h2 :class="s.title()">{{ t('exchange_rates') }}</h2>
-    </div>
+  <UiCard :title="t('exchange_rates')" :icon="ArrowRightLeft" icon-tone="text-primary">
     <p :class="s.desc()">{{ t('exchange_rates_desc') }}</p>
     <p class="text-[11px] text-text-muted mb-4">
       {{ t("exchange_rates_links_desc") }}
@@ -312,7 +307,7 @@ async function openProviderDocs(type: RatesProviderType) {
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <p class="text-sm font-medium text-text-primary">{{ activeProvider.name }}</p>
-            <span class="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-[9px] font-medium">
+            <span class="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-success/12 text-success text-[10px] font-medium">
               <Check :size="9" />
               {{ t('active') }}
             </span>
@@ -323,8 +318,10 @@ async function openProviderDocs(type: RatesProviderType) {
       <!-- Change provider button -->
       <div class="flex items-center gap-2 mt-2 pt-2 border-t border-border">
         <button
+          type="button"
           @click="showChangeProvider = !showChangeProvider"
-          class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors text-text-secondary hover:bg-surface-hover border border-border bg-surface"
+          :aria-expanded="showChangeProvider"
+          :class="button({ size: 'sm' })"
         >
           <RefreshCw :size="12" />
           {{ t('sync_change_provider') }}
@@ -442,7 +439,7 @@ async function openProviderDocs(type: RatesProviderType) {
       </div>
       <p
         v-if="hasSavedKey && !apiKey"
-        class="mt-1 text-[10px] text-green-600 dark:text-green-400"
+        class="mt-1 text-[10px] text-success"
       >
         {{ t("ai_api_key_configured") }}
       </p>
@@ -453,32 +450,25 @@ async function openProviderDocs(type: RatesProviderType) {
       <div class="flex items-center justify-between mb-2">
         <label class="text-sm font-semibold text-text-primary">{{ t('target_currencies') }}</label>
         <div class="flex gap-2">
-          <button @click="selectAllTargets" class="p-1 rounded text-primary hover:bg-primary/10 transition-colors" :title="t('select_all')">
-            <CheckSquare :size="13" />
+          <button type="button" @click="selectAllTargets" :class="button({ intent: 'ghost', size: 'icon', class: 'h-7 w-7 text-primary hover:text-primary' })" :title="t('select_all')" :aria-label="t('select_all')">
+            <CheckSquare :size="14" />
           </button>
-          <button @click="deselectAllTargets" class="p-1 rounded text-text-muted hover:bg-surface-hover transition-colors" :title="t('deselect_all')">
-            <Square :size="13" />
+          <button type="button" @click="deselectAllTargets" :class="button({ intent: 'ghost', size: 'icon', class: 'h-7 w-7' })" :title="t('deselect_all')" :aria-label="t('deselect_all')">
+            <Square :size="14" />
           </button>
         </div>
       </div>
       <p class="text-[10px] text-text-muted mb-2">{{ t('target_currencies_info') }}</p>
-      <div class="relative mb-2">
-        <Search :size="13" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input
-          v-model="targetSearch"
-          type="text"
-          :placeholder="t('search')"
-          class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow"
-        />
-      </div>
+      <SettingsSearch v-model="targetSearch" class="mb-2" />
       <div class="flex flex-wrap gap-1.5 max-h-32 overflow-auto">
         <button
           v-for="opt in filteredTargetCurrencyOptions"
           :key="String(opt.value)"
           @click="toggleTarget(String(opt.value))"
-          class="px-2 py-1 rounded-md text-[11px] font-medium border transition-colors"
+          type="button"
+          class="px-2 py-1 rounded-lg text-[11px] font-medium border transition-colors"
           :class="updateTargets.includes(String(opt.value))
-            ? 'bg-primary-light border-primary text-primary'
+ ? 'bg-primary-light border-primary text-primary'
             : 'bg-surface border-border text-text-muted hover:border-text-muted'"
         >
           {{ opt.label }}
@@ -500,9 +490,10 @@ async function openProviderDocs(type: RatesProviderType) {
       <div class="mt-3 flex items-center gap-2 text-xs text-text-muted">
         <span>{{ t('last_update') }}: {{ lastUpdate }}</span>
         <button
+          type="button"
           @click="manualUpdate"
           :disabled="isUpdating"
-          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium border border-border text-text-secondary hover:border-primary hover:text-primary disabled:opacity-30 transition-colors"
+          :class="button({ size: 'sm' })"
         >
           <RefreshCw :size="12" :class="{ 'animate-spin': isUpdating }" />
           {{ t('update_now') }}
@@ -511,5 +502,5 @@ async function openProviderDocs(type: RatesProviderType) {
     </div>
 
     <Toast :show="showToast" :message="toastMsg" :type="toastType" @close="closeToast" />
-  </section>
+  </UiCard>
 </template>

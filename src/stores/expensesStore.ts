@@ -22,6 +22,14 @@ export const useExpensesStore = defineStore("expenses", () => {
       const res = await listExpensesFiltered(currentFilter.value, pageSize.value, offset);
       items.value = res.items;
       total.value = res.total;
+      // Deleting the last row of the last page: fall back to the new last page.
+      const lastPage = Math.max(1, Math.ceil(res.total / pageSize.value));
+      if (res.items.length === 0 && page.value > lastPage) {
+        page.value = lastPage;
+        const back = await listExpensesFiltered(currentFilter.value, pageSize.value, (lastPage - 1) * pageSize.value);
+        items.value = back.items;
+        total.value = back.total;
+      }
     } finally {
       loading.value = false;
     }

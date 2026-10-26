@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiCard from "@/components/ui/UiCard.vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useChartTheme } from "@/composables/useChartTheme";
@@ -84,16 +85,12 @@ const peakDay = computed(() => {
 </script>
 
 <template>
-  <div v-if="hasData" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <CalendarDays :size="16" class="text-primary" />
-        <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_day_of_week') }}</h2>
-      </div>
-      <span v-if="peakDay" class="text-[11px] text-text-muted">{{ t('peak') }}: {{ peakDay }}</span>
-    </div>
+  <UiCard v-if="hasData" :title="t('widget_day_of_week')" :icon="CalendarDays" tone="warning">
+    <template #actions>
+    <span v-if="peakDay" class="text-[11px] text-text-muted">{{ t('peak') }}: {{ peakDay }}</span>
+    </template>
     <div class="h-48 sm:h-52">
       <VChart class="h-full w-full" :theme="chartTheme" :option="chartOption" autoresize />
     </div>
-  </div>
+  </UiCard>
 </template>

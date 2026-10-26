@@ -7,13 +7,15 @@ use crate::models::{
     ExpenseDoc, PaymentRecordDto, SubscriptionCredentialsMetaDto, SubscriptionDoc,
     SubscriptionInputDto, SubscriptionListItemDto, SubscriptionsPageRequestDto,
 };
-use crate::commands::expenses::{apply_expense_payment_record_kv_in_tx, emit_expenses_changed};
+use crate::commands::expenses::{
+    apply_expense_payment_record_kv_in_tx, emit_expenses_changed, update_expense_payment_record_index,
+};
 use crate::commands::subscription_credentials::{
     credentials_apply_optional, credentials_delete, read_meta_index,
 };
 use crate::state::{
     encode_bin, entity_table_upsert_bin_in_tx, rewrite_expense_day_index_in_tx, run_write_transaction,
-    EntityTable,
+    update_expense_day_index, EntityTable,
 };
 use crate::state_tables::touch_expense_doc;
 
@@ -102,6 +104,15 @@ fn emit_subscriptions_changed(app: &tauri::AppHandle, action: &str) {
     crate::widget_snapshot::export_widget_snapshot_from_app(app);
 }
 
+/// `last_notified_date` is owned by the notification check. The UI round-trips a cached copy
+/// that goes stale as soon as a check runs, so saving a subscription must not overwrite it.
+fn keep_notify_marker(mut row: SubscriptionDoc, existing: Option<&SubscriptionDoc>) -> SubscriptionDoc {
+    if let Some(e) = existing {
+        row.last_notified_date = e.last_notified_date.clone();
+    }
+    row
+}
+
 fn subscription_row_from_input(mut input: SubscriptionInputDto) -> Result<SubscriptionDoc, crate::errors::AppError> {
     if input.id.trim().is_empty() {
         input.id = format!("sub-{}", chrono::Utc::now().timestamp_millis());
@@ -162,8 +173,8 @@ fn normalize_date_ymd(raw: &str) -> Result<String, crate::errors::AppError> {
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(trimmed) {
         return Ok(dt.date_naive().format("%Y-%m-%d").to_string());
     }
-    if trimmed.len() >= 10 {
-        if let Ok(date) = NaiveDate::parse_from_str(&trimmed[..10], "%Y-%m-%d") {
+    if let Some(head) = trimmed.get(..10) {
+        if let Ok(date) = NaiveDate::parse_from_str(head, "%Y-%m-%d") {
             return Ok(date.format("%Y-%m-%d").to_string());
         }
     }
@@ -207,10 +218,58 @@ fn add_cycle_increment(date: NaiveDate, cycle: u64, frequency: u64, direction: i
     }
 }
 
+/// First cycle occurrence `>= on_or_after`, stepping from `anchor` by whole cycles.
+/// Each step is computed from the anchor (not chained), so month-end clamping does not drift.
+/// `None` for an unknown cycle or when the target is unreachable within the step cap.
+pub(crate) fn first_cycle_date_on_or_after(
+    anchor: NaiveDate,
+    cycle: u64,
+    frequency: u64,
+    on_or_after: NaiveDate,
+) -> Option<NaiveDate> {
+    if anchor >= on_or_after {
+        return Some(anchor);
+    }
+    if !(1..=4).contains(&cycle) {
+        return None;
+    }
+    let freq = frequency.max(1);
+    // ponytail: linear scan, ~11 years of daily cycles at most; fine for notification checks.
+    for k in 1..=4096_u64 {
+        let candidate = add_cycle_increment(anchor, cycle, freq.checked_mul(k)?, 1)?;
+        if candidate >= on_or_after {
+            return Some(candidate);
+        }
+    }
+    None
+}
+
 fn parse_subscription_date(raw: &str) -> Option<NaiveDate> {
     normalize_date_ymd(raw)
         .ok()
         .and_then(|d| NaiveDate::parse_from_str(&d, "%Y-%m-%d").ok())
+}
+
+/// Signed days until `next_payment`, elapsed fraction of the current cycle, urgency bucket.
+fn schedule_fields(next_payment: &str, cycle: u8, frequency: u32, today: NaiveDate) -> (i64, f32, String) {
+    let Some(next) = parse_subscription_date(next_payment) else {
+        return (0, 0.0, "normal".to_string());
+    };
+    let days_left = (next - today).num_days();
+    let cycle_progress = match add_cycle_increment(next, cycle as u64, frequency as u64, -1) {
+        Some(prev) if prev < next => {
+            ((today - prev).num_days() as f32 / (next - prev).num_days() as f32).clamp(0.0, 1.0)
+        }
+        _ if today >= next => 1.0,
+        _ => 0.0,
+    };
+    let urgency = match days_left {
+        d if d < 0 => "overdue",
+        0..=3 => "danger",
+        4..=7 => "warn",
+        _ => "normal",
+    };
+    (days_left, cycle_progress, urgency.to_string())
 }
 
 fn jump_to_window_start(
@@ -258,10 +317,22 @@ pub fn list_subscriptions_page(
     let guard = state
         .lock()
         .map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
+    list_subscription_rows(&guard, request, Local::now().date_naive())
+}
+
+fn list_subscription_rows(
+    guard: &crate::state::AppStateInner,
+    request: Option<SubscriptionsPageRequestDto>,
+    today: NaiveDate,
+) -> Result<Vec<SubscriptionListItemDto>, crate::errors::AppError> {
     let subscriptions = guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?;
-    let today = Local::now().date_naive();
+    let category_names: HashMap<&str, &str> =
+        guard.app_data.categories.iter().map(|c| (c.id.as_str(), c.name.as_str())).collect();
+    let payment_names: HashMap<&str, &str> =
+        guard.app_data.payment_methods.iter().map(|p| (p.id.as_str(), p.name.as_str())).collect();
+    let rates = crate::rate_map(&guard.app_data);
     let req = request.unwrap_or_default();
-    let search = req.search.trim().to_ascii_lowercase();
+    let search = req.search.trim().to_lowercase();
     let state_filter = req.state.trim().to_ascii_lowercase();
     let category_filter = req.category_id.trim().to_string();
     let payment_filter = req.payment_method_id.trim().to_string();
@@ -293,7 +364,16 @@ pub fn list_subscriptions_page(
                 return false;
             }
             if !search.is_empty() {
-                let haystack = format!("{} {} {} {}", item.name, item.notes, item.category_id, item.payment_method_id).to_ascii_lowercase();
+                let haystack = format!(
+                    "{} {} {} {} {} {}",
+                    item.name,
+                    item.notes,
+                    item.category_id,
+                    item.payment_method_id,
+                    category_names.get(item.category_id.as_str()).unwrap_or(&""),
+                    payment_names.get(item.payment_method_id.as_str()).unwrap_or(&""),
+                )
+                .to_lowercase();
                 if !haystack.contains(&search) {
                     return false;
                 }
@@ -302,14 +382,11 @@ pub fn list_subscriptions_page(
         })
         .map(|item| {
             let monthly = crate::price_per_month(item.cycle, item.frequency, item.price);
-            let (days_left, overdue) = NaiveDate::parse_from_str(&item.next_payment, "%Y-%m-%d")
-            .map(|next| {
-                let diff = (next - today).num_days();
-                let clamped = diff.clamp(0, 30) as u64;
-                let is_overdue = !item.inactive && !item.auto_renew && next < today;
-                (clamped, is_overdue)
-            })
-            .unwrap_or((0, false));
+            let price_main = crate::convert_to_main(item.price, &item.currency_id, &rates);
+            let monthly_price_main = crate::convert_to_main(monthly, &item.currency_id, &rates);
+            let (days_left, cycle_progress, urgency) =
+                schedule_fields(&item.next_payment, item.cycle, item.frequency, today);
+            let overdue = !item.inactive && !item.auto_renew && days_left < 0;
             let dto = SubscriptionListItemDto {
                 id: item.id,
                 name: item.name,
@@ -337,8 +414,12 @@ pub fn list_subscriptions_page(
                 favorite: item.favorite,
                 payment_history: item.payment_history,
                 monthly_price: monthly,
+                price_main,
+                monthly_price_main,
                 days_left,
                 overdue,
+                cycle_progress,
+                urgency,
                 credentials_meta: SubscriptionCredentialsMetaDto::default(),
             };
             Ok(dto)
@@ -346,8 +427,10 @@ pub fn list_subscriptions_page(
         .collect::<Result<Vec<_>, crate::errors::AppError>>()?;
 
     match sort_by.as_str() {
-        "name" => rows.sort_by(|a, b| a.name.to_ascii_lowercase().cmp(&b.name.to_ascii_lowercase())),
-        "price" => rows.sort_by(|a, b| a.price.partial_cmp(&b.price).unwrap_or(std::cmp::Ordering::Equal)),
+        // Unicode-aware: `to_ascii_lowercase` left Cyrillic etc. case-sensitive.
+        "name" => rows.sort_by_key(|a| a.name.to_lowercase()),
+        // Compare in the main currency: raw prices across currencies are not comparable.
+        "price" => rows.sort_by_key(|a| a.price_main),
         _ => rows.sort_by(|a, b| {
             let ad = parse_subscription_date(&a.next_payment);
             let bd = parse_subscription_date(&b.next_payment);
@@ -365,7 +448,7 @@ pub fn list_subscriptions_page(
     }
 
     for row in &mut rows {
-        row.credentials_meta = read_meta_index(&guard, &row.id)?;
+        row.credentials_meta = read_meta_index(guard, &row.id)?;
     }
 
     Ok(rows)
@@ -389,60 +472,109 @@ pub fn subscriptions_payment_dates_in_month(
     year: i32,
     month: u32,
 ) -> Result<HashMap<String, Vec<u32>>, crate::errors::AppError> {
-    if !(1..=12).contains(&month) {
-        return Err(crate::errors::AppError::from("month must be between 1 and 12"));
-    }
-
+    let (start, end) = month_bounds(year, month)?;
     let subscriptions = {
         let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         guard.table_list_typed::<SubscriptionDoc>(EntityTable::Subscriptions)?
     };
 
+    let mut result: HashMap<String, Vec<u32>> = HashMap::new();
+    for sub in &subscriptions {
+        if let Some(dates) = payment_dates_in_window(sub, start, end) {
+            result.insert(sub.id.clone(), dates.iter().map(|d| d.day()).collect());
+        }
+    }
+    Ok(result)
+}
+
+fn month_bounds(year: i32, month: u32) -> Result<(NaiveDate, NaiveDate), crate::errors::AppError> {
+    if !(1..=12).contains(&month) {
+        return Err(crate::errors::AppError::from("month must be between 1 and 12"));
+    }
     let start = NaiveDate::from_ymd_opt(year, month, 1).ok_or_else(|| {
         crate::errors::AppError::from("invalid year/month")
     })?;
     let end = NaiveDate::from_ymd_opt(year, month, last_day_of_month(year, month)).ok_or_else(|| {
         crate::errors::AppError::from("invalid end of month")
     })?;
+    Ok((start, end))
+}
 
-    let mut result: HashMap<String, Vec<u32>> = HashMap::new();
+/// Projected payment dates of `sub` inside `[start, end]`; `None` when `next_payment` is unparseable.
+pub(crate) fn payment_dates_in_window(sub: &SubscriptionDoc, start: NaiveDate, end: NaiveDate) -> Option<Vec<NaiveDate>> {
+    let next_payment = parse_subscription_date(&sub.next_payment)?;
+    let cycle = sub.cycle as u64;
+    let frequency = sub.frequency as u64;
+    let Some(mut current) = jump_to_window_start(next_payment, cycle, frequency, start, end) else {
+        return Some(Vec::new());
+    };
+    let mut dates = Vec::new();
+    for _ in 0..400 {
+        if current >= start && current <= end {
+            dates.push(current);
+        }
+        if current > end {
+            break;
+        }
+        match add_cycle_increment(current, cycle, frequency, 1) {
+            Some(next) => current = next,
+            None => break,
+        }
+    }
+    Some(dates)
+}
 
-    for sub in &subscriptions {
-        let id = sub.id.as_str();
-        let next_payment = match parse_subscription_date(&sub.next_payment) {
-            Some(v) => v,
-            None => continue,
-        };
-        let cycle = sub.cycle as u64;
-        let frequency = sub.frequency as u64;
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CalendarMonthStatsDto {
+    pub(crate) active_subscriptions: usize,
+    pub(crate) payments_count: usize,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub(crate) total_cost: rust_decimal::Decimal,
+    #[serde(with = "crate::money::serde_ipc")]
+    pub(crate) amount_due: rust_decimal::Decimal,
+}
 
-        let mut current = match jump_to_window_start(next_payment, cycle, frequency, start, end) {
-            Some(v) => v,
-            None => {
-                result.insert(id.to_string(), Vec::new());
-                continue;
-            }
-        };
-
-        let mut days: Vec<u32> = Vec::new();
-        for _ in 0..400 {
-            if current >= start && current <= end {
-                days.push(current.day());
-            }
-            if current > end {
-                break;
-            }
-            if let Some(next) = add_cycle_increment(current, cycle, frequency, 1) {
-                current = next;
-            } else {
-                break;
+fn calendar_month_stats_for(
+    data: &crate::AppDataDoc,
+    year: i32,
+    month: u32,
+    today: NaiveDate,
+) -> Result<CalendarMonthStatsDto, crate::errors::AppError> {
+    let (start, end) = month_bounds(year, month)?;
+    let rates = crate::rate_map(data);
+    let mut stats = CalendarMonthStatsDto {
+        active_subscriptions: 0,
+        payments_count: 0,
+        total_cost: rust_decimal::Decimal::ZERO,
+        amount_due: rust_decimal::Decimal::ZERO,
+    };
+    for sub in data.subscriptions.iter().filter(|s| !s.inactive) {
+        let dates = payment_dates_in_window(sub, start, end).unwrap_or_default();
+        if dates.is_empty() {
+            continue;
+        }
+        let price = crate::convert_to_main(sub.price, &sub.currency_id, &rates);
+        stats.active_subscriptions += 1;
+        stats.payments_count += dates.len();
+        for d in dates {
+            stats.total_cost += price;
+            if d >= today {
+                stats.amount_due += price;
             }
         }
-
-        result.insert(id.to_string(), days);
     }
+    Ok(stats)
+}
 
-    Ok(result)
+#[tauri::command]
+pub fn calendar_month_stats(
+    state: State<'_, AppState>,
+    year: i32,
+    month: u32,
+) -> Result<CalendarMonthStatsDto, crate::errors::AppError> {
+    let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
+    calendar_month_stats_for(&guard.app_data, year, month, Local::now().date_naive())
 }
 
 #[tauri::command]
@@ -461,6 +593,7 @@ pub fn get_overdue_subscriptions(state: State<'_, AppState>) -> Result<Vec<Subsc
                     .unwrap_or(false)
         })
         .map(|s| {
+            let (days_left, cycle_progress, urgency) = schedule_fields(&s.next_payment, s.cycle, s.frequency, today);
             Ok(SubscriptionListItemDto {
                 id: s.id,
                 name: s.name,
@@ -488,8 +621,12 @@ pub fn get_overdue_subscriptions(state: State<'_, AppState>) -> Result<Vec<Subsc
                 favorite: s.favorite,
                 payment_history: s.payment_history,
                 monthly_price: rust_decimal::Decimal::ZERO,
-                days_left: 0,
+                price_main: rust_decimal::Decimal::ZERO,
+                monthly_price_main: rust_decimal::Decimal::ZERO,
+                days_left,
                 overdue: true,
+                cycle_progress,
+                urgency,
                 credentials_meta: SubscriptionCredentialsMetaDto::default(),
             })
         })
@@ -533,6 +670,7 @@ pub fn get_upcoming_subscriptions(state: State<'_, AppState>, days: i64, limit: 
     let mut out: Vec<SubscriptionListItemDto> = rows
         .into_iter()
         .map(|s| {
+            let (days_left, cycle_progress, urgency) = schedule_fields(&s.next_payment, s.cycle, s.frequency, today);
             SubscriptionListItemDto {
                 id: s.id,
                 name: s.name,
@@ -560,8 +698,12 @@ pub fn get_upcoming_subscriptions(state: State<'_, AppState>, days: i64, limit: 
                 favorite: s.favorite,
                 payment_history: s.payment_history,
                 monthly_price: rust_decimal::Decimal::ZERO,
-                days_left: 0,
+                price_main: rust_decimal::Decimal::ZERO,
+                monthly_price_main: rust_decimal::Decimal::ZERO,
+                days_left,
                 overdue: false,
+                cycle_progress,
+                urgency,
                 credentials_meta: SubscriptionCredentialsMetaDto::default(),
             }
         })
@@ -618,6 +760,7 @@ pub fn subscriptions_insert(app: tauri::AppHandle, state: State<'_, AppState>, m
     let sub_id = subscription.id.clone();
     let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let existing = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &subscription.id)?;
+    let subscription = keep_notify_marker(subscription, existing.as_ref());
     guard.table_upsert_typed(EntityTable::Subscriptions, &subscription, &subscription.id)?;
     sync_subscription_payment_record_index(&mut guard, existing.as_ref(), Some(&subscription))?;
     credentials_apply_optional(&guard, &sub_id, creds)?;
@@ -635,6 +778,7 @@ pub fn subscriptions_upsert(app: tauri::AppHandle, state: State<'_, AppState>, m
     let sub_id = subscription.id.clone();
     let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let existing = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &subscription.id)?;
+    let subscription = keep_notify_marker(subscription, existing.as_ref());
     guard.table_upsert_typed(EntityTable::Subscriptions, &subscription, &subscription.id)?;
     sync_subscription_payment_record_index(&mut guard, existing.as_ref(), Some(&subscription))?;
     credentials_apply_optional(&guard, &sub_id, creds)?;
@@ -652,6 +796,7 @@ pub fn subscriptions_update(app: tauri::AppHandle, state: State<'_, AppState>, m
     let sub_id = subscription.id.clone();
     let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let existing = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &subscription.id)?;
+    let subscription = keep_notify_marker(subscription, existing.as_ref());
     guard.table_upsert_typed(EntityTable::Subscriptions, &subscription, &subscription.id)?;
     sync_subscription_payment_record_index(&mut guard, existing.as_ref(), Some(&subscription))?;
     credentials_apply_optional(&guard, &sub_id, creds)?;
@@ -709,8 +854,14 @@ pub fn subscriptions_insert_payment_record(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
     sub_id: String,
-    payment_record: PaymentRecordDto,
+    mut payment_record: PaymentRecordDto,
 ) -> Result<(), crate::errors::AppError> {
+    // Same rules as `subscriptions_record_payment`: a real date, a non-negative amount.
+    payment_record.date = normalize_date_ymd(payment_record.date.trim())
+        .map_err(|_| crate::errors::AppError::from("field_invalid_date:date"))?;
+    if !crate::money::is_valid_non_negative(&payment_record.amount) {
+        return Err(crate::errors::AppError::from("field_invalid_number:amount"));
+    }
     let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let mut row = guard
         .table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &sub_id)?
@@ -725,6 +876,134 @@ pub fn subscriptions_insert_payment_record(
     Ok(())
 }
 
+/// One locked unit: payment record + next cycle + linked expense + indexes.
+fn record_payment_in_guard(
+    guard: &mut crate::state::AppStateInner,
+    sub_id: &str,
+    date: Option<String>,
+    amount: Option<String>,
+    note: Option<String>,
+    today: NaiveDate,
+) -> Result<SubscriptionDoc, crate::errors::AppError> {
+    let old_row = guard
+        .table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, sub_id)?
+        .ok_or_else(|| "subscription not found".to_string())?;
+    let date = match date.as_deref().map(str::trim).filter(|d| !d.is_empty()) {
+        Some(raw) => normalize_date_ymd(raw).map_err(|_| crate::errors::AppError::from("field_invalid_date:date"))?,
+        None => today.format("%Y-%m-%d").to_string(),
+    };
+    let amount = match amount.as_deref().map(str::trim).filter(|a| !a.is_empty()) {
+        Some(raw) => crate::money::parse_money_str(raw)
+            .ok()
+            .filter(crate::money::is_valid_non_negative)
+            .ok_or_else(|| crate::errors::AppError::from("field_invalid_number:amount"))?,
+        None => old_row.price,
+    };
+    let next = parse_subscription_date(&old_row.next_payment)
+        .and_then(|d| add_cycle_increment(d, old_row.cycle as u64, old_row.frequency as u64, 1))
+        .ok_or_else(|| crate::errors::AppError::from("field_invalid_date:nextPayment"))?;
+    let stamp = chrono::Utc::now().timestamp_nanos_opt().unwrap_or_default();
+    let note = note.unwrap_or_default();
+    let record = PaymentRecordDto {
+        id: format!("pr-{stamp}"),
+        date: date.clone(),
+        amount,
+        currency_id: old_row.currency_id.clone(),
+        note: note.clone(),
+    };
+
+    let mut row = old_row.clone();
+    row.payment_history.insert(0, record.clone());
+    row.next_payment = next.format("%Y-%m-%d").to_string();
+    guard.table_upsert_typed(EntityTable::Subscriptions, &row, &row.id)?;
+    sync_subscription_payment_record_index(guard, Some(&old_row), Some(&row))?;
+
+    let expense = ExpenseDoc {
+        id: format!("exp-{stamp}"),
+        updated_at: chrono::Utc::now().timestamp_millis(),
+        name: row.name.clone(),
+        amount,
+        currency_id: row.currency_id.clone(),
+        created_at: crate::models::normalize_expense_timestamp(&date)?,
+        category_id: row.category_id.clone(),
+        tags: row.tags.clone(),
+        payment_method_id: row.payment_method_id.clone(),
+        payer_user_id: row.payer_user_id.clone(),
+        notes: note,
+        url: String::new(),
+        subscription_id: row.id.clone(),
+        payment_record_id: record.id,
+    };
+    guard.table_upsert_typed(EntityTable::Expenses, &expense, &expense.id)?;
+    update_expense_payment_record_index(guard, None, Some(&expense))?;
+    update_expense_day_index(guard.db.as_ref(), None, Some(&expense))?;
+    // Re-read: the upsert stamps `updated_at`.
+    Ok(guard
+        .table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, sub_id)?
+        .unwrap_or(row))
+}
+
+#[tauri::command]
+pub fn subscriptions_record_payment(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    sub_id: String,
+    date: Option<String>,
+    amount: Option<String>,
+    note: Option<String>,
+) -> Result<SubscriptionDoc, crate::errors::AppError> {
+    let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
+    let row = record_payment_in_guard(&mut guard, &sub_id, date, amount, note, Local::now().date_naive())?;
+    drop(guard);
+    let _ = crate::commands::notifications::notifications_reschedule_all(app.clone(), state)?;
+    emit_expenses_changed(&app, "record_payment");
+    emit_subscriptions_changed(&app, "record_payment");
+    Ok(row)
+}
+
+/// Removes the payment record from its subscription and deletes the linked expense(s).
+/// Returns whether any expense was deleted.
+fn delete_payment_record_in_guard(
+    guard: &mut crate::state::AppStateInner,
+    id: &str,
+) -> Result<bool, crate::errors::AppError> {
+    if id.trim().is_empty() {
+        return Ok(false);
+    }
+    let has_record = |s: &SubscriptionDoc| s.payment_history.iter().any(|pr| pr.id == id);
+    let mut owner = match guard.redb_get(&payment_record_index_key(id))? {
+        Some(sub_id) => guard
+            .table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &sub_id)?
+            .filter(has_record),
+        None => None,
+    };
+    if owner.is_none() {
+        // Fallback for legacy/stale index: one scan, then auto-heal index.
+        let rows: Vec<SubscriptionDoc> = guard.table_list_typed(EntityTable::Subscriptions)?;
+        owner = rows.into_iter().find(has_record);
+    }
+    if let Some(old_sub) = owner {
+        let mut sub = old_sub.clone();
+        sub.payment_history.retain(|pr| pr.id != id);
+        guard.table_upsert_typed(EntityTable::Subscriptions, &sub, &sub.id)?;
+        sync_subscription_payment_record_index(guard, Some(&old_sub), Some(&sub))?;
+    }
+
+    let linked: Vec<ExpenseDoc> = guard
+        .app_data
+        .expenses
+        .iter()
+        .filter(|e| e.payment_record_id == id)
+        .cloned()
+        .collect();
+    for expense in &linked {
+        guard.table_delete_by_id(EntityTable::Expenses, &expense.id)?;
+        update_expense_payment_record_index(guard, Some(expense), None)?;
+        update_expense_day_index(guard.db.as_ref(), Some(expense), None)?;
+    }
+    Ok(!linked.is_empty())
+}
+
 #[tauri::command]
 pub fn subscriptions_delete_payment_record(
     app: tauri::AppHandle,
@@ -732,40 +1011,12 @@ pub fn subscriptions_delete_payment_record(
     id: String,
 ) -> Result<(), crate::errors::AppError> {
     let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
-    let indexed_sub_id = guard.redb_get(&payment_record_index_key(&id))?;
-    if let Some(sub_id) = indexed_sub_id {
-        if let Some(mut sub) = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &sub_id)? {
-            let before = sub.payment_history.len();
-            sub.payment_history.retain(|pr| pr.id != id);
-            if sub.payment_history.len() != before {
-                let old_sub = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &sub.id)?;
-                guard.table_upsert_typed(EntityTable::Subscriptions, &sub, &sub.id)?;
-                sync_subscription_payment_record_index(&mut guard, old_sub.as_ref(), Some(&sub))?;
-                drop(guard);
-                let _ = crate::commands::notifications::notifications_reschedule_all(app.clone(), state)?;
-                emit_subscriptions_changed(&app, "delete_payment_record");
-                return Ok(());
-            }
-        }
-    }
-
-    // Fallback for legacy/stale index: one scan, then auto-heal index.
-    let mut rows: Vec<SubscriptionDoc> = guard.table_list_typed(EntityTable::Subscriptions)?;
-    for item in &mut rows {
-        let before = item.payment_history.len();
-        item.payment_history.retain(|pr| pr.id != id);
-        if item.payment_history.len() != before {
-            let old_item = guard.table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, &item.id)?;
-            guard.table_upsert_typed(EntityTable::Subscriptions, item, &item.id)?;
-            sync_subscription_payment_record_index(&mut guard, old_item.as_ref(), Some(item))?;
-            drop(guard);
-            let _ = crate::commands::notifications::notifications_reschedule_all(app.clone(), state)?;
-            emit_subscriptions_changed(&app, "delete_payment_record");
-            return Ok(());
-        }
-    }
+    let expenses_deleted = delete_payment_record_in_guard(&mut guard, &id)?;
     drop(guard);
     let _ = crate::commands::notifications::notifications_reschedule_all(app.clone(), state)?;
+    if expenses_deleted {
+        emit_expenses_changed(&app, "delete_by_payment_record");
+    }
     emit_subscriptions_changed(&app, "delete_payment_record");
     Ok(())
 }
@@ -773,6 +1024,170 @@ pub fn subscriptions_delete_payment_record(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ymd(raw: &str) -> NaiveDate {
+        NaiveDate::parse_from_str(raw, "%Y-%m-%d").unwrap()
+    }
+
+    fn persisted_state(doc: crate::AppDataDoc) -> (tempfile::TempDir, crate::state::AppStateInner) {
+        let (dir, db) = crate::test_support::temp_db().expect("temp db");
+        crate::state::save_app_data_typed(&db, &doc, &crate::test_support::default_config()).expect("save");
+        let state = crate::state::AppStateInner { db: std::sync::Arc::new(db), app_data: doc };
+        state.redb_set("test:kv-init", "1").expect("create kv table");
+        (dir, state)
+    }
+
+    #[test]
+    fn schedule_fields_signed_days_progress_and_urgency() {
+        // Monthly, next 2026-05-11 -> previous cycle 2026-04-11 (30 days).
+        let (d, p, u) = schedule_fields("2026-05-11", 3, 1, ymd("2026-05-01"));
+        assert_eq!((d, u.as_str()), (10, "normal"));
+        assert!((p - 20.0 / 30.0).abs() < 1e-6, "{p}");
+        assert_eq!(schedule_fields("2026-05-11", 3, 1, ymd("2026-05-04")).2, "warn");
+        assert_eq!(schedule_fields("2026-05-11", 3, 1, ymd("2026-05-08")).2, "danger");
+        assert_eq!(schedule_fields("2026-05-11", 3, 1, ymd("2026-05-11")).2, "danger");
+        let (d, p, u) = schedule_fields("2026-05-11", 3, 1, ymd("2026-05-13"));
+        assert_eq!((d, p, u.as_str()), (-2, 1.0, "overdue"));
+        assert_eq!(schedule_fields("bad", 3, 1, ymd("2026-05-13")), (0, 0.0, "normal".to_string()));
+    }
+
+    #[test]
+    fn list_rows_signed_days_left_and_search_by_catalog_names() {
+        let doc = crate::test_support::doc_with_restart_sensitive_fields().expect("doc");
+        let category_name = doc.categories[0].name.clone();
+        let payment_name = doc.payment_methods[0].name.clone();
+        let (_dir, state) = persisted_state(doc);
+        let req = |search: &str| {
+            Some(SubscriptionsPageRequestDto { search: search.to_string(), ..Default::default() })
+        };
+        let today = ymd("2026-05-04");
+
+        let rows = list_subscription_rows(&state, req(""), today).expect("rows");
+        let row = rows.iter().find(|r| r.id == "sub-test-1").expect("sub");
+        assert_eq!(row.days_left, -3);
+        assert_eq!(row.urgency, "overdue");
+        assert!(!row.overdue, "auto-renew is never flagged overdue");
+
+        for q in [category_name.to_uppercase(), payment_name.to_lowercase()] {
+            let rows = list_subscription_rows(&state, req(&q), today).expect("rows");
+            assert!(rows.iter().any(|r| r.id == "sub-test-1"), "search {q}");
+        }
+        assert!(list_subscription_rows(&state, req("zzz-no-match"), today).expect("rows").is_empty());
+    }
+
+    #[test]
+    fn list_rows_carry_main_currency_prices() {
+        let mut doc = crate::test_support::doc_with_restart_sensitive_fields().expect("doc");
+        doc.currencies[1].rate = rust_decimal::Decimal::from(2);
+        let other = doc.currencies[1].id.clone();
+        let sub = doc.subscriptions.iter_mut().find(|s| s.id == "sub-test-1").expect("sub");
+        sub.currency_id = other;
+        sub.price = rust_decimal::Decimal::from(24);
+        sub.cycle = 4; // yearly
+        sub.frequency = 1;
+        let (_dir, state) = persisted_state(doc);
+        let rows = list_subscription_rows(&state, None, ymd("2026-05-04")).expect("rows");
+        let row = rows.iter().find(|r| r.id == "sub-test-1").expect("row");
+        assert_eq!(row.price_main, rust_decimal::Decimal::from(12));
+        assert_eq!(row.monthly_price, rust_decimal::Decimal::from(2));
+        assert_eq!(row.monthly_price_main, rust_decimal::Decimal::from(1));
+    }
+
+    #[test]
+    fn price_sort_compares_in_main_currency() {
+        let mut doc = crate::test_support::doc_with_restart_sensitive_fields().expect("doc");
+        doc.currencies[1].rate = rust_decimal::Decimal::from(100);
+        let cheap_foreign = doc.currencies[1].id.clone();
+        let base = doc.subscriptions[0].clone();
+        doc.subscriptions = vec![
+            SubscriptionDoc { id: "foreign".into(), price: rust_decimal::Decimal::from(500), currency_id: cheap_foreign, ..base.clone() },
+            SubscriptionDoc { id: "main".into(), price: rust_decimal::Decimal::from(10), ..base },
+        ];
+        let (_dir, state) = persisted_state(doc);
+        let req: SubscriptionsPageRequestDto = serde_json::from_value(serde_json::json!({ "sortBy": "price" })).unwrap();
+        let rows = list_subscription_rows(&state, Some(req), ymd("2026-05-04")).expect("rows");
+        let ids: Vec<_> = rows.iter().map(|r| r.id.as_str()).collect();
+        assert_eq!(ids, ["foreign", "main"], "500 at rate 100 = 5 main < 10 main");
+    }
+
+    #[test]
+    fn calendar_month_stats_counts_active_and_converts_to_main() {
+        let mut doc = crate::test_support::doc_with_restart_sensitive_fields().expect("doc");
+        doc.currencies[1].rate = rust_decimal::Decimal::from(2);
+        let main_sub = doc.subscriptions.last_mut().expect("sub");
+        main_sub.price = "19.99".parse().unwrap(); // fixture uses lossy from_f64
+        let base = main_sub.clone();
+        // base: monthly 19.99 in main currency, next 2026-05-01.
+        let weekly = SubscriptionDoc {
+            id: "sub-weekly".into(),
+            price: rust_decimal::Decimal::from(10),
+            currency_id: doc.currencies[1].id.clone(),
+            cycle: 2,
+            next_payment: "2026-05-04".into(),
+            ..base.clone()
+        };
+        let inactive = SubscriptionDoc { id: "sub-off".into(), inactive: true, ..base.clone() };
+        let yearly_elsewhere = SubscriptionDoc { id: "sub-year".into(), cycle: 4, next_payment: "2026-09-01".into(), ..base };
+        doc.subscriptions.extend([weekly, inactive, yearly_elsewhere]);
+
+        let stats = calendar_month_stats_for(&doc, 2026, 5, ymd("2026-05-18")).expect("stats");
+        assert_eq!(stats.active_subscriptions, 2);
+        assert_eq!(stats.payments_count, 5, "May 1 + weekly 4/11/18/25");
+        assert_eq!(stats.total_cost, "39.99".parse::<rust_decimal::Decimal>().unwrap(), "19.99 + 4 * 10/2");
+        assert_eq!(stats.amount_due, rust_decimal::Decimal::from(10), "today (18th) counts as due");
+        let json = serde_json::to_value(&stats).unwrap();
+        assert_eq!(json["totalCost"], "39.99");
+        assert!(calendar_month_stats_for(&doc, 2026, 13, ymd("2026-05-18")).is_err());
+    }
+
+    #[test]
+    fn record_payment_then_delete_record_removes_linked_expense() {
+        let doc = crate::test_support::doc_with_restart_sensitive_fields().expect("doc");
+        let (_dir, mut state) = persisted_state(doc);
+        let today = ymd("2026-05-03");
+
+        let bad = record_payment_in_guard(&mut state, "sub-test-1", None, Some("-1".into()), None, today);
+        assert_eq!(bad.unwrap_err().to_string(), "field_invalid_number:amount");
+
+        let sub = record_payment_in_guard(&mut state, "sub-test-1", None, None, Some("n".into()), today).expect("record");
+        assert_eq!(sub.next_payment, "2026-06-01", "advanced one monthly cycle");
+        assert_eq!(sub.payment_history.len(), 2);
+        let pr = sub.payment_history[0].clone();
+        assert_eq!((pr.date.as_str(), pr.amount, pr.currency_id.as_str()), ("2026-05-03", sub.price, sub.currency_id.as_str()));
+        assert_eq!(
+            state.redb_get(&payment_record_index_key(&pr.id)).expect("idx"),
+            Some("sub-test-1".to_string())
+        );
+        let exp = state
+            .app_data
+            .expenses
+            .iter()
+            .find(|e| e.payment_record_id == pr.id)
+            .cloned()
+            .expect("linked expense");
+        assert_eq!(exp.subscription_id, "sub-test-1");
+        assert_eq!((&exp.category_id, &exp.tags, exp.amount), (&sub.category_id, &sub.tags, sub.price));
+        assert!(exp.created_at.starts_with("2026-05-03T12:00:00"));
+        let day = crate::state::expense_ids_in_day_range(state.db.as_ref(), today, today).expect("day idx");
+        assert!(day.contains(&exp.id));
+
+        // Empty id must not wipe unlinked expenses (their payment_record_id is "").
+        let before = state.app_data.expenses.len();
+        assert!(!delete_payment_record_in_guard(&mut state, " ").expect("noop"));
+        assert_eq!(state.app_data.expenses.len(), before);
+
+        assert!(delete_payment_record_in_guard(&mut state, &pr.id).expect("delete"));
+        let sub = state
+            .table_get_by_id_typed::<SubscriptionDoc>(EntityTable::Subscriptions, "sub-test-1")
+            .expect("read")
+            .expect("sub");
+        assert!(sub.payment_history.iter().all(|r| r.id != pr.id));
+        assert!(state.table_get_expense_by_id(&exp.id).expect("read").is_none());
+        assert!(state.app_data.expenses.iter().all(|e| e.id != exp.id));
+        assert!(state.redb_get(&payment_record_index_key(&pr.id)).expect("idx").is_none());
+        let day = crate::state::expense_ids_in_day_range(state.db.as_ref(), today, today).expect("day idx");
+        assert!(!day.contains(&exp.id));
+    }
 
     #[test]
     fn sync_subscription_payment_record_index_sets_and_clears_keys() {

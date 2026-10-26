@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useLocaleFormat } from "@/composables/useLocaleFormat";
+import UiCard from "@/components/ui/UiCard.vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
@@ -22,6 +24,7 @@ const props = defineProps<{
 }>();
 
 const data = computed(() => props.data ?? null);
+const { fmtMonthYear } = useLocaleFormat();
 
 /** Human-readable month from `YYYY-MM` (backend labels). */
 function captionFromYm(ym: string | undefined): string {
@@ -29,7 +32,7 @@ function captionFromYm(ym: string | undefined): string {
   const y = Number(ym.slice(0, 4));
   const m = Number(ym.slice(5, 7));
   if (!Number.isFinite(y) || !Number.isFinite(m)) return ym;
-  return new Date(y, m - 1, 1).toLocaleString(undefined, { month: "long", year: "numeric" });
+  return fmtMonthYear(new Date(y, m - 1, 1));
 }
 
 const comparisonHintKey = computed(() => {
@@ -44,7 +47,7 @@ const newerMonthCaption = computed(() => {
   const fromApi = captionFromYm(d?.currentMonthLabel);
   if (fromApi) return fromApi;
   const now = new Date();
-  return now.toLocaleString(undefined, { month: "long", year: "numeric" });
+  return fmtMonthYear(now);
 });
 
 const olderMonthCaption = computed(() => {
@@ -53,7 +56,7 @@ const olderMonthCaption = computed(() => {
   if (fromApi) return fromApi;
   const x = new Date();
   x.setMonth(x.getMonth() - 1);
-  return x.toLocaleString(undefined, { month: "long", year: "numeric" });
+  return fmtMonthYear(x);
 });
 
 const diff = computed(() => {
@@ -85,27 +88,22 @@ const hasData = computed(() => {
 </script>
 
 <template>
-  <div v-if="data && hasData" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
-    <div class="flex items-center gap-2 mb-2.5">
-      <component
-        :is="moneyGt(diff, '0') ? ArrowUpRight : moneyGt('0', diff) ? ArrowDownRight : Equal"
-        :size="16"
-        :class="moneyGt(diff, '0') ? 'text-red-500' : moneyGt('0', diff) ? 'text-green-500' : 'text-text-muted'"
-      />
-      <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_month_compare') }}</h2>
-    </div>
-    <p class="text-[10px] text-text-muted mb-2.5 leading-snug">
-      {{ t(comparisonHintKey) }}
-    </p>
+  <UiCard
+    v-if="data && hasData"
+    :title="t('widget_month_compare')"
+    :subtitle="t(comparisonHintKey)"
+    :icon="moneyGt(diff, '0') ? ArrowUpRight : moneyGt('0', diff) ? ArrowDownRight : Equal"
+    :icon-tone="moneyGt(diff, '0') ? 'text-danger' : moneyGt('0', diff) ? 'text-success' : 'text-text-muted'"
+  >
 
     <div class="space-y-2.5">
       <!-- Newer / current side of comparison -->
       <div>
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs text-text-primary font-medium capitalize">{{ newerMonthCaption }}</span>
-          <span class="text-sm font-bold text-text-primary tabular-nums">{{ fmt(data.currentTotal) }}</span>
+          <span class="text-sm font-semibold text-text-primary tabular-nums">{{ fmt(data.currentTotal) }}</span>
         </div>
-        <div class="w-full h-3 bg-surface-hover rounded-full overflow-hidden">
+        <div class="w-full h-2 bg-surface-hover rounded-full overflow-hidden">
           <div
             class="h-full rounded-full bg-primary transition-all duration-500"
             :style="{ width: (toDisplayNumber(parseMoney(data.currentTotal)) / barMax * 100) + '%' }"
@@ -118,11 +116,11 @@ const hasData = computed(() => {
       <div>
         <div class="flex items-center justify-between mb-1">
           <span class="text-xs text-text-muted font-medium capitalize">{{ olderMonthCaption }}</span>
-          <span class="text-sm font-bold text-text-muted tabular-nums">{{ fmt(data.previousTotal) }}</span>
+          <span class="text-sm font-semibold text-text-muted tabular-nums">{{ fmt(data.previousTotal) }}</span>
         </div>
-        <div class="w-full h-3 bg-surface-hover rounded-full overflow-hidden">
+        <div class="w-full h-2 bg-surface-hover rounded-full overflow-hidden">
           <div
-            class="h-full rounded-full bg-gray-400 transition-all duration-500"
+            class="h-full rounded-full bg-text-muted/50 transition-all duration-500"
             :style="{ width: (toDisplayNumber(parseMoney(data.previousTotal)) / barMax * 100) + '%' }"
           />
         </div>
@@ -132,19 +130,19 @@ const hasData = computed(() => {
       <!-- Diff -->
       <div class="flex items-center justify-center gap-2 pt-2 border-t border-border">
         <span
-          class="text-sm font-bold tabular-nums"
-          :class="moneyGt(diff, '0') ? 'text-red-500' : moneyGt('0', diff) ? 'text-green-500' : 'text-text-muted'"
+          class="text-sm font-semibold tabular-nums"
+          :class="moneyGt(diff, '0') ? 'text-danger' : moneyGt('0', diff) ? 'text-success' : 'text-text-muted'"
         >
           {{ moneyGt(diff, '0') ? '+' : '' }}{{ fmt(diff) }}
         </span>
         <span
           v-if="pctChange !== null"
           class="text-xs font-semibold tabular-nums px-1.5 py-0.5 rounded"
-          :class="pctChange > 0 ? 'bg-red-100 text-red-600 dark:bg-red-900/20' : 'bg-green-100 text-green-600 dark:bg-green-900/20'"
+          :class="pctChange > 0 ? 'bg-danger/12 text-danger' : 'bg-success/12 text-success'"
         >
           {{ pctChange > 0 ? '+' : '' }}{{ pctChange.toFixed(1) }}%
         </span>
       </div>
     </div>
-  </div>
+  </UiCard>
 </template>

@@ -56,6 +56,9 @@ fn item_url(base: &str, name: &str) -> String {
 
 pub(crate) fn webdav_sync_message_key(err: &crate::errors::AppError) -> Option<&'static str> {
     let msg = err.to_string().to_lowercase();
+    if !msg.contains("webdav") {
+        return None;
+    }
     if msg.contains("webdav auth") || msg.contains("401") || msg.contains("403") {
         return Some("sync_webdav_auth_failed");
     }
@@ -72,7 +75,7 @@ pub async fn test_connection(cfg: &SyncConfig) -> Result<(), crate::errors::AppE
     }
     let pwd = webdav_password()?;
     let base = cfg.webdav_url.trim_end_matches('/').to_string();
-    let client = tauri_plugin_http::reqwest::Client::new();
+    let client = super::http_client_no_redirect();
     let auth = (cfg.webdav_username.clone(), Some(pwd));
 
     let head = client
@@ -106,7 +109,7 @@ pub async fn test_connection(cfg: &SyncConfig) -> Result<(), crate::errors::AppE
     if pf_status.as_u16() == 401 || pf_status.as_u16() == 403 {
         return Err(crate::errors::AppError::from(format!("webdav auth failed: {}", pf_status)));
     }
-    Err(crate::errors::AppError::from(format!("webdav test failed: {}", pf_status)))
+    Err(status_error("test", &pf))
 }
 
 pub async fn download(cfg: &SyncConfig) -> Result<Option<SyncPayload>, crate::errors::AppError> {
@@ -115,14 +118,17 @@ pub async fn download(cfg: &SyncConfig) -> Result<Option<SyncPayload>, crate::er
     }
     let pwd = webdav_password()?;
     let url = item_url(&cfg.webdav_url, SYNC_FILENAME);
-    let resp = tauri_plugin_http::reqwest::Client::new()
+    let resp = super::http_client_no_redirect()
         .get(url)
         .basic_auth(cfg.webdav_username.clone(), Some(pwd))
         .send()
         .await
         .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     if !resp.status().is_success() {
-        return Ok(None);
+        if super::download_status_means_missing(resp.status().as_u16()) {
+            return Ok(None);
+        }
+        return Err(status_error("download", &resp));
     }
     let bytes = resp
         .bytes()
@@ -142,7 +148,7 @@ pub async fn upload(cfg: &SyncConfig, payload: &SyncPayload) -> Result<(), crate
     let final_url = item_url(&base, SYNC_FILENAME);
     let raw = encode_sync_payload(payload)?;
     let raw_clone = raw.clone();
-    let client = tauri_plugin_http::reqwest::Client::new();
+    let client = super::http_client_no_redirect();
     let auth = (cfg.webdav_username.clone(), Some(pwd));
 
     let put = client
@@ -154,10 +160,7 @@ pub async fn upload(cfg: &SyncConfig, payload: &SyncPayload) -> Result<(), crate
         .await
         .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
     if !put.status().is_success() {
-        return Err(crate::errors::AppError::from(format!(
-            "webdav upload (.tmp) failed: {}",
-            put.status()
-        )));
+        return Err(status_error("upload (.tmp)", &put));
     }
 
     let move_method =
@@ -171,24 +174,20 @@ pub async fn upload(cfg: &SyncConfig, payload: &SyncPayload) -> Result<(), crate
         .await
         .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
 
-    if mov.status().is_success() {
+    let mov_status = mov.status();
+    // 207 Multi-Status on MOVE means (partial) failure, not success.
+    if mov_status.is_success() && mov_status.as_u16() != 207 {
         return Ok(());
     }
 
-    let del = client
-        .delete(&final_url)
-        .basic_auth(auth.0.clone(), auth.1.clone())
-        .send()
-        .await
-        .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
-    if !del.status().is_success() && del.status().as_u16() != 404 {
-        let _ = client.delete(&tmp_url).basic_auth(auth.0.clone(), auth.1.clone()).send().await;
-        return Err(crate::errors::AppError::from(format!(
-            "webdav fallback delete final failed: {}",
-            del.status()
-        )));
+    // Only "MOVE not supported here" falls back to a direct PUT (which overwrites per RFC 4918).
+    // Never DELETE the final file first: if the re-PUT then fails, the cloud copy is gone and the
+    // next device pushes over it without merging. Any other MOVE failure leaves the final untouched.
+    if !move_unsupported(mov_status.as_u16()) {
+        let err = status_error("move .tmp→final", &mov);
+        let _ = client.delete(&tmp_url).basic_auth(auth.0, auth.1).send().await;
+        return Err(err);
     }
-
     let re_put = client
         .put(&final_url)
         .basic_auth(auth.0.clone(), auth.1.clone())
@@ -197,12 +196,46 @@ pub async fn upload(cfg: &SyncConfig, payload: &SyncPayload) -> Result<(), crate
         .send()
         .await
         .map_err(|e| crate::errors::AppError::Message(e.to_string()))?;
-    if !re_put.status().is_success() {
-        return Err(crate::errors::AppError::from(format!(
-            "webdav fallback put final failed: {}",
-            re_put.status()
-        )));
-    }
+    let re_put_err = (!re_put.status().is_success()).then(|| status_error("fallback put final", &re_put));
     let _ = client.delete(&tmp_url).basic_auth(auth.0, auth.1).send().await;
-    Ok(())
+    match re_put_err {
+        Some(err) => Err(err),
+        None => Ok(()),
+    }
+}
+
+/// MOVE rejected as a method (or by a proxy that can't route `Destination`), not as an operation.
+fn move_unsupported(status: u16) -> bool {
+    matches!(status, 405 | 501 | 502)
+}
+
+/// `webdav <context> failed: <status>`; for a redirect also names the target so the user can fix the
+/// URL (redirects are not followed: they would turn PUT/MOVE into GET and fake a successful upload).
+fn status_error(context: &str, resp: &tauri_plugin_http::reqwest::Response) -> crate::errors::AppError {
+    let status = resp.status();
+    if status.is_redirection() {
+        let location = resp
+            .headers()
+            .get("location")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("?");
+        return crate::errors::AppError::from(format!(
+            "webdav {context} failed: {status} redirect to {location} (use that URL)"
+        ));
+    }
+    crate::errors::AppError::from(format!("webdav {context} failed: {status}"))
+}
+
+#[cfg(test)]
+mod tests {
+    /// Auth, lock, quota and server errors must not trigger the direct-PUT fallback.
+    #[test]
+    fn move_fallback_only_when_method_unsupported() {
+        for s in [405, 501, 502] {
+            assert!(super::move_unsupported(s), "{s}");
+        }
+        for s in [401, 403, 409, 412, 423, 500, 503, 507] {
+            assert!(!super::move_unsupported(s), "{s}");
+        }
+    }
 }

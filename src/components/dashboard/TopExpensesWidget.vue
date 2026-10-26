@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiCard from "@/components/ui/UiCard.vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
@@ -21,24 +22,20 @@ function catName(id: string): string {
 </script>
 
 <template>
-  <div v-if="items.length > 0" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
-    <div class="flex items-center gap-2 mb-2.5">
-      <Receipt :size="16" class="text-red-500" />
-      <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_top_expenses') }}</h2>
-    </div>
+  <UiCard v-if="items.length > 0" :title="t('widget_top_expenses')" :icon="Receipt" tone="danger">
     <div class="space-y-2">
       <div
         v-for="(exp, i) in items"
         :key="exp.id"
         class="flex items-center gap-3 rounded-lg px-2 py-1.5"
       >
-        <span class="text-xs font-bold text-text-muted w-5 text-center tabular-nums">{{ i + 1 }}</span>
+        <span class="text-xs font-semibold text-text-muted w-5 text-center tabular-nums">{{ i + 1 }}</span>
         <div class="flex-1 min-w-0">
           <p class="text-sm font-medium text-text-primary truncate">{{ exp.name }}</p>
           <p class="text-[10px] text-text-muted">{{ catName(exp.categoryId) }} · {{ expenseToIsoDate(exp) }}</p>
         </div>
-        <span class="text-sm font-bold text-text-primary tabular-nums shrink-0">{{ fmt(exp.amount, exp.currencyId) }}</span>
+        <span class="text-sm font-semibold text-text-primary tabular-nums shrink-0">{{ fmt(exp.amount, exp.currencyId) }}</span>
       </div>
     </div>
-  </div>
+  </UiCard>
 </template>

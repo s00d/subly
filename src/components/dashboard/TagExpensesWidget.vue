@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiCard from "@/components/ui/UiCard.vue";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import { useChartTheme } from "@/composables/useChartTheme";
@@ -95,11 +96,7 @@ const chartOption = computed((): EChartsCoreOption => ({
 </script>
 
 <template>
-  <div v-if="stats.length > 0" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
-    <div class="flex items-center gap-2 mb-3">
-      <Hash :size="16" class="text-primary" />
-      <h2 class="text-sm sm:text-lg font-semibold text-text-primary">{{ t('widget_tag_expenses') }}</h2>
-    </div>
+  <UiCard v-if="stats.length > 0" :title="t('widget_tag_expenses')" :icon="Hash" tone="violet">
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
       <div class="w-full max-w-[220px] mx-auto h-44 sm:h-48 aspect-square">
         <VChart class="h-full w-full" :theme="chartTheme" :option="chartOption" autoresize />
@@ -116,5 +113,5 @@ const chartOption = computed((): EChartsCoreOption => ({
         </div>
       </div>
     </div>
-  </div>
+  </UiCard>
 </template>

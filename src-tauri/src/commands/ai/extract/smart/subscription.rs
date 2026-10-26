@@ -317,6 +317,7 @@ fn truncate_for_prompt(s: &str, max: usize) -> String {
     }
     // Snap to the last newline before the limit so we don't slice a row
     // in half and confuse the LLM.
+    let max = s.floor_char_boundary(max);
     let cut = s[..max].rfind('\n').unwrap_or(max);
     let mut out = s[..cut].to_string();
     out.push_str("\n…[truncated]");
@@ -330,6 +331,14 @@ fn truncate_for_prompt(s: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn truncate_for_prompt_handles_multibyte_cut() {
+        let s = "я".repeat(100); // 200 bytes; byte 51 is mid-char
+        let out = truncate_for_prompt(&s, 51);
+        assert!(out.starts_with(&"я".repeat(25)));
+        assert!(out.ends_with("[truncated]"));
+    }
 
     #[test]
     fn map_cycle_known_values() {

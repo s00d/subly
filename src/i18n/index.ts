@@ -43,6 +43,15 @@ export async function setupI18n(locale: string = "en"): Promise<I18n> {
     locale,
     fallbackLocale: "en",
     messages: {},
+    // Slavic 3-form plurals: "1 день | 2 дня | 5 дней"
+    pluralRules: {
+      ru: (n: number, choices: number) => {
+        if (choices < 3) return n === 1 ? 0 : 1;
+        const m10 = n % 10, m100 = n % 100;
+        if (m10 === 1 && m100 !== 11) return 0;
+        return m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 1 : 2;
+      },
+    },
   });
 
   i18nInstance = i18n;

@@ -57,9 +57,9 @@ pub fn exists_for_background(account: &str) -> Result<bool, AppError> {
     }
     #[cfg(not(target_os = "ios"))]
     {
-        Ok(store()
+        store()
             .exists_nonempty(account)
-            .map_err(map_err)?)
+            .map_err(map_err)
     }
 }
 

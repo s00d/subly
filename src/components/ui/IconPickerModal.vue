@@ -3,9 +3,9 @@ import { ref, computed, onMounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { getLogoAssets, type LogoAsset } from "@/services/logoClient";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
-import { X, Search, Upload } from "@lucide/vue";
-import { tv } from "@/lib/tv";
-import { useScrollLock } from "@/composables/useScrollLock";
+import { Search, Upload } from "@lucide/vue";
+import { tv, ui, button } from "@/lib/tv";
+import Modal from "@/components/ui/Modal.vue";
 
 const props = defineProps<{
   show: boolean;
@@ -179,39 +179,14 @@ function handleUpload(e: Event) {
   input.value = "";
 }
 
-function onBackdropClick() {
-  emit("close");
-}
-
 const pickerTv = tv({
   slots: {
-    overlay: "fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4",
-    backdrop: "absolute inset-0 bg-black/50",
-    panel: [
-      "relative bg-surface w-full max-w-md overflow-hidden",
-      "rounded-t-2xl sm:rounded-xl shadow-2xl max-h-[85vh] sm:max-h-none",
-    ],
-    header: "flex items-center justify-between px-4 sm:px-5 py-2.5 sm:py-3 border-b border-border",
-    headerTitle: "text-sm sm:text-base font-semibold text-text-primary",
-    closeBtn: "p-1 rounded-lg hover:bg-surface-hover text-text-muted",
-    searchRow: "px-4 sm:px-5 pt-3 sm:pt-4 pb-2 flex gap-2",
-    searchInput: [
-      "w-full pl-8 pr-3 py-2 rounded-lg border border-border",
-      "bg-surface text-sm text-text-primary",
-      "placeholder-text-muted",
-      "focus:outline-none focus:ring-2 focus:ring-primary transition-shadow",
-    ],
-    uploadBtn: [
-      "flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border",
-      "text-xs sm:text-sm text-text-secondary",
-      "hover:border-primary hover:text-primary transition-colors shrink-0",
-    ],
-    currentWrap: "px-5 pb-2",
-    currentInner: "flex items-center gap-2 p-2 rounded-lg bg-surface-secondary border border-border",
-    gridWrap: "px-4 sm:px-5 pb-4 max-h-[50vh] overflow-y-auto",
+    searchRow: "pb-3 flex gap-2",
+    searchInput: ui.field({ class: "pl-8" }),
+    currentInner: "mb-3 flex items-center gap-2 p-2 rounded-lg bg-surface-secondary border border-border",
     sectionLabel: "text-[10px] uppercase tracking-wider text-text-muted font-medium mb-2",
     grid: "grid grid-cols-8 gap-1.5",
-    iconBtn: "w-10 h-10 rounded-lg border flex items-center justify-center text-lg transition-colors hover:bg-surface dark:hover:bg-white/6",
+    iconBtn: "w-full aspect-square max-w-10 rounded-lg border flex items-center justify-center text-lg transition-colors hover:bg-surface-hover",
     emptyText: "text-center py-8 text-sm text-text-muted",
   },
   variants: {
@@ -223,7 +198,6 @@ const pickerTv = tv({
 });
 
 const slots = pickerTv();
-useScrollLock(computed(() => props.show));
 
 onMounted(async () => {
   logoAssets.value = await getLogoAssets();
@@ -231,80 +205,63 @@ onMounted(async () => {
 </script>
 
 <template>
-  <Teleport to="body">
-    <Transition name="app-modal">
-      <div v-if="show" :class="slots.overlay()">
-        <div :class="[slots.backdrop(), 'app-modal-backdrop']" @click="onBackdropClick" />
-        <div :class="[slots.panel(), 'app-modal-panel']">
-          <div :class="slots.header()">
-            <h3 :class="slots.headerTitle()">{{ t('choose_icon') }}</h3>
-            <button @click="emit('close')" :class="slots.closeBtn()">
-              <X :size="20" />
-            </button>
-          </div>
-
-          <div :class="slots.searchRow()">
-            <div class="relative flex-1">
-              <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-              <input
-                v-model="search"
-                type="text"
-                :placeholder="t('search')"
-                :class="slots.searchInput()"
-              />
-            </div>
-            <button @click="fileInput?.click()" :class="slots.uploadBtn()">
-              <Upload :size="14" />
-              <span class="hidden sm:inline">{{ t('upload') }}</span>
-              <span class="sm:hidden">+</span>
-            </button>
-            <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="handleUpload" />
-          </div>
-
-          <div v-if="modelValue" :class="slots.currentWrap()">
-            <div :class="slots.currentInner()">
-              <IconDisplay :icon="modelValue" :size="24" />
-              <span class="text-xs text-primary font-medium">{{ t('current') }}</span>
-            </div>
-          </div>
-
-          <div :class="slots.gridWrap()">
-            <div v-for="group in filteredEmojiGroups" :key="group.label" class="mb-3">
-              <p :class="slots.sectionLabel()">{{ group.label }}</p>
-              <div :class="slots.grid()">
-                <button
-                  v-for="item in group.items"
-                  :key="item.emoji"
-                  @click="select(item.emoji)"
-                  :class="pickerTv({ selected: modelValue === item.emoji }).iconBtn()"
-                  :title="item.keywords"
-                >
-                  {{ item.emoji }}
-                </button>
-              </div>
-            </div>
-
-            <div v-if="filteredAssets.length > 0">
-              <p :class="slots.sectionLabel()">{{ t('icons') }}</p>
-              <div :class="slots.grid()">
-                <button
-                  v-for="asset in filteredAssets"
-                  :key="asset.path"
-                  @click="select(asset.path)"
-                  :class="pickerTv({ selected: modelValue === asset.path }).iconBtn()"
-                  :title="asset.name"
-                >
-                  <img :src="asset.path" class="w-6 h-6 object-contain" />
-                </button>
-              </div>
-            </div>
-
-            <div v-if="filteredAssets.length === 0 && filteredEmojiGroups.length === 0" :class="slots.emptyText()">
-              {{ t('no_results') }}
-            </div>
-          </div>
-        </div>
+  <Modal :show="show" :title="t('choose_icon')" maxWidth="28rem" @close="emit('close')">
+    <div :class="slots.searchRow()">
+      <div class="relative flex-1">
+        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
+        <input
+          v-model="search"
+          type="text"
+          :placeholder="t('search')"
+          :class="slots.searchInput()"
+        />
       </div>
-    </Transition>
-  </Teleport>
+      <button type="button" @click="fileInput?.click()" :aria-label="t('upload')" :class="button({ size: 'lg', class: 'shrink-0' })">
+        <Upload :size="14" />
+        <span class="hidden sm:inline">{{ t('upload') }}</span>
+      </button>
+      <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="handleUpload" />
+    </div>
+
+    <div v-if="modelValue" :class="slots.currentInner()">
+      <IconDisplay :icon="modelValue" :size="24" />
+      <span class="text-xs text-primary font-medium">{{ t('current') }}</span>
+    </div>
+
+    <div v-for="group in filteredEmojiGroups" :key="group.label" class="mb-3">
+      <p :class="slots.sectionLabel()">{{ group.label }}</p>
+      <div :class="slots.grid()">
+        <button
+          v-for="item in group.items"
+          :key="item.emoji"
+          type="button"
+          @click="select(item.emoji)"
+          :class="pickerTv({ selected: modelValue === item.emoji }).iconBtn()"
+          :title="item.keywords"
+        >
+          {{ item.emoji }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="filteredAssets.length > 0">
+      <p :class="slots.sectionLabel()">{{ t('icons') }}</p>
+      <div :class="slots.grid()">
+        <button
+          v-for="asset in filteredAssets"
+          :key="asset.path"
+          type="button"
+          @click="select(asset.path)"
+          :class="pickerTv({ selected: modelValue === asset.path }).iconBtn()"
+          :title="asset.name"
+        >
+          <img :src="asset.path" :alt="asset.name" class="w-6 h-6 object-contain" />
+        </button>
+      </div>
+    </div>
+
+    <div v-if="filteredAssets.length === 0 && filteredEmojiGroups.length === 0" :class="slots.emptyText()">
+      {{ t('no_results') }}
+    </div>
+  </Modal>
 </template>

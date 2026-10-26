@@ -239,11 +239,10 @@ fn ubiquitous_item_downloaded(url: &NSURL, path: &Path) -> bool {
         if unsafe {
             url.getResourceValue_forKey_error(&mut dl_err, NSURLUbiquitousItemDownloadingErrorKey)
                 .is_ok()
-        } {
-            if dl_err.is_some() {
+        }
+            && dl_err.is_some() {
                 return false;
             }
-        }
         false
     })
 }
@@ -316,7 +315,7 @@ pub(crate) fn coordinated_read_string(path: &Path) -> Result<Option<String>, cra
             &url,
             NSFileCoordinatorReadingOptions::WithoutChanges,
             Some(&mut coord_err),
-            &*block,
+            &block,
         );
         drop(block);
         if let Some(e) = coord_err {
@@ -372,7 +371,7 @@ pub(crate) fn coordinated_read_bytes(path: &Path) -> Result<Option<Vec<u8>>, cra
             &url,
             NSFileCoordinatorReadingOptions::WithoutChanges,
             Some(&mut coord_err),
-            &*block,
+            &block,
         );
         drop(block);
         if let Some(e) = coord_err {
@@ -450,7 +449,7 @@ pub(crate) fn coordinated_write_bytes(path: &Path, contents: &[u8]) -> Result<()
             &url,
             NSFileCoordinatorWritingOptions::ForReplacing,
             Some(&mut coord_err),
-            &*block,
+            &block,
         );
         drop(block);
         if let Some(e) = coord_err {

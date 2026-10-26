@@ -11,10 +11,6 @@ fn dropbox_final_path() -> String {
     format!("/Apps/Subly/{}", SYNC_FILENAME)
 }
 
-fn dropbox_tmp_path() -> String {
-    format!("/Apps/Subly/{}.tmp", SYNC_FILENAME)
-}
-
 pub fn descriptor() -> super::ProviderInfo {
     super::ProviderInfo {
         r#type: super::SyncProviderType::Dropbox,
@@ -62,6 +58,11 @@ pub fn auth_url(cfg: &SyncConfig) -> Option<String> {
 
 pub(crate) fn dropbox_sync_message_key(err: &crate::errors::AppError) -> Option<&'static str> {
     let msg = err.to_string().to_lowercase();
+    // Own errors only: keys are tried in a chain, and a bare "401" match here used to label
+    // other providers' auth failures as this provider's.
+    if !msg.contains("dropbox") {
+        return None;
+    }
     if msg.contains("401") || msg.contains("unauthorized") {
         return Some("sync_oauth_required");
     }
@@ -72,7 +73,7 @@ pub(crate) fn dropbox_sync_message_key(err: &crate::errors::AppError) -> Option<
 }
 
 pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<SyncPayload>, crate::errors::AppError> {
-    let resp = tauri_plugin_http::reqwest::Client::new()
+    let resp = super::http_client()
         .post("https://content.dropboxapi.com/2/files/download")
         .header("Authorization", format!("Bearer {}", access_token))
         .header(
@@ -83,45 +84,33 @@ pub async fn download(_cfg: &SyncConfig, access_token: &str) -> Result<Option<Sy
         .await
         .map_err(|e| e.to_string())?;
     if !resp.status().is_success() {
-        return Ok(None);
+        let status = resp.status();
+        // Dropbox reports a missing file as 409 `path/not_found`, not 404.
+        let body = resp.text().await.unwrap_or_default();
+        if status.as_u16() == 409 && body.contains("not_found") {
+            return Ok(None);
+        }
+        return Err(crate::errors::AppError::from(format!("dropbox download failed: {}", status)));
     }
     let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
     Ok(Some(decode_sync_payload(&bytes)?))
 }
 
-async fn dropbox_move_v2(
-    client: &tauri_plugin_http::reqwest::Client,
-    access_token: &str,
-    from_path: &str,
-    to_path: &str,
-) -> Result<(), crate::errors::AppError> {
-    let resp = client
-        .post("https://api.dropboxapi.com/2/files/move_v2")
-        .header("Authorization", format!("Bearer {}", access_token))
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({
-            "from_path": from_path,
-            "to_path": to_path,
-            "autorename": false,
-            "allow_shared_folder": false,
-            "allow_ownership_transfer": false,
-        }))
-        .send()
-        .await
-        .map_err(|e| e.to_string())?;
-    if !resp.status().is_success() {
-        return Err(crate::errors::AppError::from(format!(
-            "dropbox move_v2 failed: {}",
-            resp.status()
-        )));
-    }
-    Ok(())
+fn dropbox_upload_arg(path: &str) -> String {
+    serde_json::json!({
+      "path": path,
+      "mode": "overwrite",
+      "autorename": false,
+      "mute": true
+    })
+    .to_string()
 }
 
 pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str) -> Result<(), crate::errors::AppError> {
-    let client = tauri_plugin_http::reqwest::Client::new();
+    let client = super::http_client();
     let raw = encode_sync_payload(payload)?;
-    let tmp = dropbox_tmp_path();
+    // `files/upload` commits atomically, so write straight to the final path. The old tmp + `move_v2`
+    // flow failed on every push after the first: `move_v2` cannot overwrite (`to/conflict`).
     let fin = dropbox_final_path();
 
     let put = client
@@ -130,13 +119,7 @@ pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str
         .header("Content-Type", "application/octet-stream")
         .header(
             "Dropbox-API-Arg",
-            serde_json::json!({
-              "path": tmp,
-              "mode": "overwrite",
-              "autorename": false,
-              "mute": true
-            })
-            .to_string(),
+            dropbox_upload_arg(&fin),
         )
         .body(raw)
         .send()
@@ -149,16 +132,15 @@ pub async fn upload(_cfg: &SyncConfig, payload: &SyncPayload, access_token: &str
         )));
     }
 
-    if let Err(e) = dropbox_move_v2(&client, access_token, &tmp, &fin).await {
-        let _ = client
-            .post("https://api.dropboxapi.com/2/files/delete_v2")
-            .header("Authorization", format!("Bearer {}", access_token))
-            .header("Content-Type", "application/json")
-            .json(&serde_json::json!({ "path": tmp }))
-            .send()
-            .await;
-        return Err(e);
-    }
-
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn upload_targets_final_path_with_overwrite() {
+        let arg: serde_json::Value = serde_json::from_str(&super::dropbox_upload_arg(&super::dropbox_final_path())).unwrap();
+        assert_eq!(arg["path"], super::dropbox_final_path());
+        assert_eq!(arg["mode"], "overwrite");
+    }
 }

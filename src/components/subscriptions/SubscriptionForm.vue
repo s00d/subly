@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { localYmd } from "@/composables/useLocaleFormat";
+import { ref, watch, computed, useId } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
 import { formatErrorForToast } from "@/utils/formatError";
@@ -14,7 +15,8 @@ import LogoPicker from "@/components/ui/LogoPicker.vue";
 import SecretInput from "@/components/ui/SecretInput.vue";
 import TagInput from "@/components/ui/TagInput.vue";
 import type { SelectOption } from "@/components/ui/AppSelect.vue";
-import { Sparkles, Globe, Loader2, KeyRound, ClipboardPaste, ImagePlus, DownloadCloud } from "@lucide/vue";
+import { Globe, Loader2, KeyRound, ClipboardPaste, ImagePlus, DownloadCloud, ChevronDown } from "@lucide/vue";
+import { button } from "@/lib/tv";
 import { resolveFaviconFromInputUrl } from "@/services/logoClient";
 import { getNextCycleDate as getNextCycleDateBackend, upsertSubscription } from "@/services/subscriptionsClient";
 import {
@@ -91,8 +93,8 @@ function createDefaultForm(): Partial<Subscription> {
     logo: "",
     price: "0",
     currencyId: settings.value?.mainCurrencyId || "cur-2",
-    nextPayment: new Date().toISOString().split("T")[0],
-    startDate: new Date().toISOString().split("T")[0],
+    nextPayment: localYmd(),
+    startDate: localYmd(),
     cycle: 3,
     frequency: 1,
     notes: "",
@@ -161,6 +163,11 @@ const qrFileInput = ref<HTMLInputElement | null>(null);
  */
 const credentialsTouched = ref(false);
 const isLoadingSavedCreds = ref(false);
+/** Set once the user picks a next-payment date by hand; disables auto-recalculation. */
+const nextPaymentTouched = ref(false);
+/** "Additional" disclosure (URL, tags, credentials, notes). */
+const showAdditional = ref(false);
+const formId = useId();
 
 /** Non-secret bitmap echoed back by the list endpoint; drives Secret masks. */
 const credentialsMeta = computed<SubscriptionCredentialsMeta>(() => {
@@ -237,6 +244,7 @@ watch(
     loadLookupData();
     clearSubscriptionZodDirty();
     credentialsTouched.value = false;
+    nextPaymentTouched.value = false;
     if (props.editSubscription) {
       // Credentials no longer ship with the list row — they live in the
       // keyring and are fetched only when the user clicks "Load saved".
@@ -252,6 +260,9 @@ watch(
         form.value = applyPrefill(form.value, props.prefill);
       }
     }
+    const f = form.value;
+    showAdditional.value =
+      hasAnySavedCredential.value || !!f.url?.trim() || !!f.notes?.trim() || (f.tags?.length ?? 0) > 0;
   },
 );
 
@@ -282,14 +293,36 @@ const categoryOptions = computed<SelectOption[]>(() =>
   [...categories.value].sort((a, b) => a.sortOrder - b.sortOrder).map((c) => ({ value: c.id, label: c.name, icon: c.icon || undefined }))
 );
 
+/** Guards against out-of-order results when the user edits several schedule fields quickly. */
+let nextPaymentSeq = 0;
+
+/**
+ * First cycle date on or after today (local), stepping from the start date.
+ * ponytail: one IPC per cycle, capped at 400 steps (~33 years monthly, ~1 year daily).
+ * Upgrade path: expose backend `first_cycle_date_on_or_after` as a command and call it once.
+ */
 async function calculateNextPayment() {
-  if (!form.value.startDate || !form.value.cycle || !form.value.frequency) return;
-  const today = new Date().toISOString().split("T")[0];
-  let next = form.value.startDate;
-  while (next < today) {
-    next = await getNextCycleDateBackend(next, Number(form.value.cycle), Number(form.value.frequency));
+  const { startDate, cycle, frequency } = form.value;
+  if (!startDate || !cycle || !frequency || Number(frequency) < 1) return;
+  const seq = ++nextPaymentSeq;
+  const today = localYmd();
+  let next = startDate;
+  try {
+    for (let i = 0; next < today && i < 400; i++) {
+      next = await getNextCycleDateBackend(next, Number(cycle), Number(frequency));
+      if (seq !== nextPaymentSeq) return;
+    }
+  } catch (e) {
+    console.warn("Next payment recalculation failed:", e);
+    return;
   }
+  if (seq !== nextPaymentSeq || nextPaymentTouched.value || next < today) return;
   form.value.nextPayment = next;
+}
+
+/** Called from start date / cycle / frequency inputs (user edits only, not form loads). */
+function onScheduleChange() {
+  if (!nextPaymentTouched.value) void calculateNextPayment();
 }
 
 async function applyDomainIcon() {
@@ -325,7 +358,7 @@ async function handleSubmit() {
     ...base,
     price: moneyFromNumber(Number(base.price) || 0),
     frequency: Number(base.frequency) || 1,
-    notifyDaysBefore: Number(base.notifyDaysBefore ?? 1),
+    notifyDaysBefore: Number(base.notifyDaysBefore ?? -1),
     cycle: Number(base.cycle) || 3,
   };
   if (credentialsTouched.value) {
@@ -407,7 +440,7 @@ function loadLookupData() {
 
 <template>
   <Modal :show="show" :title="title" @close="emit('close')" maxWidth="42rem">
-    <form @submit.prevent="handleSubmit()" class="space-y-4 sm:space-y-5">
+    <form :id="formId" @submit.prevent="handleSubmit()" class="space-y-4 sm:space-y-5">
       <!-- Name + Logo -->
       <div class="flex gap-3 sm:gap-4 items-start">
         <div class="flex-1">
@@ -429,8 +462,8 @@ function loadLookupData() {
       <div class="flex flex-col sm:flex-row gap-3">
         <div class="flex-1">
           <AppInput
-            :modelValue="toDisplayNumber(parseMoney(form.price ?? '0'))"
-            @update:modelValue="(v) => form.price = moneyFromNumber(Number(v))"
+            :modelValue="form.price === '' ? '' : toDisplayNumber(parseMoney(form.price ?? '0'))"
+            @update:modelValue="(v) => form.price = v === '' ? '' : moneyFromNumber(Number(v))"
             type="number"
             :label="t('price') + ' *'"
             :error="subErrors.price"
@@ -454,7 +487,8 @@ function loadLookupData() {
       <div class="flex flex-wrap gap-3 items-end">
         <div class="w-20">
           <AppInput
-            v-model="form.frequency!"
+            :modelValue="form.frequency ?? ''"
+            @update:modelValue="(v) => { form.frequency = v as number; onScheduleChange(); }"
             type="number"
             :label="t('frequency')"
             :error="subErrors.frequency"
@@ -464,7 +498,8 @@ function loadLookupData() {
         </div>
         <div class="flex-1 min-w-[120px]">
           <AppSelect
-            v-model="form.cycle!"
+            :modelValue="form.cycle!"
+            @update:modelValue="(v) => { form.cycle = Number(v) as Subscription['cycle']; onScheduleChange(); }"
             :options="cycleOptions"
             :label="t('payment_every')"
             :error="subErrors.cycle"
@@ -479,22 +514,16 @@ function loadLookupData() {
       <div class="flex flex-row gap-2 sm:gap-3 items-end">
         <div class="flex-1 min-w-0">
           <AppDatePicker
-            v-model="form.startDate!"
+            :modelValue="form.startDate!"
+            @update:modelValue="(v) => { form.startDate = v; onScheduleChange(); }"
             :label="t('start_date')"
             :error="subErrors.startDate"
           />
         </div>
-        <button
-          type="button"
-          @click="calculateNextPayment"
-          class="shrink-0 p-2 rounded-lg bg-surface-hover text-text-secondary hover:bg-primary hover:text-white transition-colors"
-          :title="t('calculate_next_payment_date')"
-        >
-          <Sparkles :size="18" />
-        </button>
         <div class="flex-1 min-w-0">
           <AppDatePicker
-            v-model="form.nextPayment!"
+            :modelValue="form.nextPayment!"
+            @update:modelValue="(v) => { form.nextPayment = v; nextPaymentTouched = true; }"
             :label="t('next_payment') + ' *'"
             :error="subErrors.nextPayment"
           />
@@ -527,108 +556,121 @@ function loadLookupData() {
         searchable
       />
 
-      <!-- Tags -->
-      <TagInput
-        v-model="form.tags!"
-        :label="t('tags')"
-        :availableTags="tags"
-      />
-
-      <!-- URL -->
-      <div class="space-y-2">
-        <AppInput
-          v-model="form.url!"
-          :label="t('url')"
-          :placeholder="'https://...'"
-        />
+      <!-- Additional (rarely used): tags, URL, credentials, notes -->
+      <div class="rounded-xl border border-border">
         <button
           type="button"
-          @click="applyDomainIcon"
-          :disabled="isResolvingIcon"
-          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          class="w-full flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4 text-sm font-medium text-text-primary rounded-xl hover:bg-surface-hover transition-colors"
+          :aria-expanded="showAdditional"
+          @click="showAdditional = !showAdditional"
         >
-          <Loader2 v-if="isResolvingIcon" :size="14" class="animate-spin" />
-          <Globe v-else :size="14" />
-          {{ t("get_icon_from_domain") }}
+          {{ t("form_additional") }}
+          <ChevronDown :size="16" class="text-text-muted transition-transform" :class="showAdditional && 'rotate-180'" />
         </button>
-      </div>
+        <div v-show="showAdditional" class="space-y-4 sm:space-y-5 px-3 pb-3 sm:px-4 sm:pb-4 pt-1">
+          <TagInput
+            v-model="form.tags!"
+            :label="t('tags')"
+            :availableTags="tags"
+          />
 
-      <!-- Credentials (secure storage, not in sync snapshot) -->
-      <div class="rounded-xl border border-border p-3 sm:p-4 space-y-3 bg-surface-secondary/50">
-        <div class="flex items-center justify-between gap-2">
-          <div class="flex items-center gap-2 min-w-0">
-            <KeyRound :size="16" class="text-primary shrink-0" />
-            <span class="text-sm font-medium text-text-primary">{{ t("credentials_section") }}</span>
+          <!-- URL -->
+          <div class="space-y-2">
+            <AppInput
+              v-model="form.url!"
+              :label="t('url')"
+              :placeholder="'https://...'"
+            />
+            <button
+              type="button"
+              @click="applyDomainIcon"
+              :disabled="isResolvingIcon"
+              :class="button({ size: 'sm' })"
+            >
+              <Loader2 v-if="isResolvingIcon" :size="14" class="animate-spin" />
+              <Globe v-else :size="14" />
+              {{ t("get_icon_from_domain") }}
+            </button>
           </div>
-          <button
-            v-if="isEdit && hasAnySavedCredential"
-            type="button"
-            class="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover disabled:opacity-50"
-            :disabled="isLoadingSavedCreds"
-            @click="loadSavedCredentials"
-          >
-            <Loader2 v-if="isLoadingSavedCreds" :size="12" class="animate-spin" />
-            <DownloadCloud v-else :size="12" />
-            {{ t("credentials_load_saved") }}
-          </button>
-        </div>
-        <p class="text-xs text-text-muted">{{ t("credentials_secure_hint") }}</p>
-        <SecretInput
-          :modelValue="form.credentials!.login"
-          :has-saved-value="credentialsMeta.hasLogin && !credentialsTouched"
-          type="text"
-          :label="t('login_username')"
-          @update:modelValue="(v: string) => { form.credentials!.login = v; markCredsTouched(); }"
-        />
-        <SecretInput
-          :modelValue="form.credentials!.password"
-          :has-saved-value="credentialsMeta.hasPassword && !credentialsTouched"
-          type="password"
-          :label="t('password')"
-          @update:modelValue="(v: string) => { form.credentials!.password = v; markCredsTouched(); }"
-        />
-        <SecretInput
-          :modelValue="form.credentials!.totpSecret"
-          :has-saved-value="credentialsMeta.hasTotp && !credentialsTouched"
-          type="text"
-          :label="t('totp_secret')"
-          :placeholder="t('totp_secret_placeholder')"
-          @update:modelValue="(v: string) => { form.credentials!.totpSecret = v; markCredsTouched(); }"
-        />
-        <div class="flex flex-wrap gap-2">
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover"
-            @click="pasteOtpauthFromClipboard"
-          >
-            <ClipboardPaste :size="14" />
-            {{ t("paste_otpauth_clipboard") }}
-          </button>
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium text-text-secondary hover:bg-surface-hover"
-            @click="triggerQrPicker"
-          >
-            <ImagePlus :size="14" />
-            {{ t("load_totp_qr") }}
-          </button>
-          <input
-            ref="qrFileInput"
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
-            class="hidden"
-            @change="onQrFileChange"
+
+          <!-- Credentials (secure storage, not in sync snapshot) -->
+          <div class="rounded-xl border border-border p-3 sm:p-4 space-y-3 bg-surface-secondary/50">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 min-w-0">
+                <KeyRound :size="16" class="text-primary shrink-0" />
+                <span class="text-sm font-medium text-text-primary">{{ t("credentials_section") }}</span>
+              </div>
+              <button
+                v-if="isEdit && hasAnySavedCredential"
+                type="button"
+                :class="button({ size: 'sm', class: 'shrink-0' })"
+                :disabled="isLoadingSavedCreds"
+                @click="loadSavedCredentials"
+              >
+                <Loader2 v-if="isLoadingSavedCreds" :size="14" class="animate-spin" />
+                <DownloadCloud v-else :size="14" />
+                {{ t("credentials_load_saved") }}
+              </button>
+            </div>
+            <p class="text-xs text-text-muted">{{ t("credentials_secure_hint") }}</p>
+            <SecretInput
+              :modelValue="form.credentials!.login"
+              :has-saved-value="credentialsMeta.hasLogin && !credentialsTouched"
+              type="text"
+              :label="t('login_username')"
+              @update:modelValue="(v: string) => { form.credentials!.login = v; markCredsTouched(); }"
+            />
+            <SecretInput
+              :modelValue="form.credentials!.password"
+              :has-saved-value="credentialsMeta.hasPassword && !credentialsTouched"
+              type="password"
+              :label="t('password')"
+              @update:modelValue="(v: string) => { form.credentials!.password = v; markCredsTouched(); }"
+            />
+            <SecretInput
+              :modelValue="form.credentials!.totpSecret"
+              :has-saved-value="credentialsMeta.hasTotp && !credentialsTouched"
+              type="text"
+              :label="t('totp_secret')"
+              :placeholder="t('totp_secret_placeholder')"
+              @update:modelValue="(v: string) => { form.credentials!.totpSecret = v; markCredsTouched(); }"
+            />
+            <div class="flex flex-wrap gap-2">
+              <button
+                type="button"
+                :class="button({ size: 'sm' })"
+                @click="pasteOtpauthFromClipboard"
+              >
+                <ClipboardPaste :size="14" />
+                {{ t("paste_otpauth_clipboard") }}
+              </button>
+              <button
+                type="button"
+                :class="button({ size: 'sm' })"
+                @click="triggerQrPicker"
+              >
+                <ImagePlus :size="14" />
+                {{ t("load_totp_qr") }}
+              </button>
+              <input
+                ref="qrFileInput"
+                type="file"
+                accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+                class="hidden"
+                @change="onQrFileChange"
+              />
+            </div>
+          </div>
+
+          <!-- Notes -->
+          <AppTextarea
+            v-model="form.notes!"
+            :label="t('notes')"
+            :placeholder="t('notes')"
+            :rows="2"
           />
         </div>
       </div>
-
-      <!-- Notes -->
-      <AppTextarea
-        v-model="form.notes!"
-        :label="t('notes')"
-        :placeholder="t('notes')"
-        :rows="2"
-      />
 
       <!-- Toggles -->
       <div class="flex flex-wrap gap-x-6 gap-y-3 pt-1">
@@ -639,14 +681,12 @@ function loadLookupData() {
 
     <template #footer>
       <div class="flex items-center justify-end gap-2 w-full">
-        <button
-          @click="emit('close')"
-          class="px-4 py-2 rounded-lg border border-border text-sm font-medium text-text-secondary hover:bg-surface-hover transition-colors"
-        >{{ t('cancel') }}</button>
-        <button
-          @click="handleSubmit()"
-          class="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors"
-        >{{ t('save') }}</button>
+        <button type="button" :class="button({ intent: 'ghost' })" @click="emit('close')">
+          {{ t('cancel') }}
+        </button>
+        <button type="submit" :form="formId" :class="button({ intent: 'primary' })">
+          {{ t('save') }}
+        </button>
       </div>
     </template>
   </Modal>

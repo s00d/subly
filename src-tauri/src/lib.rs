@@ -60,6 +60,7 @@ use commands::sync::{
     sync_should_pull,
 };
 use commands::subscriptions::{
+    calendar_month_stats,
     get_overdue_subscriptions,
     get_upcoming_subscriptions,
     list_subscriptions_page,
@@ -71,6 +72,7 @@ use commands::subscriptions::{
     subscriptions_insert,
     subscriptions_insert_payment_record,
     subscriptions_list,
+    subscriptions_record_payment,
     subscriptions_upsert,
     subscriptions_update,
 };
@@ -152,8 +154,9 @@ struct OpenedBackupPaths(Mutex<Vec<String>>);
 /// Android is the special case: `dirs` returns `None` there (no XDG / no
 /// `$HOME`), which used to crash the setup hook with "Unable to resolve local
 /// data directory". For Android we route through Tauri's path resolver which
-/// internally calls `Context.getFilesDir()` and yields the per-app sandbox
-/// (`/data/user/0/<package>/files/`).
+/// calls `Context.getDataDir()` (`/data/user/0/<package>/`). The DB lives
+/// there as `subly.redb`. Home-screen widget JSON is written under
+/// `files/widget/` so it matches Kotlin `Context.getFilesDir()/widget`.
 fn db_path(app: &tauri::AppHandle) -> Result<PathBuf, crate::errors::AppError> {
     #[cfg(target_os = "android")]
     {
@@ -164,12 +167,20 @@ fn db_path(app: &tauri::AppHandle) -> Result<PathBuf, crate::errors::AppError> {
                 format!("Unable to resolve local data directory: {e}"),
             ))?;
         std::fs::create_dir_all(&base)?;
-        return Ok(base.join("subly.redb"));
+        Ok(base.join("subly.redb"))
     }
 
     #[cfg(not(target_os = "android"))]
     {
         let _ = app;
+        // Dev builds only: `SUBLY_DATA_DIR=/tmp/x pnpm tauri dev` runs on a throwaway DB instead of
+        // the installed app's real data (same bundle identifier, same default directory).
+        #[cfg(debug_assertions)]
+        if let Some(dir) = std::env::var_os("SUBLY_DATA_DIR") {
+            let dir = PathBuf::from(dir);
+            std::fs::create_dir_all(&dir)?;
+            return Ok(dir.join("subly.redb"));
+        }
         let base = dirs::data_local_dir()
             .or_else(dirs::home_dir)
             .ok_or_else(|| {
@@ -424,8 +435,14 @@ pub fn run() {
     )]
     let mut builder = tauri::Builder::default();
 
+    // A dev run on an isolated `SUBLY_DATA_DIR` must not hand off to an installed Subly instance.
+    #[cfg(all(debug_assertions, not(any(target_os = "android", target_os = "ios"))))]
+    let isolated_dev_run = std::env::var_os("SUBLY_DATA_DIR").is_some();
+    #[cfg(all(not(debug_assertions), not(any(target_os = "android", target_os = "ios"))))]
+    let isolated_dev_run = false;
+
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    {
+    if !isolated_dev_run {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             let urls: Vec<String> = args
                 .iter()
@@ -505,7 +522,9 @@ pub fn run() {
             subscriptions_delete,
             subscriptions_delete_batch,
             subscriptions_insert_payment_record,
+            subscriptions_record_payment,
             subscriptions_delete_payment_record,
+            calendar_month_stats,
             expenses_get_by_id,
             expenses_insert,
             expenses_upsert,
@@ -584,6 +603,8 @@ pub fn run() {
             }
             app.manage(std::sync::Mutex::new(state::AppStateInner { db, app_data: initial_data }));
             ensure_rates_scheduler_started(app.handle().clone());
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            commands::notifications::ensure_desktop_notification_scheduler_started(app.handle().clone());
 
             #[cfg(any(target_os = "ios", target_os = "android"))]
             {
@@ -712,8 +733,10 @@ mod tests {
     fn startup_loads_seed_when_config_not_initialized() {
         let (_dir, db) = crate::test_support::temp_db().expect("create temp db");
         let doc = crate::test_support::base_seeded_doc().expect("seed");
-        let mut cfg = models::AppConfigDoc::default();
-        cfg.initialized = false;
+        let cfg = models::AppConfigDoc {
+            initialized: false,
+            ..Default::default()
+        };
         save_app_data_typed(&db, &doc, &cfg).expect("save");
 
         let (loaded, loaded_cfg) = load_initial_state_for_startup(&db).expect("startup load");
@@ -734,8 +757,10 @@ mod tests {
             sort_order: 0,
             i18n_key: String::new(),
         }];
-        let mut cfg = models::AppConfigDoc::default();
-        cfg.initialized = false;
+        let cfg = models::AppConfigDoc {
+            initialized: false,
+            ..Default::default()
+        };
         save_app_data_typed(&db, &doc, &cfg).expect("save");
 
         let (loaded, loaded_cfg) = load_initial_state_for_startup(&db).expect("startup load");

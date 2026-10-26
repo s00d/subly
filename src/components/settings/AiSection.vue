@@ -19,7 +19,8 @@ import AppToggle from "@/components/ui/AppToggle.vue";
 import SecretInput from "@/components/ui/SecretInput.vue";
 import Toast from "@/components/ui/Toast.vue";
 import { useToast } from "@/composables/useToast";
-import { tv, ui } from "@/lib/tv";
+import { tv, button } from "@/lib/tv";
+import UiCard from "@/components/ui/UiCard.vue";
 
 import {
   aiApiKeyName,
@@ -46,8 +47,13 @@ const {
   model,
   endpoint,
   hasApiKey,
-  activeProvider,
 } = storeToRefs(store);
+
+// Provider picked in the form; committed to the store only on Save — writing the store directly
+// made other pages evaluate an unsaved provider against the old key state.
+const formProviderType = ref<AiProviderType>(providerType.value);
+watch(providerType, (v) => (formProviderType.value = v));
+const formProvider = computed(() => providers.value.find((p) => p.type === formProviderType.value));
 
 const CUSTOM_MODEL_VALUE = "__custom__";
 
@@ -69,7 +75,7 @@ const isTesting = ref(false);
 const lastTest = ref<AiTestResult | null>(null);
 
 const recommendedModels = computed<readonly AiModelPreset[]>(
-  () => activeProvider.value?.recommendedModels ?? [],
+  () => formProvider.value?.recommendedModels ?? [],
 );
 
 const modelSelectOptions = computed(() => {
@@ -99,7 +105,7 @@ const apiKeyEdited = computed(() => formApiKey.value.length > 0);
 
 /** True ⇔ Save button should be enabled. */
 const isDirty = computed(() => {
-  const desc = activeProvider.value;
+  const desc = formProvider.value;
   if (!desc) return false;
   if (desc.type !== providerType.value) return true;
   if (formModel.value.trim() !== model.value.trim()) return true;
@@ -141,11 +147,11 @@ onMounted(async () => {
   } catch (e) {
     toast(formatErrorForToast(e, t), "error");
   }
-  applyProviderToForm(activeProvider.value);
-  await refreshKeyState(providerType.value);
+  applyProviderToForm(formProvider.value);
+  await refreshKeyState(formProviderType.value);
 });
 
-watch(activeProvider, (next, prev) => {
+watch(formProvider, (next, prev) => {
   if (!next) return;
   // Only react to provider switch, not in-store mutations of the same provider.
   if (prev?.type === next.type) return;
@@ -155,12 +161,11 @@ watch(activeProvider, (next, prev) => {
 
 async function onSelectProvider(value: string | number) {
   const type = String(value) as AiProviderType;
-  if (type === providerType.value) return;
+  if (type === formProviderType.value) return;
   const desc = providers.value.find((p) => p.type === type);
   if (!desc) return;
-  // Commit minimal switch (no key change) — the user still has to press Save
-  // after entering credentials for the new provider.
-  providerType.value = type;
+  // Form-only switch: the store (used by every page) changes on Save.
+  formProviderType.value = type;
   applyProviderToForm(desc, { reset: true });
   await refreshKeyState(type);
   lastTest.value = null;
@@ -177,7 +182,7 @@ function onModelSelectChange(value: string | number) {
 }
 
 async function saveProviderConfig() {
-  const desc = activeProvider.value;
+  const desc = formProvider.value;
   if (!desc) return;
 
   // Push the key down to the keyring only when the user actually typed
@@ -301,7 +306,7 @@ const PROVIDER_HELP_KEYS: Record<string, string> = {
 };
 
 const providerHelpText = computed(() => {
-  const desc = activeProvider.value;
+  const desc = formProvider.value;
   if (!desc) return "";
   const key = PROVIDER_HELP_KEYS[desc.type];
   return key ? t(key) : desc.description;
@@ -313,9 +318,6 @@ const visionPresets = computed(() =>
 
 const s = tv({
   slots: {
-    root: "bg-surface rounded-xl border border-border p-4 sm:p-5",
-    header: "flex items-center gap-2 mb-1",
-    title: ui.sectionTitle(),
     desc: "text-xs sm:text-sm text-text-muted mb-4",
     divider: "pt-4 mt-4 border-t border-border",
     badge:
@@ -323,27 +325,17 @@ const s = tv({
     helpCard:
       "mt-3 rounded-xl border border-primary/30 bg-primary-light p-3 space-y-2",
     warningBox:
-      "mt-3 rounded-lg border border-amber-300 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/20 p-3 text-[12px] text-amber-700 dark:text-amber-300 flex items-start gap-2",
+      "mt-3 rounded-lg border border-warning/30 bg-warning/12 p-3 text-xs text-text-primary flex items-start gap-2",
     privacyBox:
-      "mt-4 rounded-lg border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/10 p-3 text-[11px] text-amber-700 dark:text-amber-300",
-    saveBtn: [
-      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-50",
-      "bg-primary text-white hover:bg-primary-hover",
-    ],
-    testBtn: [
-      "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-xs font-medium",
-      "text-text-secondary hover:border-primary hover:text-primary transition-colors disabled:opacity-50",
-    ],
+      "mt-4 rounded-lg border border-warning/25 bg-warning/8 p-3 text-[11px] text-text-secondary",
+    saveBtn: button({ intent: "primary", size: "sm" }),
+    testBtn: button({ size: "sm" }),
   },
 })();
 </script>
 
 <template>
-  <section :class="s.root()">
-    <div :class="s.header()">
-      <Sparkles :size="18" class="text-primary" />
-      <h2 :class="s.title()">{{ t("ai_section_title") }}</h2>
-    </div>
+  <UiCard :title="t('ai_section_title')" :icon="Sparkles" icon-tone="text-primary">
     <p :class="s.desc()">{{ t("ai_section_desc") }}</p>
 
     <!-- Master toggle -->
@@ -356,10 +348,10 @@ const s = tv({
 
     <!-- No-key warning banner -->
     <div
-      v-if="enabled && activeProvider?.requiresKey && !hasSavedKey"
+      v-if="enabled && formProvider?.requiresKey && !hasSavedKey"
       :class="s.warningBox()"
     >
-      <AlertTriangle :size="16" class="shrink-0 mt-px" />
+      <AlertTriangle :size="16" class="shrink-0 mt-px text-warning" />
       <span>{{ t("ai_no_key_warning") }}</span>
     </div>
 
@@ -371,7 +363,7 @@ const s = tv({
       class="cursor-pointer hover:opacity-80 transition-opacity"
       @click="toggleEnabled(true)"
     >
-      <AlertTriangle :size="16" class="shrink-0 mt-px" />
+      <AlertTriangle :size="16" class="shrink-0 mt-px text-warning" />
       <span class="flex-1">{{ t("ai_configured_but_disabled") }}</span>
       <span class="font-semibold underline shrink-0">{{ t("ai_enable_now") }}</span>
     </div>
@@ -379,7 +371,7 @@ const s = tv({
     <!-- Provider selector -->
     <div class="mt-4 space-y-3">
       <AppSelect
-        :modelValue="providerType"
+        :modelValue="formProviderType"
         :options="providerSelectOptions"
         :label="t('ai_provider_label')"
         :placeholder="t('ai_provider_label')"
@@ -387,7 +379,7 @@ const s = tv({
       />
 
       <!-- Provider help card -->
-      <div v-if="activeProvider" :class="s.helpCard()">
+      <div v-if="formProvider" :class="s.helpCard()">
         <div class="flex items-start gap-2">
           <Sparkles :size="14" class="text-primary mt-0.5 shrink-0" />
           <div class="flex-1 min-w-0">
@@ -396,21 +388,21 @@ const s = tv({
             </p>
             <div class="flex flex-wrap gap-1.5 mt-2">
               <span
-                v-if="!activeProvider.requiresKey"
-                :class="[s.badge(), 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300']"
+                v-if="!formProvider.requiresKey"
+                :class="[s.badge(), 'bg-success/12 text-success']"
               >
                 {{ t("ai_free_tier") }}
               </span>
               <span
                 v-else
-                :class="[s.badge(), 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300']"
+                :class="[s.badge(), 'bg-info/12 text-info']"
               >
                 <KeyRound :size="9" />
                 {{ t("ai_paid_tier") }}
               </span>
               <span
                 v-if="visionPresets.length > 0"
-                :class="[s.badge(), 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300']"
+                :class="[s.badge(), 'bg-primary/12 text-primary']"
               >
                 {{ t("ai_vision_badge") }}
               </span>
@@ -420,7 +412,7 @@ const s = tv({
         <button
           type="button"
           class="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
-          @click="openDocs(activeProvider.docsUrl)"
+          @click="openDocs(formProvider.docsUrl)"
         >
           <ExternalLink :size="11" />
           {{ t("ai_open_docs") }}
@@ -443,7 +435,7 @@ const s = tv({
         v-model="formModel"
         type="text"
         :label="recommendedModels.length === 0 ? t('ai_model') : t('ai_model_custom')"
-        :placeholder="activeProvider?.defaultModel"
+        :placeholder="formProvider?.defaultModel"
       />
 
       <p class="text-[11px] text-text-muted -mt-1.5">
@@ -458,7 +450,7 @@ const s = tv({
 
       <!-- Endpoint -->
       <AppInput
-        v-if="activeProvider?.requiresEndpoint"
+        v-if="formProvider?.requiresEndpoint"
         v-model="formEndpoint"
         type="text"
         :label="t('ai_endpoint_url')"
@@ -466,13 +458,13 @@ const s = tv({
       />
 
       <!-- API key -->
-      <div v-if="activeProvider && (activeProvider.requiresKey || activeProvider.requiresEndpoint)">
+      <div v-if="formProvider && (formProvider.requiresKey || formProvider.requiresEndpoint)">
         <SecretInput
           v-model="formApiKey"
           :has-saved-value="hasSavedKey"
           :label="t('ai_api_key')"
           :placeholder="
-            activeProvider.requiresKey
+            formProvider.requiresKey
               ? t('ai_api_key')
               : t('ai_api_key_optional')
           "
@@ -481,13 +473,13 @@ const s = tv({
           v-if="hasSavedKey && !apiKeyEdited"
           class="mt-1 flex items-center justify-between gap-2"
         >
-          <p class="text-[11px] text-green-600 dark:text-green-400 flex items-center gap-1">
+          <p class="text-[11px] text-success flex items-center gap-1">
             <Check :size="11" />
             {{ t("ai_api_key_configured") }}
           </p>
           <button
             type="button"
-            class="text-[11px] text-text-muted hover:text-red-500 transition-colors"
+            class="text-[11px] text-text-muted hover:text-danger transition-colors"
             @click="clearApiKey"
           >
             {{ t("ai_api_key_clear") }}
@@ -495,7 +487,7 @@ const s = tv({
         </div>
         <p
           v-else-if="hasSavedKey && apiKeyEdited"
-          class="mt-1 text-[11px] text-amber-600 dark:text-amber-400"
+          class="mt-1 text-[11px] text-warning"
         >
           {{ t("ai_api_key_will_replace") }}
         </p>
@@ -504,6 +496,7 @@ const s = tv({
       <!-- Action row -->
       <div class="flex items-center gap-2 flex-wrap pt-1">
         <button
+          type="button"
           @click="saveProviderConfig"
           :disabled="isSaving || !isDirty"
           :class="s.saveBtn()"
@@ -513,6 +506,7 @@ const s = tv({
           {{ t("save") }}
         </button>
         <button
+          type="button"
           @click="runTest"
           :disabled="isTesting"
           :class="s.testBtn()"
@@ -523,13 +517,13 @@ const s = tv({
         </button>
         <span
           v-if="isDirty"
-          class="text-[11px] text-amber-600 dark:text-amber-400"
+          class="text-[11px] text-warning"
         >
           {{ t("ai_unsaved_changes") }}
         </span>
         <span
           v-else-if="hasSavedKey && lastTest?.ok"
-          class="text-[11px] text-green-600 dark:text-green-400 flex items-center gap-1"
+          class="text-[11px] text-success flex items-center gap-1"
         >
           <Check :size="11" />
           {{ t("ai_saved_indicator") }}
@@ -539,7 +533,7 @@ const s = tv({
       <!-- Last test feedback -->
       <div
         v-if="lastTest && lastTest.ok"
-        class="text-[11px] text-green-600 dark:text-green-400 flex items-center gap-1.5"
+        class="text-[11px] text-success flex items-center gap-1.5"
       >
         <Check :size="12" />
         {{ t("ai_test_ok_with_latency", { ms: lastTest.latencyMs }) }}
@@ -547,7 +541,7 @@ const s = tv({
       </div>
       <div
         v-else-if="lastTest && !lastTest.ok"
-        class="text-[11px] text-red-500 wrap-break-word"
+        class="text-[11px] text-danger wrap-break-word"
       >
         {{ lastTest.error || t("ai_test_failed") }}
       </div>
@@ -595,5 +589,5 @@ const s = tv({
     </div>
 
     <Toast :show="showToast" :message="toastMsg" :type="toastType" @close="closeToast" />
-  </section>
+  </UiCard>
 </template>

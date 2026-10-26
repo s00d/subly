@@ -20,6 +20,8 @@ const props = defineProps<{
   inputmode?: InputModeAttr;
   label?: string;
   size?: "sm" | "md";
+  /** `inline`: borderless until hover/focus — for editable names inside list rows. */
+  variant?: "inline";
   error?: string;
   class?: string;
 }>();
@@ -53,15 +55,18 @@ const inputTv = tv({
   },
   variants: {
     size: {
-      sm: { inputEl: "px-2.5 py-1.5 text-xs" },
-      md: { inputEl: "px-3 py-2 text-sm" },
+      sm: { inputEl: "min-h-8 px-2.5 py-1 text-xs" },
+      md: { inputEl: "px-3 py-1.5 text-[13px]" },
     },
     status: {
-      error: { inputEl: "border-red-500 hover:border-red-500 focus:ring-red-500/20 focus:border-red-500" },
+      error: { inputEl: "border-danger hover:border-danger focus:ring-danger/20 focus:border-danger" },
       normal: {},
     },
     disabled: {
       true: { inputEl: "bg-surface-secondary" },
+    },
+    inline: {
+      true: { inputEl: "border-transparent bg-transparent shadow-none hover:border-border" },
     },
   },
   defaultVariants: { size: "md", status: "normal" },
@@ -72,6 +77,7 @@ const slots = computed(() =>
     size: props.size ?? "md",
     status: props.error ? "error" : "normal",
     disabled: props.disabled || undefined,
+    inline: props.variant === "inline" || undefined,
   }),
 );
 </script>

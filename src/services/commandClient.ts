@@ -1,7 +1,21 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke as coreInvoke, type InvokeArgs } from "@tauri-apps/api/core";
 import type * as DashboardIpc from "@/types/dashboardIpc";
 import type { Expense } from "@/schemas/appData";
 
+
+type IpcRecorder = (cmd: string, args: unknown, result: unknown) => void;
+let ipcRecorder: IpcRecorder | null = null;
+
+/** Dev only (`src/dev/ipcFixtures.ts`): observe every app command response to build browser fixtures. */
+export function setIpcRecorder(fn: IpcRecorder): void {
+  ipcRecorder = fn;
+}
+
+async function invoke<T>(cmd: string, args?: InvokeArgs): Promise<T> {
+  const result = await coreInvoke<T>(cmd, args);
+  ipcRecorder?.(cmd, args ?? {}, result);
+  return result;
+}
 /**
  * Карта IPC-команд для типобезопасного вызова (расширять по мере необходимости).
  * Значение: аргументы `invoke` и тип результата.

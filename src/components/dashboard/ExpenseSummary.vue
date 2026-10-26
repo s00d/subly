@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiCard from "@/components/ui/UiCard.vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useLocaleFormat } from "@/composables/useLocaleFormat";
@@ -38,36 +39,32 @@ function getCategoryName(id: string) {
 </script>
 
 <template>
-  <div class="rounded-xl bg-surface border border-border p-2.5 sm:p-4">
-    <div class="flex items-center justify-between mb-3">
-      <div class="flex items-center gap-2">
-        <Wallet :size="18" class="text-primary" />
-        <h3 class="font-semibold text-text-primary">{{ t('widget_expenses') }}</h3>
-      </div>
-      <button @click="router.push('/expenses')"
-        class="flex items-center gap-1 text-xs text-primary hover:underline">
-        {{ t('view_all') }} <ArrowRight :size="12" />
-      </button>
-    </div>
+  <UiCard :title="t('widget_expenses')" :icon="Wallet" tone="success">
+    <template #actions>
+    <button @click="router.push('/expenses')"
+      class="inline-flex items-center gap-1 text-xs font-medium text-primary hover:text-primary-hover">
+      {{ t('view_all') }} <ArrowRight :size="12" />
+    </button>
+    </template>
 
     <div class="grid grid-cols-2 gap-2.5 mb-3">
       <div class="p-2.5 rounded-lg border border-border bg-surface-secondary">
         <p class="text-xs text-text-muted">{{ t('this_month') }}</p>
-        <p class="text-base sm:text-lg font-bold text-text-primary tabular-nums">{{ fmtCurrency(toDisplayNumber(parseMoney(agg.monthTotal)), mainCode()) }}</p>
+        <p class="text-base sm:text-lg font-semibold text-text-primary tabular-nums">{{ fmtCurrency(toDisplayNumber(parseMoney(agg.monthTotal)), mainCode()) }}</p>
       </div>
       <div class="p-2.5 rounded-lg border border-border bg-surface-secondary">
         <p class="text-xs text-text-muted">{{ t('this_year') }}</p>
-        <p class="text-base sm:text-lg font-bold text-text-primary tabular-nums">{{ fmtCurrency(toDisplayNumber(parseMoney(agg.yearTotal)), mainCode()) }}</p>
+        <p class="text-base sm:text-lg font-semibold text-text-primary tabular-nums">{{ fmtCurrency(toDisplayNumber(parseMoney(agg.yearTotal)), mainCode()) }}</p>
       </div>
     </div>
 
     <div v-if="agg.recentExpenses.length > 0" class="space-y-2">
       <p class="text-xs font-medium text-text-muted uppercase tracking-wide">{{ t('recent_expenses') }}</p>
-      <div class="rounded-lg border border-border bg-surface-secondary overflow-hidden divide-y divide-border">
+      <div class="-mx-2 divide-y divide-border">
         <div
           v-for="exp in agg.recentExpenses"
           :key="exp.id"
-          class="flex items-center justify-between gap-3 px-3 py-2.5 text-sm transition-colors hover:bg-surface dark:hover:bg-white/6"
+          class="flex items-center justify-between gap-3 px-3 py-2.5 text-sm transition-colors rounded-lg hover:bg-surface-hover"
         >
           <div class="min-w-0">
             <span class="text-text-primary truncate block">{{ exp.name }}</span>
@@ -82,5 +79,5 @@ function getCategoryName(id: string) {
     <div v-else class="text-center text-sm text-text-muted py-4">
       {{ t('no_expenses_yet') }}
     </div>
-  </div>
+  </UiCard>
 </template>

@@ -2,16 +2,19 @@
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { useI18n } from "vue-i18n";
-import { useHeaderActions } from "@/composables/useHeaderActions";
-import { tv, typo, iconSize } from "@/lib/tv";
+import { useHeaderActions, type HeaderAction } from "@/composables/useHeaderActions";
+import { useRouter } from "vue-router";
+import { tv, typo, iconSize, button } from "@/lib/tv";
+import { useAlerts } from "@/composables/useAlerts";
 import Tooltip from "@/components/ui/Tooltip.vue";
-import { Menu } from "@lucide/vue";
+import { Bell, Menu } from "@lucide/vue";
 
 const emit = defineEmits<{
   toggleSidebar: [];
 }>();
 
 const route = useRoute();
+const router = useRouter();
 const { t } = useI18n();
 const { actions } = useHeaderActions();
 
@@ -27,56 +30,78 @@ const pageTitle = computed(() => {
   return names[route.name as string] || "Subly";
 });
 
+const { alerts } = useAlerts();
+const alertTone = computed(() =>
+  alerts.value.some((a) => a.type === "overdue" || a.type === "due_today") ? "bg-danger" : "bg-primary",
+);
+
 const headerTv = tv({
   slots: {
-    root:
-      "max-md:min-h-[4.75rem] md:min-h-16 bg-surface border-b border-border flex items-center px-3 sm:px-6 shrink-0 gap-1.5 sm:gap-2 max-md:py-2",
-    burgerBtn:
-      "md:hidden w-11 h-11 min-w-[44px] min-h-[44px] p-0 -ml-0.5 rounded-xl text-text-secondary hover:bg-surface-hover transition-colors shrink-0 inline-flex items-center justify-center",
+    root: "bg-surface-secondary shrink-0 max-md:border-b max-md:border-border",
+    inner:
+      "mx-auto w-full max-w-[1120px] min-h-14 md:min-h-16 flex items-center gap-2 px-3 sm:px-5 md:px-8 max-md:py-1.5",
+    burgerBtn: `md:hidden -ml-1 ${button({ intent: "ghost", size: "icon" })} h-10 w-10`,
     title: `${typo.pageTitle()} flex-1 min-w-0`,
-    actionsWrap: "flex items-center gap-1 sm:gap-2 ml-auto shrink-0",
-    actionBtn:
-      "w-11 h-11 min-w-[44px] min-h-[44px] rounded-xl inline-flex items-center justify-center shadow-sm transition-colors shrink-0",
+    actionsWrap: "flex items-center gap-1 sm:gap-1.5 ml-auto shrink-0",
+    bellBadge:
+      "absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full text-[10px] font-semibold leading-4 text-white text-center ring-2 ring-surface-secondary",
   },
 });
 
 const slots = headerTv();
 
-function getActionBtnClass(style?: "primary" | "neutral" | "accent" | "success" | "warning" | "danger"): string {
-  switch (style) {
-    case "primary":
-      return "bg-primary text-white hover:bg-primary-hover";
-    case "accent":
-      return "bg-indigo-500 text-white hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500";
-    case "success":
-      return "bg-green-500 text-white hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-500";
-    case "warning":
-      return "bg-orange-500 text-white hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-500";
-    case "danger":
-      return "bg-red-500 text-white hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-500";
-    case "neutral":
-    default:
-      return "bg-surface-hover text-text-secondary hover:text-text-primary hover:bg-surface-secondary border border-border";
-  }
+/** One primary (filled, labelled on sm+) action per page; everything else is a quiet secondary button. */
+function hasLabel(action: HeaderAction): boolean {
+  return action.style === "primary" || action.style === "accent";
+}
+
+function getActionBtnClass(action: Pick<HeaderAction, "style">): string {
+  const labelled = hasLabel(action as HeaderAction);
+  const size = labelled ? "max-sm:w-9 max-sm:px-0" : "";
+  if (action.style === "primary") return button({ intent: "primary", class: size });
+  if (action.style === "danger") return button({ intent: "danger", size: "icon" });
+  if (action.style === "warning" || action.style === "success") return button({ size: "icon", pressed: true });
+  // accent = AI / smart actions: same secondary button, violet icon carries the identity
+  if (action.style === "accent") return button({ class: `${size} [&>svg]:text-violet-500 dark:[&>svg]:text-violet-400` });
+  return button({ size: "icon", class: "text-text-secondary hover:text-text-primary" });
 }
 </script>
 
 <template>
   <header :class="[slots.root(), 'app-header-safe']">
-    <button data-compact :class="slots.burgerBtn()" @click="emit('toggleSidebar')">
-      <Menu :size="iconSize.nav" />
-    </button>
-    <h1 :class="slots.title()">{{ pageTitle }}</h1>
-    <div :class="slots.actionsWrap()">
-      <Tooltip v-for="action in actions" :key="action.id" :text="action.title" position="bottom">
-        <button
-          data-compact
-          @click="action.onClick"
-          :class="[slots.actionBtn(), getActionBtnClass(action.style)]"
-        >
-          <component :is="action.icon" :size="iconSize.md" />
-        </button>
-      </Tooltip>
+    <div :class="slots.inner()">
+      <button data-compact :class="slots.burgerBtn()" aria-label="Menu" @click="emit('toggleSidebar')">
+        <Menu :size="iconSize.nav" />
+      </button>
+      <h1 :class="slots.title()">{{ pageTitle }}</h1>
+      <div :class="slots.actionsWrap()">
+        <Tooltip v-for="action in actions" :key="action.id" :text="action.title" position="bottom">
+          <button
+            data-compact
+            :aria-label="action.title"
+            @click="action.onClick"
+            :class="getActionBtnClass(action)"
+          >
+            <component :is="action.icon" :size="iconSize.sm" />
+            <span v-if="hasLabel(action)" class="max-sm:hidden">{{ action.label ?? action.title }}</span>
+          </button>
+        </Tooltip>
+        <!-- Alerts are listed on the Dashboard itself; phones keep header room for the title -->
+        <span v-if="alerts.length > 0 && route.name !== 'dashboard'" class="max-sm:hidden">
+        <Tooltip :text="t('notifications')" position="bottom">
+          <button
+            data-compact
+            class="relative"
+            :aria-label="t('notifications')"
+            :class="getActionBtnClass({ style: 'neutral' })"
+            @click="router.push('/')"
+          >
+            <Bell :size="iconSize.sm" />
+            <span :class="[slots.bellBadge(), alertTone]">{{ alerts.length }}</span>
+          </button>
+        </Tooltip>
+        </span>
+      </div>
     </div>
   </header>
 </template>

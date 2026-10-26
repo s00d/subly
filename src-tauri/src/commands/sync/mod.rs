@@ -272,9 +272,12 @@ pub fn sync_payload_fits_limit(payload: SyncPayload, max_bytes: usize) -> Result
 
 /// True if remote file revision does not match the last revision this device recorded (`SyncConfig.remote_revision`).
 /// When local revision is empty but remote has a revision, returns true (must pull or force-push).
+/// When this device already synced but the remote file is not visible (iCloud placeholder, new device
+/// before metadata arrives, switched account, wiped folder), returns true as well: an automatic push
+/// would replace other devices' data without a merge. The user can still force-push explicitly.
 pub(crate) fn sync_push_revision_mismatch(expected_revision: &str, remote: Option<&SyncPayload>) -> bool {
     let Some(remote) = remote else {
-        return false;
+        return !expected_revision.trim().is_empty();
     };
     let actual = remote.meta.revision.as_deref().unwrap_or("").trim();
     if actual.is_empty() {
@@ -486,9 +489,11 @@ mod tests {
 
     #[test]
     fn oauth_enable_leaves_disabled_until_finish() {
-        let mut cfg = SyncConfig::default();
-        cfg.provider = Some(SyncProviderType::Gdrive);
-        cfg.enabled = false;
+        let cfg = SyncConfig {
+            provider: Some(SyncProviderType::Gdrive),
+            enabled: false,
+            ..Default::default()
+        };
         let status = sync_status_snapshot(&cfg, Some(&SyncProviderType::Gdrive));
         assert!(!status.enabled);
         assert!(status.oauth_pending);
@@ -497,9 +502,11 @@ mod tests {
 
     #[test]
     fn oauth_finish_enables_provider_in_status_snapshot() {
-        let mut cfg = SyncConfig::default();
-        cfg.provider = Some(SyncProviderType::Gdrive);
-        cfg.enabled = true;
+        let cfg = SyncConfig {
+            provider: Some(SyncProviderType::Gdrive),
+            enabled: true,
+            ..Default::default()
+        };
         let status = sync_status_snapshot(&cfg, None);
         assert!(status.enabled);
         assert!(!status.oauth_pending);
@@ -536,10 +543,9 @@ mod tests {
         local.subscriptions.clear();
 
         let mut remote = base.clone();
-        for s in &mut remote.subscriptions {
+        if let Some(s) = remote.subscriptions.first_mut() {
             s.id = "tomb-a".to_string();
             s.updated_at = 50;
-            break;
         }
 
         let ts = vec![DeletionTombstone {
@@ -597,7 +603,10 @@ mod tests {
         assert!(sync_push_revision_mismatch("remote_rev_a", Some(&payload)));
         assert!(!sync_push_revision_mismatch("remote_rev_b", Some(&payload)));
         assert!(sync_push_revision_mismatch("", Some(&payload)));
-        assert!(!sync_push_revision_mismatch("x", None));
+        // Synced before, remote now invisible: never auto-push over it.
+        assert!(sync_push_revision_mismatch("x", None));
+        // Never synced and nothing remote: first push is fine.
+        assert!(!sync_push_revision_mismatch("", None));
     }
 
     #[test]

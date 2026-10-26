@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { parseLocalDate } from "@/composables/useLocaleFormat";
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import { useI18n } from "vue-i18n";
 import {
@@ -40,7 +41,7 @@ watch(
   () => props.modelValue,
   (newVal) => {
     if (!newVal || isOpen.value) return;
-    const parsed = new Date(newVal);
+    const parsed = parseLocalDate(newVal);
     if (!Number.isNaN(parsed.getTime())) {
       viewDate.value = parsed;
     }
@@ -101,7 +102,7 @@ function formatIso(d: Date) {
 
 function formatDisplayDate(dateStr: string) {
   if (!dateStr) return "";
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   if (Number.isNaN(d.getTime())) return "";
   return new Intl.DateTimeFormat(locale.value, {
     day: "numeric",
@@ -125,7 +126,7 @@ function toggleOpen() {
   isOpen.value = !isOpen.value;
   if (!isOpen.value) return;
   viewMode.value = "days";
-  const source = props.modelValue ? new Date(props.modelValue) : new Date();
+  const source = props.modelValue ? parseLocalDate(props.modelValue) : new Date();
   viewDate.value = Number.isNaN(source.getTime()) ? new Date() : source;
   nextTick(updatePosition);
 }
@@ -216,7 +217,7 @@ const datePickerTv = tv({
     labelEl: ui.fieldLabel(),
     trigger: [
       ui.field(),
-      "flex items-center gap-2.5 px-3 py-2 text-sm text-left cursor-pointer",
+      "flex items-center gap-2.5 px-3 py-1.5 text-[13px] text-left cursor-pointer",
     ],
     popover: "fixed z-[200] w-72 bg-surface border border-border rounded-xl shadow-xl overflow-hidden flex flex-col",
     header: "flex items-center justify-between px-3 py-2 border-b border-border bg-surface-secondary",
@@ -233,13 +234,13 @@ const datePickerTv = tv({
   },
   variants: {
     status: {
-      error: { trigger: "border-red-500 ring-2 ring-red-500/20" },
+      error: { trigger: "border-danger ring-2 ring-danger/20" },
       open: { trigger: "border-primary ring-2 ring-primary/20" },
       normal: {},
     },
     cellState: {
-      selected: { cellBtn: "bg-primary text-white font-bold shadow-md", bigCellBtn: "bg-primary text-white font-bold shadow-md" },
-      today: { cellBtn: "bg-primary-light text-primary font-bold", bigCellBtn: "bg-primary-light text-primary font-bold" },
+      selected: { cellBtn: "bg-primary text-white font-semibold shadow-md", bigCellBtn: "bg-primary text-white font-semibold shadow-md" },
+      today: { cellBtn: "bg-primary-light text-primary font-semibold", bigCellBtn: "bg-primary-light text-primary font-semibold" },
       normal: { cellBtn: "text-text-primary hover:bg-surface-hover", bigCellBtn: "text-text-primary hover:bg-surface-hover" },
       muted: { cellBtn: "text-text-muted hover:bg-surface-hover opacity-50", bigCellBtn: "text-text-muted hover:bg-surface-hover opacity-50" },
       disabled: { cellBtn: "text-text-muted opacity-30 cursor-not-allowed", bigCellBtn: "text-text-muted opacity-30 cursor-not-allowed" },
@@ -269,7 +270,7 @@ function getCellState(day: { date: Date; isCurrentMonth: boolean }) {
     <button ref="triggerRef" type="button" @click="toggleOpen" :disabled="disabled" :class="slots.trigger()">
       <CalendarIcon :size="16" class="text-text-muted shrink-0" />
       <span class="flex-1 truncate text-text-primary" :class="{ 'text-text-muted': !modelValue }">
-        {{ modelValue ? formatDisplayDate(modelValue) : (t("select_date") || "Select date") }}
+        {{ modelValue ? formatDisplayDate(modelValue) : t("select_date") }}
       </span>
     </button>
 
@@ -293,10 +294,10 @@ function getCellState(day: { date: Date; isCurrentMonth: boolean }) {
         >
           <div :class="slots.header()">
             <div class="flex gap-1">
-              <button type="button" @click="navigateYear(-1)" :class="slots.navBtn()" title="Prev year">
+              <button type="button" @click="navigateYear(-1)" :class="slots.navBtn()" :title="t('prev_year')" :aria-label="t('prev_year')">
                 <ChevronsLeft :size="16" />
               </button>
-              <button type="button" @click="navigateMonth(-1)" :class="slots.navBtn()" title="Prev month">
+              <button type="button" @click="navigateMonth(-1)" :class="slots.navBtn()" :title="t('prev_month')" :aria-label="t('prev_month')">
                 <ChevronLeft :size="16" />
               </button>
             </div>
@@ -310,10 +311,10 @@ function getCellState(day: { date: Date; isCurrentMonth: boolean }) {
             </button>
 
             <div class="flex gap-1">
-              <button type="button" @click="navigateMonth(1)" :class="slots.navBtn()" title="Next month">
+              <button type="button" @click="navigateMonth(1)" :class="slots.navBtn()" :title="t('next_month')" :aria-label="t('next_month')">
                 <ChevronRight :size="16" />
               </button>
-              <button type="button" @click="navigateYear(1)" :class="slots.navBtn()" title="Next year">
+              <button type="button" @click="navigateYear(1)" :class="slots.navBtn()" :title="t('next_year')" :aria-label="t('next_year')">
                 <ChevronsRight :size="16" />
               </button>
             </div>

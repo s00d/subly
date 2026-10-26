@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiCard from "@/components/ui/UiCard.vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useCurrencyFormat } from "@/composables/useCurrencyFormat";
@@ -16,12 +17,8 @@ const stats = computed(() => props.stats ?? null);
 </script>
 
 <template>
-  <div v-if="stats && stats.count > 0" class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
-    <div class="flex items-center gap-2 mb-3">
-      <Calculator :size="iconSize.sm" class="text-primary" />
-      <h2 :class="ui.sectionTitle()">{{ t('widget_avg_check') }}</h2>
-    </div>
-    <div class="grid grid-cols-3 gap-3 text-center">
+  <UiCard v-if="stats && stats.count > 0" :title="t('widget_avg_check')" :icon="Calculator" tone="info">
+    <div class="grid h-full grid-cols-3 content-center gap-3 text-center">
       <div>
         <p class="text-[10px] sm:text-xs text-text-muted">{{ t('avg_amount') }}</p>
         <p :class="statValue({ tone: 'primary' })">{{ fmt(stats.avgAmount) }}</p>
@@ -35,5 +32,5 @@ const stats = computed(() => props.stats ?? null);
         <p :class="statValue()">{{ stats.count }}</p>
       </div>
     </div>
-  </div>
+  </UiCard>
 </template>

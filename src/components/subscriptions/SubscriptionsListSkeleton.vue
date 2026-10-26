@@ -14,7 +14,7 @@
       <div
         v-for="n in 6"
         :key="n"
-        class="rounded-2xl border border-border bg-surface-secondary h-[88px] sm:h-[96px]"
+        class="rounded-xl border border-border bg-surface-secondary h-[88px] sm:h-[96px]"
       />
     </div>
   </div>

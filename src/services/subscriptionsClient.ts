@@ -28,6 +28,18 @@ export async function getPaymentDatesInMonth(year: number, month: number): Promi
   return callCommand("subscriptions_payment_dates_in_month", { year, month });
 }
 
+export interface CalendarMonthStats {
+  activeSubscriptions: number;
+  paymentsCount: number;
+  totalCost: string;
+  amountDue: string;
+}
+
+/** Subscription payments in a month, converted to the main currency (due = today or later). */
+export async function getCalendarMonthStats(year: number, month: number): Promise<CalendarMonthStats> {
+  return callCommand("calendar_month_stats", { year, month });
+}
+
 export async function listOverdueSubscriptions(): Promise<SubscriptionListItem[]> {
   return callCommand("get_overdue_subscriptions");
 }
@@ -58,6 +70,22 @@ export async function deleteSubscriptionsBatch(ids: string[]): Promise<void> {
 
 export async function insertPaymentRecord(subId: string, paymentRecord: import("@/schemas/appData").PaymentRecord): Promise<void> {
   return callCommand("subscriptions_insert_payment_record", { subId, paymentRecord });
+}
+
+/**
+ * One atomic backend step: payment record + linked expense + next payment advanced one cycle.
+ * Omitted `date` = today (local), `amount` = subscription price.
+ */
+export async function recordSubscriptionPayment(
+  subId: string,
+  opts: { date?: string; amount?: string; note?: string } = {},
+): Promise<Subscription> {
+  return callCommand("subscriptions_record_payment", {
+    subId,
+    date: opts.date ?? null,
+    amount: opts.amount ?? null,
+    note: opts.note ?? null,
+  });
 }
 
 export async function deletePaymentRecord(id: string): Promise<void> {

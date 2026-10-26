@@ -20,6 +20,18 @@ export interface NotificationsEventResponse<T = unknown> {
   data: T;
 }
 
+export interface NotificationsRescheduleResult {
+  ok: boolean;
+  scheduledCount: number;
+  scheduled: unknown[];
+}
+
+export interface LocalNotificationPayload {
+  title: string;
+  body: string;
+  items?: Array<{ title: string; body: string }>;
+}
+
 export async function notificationsEvent<T = unknown>(
   event: NotificationsEventKind,
   payload?: Record<string, unknown>,
@@ -28,4 +40,8 @@ export async function notificationsEvent<T = unknown>(
     event,
     payload: payload ?? {},
   });
+}
+
+export async function notificationsRescheduleAll(): Promise<NotificationsRescheduleResult> {
+  return callCommand<NotificationsRescheduleResult>("notifications_reschedule_all");
 }

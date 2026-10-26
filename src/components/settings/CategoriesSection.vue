@@ -8,11 +8,15 @@ import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useCatalogsUsageStore } from "@/stores/catalogsUsageStore";
 import { formatErrorForToast } from "@/utils/formatError";
 import AppInput from "@/components/ui/AppInput.vue";
+import UiCard from "@/components/ui/UiCard.vue";
+import SavedIndicator, { useAutoSave } from "@/components/settings/SavedIndicator.vue";
+import SettingsSearch from "@/components/settings/SettingsSearch.vue";
+import ReorderButtons from "@/components/settings/ReorderButtons.vue";
 import IconDisplay from "@/components/ui/IconDisplay.vue";
 import IconPickerModal from "@/components/ui/IconPickerModal.vue";
-import { Trash2, Plus, ChevronUp, ChevronDown, Star, Search, ImageIcon } from "@lucide/vue";
+import { Trash2, Plus, ImageIcon } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
-import { ui } from "@/lib/tv";
+import { button } from "@/lib/tv";
 
 const props = defineProps<{
   lookupData: {
@@ -25,6 +29,8 @@ const { t } = useI18n();
 const { toast } = useToast();
 const metaStore = useAppMetaStore();
 const catalogsUsageStore = useCatalogsUsageStore();
+const { savedAt, run, debounce } = useAutoSave();
+const iconBtn = button({ intent: "ghost", size: "icon", class: "h-7 w-7" });
 const categories = ref<Category[]>([]);
 const settings = ref<Settings | null>(null);
 const categoryUsage = ref<Record<string, number>>({});
@@ -42,6 +48,11 @@ const catSearch = ref("");
 const isCatSearching = computed(() => catSearch.value.length > 0);
 
 /** Sorted: default category first, then by order */
+/** Rows the sort pins on top ("No category", default): they can't move and nothing moves above them. */
+const pinnedCount = computed(() => {
+  const defId = settings.value?.defaultCategoryId;
+  return 1 + (defId && defId !== "cat-1" && categories.value.some((c) => c.id === defId) ? 1 : 0);
+});
 const sortedCategories = computed(() => {
   const defId = settings.value?.defaultCategoryId;
   return [...categories.value].sort((a, b) => {
@@ -79,29 +90,36 @@ function openIconPicker(catId: string) {
 function onIconSelected(icon: string) {
   if (iconPickerCatId.value) {
     const cat = categories.value.find((c) => c.id === iconPickerCatId.value);
-    if (cat) {
-      updateCategory(cat.id, cat.name, icon);
-      toast(t("success"));
-    }
+    if (cat) void run(() => updateCategory(cat.id, cat.name, icon));
   }
   showIconPicker.value = false;
   iconPickerCatId.value = null;
 }
 
-async function addCat() {
-  const order = await maxSortOrder("categories");
-  const cat: Category = { id: crypto.randomUUID(), name: "Category", icon: "", sortOrder: order + 1, i18nKey: "" };
-  await upsertCategory(cat);
-  categories.value.push(cat);
+function addCat() {
+  void run(async () => {
+    const order = await maxSortOrder("categories");
+    const cat: Category = { id: crypto.randomUUID(), name: "Category", icon: "", sortOrder: order + 1, i18nKey: "" };
+    await upsertCategory(cat);
+    metaStore.refreshSoon();
+    categories.value.push(cat);
+  });
 }
 async function updateCategory(id: string, name: string, icon?: string) {
   const cat = categories.value.find((c) => c.id === id);
   if (!cat) return;
   const next = { ...cat, name, icon: icon ?? cat.icon };
   await upsertCategory(next);
+  metaStore.refreshSoon();
   Object.assign(cat, next);
 }
-async function saveCat(id: string, name: string) { await updateCategory(id, name); toast(t("success")); }
+/** Name edits: update the row now, persist once typing pauses. */
+function saveCat(id: string, name: string) {
+  const cat = categories.value.find((c) => c.id === id);
+  if (!cat) return;
+  cat.name = name;
+  debounce(`name:${id}`, () => updateCategory(id, cat.name));
+}
 async function removeCat(id: string) {
   if (id === "cat-1") {
     toast(t("category_cannot_delete"), "error");
@@ -109,6 +127,7 @@ async function removeCat(id: string) {
   }
   try {
     await deleteCategoryApi(id);
+    metaStore.refreshSoon();
     categories.value = categories.value.filter((c) => c.id !== id);
     await catalogsUsageStore.refresh();
     toast(t("success"));
@@ -122,7 +141,7 @@ async function moveCatUp(id: string) {
   const idx = ids.indexOf(id);
   if (idx <= 0) return;
   [ids[idx - 1], ids[idx]] = [ids[idx], ids[idx - 1]];
-  await reorderCategories(ids);
+  await run(() => reorderCategories(ids));
 }
 
 async function moveCatDown(id: string) {
@@ -130,7 +149,7 @@ async function moveCatDown(id: string) {
   const idx = ids.indexOf(id);
   if (idx < 0 || idx >= ids.length - 1) return;
   [ids[idx], ids[idx + 1]] = [ids[idx + 1], ids[idx]];
-  await reorderCategories(ids);
+  await run(() => reorderCategories(ids));
 }
 
 function getCatIcon(id: string): string {
@@ -142,74 +161,86 @@ async function reorderCategories(ids: string[]) {
     if (!cat) continue;
     const next = { ...cat, sortOrder: i };
     await upsertCategory(next);
+    metaStore.refreshSoon();
     Object.assign(cat, next);
   }
 }
-async function setDefaultCategory(id: string) {
+function setDefaultCategory(id: string) {
   if (!settings.value) return;
   const next = { ...settings.value, defaultCategoryId: id };
   settings.value = next;
-  await metaStore.updateSettings(next);
+  void run(() => metaStore.updateSettings(next));
 }
 </script>
 
 <template>
-  <section class="bg-surface rounded-xl border border-border p-3 sm:p-5">
-    <div class="flex items-center justify-between gap-2 mb-3">
-      <h2 :class="[ui.sectionTitle(), 'shrink-0']">{{ t('categories') }}</h2>
-      <div class="relative w-32 sm:w-44">
-        <Search :size="14" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input v-model="catSearch" type="text" :placeholder="t('search')" class="w-full pl-8 pr-3 py-1.5 rounded-lg border border-border bg-surface text-xs text-text-primary placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary transition-shadow" />
-      </div>
-    </div>
-    <div class="space-y-1.5 max-h-72 overflow-y-auto overflow-x-hidden">
+  <UiCard :title="t('categories')">
+    <template #actions>
+      <SavedIndicator :at="savedAt" />
+      <SettingsSearch v-model="catSearch" class="w-32 sm:w-44" />
+    </template>
+    <div class="space-y-1 max-h-72 overflow-y-auto overflow-x-hidden">
       <div
         v-for="(c, idx) in filteredCategories"
         :key="c.id"
-        class="flex gap-2 items-center rounded-lg px-2 py-1"
+        class="flex gap-1.5 items-center rounded-lg px-1.5 py-1"
         :class="c.id === settings?.defaultCategoryId ? 'bg-primary-light/50' : ''"
       >
         <!-- Move buttons (not for cat-1 "No category") -->
-        <div v-if="!isCatSearching && c.id !== 'cat-1'" class="flex flex-row sm:flex-col shrink-0">
-          <Tooltip :text="t('move_up')"><button @click="moveCatUp(c.id)" :disabled="idx === 0" class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronUp :size="14" /></button></Tooltip>
-          <Tooltip :text="t('move_down')"><button @click="moveCatDown(c.id)" :disabled="idx === sortedCategories.length - 1" class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-30 disabled:cursor-not-allowed transition-colors"><ChevronDown :size="14" /></button></Tooltip>
-        </div>
-        <div v-else-if="c.id === 'cat-1'" class="w-[22px] shrink-0" />
+        <ReorderButtons
+          v-if="!isCatSearching && idx >= pinnedCount"
+          :up-disabled="idx <= pinnedCount"
+          :down-disabled="idx === sortedCategories.length - 1"
+          @up="moveCatUp(c.id)"
+          @down="moveCatDown(c.id)"
+        />
+        <div v-else-if="!isCatSearching" class="w-14 shrink-0" />
 
-        <!-- Primary star -->
+        <!-- Default (radio) -->
         <Tooltip :text="t('set_as_primary')">
-          <button @click="setDefaultCategory(c.id)" class="p-1 rounded-lg transition-colors shrink-0" :class="c.id === settings?.defaultCategoryId ? 'text-yellow-500' : 'text-text-muted hover:text-yellow-500'">
-            <Star :size="14" :fill="c.id === settings?.defaultCategoryId ? 'currentColor' : 'none'" />
+          <button
+            type="button"
+            role="radio"
+            :aria-checked="c.id === settings?.defaultCategoryId"
+            :aria-label="t('set_as_primary')"
+            :class="iconBtn"
+            @click="setDefaultCategory(c.id)"
+          >
+            <span class="flex h-3.5 w-3.5 items-center justify-center rounded-full border-2" :class="c.id === settings?.defaultCategoryId ? 'border-primary' : 'border-border-strong'">
+              <span v-if="c.id === settings?.defaultCategoryId" class="h-1.5 w-1.5 rounded-full bg-primary" />
+            </span>
           </button>
         </Tooltip>
 
         <!-- Icon button -->
         <Tooltip :text="t('choose_icon')">
           <button
+            type="button"
             @click="openIconPicker(c.id)"
             class="w-8 h-8 rounded-lg border flex items-center justify-center shrink-0 transition-colors hover:border-primary"
             :class="getCatIcon(c.id) ? 'border-primary/30 bg-primary-light' : 'border-border'"
           >
-          <IconDisplay v-if="getCatIcon(c.id)" :icon="getCatIcon(c.id)" :size="18" />
-          <ImageIcon v-else :size="14" class="text-text-muted" />
-        </button>
+            <IconDisplay v-if="getCatIcon(c.id)" :icon="getCatIcon(c.id)" :size="18" />
+            <ImageIcon v-else :size="14" class="text-text-muted" />
+          </button>
         </Tooltip>
 
         <!-- Name: read-only for default, editable for user-added -->
         <div class="flex-1 min-w-0">
-          <span v-if="isDefaultItem(c)" class="text-sm text-text-primary truncate block px-2 py-1">{{ c.name }}</span>
-          <AppInput v-else :modelValue="c.name" @update:modelValue="(v: string | number) => saveCat(c.id, String(v))" size="sm" />
+          <span v-if="isDefaultItem(c)" class="text-xs text-text-primary truncate block px-2.5 py-1 border border-transparent">{{ c.name }}</span>
+          <AppInput v-else :modelValue="c.name" @update:modelValue="(v: string | number) => saveCat(c.id, String(v))" size="sm" variant="inline" />
         </div>
+        <span v-if="c.id === settings?.defaultCategoryId" class="shrink-0 rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] font-medium text-primary">{{ t('catalog_default') }}</span>
 
         <!-- Delete (not for cat-1) -->
         <Tooltip v-if="c.id !== 'cat-1'" :text="t('delete')">
-          <button @click="removeCat(c.id)" class="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors shrink-0"><Trash2 :size="14" /></button>
+          <button type="button" :aria-label="t('delete')" @click="removeCat(c.id)" :class="[iconBtn, 'text-danger hover:bg-danger/12 hover:text-danger']"><Trash2 :size="14" /></button>
         </Tooltip>
-        <div v-else class="w-[34px] shrink-0" />
+        <div v-else class="w-7 shrink-0" />
       </div>
     </div>
-    <button @click="addCat" class="mt-3 px-3 py-1.5 rounded-lg bg-primary text-white text-sm hover:bg-primary-hover transition-colors">
-      <Plus :size="14" class="inline mr-1" /> {{ t('add') }}
+    <button type="button" @click="addCat" :class="button({ intent: 'secondary', size: 'sm', class: 'mt-3' })">
+      <Plus :size="14" /> {{ t('add') }}
     </button>
 
     <!-- Icon Picker Modal -->
@@ -220,5 +251,5 @@ async function setDefaultCategory(id: string) {
       @update:modelValue="onIconSelected"
       @close="showIconPicker = false"
     />
-  </section>
+  </UiCard>
 </template>

@@ -1,7 +1,11 @@
-use chrono::{Local, LocalResult, NaiveDate, TimeZone, Timelike};
+use chrono::{Local, NaiveDate, Timelike};
+#[cfg(any(target_os = "android", target_os = "ios"))]
+use chrono::{LocalResult, TimeZone};
 use tauri::State;
 use tauri::Emitter;
-use tauri_plugin_notification::{NotificationExt, Schedule};
+use tauri_plugin_notification::NotificationExt;
+#[cfg(any(target_os = "android", target_os = "ios"))]
+use tauri_plugin_notification::Schedule;
 use crate::models::AppConfigDoc;
 use crate::AppState;
 use crate::state::{AppStateInner, EntityTable};
@@ -138,9 +142,18 @@ struct NotificationConfigDto {
 
 #[derive(Debug, Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
+struct LocalNotificationItemDto {
+    title: String,
+    body: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct LocalNotificationEventPayloadDto {
     title: String,
     body: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    items: Vec<LocalNotificationItemDto>,
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -161,9 +174,13 @@ const FALLBACK_BODY_SOON: &str = "Payment for \"{name}\" is due in {days} day(s)
 const FALLBACK_BODY_OVERDUE: &str = "\"{name}\" is overdue by {days} day(s).";
 const FALLBACK_TITLE_DUE: &str = "Subly - {name}";
 const FALLBACK_TITLE_OVERDUE: &str = "Subly - Overdue: {name}";
+#[cfg(any(target_os = "android", target_os = "ios"))]
 const FALLBACK_SCHEDULE_TITLE: &str = "Subly - {name}";
+#[cfg(any(target_os = "android", target_os = "ios"))]
 const FALLBACK_SCHEDULE_BODY: &str = "Payment date: {due_date}";
 const CONFIG_SETTINGS_KEY: &str = "config:settings";
+/// Same account as `setSecureValue("telegramBotToken")` in `TelegramSection.vue`.
+const SECURE_TELEGRAM_BOT_TOKEN: &str = "secure_storage.telegramBotToken";
 
 fn unwrap_config_settings_value(raw: &str) -> Result<serde_json::Value, crate::errors::AppError> {
     match serde_json::from_str::<serde_json::Value>(raw) {
@@ -191,9 +208,15 @@ fn load_notification_config(
     guard: &AppStateInner,
 ) -> Result<NotificationConfigDto, crate::errors::AppError> {
     let cfg: AppConfigDoc = guard.config_typed()?;
+    // The settings UI stores the token in the OS keyring; `AppConfigDoc` only has it on legacy installs.
+    let telegram_bot_token = crate::keyring_store::get_for_background(SECURE_TELEGRAM_BOT_TOKEN)
+        .ok()
+        .flatten()
+        .filter(|t| !t.trim().is_empty())
+        .unwrap_or(cfg.telegram_bot_token);
     Ok(NotificationConfigDto {
         telegram_enabled: cfg.telegram_enabled,
-        telegram_bot_token: cfg.telegram_bot_token,
+        telegram_bot_token,
         telegram_chat_id: cfg.telegram_chat_id,
         telegram_proxy_url: if cfg.telegram_proxy_url.trim().is_empty() {
             None
@@ -239,7 +262,7 @@ async fn send_telegram_message(bot_token: &str, chat_id: &str, text: &str, proxy
         chat_id: chat_id.to_string(),
         text: text.to_string(),
     };
-    tauri_plugin_http::reqwest::Client::new()
+    crate::commands::sync::providers::http_client()
         .post(url)
         .json(&payload)
         .send()
@@ -258,27 +281,68 @@ fn notification_schedule_allows_now(settings: &NotificationSettingsDto) -> bool 
     match schedule {
         "morning" => (7..12).contains(&hour),
         "evening" => (17..22).contains(&hour),
-        "custom" => {
-            let target = settings.notification_custom_hour as i32;
-            let now_minutes = (hour as i32) * 60 + now.minute() as i32;
-            let target_minutes = target * 60;
-            let delta = (now_minutes - target_minutes).abs();
-            let min_delta = delta.min(1440 - delta);
-            min_delta <= 30
-        }
+        // From the chosen hour until midnight: a ±30 min window was missed whenever the check
+        // did not run in it (sleeping laptop, throttled timers), dropping the reminder for the day.
+        "custom" => i64::from(hour) >= settings.notification_custom_hour.clamp(0, 23),
         _ => true,
     }
 }
 
-fn emit_local_notification_event(app: &tauri::AppHandle, title: &str, body: &str) {
-    let payload = LocalNotificationEventPayloadDto {
-        title: title.to_string(),
-        body: body.to_string(),
+/// Payment date reminders target. Auto-renewing subscriptions are not advanced in storage, so a
+/// past `next_payment` is projected forward to the next cycle (on the fly, nothing is persisted).
+fn effective_next_payment(sub: &crate::models::SubscriptionDoc, today: NaiveDate) -> Option<NaiveDate> {
+    let stored = NaiveDate::parse_from_str(&sub.next_payment, "%Y-%m-%d").ok()?;
+    if sub.auto_renew && stored < today {
+        return crate::commands::subscriptions::first_cycle_date_on_or_after(
+            stored,
+            u64::from(sub.cycle),
+            u64::from(sub.frequency),
+            today,
+        );
+    }
+    Some(stored)
+}
+
+/// Non-recurring mode marker for the overdue reminder; distinct from the upcoming marker
+/// (the due date itself) so an "upcoming" push does not suppress the later "overdue" one.
+fn overdue_marker(due_date: &str) -> String {
+    format!("{due_date}:overdue")
+}
+
+fn emit_local_notification_digest(app: &tauri::AppHandle, items: Vec<LocalNotificationItemDto>) {
+    if items.is_empty() {
+        return;
+    }
+    let (title, body) = if items.len() == 1 {
+        (items[0].title.clone(), items[0].body.clone())
+    } else {
+        (
+            "Subly".to_string(),
+            format!("{} payments need attention", items.len()),
+        )
     };
-    let _ = app.emit(
-        "notifications:local",
-        payload,
-    );
+    let payload = LocalNotificationEventPayloadDto {
+        title,
+        body,
+        items,
+    };
+    let _ = app.emit("notifications:local", payload);
+}
+
+fn show_os_notification_immediate(app: &tauri::AppHandle, title: &str, body: &str) -> bool {
+    match app
+        .notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show()
+    {
+        Ok(()) => true,
+        Err(e) => {
+            eprintln!("[subly][notifications] OS show failed: {}", e);
+            false
+        }
+    }
 }
 
 fn notification_id_for(subscription_id: &str, notify_date: &str) -> i32 {
@@ -300,12 +364,17 @@ fn schedule_hour_for_settings(settings: &NotificationSettingsDto) -> u8 {
     }
 }
 
+fn notified_for_current_payment(last_notified_date: &str, next_payment: &str) -> bool {
+    !last_notified_date.is_empty() && last_notified_date == next_payment
+}
+
 fn build_schedule_preview(state: &State<'_, AppState>) -> Result<Vec<NotificationScheduleItemDto>, crate::errors::AppError> {
     let guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
     let settings: NotificationSettingsDto = load_notification_settings(&guard)?;
     let subscriptions: Vec<crate::models::SubscriptionDoc> =
         guard.table_list_typed(EntityTable::Subscriptions)?;
     let default_days_before = settings.notify_days_before;
+    let today = Local::now().date_naive();
     let mut out = Vec::new();
     let schedule_hour = schedule_hour_for_settings(&settings);
     for sub in subscriptions {
@@ -325,15 +394,15 @@ fn build_schedule_preview(state: &State<'_, AppState>) -> Result<Vec<Notificatio
         } else {
             sub.notify_days_before
         };
-        if let Ok(payment_date) = NaiveDate::parse_from_str(&sub.next_payment, "%Y-%m-%d") {
-            let notify_date = payment_date - chrono::Duration::days(notify_days_before);
+        if let Some(payment_date) = effective_next_payment(&sub, today) {
+            let notify_date = payment_date - chrono::Duration::days(notify_days_before.clamp(0, 365));
             let notify_date_str = notify_date.format("%Y-%m-%d").to_string();
             let notification_id = notification_id_for(&sub.id, &notify_date_str);
             out.push(NotificationScheduleItemDto {
                 id: sub.id.clone(),
                 name,
                 notify_date: notify_date_str,
-                next_payment: sub.next_payment.clone(),
+                next_payment: payment_date.format("%Y-%m-%d").to_string(),
                 price: sub.price,
                 currency_id: sub.currency_id.clone(),
                 notification_id,
@@ -362,9 +431,9 @@ pub(crate) fn notifications_reschedule_with_state(
         {
             let ids: Vec<i32> = serde_json::from_str(&raw_ids)
                 .map_err(|e| format!("invalid notifications.scheduled.ids payload: {}", e))?;
-            app.notification()
-                .cancel(ids)
-                .map_err(|e| format!("failed to cancel scheduled notifications: {}", e))?;
+            if let Err(e) = app.notification().cancel(ids) {
+                eprintln!("[subly][notifications] cancel failed: {}", e);
+            }
         }
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         {
@@ -372,60 +441,80 @@ pub(crate) fn notifications_reschedule_with_state(
         }
     }
 
+    #[allow(unused_mut)] // mutated only on android/ios schedule path
     let mut scheduled_ids: Vec<i32> = Vec::new();
-    for item in &schedule {
-        let payment_date = NaiveDate::parse_from_str(&item.next_payment, "%Y-%m-%d").ok();
-        let notify_date_parsed = NaiveDate::parse_from_str(&item.notify_date, "%Y-%m-%d").ok();
-        let days_to_payment = match (payment_date, notify_date_parsed) {
-            (Some(p), Some(n)) => (p - n).num_days(),
-            _ => 0,
-        };
-        let tpl_ctx = NotificationTemplateContext {
-            name: item.name.as_str(),
-            days: days_to_payment,
-            price: item.price,
-            currency_id: item.currency_id.as_str(),
-            due_date: item.next_payment.as_str(),
-        };
-        let title_tpl = pick_notification_template(&settings.notification_title, FALLBACK_SCHEDULE_TITLE);
-        let body_tpl = pick_notification_template(&settings.notification_body_due_soon, FALLBACK_SCHEDULE_BODY);
-        let title = render_notification_placeholders(title_tpl, &tpl_ctx);
-        let body = render_notification_placeholders(body_tpl, &tpl_ctx);
-        let schedule_hour = item.schedule_hour;
-        let notify_date = match NaiveDate::parse_from_str(&item.notify_date, "%Y-%m-%d") {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-        let naive = notify_date
-            .and_hms_opt(schedule_hour as u32, 0, 0)
-            .ok_or("invalid schedule datetime".to_string())?;
-        // Interpret wall-clock time in the user's timezone (not UTC). Using `and_utc()` on naive
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        // Wall-clock `hour` on `day` in the user's timezone (not UTC). Using `and_utc()` on naive
         // values caused wrong instants and iOS `pastScheduledTime` when local hour had already passed.
-        let local_dt = match Local.from_local_datetime(&naive) {
-            LocalResult::Single(dt) => dt,
-            LocalResult::Ambiguous(earliest, _) => earliest,
-            LocalResult::None => continue,
+        let future_instant = |day: NaiveDate, hour: u8| -> Option<time::OffsetDateTime> {
+            let naive = day.and_hms_opt(u32::from(hour), 0, 0)?;
+            let local_dt = match Local.from_local_datetime(&naive) {
+                LocalResult::Single(dt) => dt,
+                LocalResult::Ambiguous(earliest, _) => earliest,
+                LocalResult::None => return None,
+            };
+            let date = time::OffsetDateTime::from_unix_timestamp(local_dt.timestamp()).ok()?;
+            (date > time::OffsetDateTime::now_utc()).then_some(date)
         };
-        let ts = local_dt.timestamp();
-        let date = time::OffsetDateTime::from_unix_timestamp(ts).map_err(|e| e.to_string())?;
-        let now = time::OffsetDateTime::now_utc();
-        if date <= now {
-            continue;
+        for item in &schedule {
+            let (Ok(payment_date), Ok(notify_date)) = (
+                NaiveDate::parse_from_str(&item.next_payment, "%Y-%m-%d"),
+                NaiveDate::parse_from_str(&item.notify_date, "%Y-%m-%d"),
+            ) else {
+                continue;
+            };
+            // Reminder time already passed (app opened inside the window): fall back to the
+            // payment day so the user still gets one system notification for this cycle.
+            let (date, days_to_payment) = match future_instant(notify_date, item.schedule_hour) {
+                Some(d) => (d, (payment_date - notify_date).num_days()),
+                None => match future_instant(payment_date, item.schedule_hour) {
+                    Some(d) => (d, 0),
+                    None => continue,
+                },
+            };
+            let tpl_ctx = NotificationTemplateContext {
+                name: item.name.as_str(),
+                days: days_to_payment,
+                price: item.price,
+                currency_id: item.currency_id.as_str(),
+                due_date: item.next_payment.as_str(),
+            };
+            let title_tpl = pick_notification_template(&settings.notification_title, FALLBACK_SCHEDULE_TITLE);
+            let body_tpl = if days_to_payment == 0 {
+                pick_notification_template(&settings.notification_body_due_today, FALLBACK_SCHEDULE_BODY)
+            } else {
+                pick_notification_template(&settings.notification_body_due_soon, FALLBACK_SCHEDULE_BODY)
+            };
+            let title = render_notification_placeholders(title_tpl, &tpl_ctx);
+            let body = render_notification_placeholders(body_tpl, &tpl_ctx);
+            match app
+                .notification()
+                .builder()
+                .id(item.notification_id)
+                .title(title)
+                .body(body)
+                .schedule(Schedule::At {
+                    date,
+                    repeating: false,
+                    allow_while_idle: true,
+                })
+                .show()
+            {
+                Ok(()) => scheduled_ids.push(item.notification_id),
+                Err(e) => {
+                    eprintln!(
+                        "[subly][notifications] failed to schedule {}: {}",
+                        item.notification_id, e
+                    );
+                }
+            }
         }
-        let _ = app
-            .notification()
-            .builder()
-            .id(item.notification_id)
-            .title(title)
-            .body(body)
-            .schedule(Schedule::At {
-                date,
-                repeating: false,
-                allow_while_idle: true,
-            })
-            .show()
-            .map_err(|e| format!("failed to schedule notification {}: {}", item.notification_id, e))?;
-        scheduled_ids.push(item.notification_id);
+    }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        let _ = &settings;
+        let _ = app;
     }
 
     {
@@ -446,6 +535,39 @@ pub(crate) fn notifications_reschedule_with_state(
     })
 }
 
+/// Desktop has no OS-scheduled reminders, so checks must run while the app is alive. The webview's
+/// `setInterval` is throttled or suspended while the window is hidden in the tray, so the periodic
+/// check runs here instead; results reach the UI via `notifications:alerts`.
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub(crate) fn ensure_desktop_notification_scheduler_started(app: tauri::AppHandle) {
+    use tauri::Manager;
+    static STARTED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    STARTED.get_or_init(|| {
+        tauri::async_runtime::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(15 * 60)).await;
+                let state = app.state::<AppState>();
+                match notifications_run_check(app.clone(), state).await {
+                    Ok(result) => {
+                        let _ = app.emit("notifications:alerts", result.alerts);
+                    }
+                    Err(e) => eprintln!("[subly][notifications] scheduled check failed: {}", e),
+                }
+            }
+        });
+    });
+}
+
+/// Re-plan OS reminders after a bulk data replace (import, reset, sync pull). Best effort.
+#[cfg(any(target_os = "android", target_os = "ios"))]
+pub(crate) fn reschedule_from_app(app: &tauri::AppHandle) {
+    use tauri::Manager;
+    let state = app.state::<AppState>();
+    if let Err(e) = notifications_reschedule_with_state(app, &state) {
+        eprintln!("[subly][notifications] reschedule after data replace failed: {}", e);
+    }
+}
+
 #[tauri::command]
 pub fn notifications_cancel_all_scheduled(
     app: tauri::AppHandle,
@@ -457,9 +579,9 @@ pub fn notifications_cancel_all_scheduled(
         {
             let ids: Vec<i32> = serde_json::from_str(&raw_ids)
                 .map_err(|e| format!("invalid notifications.scheduled.ids payload: {}", e))?;
-            app.notification()
-                .cancel(ids)
-                .map_err(|e| format!("failed to cancel scheduled notifications: {}", e))?;
+            if let Err(e) = app.notification().cancel(ids) {
+                eprintln!("[subly][notifications] cancel-all failed: {}", e);
+            }
         }
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         {
@@ -489,7 +611,7 @@ async fn notifications_run_check(
 ) -> Result<NotificationsRunCheckResultDto, crate::errors::AppError> {
     let today = Local::now().date_naive();
     let today_str = today.format("%Y-%m-%d").to_string();
-    let (sent_count, alerts, telegram_jobs) = {
+    let (sent_count, alerts, telegram_jobs, digest_items) = {
         let mut guard = state.lock().map_err(|_| crate::errors::AppError::StateLockPoisoned)?;
         let settings: NotificationSettingsDto = load_notification_settings(&guard)?;
         let config: NotificationConfigDto = load_notification_config(&guard)?;
@@ -510,6 +632,8 @@ async fn notifications_run_check(
 
         let mut sent_count = 0_u32;
         let mut alerts: Vec<InAppAlertDto> = Vec::new();
+        let mut digest_items: Vec<LocalNotificationItemDto> = Vec::new();
+        let mut dirty_ids: Vec<String> = Vec::new();
         let telegram_enabled = config.telegram_enabled;
         let telegram_token = config.telegram_bot_token;
         let telegram_chat_id = config.telegram_chat_id;
@@ -517,119 +641,171 @@ async fn notifications_run_check(
         let mut telegram_jobs: Vec<String> = Vec::new();
 
         for sub in &mut subscriptions {
-                if sub.inactive || !sub.notify {
-                    continue;
-                }
-                let next_payment = match NaiveDate::parse_from_str(&sub.next_payment, "%Y-%m-%d") {
-                    Ok(d) => d,
-                    Err(_) => continue,
-                };
-                let diff_days = (next_payment - today).num_days();
-                let days_before = if sub.notify_days_before < 0 {
-                    notify_days_before
-                } else {
-                    sub.notify_days_before
-                };
-                let notified_today = sub.last_notified_date == today_str;
-                let notified_for_current_payment =
-                    !sub.last_notified_date.is_empty() && sub.last_notified_date >= sub.next_payment;
-                let should_send_push = within_schedule && !notified_today;
-                let id = sub.id.clone();
-                let name = if sub.name.is_empty() {
-                    "Subscription".to_string()
-                } else {
-                    sub.name.clone()
-                };
-                let price = sub.price;
-                let currency_id = sub.currency_id.clone();
+            if sub.inactive || !sub.notify {
+                continue;
+            }
+            let Some(next_payment) = effective_next_payment(sub, today) else {
+                continue;
+            };
+            let due_str = next_payment.format("%Y-%m-%d").to_string();
+            let diff_days = (next_payment - today).num_days();
+            let days_before = if sub.notify_days_before < 0 {
+                notify_days_before
+            } else {
+                sub.notify_days_before
+            };
+            let notified_today = sub.last_notified_date == today_str;
+            let cycle_notified = notified_for_current_payment(&sub.last_notified_date, &due_str);
+            let overdue_notified = sub.last_notified_date == overdue_marker(&due_str);
+            let should_send_push = within_schedule && !notified_today;
+            let id = sub.id.clone();
+            let name = if sub.name.is_empty() {
+                "Subscription".to_string()
+            } else {
+                sub.name.clone()
+            };
+            let price = sub.price;
+            let currency_id = sub.currency_id.clone();
 
-                if diff_days >= 0 && diff_days <= days_before {
-                    let alert_type = if diff_days == 0 { "due_today" } else { "upcoming" };
-                    alerts.push(InAppAlertDto {
-                        id: format!("{id}-{alert_type}"),
-                        subscription_id: id.clone(),
-                        subscription_name: name.clone(),
-                        r#type: alert_type.to_string(),
-                        days_until: diff_days,
+            if diff_days >= 0 && diff_days <= days_before {
+                let alert_type = if diff_days == 0 { "due_today" } else { "upcoming" };
+                alerts.push(InAppAlertDto {
+                    id: format!("{id}-{alert_type}-{due_str}"),
+                    subscription_id: id.clone(),
+                    subscription_name: name.clone(),
+                    r#type: alert_type.to_string(),
+                    days_until: diff_days,
+                    price,
+                    currency_id: currency_id.clone(),
+                });
+                let should_send_for_sub = if recurring {
+                    should_send_push
+                } else {
+                    should_send_push && !cycle_notified
+                };
+                if should_send_for_sub {
+                    let tpl_ctx = NotificationTemplateContext {
+                        name: &name,
+                        days: diff_days,
                         price,
-                        currency_id: currency_id.clone(),
-                    });
-                    let should_send_for_sub = if recurring {
-                        should_send_push
-                    } else {
-                        should_send_push && !notified_for_current_payment
+                        currency_id: &currency_id,
+                        due_date: &due_str,
                     };
-                    if should_send_for_sub {
-                        let tpl_ctx = NotificationTemplateContext {
-                            name: &name,
-                            days: diff_days,
-                            price,
-                            currency_id: &currency_id,
-                            due_date: &sub.next_payment,
-                        };
-                        let title = render_notification_placeholders(title_due_tpl, &tpl_ctx);
-                        let body_tpl = if diff_days == 0 {
-                            body_today_tpl
-                        } else {
-                            body_soon_tpl
-                        };
-                        let body = render_notification_placeholders(body_tpl, &tpl_ctx);
-                        emit_local_notification_event(&app, &title, &body);
-                        if telegram_enabled {
-                            telegram_jobs.push(body.clone());
-                        }
-                        sent_count += 1;
-                        sub.last_notified_date = today_str.clone();
+                    let title = render_notification_placeholders(title_due_tpl, &tpl_ctx);
+                    let body_tpl = if diff_days == 0 {
+                        body_today_tpl
+                    } else {
+                        body_soon_tpl
+                    };
+                    let body = render_notification_placeholders(body_tpl, &tpl_ctx);
+                    digest_items.push(LocalNotificationItemDto {
+                        title: title.clone(),
+                        body: body.clone(),
+                    });
+                    if telegram_enabled {
+                        telegram_jobs.push(body);
+                    }
+                    sent_count += 1;
+                    let next_last = if recurring {
+                        today_str.clone()
+                    } else {
+                        due_str.clone()
+                    };
+                    if sub.last_notified_date != next_last {
+                        sub.last_notified_date = next_last;
+                        dirty_ids.push(id.clone());
                     }
                 }
-                if !sub.auto_renew && diff_days < 0 {
-                    alerts.push(InAppAlertDto {
-                        id: format!("{id}-overdue"),
-                        subscription_id: id.clone(),
-                        subscription_name: name.clone(),
-                        r#type: "overdue".to_string(),
-                        days_until: diff_days,
+            }
+            if !sub.auto_renew && diff_days < 0 {
+                alerts.push(InAppAlertDto {
+                    id: format!("{id}-overdue-{due_str}"),
+                    subscription_id: id.clone(),
+                    subscription_name: name.clone(),
+                    r#type: "overdue".to_string(),
+                    days_until: diff_days,
+                    price,
+                    currency_id: currency_id.clone(),
+                });
+                let should_send_overdue = if recurring {
+                    should_send_push
+                } else {
+                    should_send_push && !overdue_notified
+                };
+                if should_send_overdue {
+                    let tpl_ctx = NotificationTemplateContext {
+                        name: &name,
+                        days: diff_days.abs(),
                         price,
-                        currency_id: currency_id.clone(),
-                    });
-                    let should_send_overdue = if recurring {
-                        should_send_push
-                    } else {
-                        should_send_push && !notified_for_current_payment
+                        currency_id: &currency_id,
+                        due_date: &due_str,
                     };
-                    if should_send_overdue {
-                        let tpl_ctx = NotificationTemplateContext {
-                            name: &name,
-                            days: diff_days.abs(),
-                            price,
-                            currency_id: &currency_id,
-                            due_date: &sub.next_payment,
-                        };
-                        let title = render_notification_placeholders(title_overdue_tpl, &tpl_ctx);
-                        let body = render_notification_placeholders(body_overdue_tpl, &tpl_ctx);
-                        emit_local_notification_event(&app, &title, &body);
-                        if telegram_enabled {
-                            telegram_jobs.push(body.clone());
+                    let title = render_notification_placeholders(title_overdue_tpl, &tpl_ctx);
+                    let body = render_notification_placeholders(body_overdue_tpl, &tpl_ctx);
+                    digest_items.push(LocalNotificationItemDto {
+                        title: title.clone(),
+                        body: body.clone(),
+                    });
+                    if telegram_enabled {
+                        telegram_jobs.push(body);
+                    }
+                    sent_count += 1;
+                    let next_last = if recurring {
+                        today_str.clone()
+                    } else {
+                        overdue_marker(&due_str)
+                    };
+                    if sub.last_notified_date != next_last {
+                        sub.last_notified_date = next_last;
+                        if !dirty_ids.iter().any(|d| d == &id) {
+                            dirty_ids.push(id.clone());
                         }
-                        sent_count += 1;
-                        sub.last_notified_date = today_str.clone();
                     }
                 }
+            }
         }
         for sub in &subscriptions {
-            guard.table_upsert_typed(EntityTable::Subscriptions, sub, &sub.id)?;
+            if dirty_ids.iter().any(|d| d == &sub.id) {
+                guard.table_upsert_typed(EntityTable::Subscriptions, sub, &sub.id)?;
+            }
         }
         let telegram_context = if telegram_enabled {
             Some((telegram_token, telegram_chat_id, telegram_proxy))
         } else {
             None
         };
-        (sent_count, alerts, (telegram_context, telegram_jobs))
+        (sent_count, alerts, (telegram_context, telegram_jobs), digest_items)
     };
+
+    if !digest_items.is_empty() {
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        {
+            let (title, body) = if digest_items.len() == 1 {
+                (
+                    digest_items[0].title.clone(),
+                    digest_items[0].body.clone(),
+                )
+            } else {
+                (
+                    "Subly".to_string(),
+                    format!("{} payments need attention", digest_items.len()),
+                )
+            };
+            let _ = show_os_notification_immediate(&app, &title, &body);
+        }
+        emit_local_notification_digest(&app, digest_items);
+    }
+
     if let (Some((token, chat_id, proxy)), jobs) = telegram_jobs {
         for message in jobs {
             let _ = send_telegram_message(&token, &chat_id, &message, proxy.as_deref()).await;
         }
+    }
+    // OS alarms are one-shot per cycle; without this the next cycle is only scheduled after the
+    // user happens to edit a subscription or notification settings.
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    if let Err(e) = notifications_reschedule_with_state(&app, &state) {
+        eprintln!("[subly][notifications] reschedule after check failed: {}", e);
     }
     Ok(NotificationsRunCheckResultDto {
         sent_count,
@@ -637,6 +813,7 @@ async fn notifications_run_check(
     })
 }
 
+#[allow(clippy::too_many_arguments)] // one arg per optional IPC payload field
 async fn notifications_dispatch(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
@@ -651,17 +828,30 @@ async fn notifications_dispatch(
     telegram_proxy_base_url: Option<String>,
 ) -> Result<NotificationsDispatchResultDto, crate::errors::AppError> {
     let do_system = show_system.unwrap_or(true);
-    let _ = play_sound;
-    let _ = force_sound;
+    let do_sound = play_sound.unwrap_or(false) || force_sound.unwrap_or(false);
     let do_telegram = send_telegram.unwrap_or(false);
+    let title_s = title.unwrap_or_else(|| "Subly".to_string());
+    let body_s = body.unwrap_or_default();
 
     let system = if do_system {
-        emit_local_notification_event(
+        let os_ok = show_os_notification_immediate(&app, &title_s, &body_s);
+        emit_local_notification_digest(
             &app,
-            title.as_deref().unwrap_or("Subly"),
-            body.as_deref().unwrap_or(""),
+            vec![LocalNotificationItemDto {
+                title: title_s.clone(),
+                body: body_s.clone(),
+            }],
         );
-        true
+        os_ok
+    } else if do_sound {
+        emit_local_notification_digest(
+            &app,
+            vec![LocalNotificationItemDto {
+                title: title_s.clone(),
+                body: body_s.clone(),
+            }],
+        );
+        false
     } else {
         false
     };
@@ -679,7 +869,11 @@ async fn notifications_dispatch(
         let token = telegram_bot_token.unwrap_or(fallback.0);
         let chat = telegram_chat_id.unwrap_or(fallback.1);
         let proxy = telegram_proxy_base_url.or(fallback.2);
-        let text = body.as_deref().unwrap_or("Subly notification");
+        let text = if body_s.is_empty() {
+            "Subly notification"
+        } else {
+            body_s.as_str()
+        };
         send_telegram_message(&token, &chat, text, proxy.as_deref()).await
     } else {
         false
@@ -687,7 +881,7 @@ async fn notifications_dispatch(
 
     Ok(NotificationsDispatchResultDto {
         system,
-        sound: false,
+        sound: do_sound,
         telegram: telegram_ok,
     })
 }
@@ -725,4 +919,86 @@ pub async fn notifications_event(
         event,
         data,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        effective_next_payment, notified_for_current_payment, notification_schedule_allows_now, overdue_marker,
+        NotificationSettingsDto,
+    };
+    use chrono::NaiveDate;
+
+    fn ymd(s: &str) -> NaiveDate {
+        NaiveDate::parse_from_str(s, "%Y-%m-%d").unwrap()
+    }
+
+    fn monthly_sub(next_payment: &str, auto_renew: bool) -> crate::models::SubscriptionDoc {
+        let mut sub = crate::test_support::doc_with_restart_sensitive_fields().unwrap().subscriptions[0].clone();
+        sub.next_payment = next_payment.into();
+        sub.cycle = 3;
+        sub.frequency = 1;
+        sub.auto_renew = auto_renew;
+        sub
+    }
+
+    /// Stale auto-renew date must project to the upcoming cycle, otherwise "N days before"
+    /// reminders never fire again after the first missed renewal.
+    #[test]
+    fn auto_renew_past_date_projects_to_next_cycle() {
+        let sub = monthly_sub("2026-01-30", true);
+        assert_eq!(effective_next_payment(&sub, ymd("2026-10-24")), Some(ymd("2026-10-30")));
+        // Steps are taken from the anchor, so the 30th survives February.
+        assert_eq!(effective_next_payment(&sub, ymd("2026-03-01")), Some(ymd("2026-03-30")));
+        // Due today stays today.
+        assert_eq!(effective_next_payment(&sub, ymd("2026-01-30")), Some(ymd("2026-01-30")));
+    }
+
+    #[test]
+    fn manual_renew_past_date_stays_overdue() {
+        let sub = monthly_sub("2026-01-30", false);
+        assert_eq!(effective_next_payment(&sub, ymd("2026-10-24")), Some(ymd("2026-01-30")));
+    }
+
+    #[test]
+    fn invalid_cycle_does_not_loop() {
+        let mut sub = monthly_sub("2026-01-30", true);
+        sub.cycle = 9;
+        assert_eq!(effective_next_payment(&sub, ymd("2026-10-24")), None);
+    }
+
+    /// Non-recurring mode: the "upcoming" marker must not suppress the later "overdue" reminder.
+    #[test]
+    fn overdue_marker_is_distinct_from_upcoming_marker() {
+        let due = "2026-10-20";
+        assert!(notified_for_current_payment(due, due));
+        assert_ne!(overdue_marker(due), due);
+        assert!(!notified_for_current_payment(&overdue_marker(due), due));
+    }
+
+    #[test]
+    fn custom_schedule_hour_zero_always_allows() {
+        let s = NotificationSettingsDto {
+            notification_schedule: "custom".into(),
+            notification_custom_hour: 0,
+            ..Default::default()
+        };
+        assert!(notification_schedule_allows_now(&s));
+    }
+
+    #[test]
+    fn recurring_false_marks_cycle_by_next_payment() {
+        assert!(!notified_for_current_payment("", "2099-01-15"));
+        assert!(!notified_for_current_payment("2099-01-01", "2099-01-15"));
+        assert!(notified_for_current_payment("2099-01-15", "2099-01-15"));
+    }
+
+    #[test]
+    fn schedule_any_always_allows() {
+        let s = NotificationSettingsDto {
+            notification_schedule: "any".into(),
+            ..Default::default()
+        };
+        assert!(notification_schedule_allows_now(&s));
+    }
 }

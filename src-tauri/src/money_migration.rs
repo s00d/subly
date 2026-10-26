@@ -178,17 +178,40 @@ fn default_rate_days() -> u32 {
     90
 }
 
-/// Decode a typed entity row: try legacy postcard layout first so we never
-/// mis-parse old `f64` money blobs as `Decimal` strings (which desyncs and
-/// surfaces as bogus `bool` postcard errors).
-pub(crate) fn decode_row<T, L, F>(raw: &[u8], convert: F) -> AppResult<T>
+/// Postcard decode that must consume the whole buffer (plain `from_bytes` ignores trailing bytes,
+/// so a wrong layout can "succeed" on a prefix).
+fn decode_bin_exact<T: DeserializeOwned>(raw: &[u8]) -> Option<T> {
+    match postcard::take_from_bytes::<T>(raw) {
+        Ok((v, [])) => Some(v),
+        _ => None,
+    }
+}
+
+/// Decode a typed entity row that may still be in a legacy postcard layout.
+///
+/// Layouts can be ambiguous: a 7-char `Decimal` string (1 length byte + 7 chars) is exactly
+/// as long as an `f64`, so both parses consume the buffer. `legacy_first` must therefore only be
+/// set before the money migration marker is written; afterwards every row is in the current layout.
+pub(crate) fn decode_row<T, L, F>(raw: &[u8], legacy_first: bool, convert: F) -> AppResult<T>
 where
     T: DeserializeOwned,
     L: DeserializeOwned,
     F: FnOnce(L) -> T,
 {
-    if let Ok(legacy) = decode_bin::<L>(raw) {
-        return Ok(convert(legacy));
+    if legacy_first {
+        if let Some(legacy) = decode_bin_exact::<L>(raw) {
+            return Ok(convert(legacy));
+        }
+        if let Some(v) = decode_bin_exact::<T>(raw) {
+            return Ok(v);
+        }
+    } else {
+        if let Some(v) = decode_bin_exact::<T>(raw) {
+            return Ok(v);
+        }
+        if let Some(legacy) = decode_bin_exact::<L>(raw) {
+            return Ok(convert(legacy));
+        }
     }
     decode_bin::<T>(raw)
 }
@@ -203,6 +226,7 @@ where
     L: DeserializeOwned,
     F: Fn(L) -> T + Copy,
 {
+    let legacy_first = !migration_marker_done(db)?;
     let tx = db.begin_read().map_err(AppError::from)?;
     let t = match tx.open_table(table) {
         Ok(t) => t,
@@ -211,7 +235,7 @@ where
     let mut rows = Vec::new();
     for entry in t.iter().map_err(AppError::from)? {
         let (_, value) = entry.map_err(AppError::from)?;
-        rows.push(decode_row::<T, L, _>(value.value(), convert)?);
+        rows.push(decode_row::<T, L, _>(value.value(), legacy_first, convert)?);
     }
     Ok(rows)
 }
@@ -346,6 +370,7 @@ pub(crate) fn load_currencies_migrated(db: &Database) -> AppResult<Vec<CurrencyD
 }
 
 pub(crate) fn load_settings_migrated(db: &Database) -> AppResult<SettingsDoc> {
+    let legacy_first = !migration_marker_done(db)?;
     let tx = db.begin_read().map_err(AppError::from)?;
     let t = match tx.open_table(T2_SETTINGS) {
         Ok(t) => t,
@@ -354,7 +379,7 @@ pub(crate) fn load_settings_migrated(db: &Database) -> AppResult<SettingsDoc> {
     let entry = t.get(crate::state::KEY_DATA).map_err(AppError::from)?;
     match entry {
         None => Ok(crate::state::default_settings_doc()),
-        Some(v) => decode_row::<SettingsDoc, legacy::SettingsDocV1, _>(v.value(), Into::into),
+        Some(v) => decode_row::<SettingsDoc, legacy::SettingsDocV1, _>(v.value(), legacy_first, Into::into),
     }
 }
 
@@ -423,7 +448,7 @@ pub(crate) fn finalize_money_migration_if_needed(
 mod tests {
     use super::legacy;
     use super::decode_row;
-    use crate::models::{ExpenseDoc, SubscriptionDoc};
+    use crate::models::{ExpenseDoc, PaymentMethodDoc, SubscriptionDoc};
     use crate::money::from_f64_legacy;
     use crate::state::{decode_bin, encode_bin};
     use rust_decimal::Decimal;
@@ -504,9 +529,73 @@ mod tests {
         };
         let bytes = encode_bin(&v1).unwrap();
         let doc: SubscriptionDoc =
-            decode_row::<SubscriptionDoc, legacy::SubscriptionDocV1, _>(&bytes, Into::into)
+            decode_row::<SubscriptionDoc, legacy::SubscriptionDocV1, _>(&bytes, true, Into::into)
                 .expect("legacy-first decode");
         assert_eq!(doc.price, from_f64_legacy(0.01106));
+    }
+
+    fn sample_expense_v1() -> legacy::ExpenseDocV1 {
+        legacy::ExpenseDocV1 {
+            id: "e1".into(),
+            updated_at: 1,
+            name: "Coffee".into(),
+            amount: 0.0,
+            currency_id: "cur-1".into(),
+            created_at: "2026-05-01T12:00:00.000Z".into(),
+            category_id: String::new(),
+            tags: vec![],
+            payment_method_id: String::new(),
+            payer_user_id: String::new(),
+            notes: String::new(),
+            url: String::new(),
+            subscription_id: String::new(),
+            payment_record_id: String::new(),
+        }
+    }
+
+    /// A 7-char decimal string encodes to the same byte length as an `f64`, so the legacy layout
+    /// parses it "successfully" as ~1e-47. After migration the current layout must win.
+    #[test]
+    fn decode_row_keeps_seven_char_decimal_after_migration() {
+        for s in ["1234.56", "1500.00", "999.999", "92.5432"] {
+            let mut doc: ExpenseDoc = sample_expense_v1().into();
+            doc.amount = Decimal::from_str(s).unwrap();
+            let bytes = encode_bin(&doc).unwrap();
+            let back: ExpenseDoc =
+                decode_row::<ExpenseDoc, legacy::ExpenseDocV1, _>(&bytes, false, Into::into).unwrap();
+            assert_eq!(back.amount, doc.amount, "amount {s}");
+        }
+    }
+
+    #[test]
+    fn decode_row_legacy_f64_still_reads_after_migration_marker() {
+        let mut v1 = sample_expense_v1();
+        v1.amount = 12.5;
+        let bytes = encode_bin(&v1).unwrap();
+        let doc: ExpenseDoc =
+            decode_row::<ExpenseDoc, legacy::ExpenseDocV1, _>(&bytes, false, Into::into).unwrap();
+        assert_eq!(doc.amount, Decimal::from_str("12.5").unwrap());
+    }
+
+    #[test]
+    fn decode_row_payment_method_keeps_enabled_and_sort_order() {
+        let pm = PaymentMethodDoc {
+            id: "pm-1".into(),
+            name: "Card".into(),
+            icon: "card".into(),
+            enabled: false,
+            sort_order: 3,
+            i18n_key: "payment_card".into(),
+        };
+        let bytes = encode_bin(&pm).unwrap();
+        for legacy_first in [true, false] {
+            let back: PaymentMethodDoc =
+                decode_row::<PaymentMethodDoc, legacy::PaymentMethodDocV0, _>(&bytes, legacy_first, Into::into)
+                    .unwrap();
+            assert!(!back.enabled);
+            assert_eq!(back.sort_order, 3);
+            assert_eq!(back.i18n_key, "payment_card");
+        }
     }
 
     #[test]

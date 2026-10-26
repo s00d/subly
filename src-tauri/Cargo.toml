@@ -104,3 +104,9 @@ tauri-plugin-single-instance = { version = "2.4.2", features = ["deep-link"] }
 tempfile = "3"
 ureq = { version = "3", default-features = true }
 
+[profile.release]
+opt-level = "z" # Оптимизация для размера
+lto = true # Включение Link Time Optimization
+codegen-units = 1 # Уменьшение количества единиц компиляции для лучшей оптимизации
+panic = "abort" # Уменьшение объема кода для обработки паник
+strip = true # Удаление символов отладки

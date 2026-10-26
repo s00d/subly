@@ -2,7 +2,9 @@
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import AppSelect, { type SelectOption } from "@/components/ui/AppSelect.vue";
-import { Sparkles, AlertTriangle, CheckSquare, Square, X } from "@lucide/vue";
+import { Sparkles, AlertTriangle, CheckSquare, Square } from "@lucide/vue";
+import AppCheckbox from "@/components/ui/AppCheckbox.vue";
+import { button, ui } from "@/lib/tv";
 import type { Category, Currency, PaymentMethod } from "@/schemas/appData";
 import type { AiSubscriptionDraftRow } from "@/services/aiClient";
 
@@ -21,7 +23,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:row": [index: number, patch: Partial<AiSubscriptionDraftRow["draft"]>];
   "toggle-selection": [index: number];
-  remove: [index: number];
   "select-all": [];
   "deselect-all": [];
 }>();
@@ -74,16 +75,16 @@ function rowWarning(row: AiSubscriptionDraftRow): string | null {
       <button
         type="button"
         @click="emit('select-all')"
-        class="text-[11px] text-text-secondary hover:text-text-primary inline-flex items-center gap-1"
+        :class="button({ intent: 'ghost', size: 'sm' })"
       >
-        <CheckSquare :size="12" /> {{ t("select_all") }}
+        <CheckSquare :size="14" /> {{ t("select_all") }}
       </button>
       <button
         type="button"
         @click="emit('deselect-all')"
-        class="text-[11px] text-text-muted hover:text-text-secondary inline-flex items-center gap-1"
+        :class="button({ intent: 'ghost', size: 'sm' })"
       >
-        <Square :size="12" /> {{ t("deselect_all") }}
+        <Square :size="14" /> {{ t("deselect_all") }}
       </button>
       <div class="flex-1" />
       <span class="text-[11px] text-text-muted">
@@ -97,47 +98,18 @@ function rowWarning(row: AiSubscriptionDraftRow): string | null {
         :key="idx"
         class="rounded-lg border p-2.5 transition-colors"
         :class="
-          state.selected
+ state.selected
             ? 'border-primary ring-1 ring-primary/30 bg-surface'
             : 'border-border bg-surface'
         "
       >
-        <div class="flex items-start gap-2.5">
-          <button
-            type="button"
-            class="shrink-0 mt-1 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors cursor-pointer"
-            :class="
-              state.selected
-                ? 'bg-primary border-primary text-white'
-                : 'border-border hover:border-primary'
-            "
-            @click="emit('toggle-selection', idx)"
-          >
-            <svg
-              v-if="state.selected"
-              width="10"
-              height="10"
-              viewBox="0 0 12 12"
-              fill="none"
-            >
-              <path
-                d="M2 6L5 9L10 3"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </button>
-
-          <button
-            type="button"
-            class="shrink-0 mt-1 w-4 h-4 rounded text-text-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center transition-colors cursor-pointer"
-            :title="t('delete')"
-            @click="emit('remove', idx)"
-          >
-            <X :size="12" />
-          </button>
+        <div class="flex items-start gap-2">
+          <!-- One control per row: unchecked rows are simply not imported. -->
+          <AppCheckbox
+            :modelValue="state.selected"
+            @update:modelValue="emit('toggle-selection', idx)"
+            class="shrink-0 w-8 h-8 justify-center -ml-1"
+          />
 
           <div class="min-w-0 flex-1 grid grid-cols-12 gap-2">
             <div class="col-span-12 sm:col-span-5">
@@ -149,7 +121,7 @@ function rowWarning(row: AiSubscriptionDraftRow): string | null {
                   })
                 "
                 type="text"
-                class="w-full px-2 py-1.5 rounded-md border border-border bg-surface text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                :class="ui.field({ class: 'px-2 py-1.5 text-xs' })"
                 :placeholder="t('subscription_name')"
               />
             </div>
@@ -165,7 +137,7 @@ function rowWarning(row: AiSubscriptionDraftRow): string | null {
                 step="0.01"
                 inputmode="decimal"
                 :placeholder="t('price')"
-                class="w-full px-2 py-1.5 rounded-md border border-border bg-surface text-xs text-text-primary text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                :class="ui.field({ class: 'px-2 py-1.5 text-xs text-right tabular-nums' })"
               />
             </div>
             <div class="col-span-6 sm:col-span-2">
@@ -199,7 +171,7 @@ function rowWarning(row: AiSubscriptionDraftRow): string | null {
                 "
                 type="date"
                 :placeholder="t('next_payment')"
-                class="w-full px-2 py-1.5 rounded-md border border-border bg-surface text-xs text-text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                :class="ui.field({ class: 'px-2 py-1.5 text-xs' })"
               />
             </div>
             <div class="col-span-6 sm:col-span-4">
@@ -227,16 +199,16 @@ function rowWarning(row: AiSubscriptionDraftRow): string | null {
           </div>
         </div>
 
-        <div class="flex items-center gap-2 mt-1.5 pl-7">
+        <div class="flex items-center gap-2 mt-1.5 pl-9">
           <span
-            class="inline-flex items-center gap-1 px-1.5 py-0 rounded text-[9px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300"
+            class="inline-flex items-center gap-1 px-1.5 py-0 rounded text-[9px] font-medium bg-info/12 text-info"
           >
             <Sparkles :size="9" />
             {{ t("ai_source_llm") }}
           </span>
           <span
             v-if="rowWarning(state.row)"
-            class="inline-flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400 truncate"
+            class="inline-flex items-center gap-1 text-[10px] text-warning truncate"
             :title="rowWarning(state.row) ?? ''"
           >
             <AlertTriangle :size="10" />

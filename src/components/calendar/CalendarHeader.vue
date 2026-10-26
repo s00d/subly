@@ -2,7 +2,7 @@
 import { useI18n } from "vue-i18n";
 import { ChevronLeft, ChevronRight, CalendarDays } from "@lucide/vue";
 import Tooltip from "@/components/ui/Tooltip.vue";
-import { typo, iconSize } from "@/lib/tv";
+import { typo, iconSize, button } from "@/lib/tv";
 
 defineProps<{
   monthName: string;
@@ -24,20 +24,12 @@ const { t } = useI18n();
   <div class="flex items-center justify-between" :class="compact ? 'mb-3 sm:mb-4' : 'mb-4 sm:mb-6'">
     <div class="flex items-center gap-2 sm:gap-3">
       <Tooltip :text="t('reset')">
-        <button
-          @click="emit('resetMonth')"
-          class="rounded-lg bg-surface border border-border hover:bg-surface-hover"
-          :class="compact ? 'p-1.5' : 'p-1.5 sm:p-2'"
-        >
+        <button :class="button({ size: 'icon' })" :aria-label="t('reset')" @click="emit('resetMonth')">
           <CalendarDays :size="iconSize.sm" class="text-text-secondary" />
         </button>
       </Tooltip>
       <Tooltip :text="t('previous_month')">
-        <button
-          @click="emit('prevMonth')"
-          class="rounded-lg bg-surface border border-border hover:bg-surface-hover"
-          :class="compact ? 'p-1.5' : 'p-1.5 sm:p-2'"
-        >
+        <button :class="button({ size: 'icon' })" :aria-label="t('previous_month')" @click="emit('prevMonth')">
           <ChevronLeft :size="iconSize.sm" class="text-text-secondary" />
         </button>
       </Tooltip>
@@ -45,11 +37,7 @@ const { t } = useI18n();
         {{ monthName }}
       </h2>
       <Tooltip :text="t('next_month')">
-        <button
-          @click="emit('nextMonth')"
-          class="rounded-lg bg-surface border border-border hover:bg-surface-hover"
-          :class="compact ? 'p-1.5' : 'p-1.5 sm:p-2'"
-        >
+        <button :class="button({ size: 'icon' })" :aria-label="t('next_month')" @click="emit('nextMonth')">
           <ChevronRight :size="iconSize.sm" class="text-text-secondary" />
         </button>
       </Tooltip>

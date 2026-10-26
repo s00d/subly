@@ -166,7 +166,7 @@ pub fn setup_desktop_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
         .on_tray_icon_event(|tray, event| {
             if let tauri::tray::TrayIconEvent::DoubleClick { .. } = event {
                 let app = tray.app_handle();
-                show_main_window(&app);
+                show_main_window(app);
             }
         })
         .build(app)?;

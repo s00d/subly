@@ -73,7 +73,7 @@ fn expense_row_from_input(mut input: ExpenseInputDto) -> AppResult<ExpenseDoc> {
     let created_at = if input.created_at.trim().is_empty() {
         chrono::Utc::now().to_rfc3339()
     } else {
-        normalize_expense_timestamp(&input.created_at).map_err(AppError::from)?
+        normalize_expense_timestamp(&input.created_at)?
     };
     Ok(ExpenseDoc {
         id: input.id,
@@ -123,12 +123,21 @@ struct ExpenseListFilter {
     tag: String,
     date_from_nd: Option<chrono::NaiveDate>,
     date_to_nd: Option<chrono::NaiveDate>,
+    /// Catalog id -> name (categories + payment methods) so search matches display names.
+    catalog_names: std::collections::HashMap<String, String>,
 }
 
 impl ExpenseListFilter {
-    fn from_request(req: &ExpensesPageRequestDto) -> Self {
+    fn from_request(req: &ExpensesPageRequestDto, data: &crate::AppDataDoc) -> Self {
+        let catalog_names = data
+            .categories
+            .iter()
+            .map(|c| (c.id.clone(), c.name.clone()))
+            .chain(data.payment_methods.iter().map(|p| (p.id.clone(), p.name.clone())))
+            .collect();
         Self {
-            search: req.search.trim().to_ascii_lowercase(),
+            catalog_names,
+            search: req.search.trim().to_lowercase(),
             category: req.category_id.trim().to_string(),
             payment_method: req.payment_method_id.trim().to_string(),
             tag: req.tag.trim().to_ascii_lowercase(),
@@ -157,8 +166,17 @@ impl ExpenseListFilter {
             return false;
         }
         if !self.search.is_empty() {
-            let haystack =
-                format!("{} {} {} {}", e.name, e.notes, e.category_id, e.payment_method_id).to_ascii_lowercase();
+            let name_of = |id: &str| self.catalog_names.get(id).map(String::as_str).unwrap_or("");
+            let haystack = format!(
+                "{} {} {} {} {} {}",
+                e.name,
+                e.notes,
+                e.category_id,
+                e.payment_method_id,
+                name_of(&e.category_id),
+                name_of(&e.payment_method_id),
+            )
+            .to_lowercase();
             if !haystack.contains(&self.search) {
                 return false;
             }
@@ -173,7 +191,7 @@ fn candidate_expenses_for_date_filter(
     date_to_nd: Option<chrono::NaiveDate>,
 ) -> AppResult<Vec<ExpenseDoc>> {
     if let (Some(df), Some(dt)) = (date_from_nd, date_to_nd) {
-        let ids = expense_ids_in_day_range(guard.db.as_ref(), df, dt).map_err(AppError::from)?;
+        let ids = expense_ids_in_day_range(guard.db.as_ref(), df, dt)?;
         Ok(guard
             .app_data
             .expenses
@@ -182,8 +200,7 @@ fn candidate_expenses_for_date_filter(
             .cloned()
             .collect())
     } else {
-        guard.table_list_typed(EntityTable::Expenses).map_err(AppError::from)
-    }
+        guard.table_list_typed(EntityTable::Expenses)}
 }
 
 #[tauri::command]
@@ -194,22 +211,20 @@ pub fn list_expenses_page(
     (|| -> AppResult<ExpensesPageResponseDto> {
         let guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
         let req = request.unwrap_or_default();
-        let filter = ExpenseListFilter::from_request(&req);
+        let filter = ExpenseListFilter::from_request(&req, &guard.app_data);
+        let rates = crate::rate_map(&guard.app_data);
         let mut items: Vec<ExpenseDoc> =
             candidate_expenses_for_date_filter(&guard, filter.date_from_nd, filter.date_to_nd)?;
         drop(guard);
 
         items.retain(|e| filter.matches(e));
 
+        let in_main = |e: &ExpenseDoc| crate::convert_to_main(e.amount, &e.currency_id, &rates);
         match req.sort_by.as_str() {
-            "amount_desc" => {
-                items.sort_by(|a, b| b.amount.partial_cmp(&a.amount).unwrap_or(std::cmp::Ordering::Equal));
-            }
-            "amount_asc" => {
-                items.sort_by(|a, b| a.amount.partial_cmp(&b.amount).unwrap_or(std::cmp::Ordering::Equal));
-            }
-            "date_asc" => items.sort_by(|a, b| expense_sort_timestamp(a).cmp(&expense_sort_timestamp(b))),
-            _ => items.sort_by(|a, b| expense_sort_timestamp(b).cmp(&expense_sort_timestamp(a))),
+            "amount_desc" => items.sort_by_key(|e| std::cmp::Reverse(in_main(e))),
+            "amount_asc" => items.sort_by_key(in_main),
+            "date_asc" => items.sort_by_key(expense_sort_timestamp),
+            _ => items.sort_by_key(|b| std::cmp::Reverse(expense_sort_timestamp(b))),
         }
 
         let total = items.len();
@@ -230,20 +245,25 @@ pub fn expenses_total_filtered(
     state: State<'_, AppState>,
     filter: ExpensesPageRequestDto,
 ) -> Result<String, crate::errors::AppError> {
-    (|| -> AppResult<String> {
-        let guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
-        let list_filter = ExpenseListFilter::from_request(&filter);
-        let items: Vec<ExpenseDoc> =
-            candidate_expenses_for_date_filter(&guard, list_filter.date_from_nd, list_filter.date_to_nd)?;
-        drop(guard);
+    let guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
+    let total = expenses_total_in_main(&guard, &filter)?;
+    Ok(crate::money::to_ipc_string(&total))
+}
 
-        let total: rust_decimal::Decimal = items
-            .iter()
-            .filter(|e| list_filter.matches(e))
-            .map(|e| e.amount)
-            .sum();
-        Ok(crate::money::to_ipc_string(&total))
-    })()
+/// Filtered expense total, every amount converted to the main currency.
+fn expenses_total_in_main(
+    guard: &crate::state::AppStateInner,
+    filter: &ExpensesPageRequestDto,
+) -> AppResult<rust_decimal::Decimal> {
+    let list_filter = ExpenseListFilter::from_request(filter, &guard.app_data);
+    let rates = crate::rate_map(&guard.app_data);
+    let items: Vec<ExpenseDoc> =
+        candidate_expenses_for_date_filter(guard, list_filter.date_from_nd, list_filter.date_to_nd)?;
+    Ok(items
+        .iter()
+        .filter(|e| list_filter.matches(e))
+        .map(|e| crate::convert_to_main(e.amount, &e.currency_id, &rates))
+        .sum())
 }
 
 #[tauri::command]
@@ -257,14 +277,14 @@ pub fn expenses_for_month(
             return Err(AppError::Message("month must be between 1 and 12".to_string()));
         }
         let guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
-        let mut items: Vec<ExpenseDoc> = guard.table_list_typed(EntityTable::Expenses).map_err(AppError::from)?;
+        let mut items: Vec<ExpenseDoc> = guard.table_list_typed(EntityTable::Expenses)?;
         drop(guard);
         items.retain(|e| {
             e.naive_date()
                 .map(|d| d.year() == year && d.month() == month)
                 .unwrap_or(false)
         });
-        items.sort_by(|a, b| expense_sort_timestamp(a).cmp(&expense_sort_timestamp(b)));
+        items.sort_by_key(expense_sort_timestamp);
         Ok(items)
     })()
 }
@@ -273,22 +293,20 @@ pub fn expenses_for_month(
 pub fn expenses_get_by_id(state: State<'_, AppState>, id: String) -> Result<Option<ExpenseDoc>, crate::errors::AppError> {
     (|| -> AppResult<Option<ExpenseDoc>> {
         let guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
-        guard.table_get_expense_by_id(&id).map_err(AppError::from)
-    })()
+        guard.table_get_expense_by_id(&id)})()
 }
 
 #[tauri::command]
 pub fn expenses_insert(app: tauri::AppHandle, state: State<'_, AppState>, expense: ExpenseInputDto) -> Result<(), crate::errors::AppError> {
     (|| -> AppResult<()> {
-        expense.validate().map_err(AppError::from)?;
+        expense.validate()?;
         let expense = expense_row_from_input(expense)?;
         let mut guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
-        let existing = guard.table_get_expense_by_id(&expense.id).map_err(AppError::from)?;
+        let existing = guard.table_get_expense_by_id(&expense.id)?;
         guard
-            .table_upsert_typed(EntityTable::Expenses, &expense, &expense.id)
-            .map_err(AppError::from)?;
-        update_expense_payment_record_index(&mut guard, existing.as_ref(), Some(&expense)).map_err(AppError::from)?;
-        update_expense_day_index(guard.db.as_ref(), existing.as_ref(), Some(&expense)).map_err(AppError::from)?;
+            .table_upsert_typed(EntityTable::Expenses, &expense, &expense.id)?;
+        update_expense_payment_record_index(&mut guard, existing.as_ref(), Some(&expense))?;
+        update_expense_day_index(guard.db.as_ref(), existing.as_ref(), Some(&expense))?;
         drop(guard);
         emit_expenses_changed(&app, "insert");
         Ok(())
@@ -298,15 +316,14 @@ pub fn expenses_insert(app: tauri::AppHandle, state: State<'_, AppState>, expens
 #[tauri::command]
 pub fn expenses_upsert(app: tauri::AppHandle, state: State<'_, AppState>, expense: ExpenseInputDto) -> Result<(), crate::errors::AppError> {
     (|| -> AppResult<()> {
-        expense.validate().map_err(AppError::from)?;
+        expense.validate()?;
         let expense = expense_row_from_input(expense)?;
         let mut guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
-        let existing = guard.table_get_expense_by_id(&expense.id).map_err(AppError::from)?;
+        let existing = guard.table_get_expense_by_id(&expense.id)?;
         guard
-            .table_upsert_typed(EntityTable::Expenses, &expense, &expense.id)
-            .map_err(AppError::from)?;
-        update_expense_payment_record_index(&mut guard, existing.as_ref(), Some(&expense)).map_err(AppError::from)?;
-        update_expense_day_index(guard.db.as_ref(), existing.as_ref(), Some(&expense)).map_err(AppError::from)?;
+            .table_upsert_typed(EntityTable::Expenses, &expense, &expense.id)?;
+        update_expense_payment_record_index(&mut guard, existing.as_ref(), Some(&expense))?;
+        update_expense_day_index(guard.db.as_ref(), existing.as_ref(), Some(&expense))?;
         drop(guard);
         emit_expenses_changed(&app, "upsert");
         Ok(())
@@ -316,15 +333,14 @@ pub fn expenses_upsert(app: tauri::AppHandle, state: State<'_, AppState>, expens
 #[tauri::command]
 pub fn expenses_update(app: tauri::AppHandle, state: State<'_, AppState>, expense: ExpenseInputDto) -> Result<(), crate::errors::AppError> {
     (|| -> AppResult<()> {
-        expense.validate().map_err(AppError::from)?;
+        expense.validate()?;
         let expense = expense_row_from_input(expense)?;
         let mut guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
-        let existing = guard.table_get_expense_by_id(&expense.id).map_err(AppError::from)?;
+        let existing = guard.table_get_expense_by_id(&expense.id)?;
         guard
-            .table_upsert_typed(EntityTable::Expenses, &expense, &expense.id)
-            .map_err(AppError::from)?;
-        update_expense_payment_record_index(&mut guard, existing.as_ref(), Some(&expense)).map_err(AppError::from)?;
-        update_expense_day_index(guard.db.as_ref(), existing.as_ref(), Some(&expense)).map_err(AppError::from)?;
+            .table_upsert_typed(EntityTable::Expenses, &expense, &expense.id)?;
+        update_expense_payment_record_index(&mut guard, existing.as_ref(), Some(&expense))?;
+        update_expense_day_index(guard.db.as_ref(), existing.as_ref(), Some(&expense))?;
         drop(guard);
         emit_expenses_changed(&app, "update");
         Ok(())
@@ -335,10 +351,10 @@ pub fn expenses_update(app: tauri::AppHandle, state: State<'_, AppState>, expens
 pub fn expenses_delete(app: tauri::AppHandle, state: State<'_, AppState>, id: String) -> Result<(), crate::errors::AppError> {
     (|| -> AppResult<()> {
         let mut guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
-        let existing = guard.table_get_expense_by_id(&id).map_err(AppError::from)?;
-        guard.table_delete_by_id(EntityTable::Expenses, &id).map_err(AppError::from)?;
-        update_expense_payment_record_index(&mut guard, existing.as_ref(), None).map_err(AppError::from)?;
-        update_expense_day_index(guard.db.as_ref(), existing.as_ref(), None).map_err(AppError::from)?;
+        let existing = guard.table_get_expense_by_id(&id)?;
+        guard.table_delete_by_id(EntityTable::Expenses, &id)?;
+        update_expense_payment_record_index(&mut guard, existing.as_ref(), None)?;
+        update_expense_day_index(guard.db.as_ref(), existing.as_ref(), None)?;
         drop(guard);
         emit_expenses_changed(&app, "delete");
         Ok(())
@@ -351,10 +367,10 @@ pub fn expenses_delete_batch(app: tauri::AppHandle, state: State<'_, AppState>, 
         let mut guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
         for id in ids {
             if !id.trim().is_empty() {
-                let existing = guard.table_get_expense_by_id(&id).map_err(AppError::from)?;
-                guard.table_delete_by_id(EntityTable::Expenses, &id).map_err(AppError::from)?;
-                update_expense_payment_record_index(&mut guard, existing.as_ref(), None).map_err(AppError::from)?;
-                update_expense_day_index(guard.db.as_ref(), existing.as_ref(), None).map_err(AppError::from)?;
+                let existing = guard.table_get_expense_by_id(&id)?;
+                guard.table_delete_by_id(EntityTable::Expenses, &id)?;
+                update_expense_payment_record_index(&mut guard, existing.as_ref(), None)?;
+                update_expense_day_index(guard.db.as_ref(), existing.as_ref(), None)?;
             }
         }
         drop(guard);
@@ -368,11 +384,11 @@ pub fn expenses_delete_by_payment_record(app: tauri::AppHandle, state: State<'_,
     (|| -> AppResult<()> {
         let mut guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
         if let Some(idx_key) = expense_payment_record_index_key(&sub_id, &pr_id) {
-            if let Some(expense_id) = guard.redb_get(&idx_key).map_err(AppError::from)? {
-                if let Some(expense) = guard.table_get_expense_by_id(&expense_id).map_err(AppError::from)? {
-                    guard.table_delete_by_id(EntityTable::Expenses, &expense.id).map_err(AppError::from)?;
-                    update_expense_payment_record_index(&mut guard, Some(&expense), None).map_err(AppError::from)?;
-                    update_expense_day_index(guard.db.as_ref(), Some(&expense), None).map_err(AppError::from)?;
+            if let Some(expense_id) = guard.redb_get(&idx_key)? {
+                if let Some(expense) = guard.table_get_expense_by_id(&expense_id)? {
+                    guard.table_delete_by_id(EntityTable::Expenses, &expense.id)?;
+                    update_expense_payment_record_index(&mut guard, Some(&expense), None)?;
+                    update_expense_day_index(guard.db.as_ref(), Some(&expense), None)?;
                     drop(guard);
                     emit_expenses_changed(&app, "delete_by_payment_record");
                     return Ok(());
@@ -381,12 +397,12 @@ pub fn expenses_delete_by_payment_record(app: tauri::AppHandle, state: State<'_,
         }
 
         // Fallback for legacy/stale index state.
-        let arr: Vec<ExpenseDoc> = guard.table_list_typed(EntityTable::Expenses).map_err(AppError::from)?;
+        let arr: Vec<ExpenseDoc> = guard.table_list_typed(EntityTable::Expenses)?;
         for expense in arr {
             if expense.subscription_id == sub_id && expense.payment_record_id == pr_id {
-                guard.table_delete_by_id(EntityTable::Expenses, &expense.id).map_err(AppError::from)?;
-                update_expense_payment_record_index(&mut guard, Some(&expense), None).map_err(AppError::from)?;
-                update_expense_day_index(guard.db.as_ref(), Some(&expense), None).map_err(AppError::from)?;
+                guard.table_delete_by_id(EntityTable::Expenses, &expense.id)?;
+                update_expense_payment_record_index(&mut guard, Some(&expense), None)?;
+                update_expense_day_index(guard.db.as_ref(), Some(&expense), None)?;
             }
         }
         drop(guard);
@@ -400,7 +416,7 @@ pub fn expenses_count(state: State<'_, AppState>) -> Result<usize, crate::errors
     (|| -> AppResult<usize> {
         let arr = {
             let guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
-            guard.table_list_typed::<ExpenseDoc>(EntityTable::Expenses).map_err(AppError::from)?
+            guard.table_list_typed::<ExpenseDoc>(EntityTable::Expenses)?
         };
         Ok(arr.len())
     })()
@@ -410,7 +426,7 @@ pub fn expenses_count(state: State<'_, AppState>) -> Result<usize, crate::errors
 pub fn expenses_update_tags_batch(app: tauri::AppHandle, state: State<'_, AppState>, old_name: String, new_name: String) -> Result<(), crate::errors::AppError> {
     (|| -> AppResult<()> {
         let mut guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
-        let mut arr: Vec<ExpenseDoc> = guard.table_list_typed(EntityTable::Expenses).map_err(AppError::from)?;
+        let mut arr: Vec<ExpenseDoc> = guard.table_list_typed(EntityTable::Expenses)?;
         for e in &mut arr {
             let mut changed = false;
             for tag in &mut e.tags {
@@ -420,9 +436,9 @@ pub fn expenses_update_tags_batch(app: tauri::AppHandle, state: State<'_, AppSta
                 }
             }
             if changed {
-                let before = guard.table_get_expense_by_id(&e.id).map_err(AppError::from)?;
-                guard.table_upsert_typed(EntityTable::Expenses, e, &e.id).map_err(AppError::from)?;
-                update_expense_day_index(guard.db.as_ref(), before.as_ref(), Some(e)).map_err(AppError::from)?;
+                let before = guard.table_get_expense_by_id(&e.id)?;
+                guard.table_upsert_typed(EntityTable::Expenses, e, &e.id)?;
+                update_expense_day_index(guard.db.as_ref(), before.as_ref(), Some(e))?;
             }
         }
         drop(guard);
@@ -435,14 +451,14 @@ pub fn expenses_update_tags_batch(app: tauri::AppHandle, state: State<'_, AppSta
 pub fn expenses_remove_tag_batch(app: tauri::AppHandle, state: State<'_, AppState>, tag_name: String) -> Result<(), crate::errors::AppError> {
     (|| -> AppResult<()> {
         let mut guard = state.lock().map_err(|_| AppError::StateLockPoisoned)?;
-        let mut arr: Vec<ExpenseDoc> = guard.table_list_typed(EntityTable::Expenses).map_err(AppError::from)?;
+        let mut arr: Vec<ExpenseDoc> = guard.table_list_typed(EntityTable::Expenses)?;
         for e in &mut arr {
             let before = e.tags.len();
             e.tags.retain(|t| t != &tag_name);
             if e.tags.len() != before {
-                let old_row = guard.table_get_expense_by_id(&e.id).map_err(AppError::from)?;
-                guard.table_upsert_typed(EntityTable::Expenses, e, &e.id).map_err(AppError::from)?;
-                update_expense_day_index(guard.db.as_ref(), old_row.as_ref(), Some(e)).map_err(AppError::from)?;
+                let old_row = guard.table_get_expense_by_id(&e.id)?;
+                guard.table_upsert_typed(EntityTable::Expenses, e, &e.id)?;
+                update_expense_day_index(guard.db.as_ref(), old_row.as_ref(), Some(e))?;
             }
         }
         drop(guard);
@@ -454,6 +470,28 @@ pub fn expenses_remove_tag_batch(app: tauri::AppHandle, state: State<'_, AppStat
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn expenses_total_converts_to_main_and_search_matches_catalog_names() {
+        let (_dir, db) = crate::test_support::temp_db().expect("temp db");
+        let mut doc = crate::test_support::doc_with_restart_sensitive_fields().expect("doc");
+        doc.currencies[1].rate = rust_decimal::Decimal::from(2);
+        let mut usd = doc.expenses[0].clone();
+        usd.id = "exp-usd".into();
+        usd.amount = rust_decimal::Decimal::from(10);
+        usd.currency_id = doc.currencies[1].id.clone();
+        usd.category_id = doc.categories[1].id.clone();
+        doc.expenses.push(usd);
+        let category_name = doc.categories[1].name.clone();
+        let state = crate::state::AppStateInner { db: std::sync::Arc::new(db), app_data: doc };
+
+        // 7.5 (main) + 10 / 2
+        let total = expenses_total_in_main(&state, &ExpensesPageRequestDto::default()).expect("total");
+        assert_eq!(total, "12.5".parse::<rust_decimal::Decimal>().unwrap());
+
+        let by_name = ExpensesPageRequestDto { search: category_name.to_uppercase(), ..Default::default() };
+        assert_eq!(expenses_total_in_main(&state, &by_name).expect("total"), rust_decimal::Decimal::from(5));
+    }
 
     #[test]
     fn expense_payment_record_index_tracks_row_lifecycle() {

@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { LineChart } from "@lucide/vue";
+import UiCard from "@/components/ui/UiCard.vue";
 import { computed } from "vue";
 import { useI18n } from "vue-i18n";
 import { useChartTheme } from "@/composables/useChartTheme";
@@ -78,13 +80,12 @@ const avg = computed(() => {
 </script>
 
 <template>
-  <div class="bg-surface rounded-xl border border-border p-2.5 sm:p-4">
-    <div class="flex items-center justify-between mb-2.5 sm:mb-3">
-      <h3 class="text-xs sm:text-sm font-semibold text-text-primary">{{ t('spending_trend') }}</h3>
-      <span class="text-[11px] sm:text-xs text-text-muted tabular-nums">{{ t('avg') }}: {{ fmt(avg) }}</span>
-    </div>
+  <UiCard :title="t('spending_trend')" :icon="LineChart" tone="primary">
+    <template #actions>
+    <span class="text-[11px] sm:text-xs text-text-muted tabular-nums">{{ t('avg') }}: {{ fmt(avg) }}</span>
+    </template>
     <div class="h-44 sm:h-48">
       <VChart class="h-full w-full" :theme="chartTheme" :option="chartOption" autoresize />
     </div>
-  </div>
+  </UiCard>
 </template>

@@ -368,7 +368,6 @@ async fn perform_rates_update(
                 if crate::money::rates_differ_stored(cur.rate, *rate) {
                     cur.rate = crate::money::decimal_from_api_rate(*rate);
                     updated += 1;
-                    let _ = history_enabled;
                     touched_ids.insert(cur.id.clone());
                 }
             }
@@ -376,7 +375,6 @@ async fn perform_rates_update(
         if let Some(main) = currencies.iter_mut().find(|c| c.id == main_id) {
             if main.rate != rust_decimal::Decimal::ONE {
                 main.rate = rust_decimal::Decimal::ONE;
-                let _ = history_days;
                 touched_ids.insert(main.id.clone());
             }
         }
@@ -385,11 +383,23 @@ async fn perform_rates_update(
                 guard.table_upsert_typed(EntityTable::Currencies, cur, &cur.id)?;
             }
         }
+        if history_enabled {
+            // One point per target per day (also when unchanged, so the chart has a continuous line).
+            let points: Vec<(String, rust_decimal::Decimal)> = currencies
+                .iter()
+                .filter(|c| rate_by_id.contains_key(&c.id))
+                .map(|c| (c.id.clone(), c.rate))
+                .collect();
+            crate::commands::rates::history::record_snapshots_in_db(
+                guard.db.as_ref(),
+                &points,
+                chrono::Local::now().date_naive(),
+                history_days.max(1),
+            )?;
+        }
         updated
     };
-    if updated == 0 {
-        return Err(crate::errors::AppError::from("No rates changed for selected currencies"));
-    }
+    // Identical rates (weekends, provider not refreshed yet) are a successful no-op, not an error.
     Ok(RatesUpdateResultDto { updated, error: None })
 }
 
@@ -460,7 +470,8 @@ async fn run_currency_update_if_needed(
     )
     .await?;
 
-    if result.updated > 0 {
+    if result.error.is_none() {
+        // Also on "nothing changed": otherwise the scheduler re-fetches every 30 minutes all day.
         update_last_currency_update(&today_ymd())?;
     }
     eprintln!(
@@ -543,6 +554,10 @@ pub fn ensure_rates_scheduler_started(app: tauri::AppHandle) {
                 let state = app.state::<AppState>();
                 match run_currency_update_if_needed(&state, false).await {
                     Ok(result) => {
+                        if result.updated > 0 {
+                            use tauri::Emitter;
+                            let _ = app.emit("app:data-changed", serde_json::json!({ "entity": "currencies", "action": "rates_update" }));
+                        }
                         if let Some(err) = result.error {
                             eprintln!("[subly][rates][scheduler] update completed with error: {}", err);
                         } else if result.updated == 0 {

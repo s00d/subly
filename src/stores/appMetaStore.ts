@@ -21,7 +21,17 @@ export const useAppMetaStore = defineStore("appMeta", () => {
   const initialized = ref(false);
   const loading = ref(false);
 
-  async function fetchMeta() {
+  let inflight: Promise<void> | null = null;
+
+  /** Concurrent callers share one request, so `await ensureLoaded()` always means "data is here". */
+  function fetchMeta(): Promise<void> {
+    inflight ??= doFetchMeta().finally(() => {
+      inflight = null;
+    });
+    return inflight;
+  }
+
+  async function doFetchMeta() {
     loading.value = true;
     try {
       const [catalogs, savedSettings] = await Promise.all([
@@ -40,14 +50,23 @@ export const useAppMetaStore = defineStore("appMeta", () => {
     }
   }
 
+  let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Catalog edits in Settings: coalesce bursts (autosave) into one reload so forms elsewhere see them. */
+  function refreshSoon() {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null;
+      void refresh();
+    }, 500);
+  }
+
   async function ensureLoaded() {
-    if (initialized.value || loading.value) return;
+    if (initialized.value) return;
     await fetchMeta();
   }
 
   async function refresh() {
-    if (loading.value) return;
-    initialized.value = false;
+    if (inflight) await inflight;
     await fetchMeta();
   }
 
@@ -75,6 +94,7 @@ export const useAppMetaStore = defineStore("appMeta", () => {
     loading,
     hasCoreMeta,
     ensureLoaded,
+    refreshSoon,
     refresh,
     updateSettings,
   };

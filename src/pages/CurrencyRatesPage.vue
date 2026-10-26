@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UiViewSwitch from "@/components/ui/UiViewSwitch.vue";
 import { ref, computed, watch, onMounted, onUnmounted } from "vue";
 import { useI18n } from "vue-i18n";
 import { useToast } from "@/composables/useToast";
@@ -10,7 +11,6 @@ import { storeToRefs } from "pinia";
 import type { Currency, Settings } from "@/schemas/appData";
 import { useAppMetaStore } from "@/stores/appMetaStore";
 import Toast from "@/components/ui/Toast.vue";
-import { typo } from "@/lib/tv";
 import Tooltip from "@/components/ui/Tooltip.vue";
 import { formatErrorForToast } from "@/utils/formatError";
 import {
@@ -22,10 +22,11 @@ import {
 } from "@/lib/money";
 import AppSlider from "@/components/ui/AppSlider.vue";
 import ExpenseForm from "@/components/expenses/ExpenseForm.vue";
-import {
-  RefreshCw, Copy, ArrowRightLeft, TrendingUp,
-  Search, Star, Check, Plus, RotateCcw, ChevronUp, ChevronDown, ArrowUpDown, LayoutList, LayoutGrid, Rows3, Hash, Type, CircleDollarSign, CheckSquare, Square, Pencil, X,
-} from "@lucide/vue";
+import { button, ui } from "@/lib/tv";
+import { RefreshCw, Copy, ArrowRightLeft, TrendingUp, Search, Star, Check, Plus, RotateCcw, ChevronUp, ChevronDown, ArrowUpDown, Hash, Type, CircleDollarSign, CheckSquare, Square, Pencil, X } from "@lucide/vue";
+
+const iconBtn = button({ intent: "ghost", size: "iconSm", class: "shrink-0" });
+const smBtn = button({ size: "sm" });
 
 const { t } = useI18n();
 const metaStore = useAppMetaStore();
@@ -81,18 +82,11 @@ function setViewMode(mode: "default" | "compact" | "expanded") {
 }
 
 function updateHeaderActions() {
-  const viewIcon = viewMode.value === "compact" ? Rows3 : viewMode.value === "expanded" ? LayoutGrid : LayoutList;
-  const nextViewMode = viewMode.value === "compact" ? "default" : viewMode.value === "default" ? "expanded" : "compact";
-  const currentViewTitle = viewMode.value === "compact" ? t("view_compact") : viewMode.value === "expanded" ? t("view_expanded") : t("view_default");
-  const nextViewTitle = nextViewMode === "compact" ? t("view_compact") : nextViewMode === "expanded" ? t("view_expanded") : t("view_default");
-
   setActions([
     { id: "currency-update", icon: RefreshCw, title: t("update_now"), onClick: handleUpdate, style: "primary" },
-    { id: "cycle-currency-view", icon: viewIcon, title: `${currentViewTitle} → ${nextViewTitle}`, onClick: () => setViewMode(nextViewMode), style: "accent" },
   ]);
 }
 
-watch(viewMode, updateHeaderActions);
 watch(isUpdating, updateHeaderActions);
 
 async function refreshCurrencyFlags() {
@@ -134,6 +128,11 @@ const otherCurrencies = computed(() => {
   return out;
 });
 const selectedTargetIds = computed(() => settings.value?.currencyUpdateTargets ?? []);
+/** Targets that appear in the list (the main currency can sit in targets but is never listed). */
+const listedTargetCount = computed(() => {
+  const ids = new Set(otherCurrencies.value.map((c) => c.id));
+  return selectedTargetIds.value.filter((id) => ids.has(id)).length;
+});
 const expenseFormLookupData = computed(() => {
   if (!settings.value) return null;
   return {
@@ -246,7 +245,8 @@ function getDisplayValue(cur: ConverterCurrency): string {
 
 function onInput(cur: ConverterCurrency, raw: string) {
   editingId.value = cur.id;
-  const val = parseFloat(raw.replace(/[^\d.\-]/g, ""));
+  // Comma decimals (ru/de keyboards): "1,5" must be 1.5, not 15.
+  const val = parseFloat(raw.replace(",", ".").replace(/[^\d.\-]/g, ""));
   if (isNaN(val) || val < 0) return;
   if (cur.isBase) {
     baseAmount.value = val;
@@ -360,8 +360,10 @@ async function handleUpdate() {
   isUpdating.value = true;
   try {
     const result = await ratesRunBackendUpdate();
+    // The command writes rates/last-update in the backend: reload them into the page.
+    await metaStore.refresh();
     if (result.error) toast(result.error, "error");
-    else if (result.updated > 0) toast(t("rates_updated").replace("{count}", String(result.updated)));
+    else if (result.updated > 0) toast(t("rates_updated", { count: result.updated }));
     else toast(t("no_rates_updated"));
   } catch (e) {
     toast(formatErrorForToast(e, t), "error");
@@ -434,12 +436,10 @@ watch(
 <template>
   <div class="space-y-4">
 
-    <!-- Header -->
-    <div class="flex items-center justify-between gap-3">
-      <div class="min-w-0">
-        <h1 :class="typo.screenTitle()">{{ t('exchange_rates') }}</h1>
-        <p class="text-xs text-text-muted mt-0.5">{{ t('last_update') }}: {{ lastUpdate }}</p>
-      </div>
+    <!-- Page title lives in the app header; keep only the freshness line here -->
+    <div class="flex items-center justify-between gap-2 px-1">
+      <p class="text-xs text-text-muted">{{ t('last_update') }}: {{ lastUpdate }}</p>
+      <UiViewSwitch :model-value="viewMode" @update:model-value="setViewMode" />
     </div>
 
     <!-- Converter empty state -->
@@ -457,7 +457,7 @@ watch(
     <!-- Converter -->
     <div
       v-else
-      class="bg-surface rounded-xl border border-border"
+      class="bg-surface rounded-xl border border-border shadow-sm"
       :class="isCompactView ? 'p-3' : viewMode === 'expanded' ? 'p-3 sm:p-5' : 'p-3 sm:p-4'"
     >
       <div class="flex items-center justify-between" :class="isCompactView ? 'mb-2' : 'mb-3'">
@@ -467,17 +467,15 @@ watch(
         </div>
         <div v-if="!isCompactView" class="flex items-center gap-1">
           <Tooltip :text="t('copy')">
-            <button
+            <button :class="iconBtn"
               @click="copyAllConversion"
-              class="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-surface-secondary transition-colors"
             >
               <Copy :size="14" />
             </button>
           </Tooltip>
           <Tooltip :text="t('reset')">
-            <button
+            <button :class="iconBtn"
               @click="resetConverter()"
-              class="p-1.5 rounded-lg text-text-muted hover:text-primary hover:bg-surface-secondary transition-colors"
             >
               <RotateCcw :size="14" />
             </button>
@@ -492,10 +490,10 @@ watch(
           :key="preset"
           @click="baseAmount = preset"
           :class="[
-            'px-3 py-1 text-xs font-semibold rounded-lg border transition-colors',
+ 'px-3 py-1 text-xs font-semibold rounded-full border transition-colors tabular-nums',
             baseAmount === preset
-              ? 'bg-primary text-white border-primary'
-              : 'bg-surface-secondary text-text-secondary border-border hover:bg-surface hover:border-text-muted',
+              ? 'bg-primary-light text-primary border-primary/40'
+              : 'bg-surface text-text-secondary border-border-strong hover:text-text-primary',
           ]"
         >
           {{ fmtNum(preset) }}
@@ -510,24 +508,22 @@ watch(
         >
           <div class="flex items-start justify-between gap-2 mb-2">
             <div class="min-w-0">
-              <div class="text-sm font-bold text-text-primary leading-tight">
-                <span v-if="flagFor(cur.code)" class="mr-0.5">{{ flagFor(cur.code) }}</span>{{ cur.code }}
+              <div class="text-sm font-semibold text-text-primary leading-tight">
+                <span v-if="flagFor(cur.code)" class="mr-1">{{ flagFor(cur.code) }}</span>{{ cur.code }}
               </div>
               <div class="text-xs text-text-muted truncate">{{ cur.name }}</div>
             </div>
             <div class="flex items-center gap-0.5 shrink-0">
               <Tooltip :text="t('move_up')">
-                <button
+                <button :class="iconBtn"
                   @click="moveConverterUp(cur.id)"
                   :disabled="idx === 0"
-                  class="p-1 rounded text-text-muted hover:text-primary disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                 ><ChevronUp :size="14" /></button>
               </Tooltip>
               <Tooltip :text="t('move_down')">
-                <button
+                <button :class="iconBtn"
                   @click="moveConverterDown(cur.id)"
                   :disabled="idx === converterCurrencies.length - 1"
-                  class="p-1 rounded text-text-muted hover:text-primary disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
                 ><ChevronDown :size="14" /></button>
               </Tooltip>
             </div>
@@ -542,7 +538,7 @@ watch(
               @input="onInput(cur, ($event.target as HTMLInputElement).value)"
               @focus="onFocus(cur, $event.target as HTMLInputElement)"
               @blur="onBlur"
-              class="w-full pl-3 pr-12 py-2.5 text-lg font-bold rounded-lg bg-surface border border-border text-text-primary text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-shadow"
+              class="w-full pl-3 pr-12 py-2.5 text-lg font-semibold rounded-lg bg-surface border border-border text-text-primary text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-shadow"
             />
             <span class="absolute right-3 top-1/2 -translate-y-1/2 text-base font-semibold text-primary pointer-events-none select-none">
               {{ cur.symbol }}
@@ -563,20 +559,17 @@ watch(
 
           <div class="flex items-center justify-end gap-1 mt-2">
             <Tooltip :text="t('add_expense')">
-              <button
+              <button :class="iconBtn"
                 @click="openExpenseForm(cur)"
-                class="p-1.5 rounded-lg transition-all text-text-muted hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
               >
                 <Plus :size="14" />
               </button>
             </Tooltip>
             <Tooltip :text="t('copy')">
-              <button
+              <button :class="[iconBtn, (copiedId === `conv-${cur.id}`
+ ? 'text-success'
+                  : 'text-text-muted hover:text-primary hover:bg-surface')]"
                 @click="copyRow(`${getDisplayValue(cur)} ${cur.code}`, `conv-${cur.id}`)"
-                class="p-1.5 rounded-lg transition-all"
-                :class="copiedId === `conv-${cur.id}`
-                  ? 'text-green-500'
-                  : 'text-text-muted hover:text-primary hover:bg-surface'"
               >
                 <component :is="copiedId === `conv-${cur.id}` ? Check : Copy" :size="14" />
               </button>
@@ -593,23 +586,21 @@ watch(
         >
           <div v-if="!isCompactView" class="flex flex-row sm:flex-col shrink-0">
             <Tooltip :text="t('move_up')">
-              <button
+              <button :class="iconBtn"
                 @click="moveConverterUp(cur.id)"
                 :disabled="idx === 0"
-                class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
               ><ChevronUp :size="14" /></button>
             </Tooltip>
             <Tooltip :text="t('move_down')">
-              <button
+              <button :class="iconBtn"
                 @click="moveConverterDown(cur.id)"
                 :disabled="idx === converterCurrencies.length - 1"
-                class="p-0.5 rounded text-text-muted hover:text-primary disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
               ><ChevronDown :size="14" /></button>
             </Tooltip>
           </div>
           <div class="shrink-0" :class="isCompactView ? 'w-14 sm:w-16' : 'w-14 sm:w-20'">
-            <span class="text-sm font-bold text-text-primary block leading-tight">
-              <span v-if="flagFor(cur.code)" class="mr-0.5">{{ flagFor(cur.code) }}</span>{{ cur.code }}
+            <span class="text-sm font-semibold text-text-primary block leading-tight">
+              <span v-if="flagFor(cur.code)" class="mr-1">{{ flagFor(cur.code) }}</span>{{ cur.code }}
             </span>
             <span class="text-[10px] text-text-muted leading-tight truncate block max-w-14 sm:max-w-none">{{ cur.name }}</span>
           </div>
@@ -623,7 +614,7 @@ watch(
                 @input="onInput(cur, ($event.target as HTMLInputElement).value)"
                 @focus="onFocus(cur, $event.target as HTMLInputElement)"
                 @blur="onBlur"
-                class="w-full pl-3 pr-12 py-2.5 text-lg font-bold rounded-lg bg-surface-secondary border border-border text-text-primary text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-shadow"
+                class="w-full pl-3 pr-12 py-2.5 text-lg font-semibold rounded-lg bg-surface-secondary border border-border text-text-primary text-right tabular-nums focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-shadow"
               />
               <span class="absolute right-3 top-1/2 -translate-y-1/2 text-base font-semibold text-primary pointer-events-none select-none">
                 {{ cur.symbol }}
@@ -644,20 +635,17 @@ watch(
           </div>
           <div v-if="!isCompactView" class="flex flex-row shrink-0 gap-0.5">
             <Tooltip :text="t('add_expense')">
-              <button
+              <button :class="iconBtn"
                 @click="openExpenseForm(cur)"
-                class="p-1 rounded-lg sm:p-1.5 transition-all text-text-muted hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
               >
                 <Plus :size="14" />
               </button>
             </Tooltip>
             <Tooltip :text="t('copy')">
-              <button
+              <button :class="[iconBtn, (copiedId === `conv-${cur.id}`
+ ? 'text-success'
+                  : 'text-text-muted hover:text-primary hover:bg-surface')]"
                 @click="copyRow(`${getDisplayValue(cur)} ${cur.code}`, `conv-${cur.id}`)"
-                class="p-1 rounded-lg sm:p-1.5 transition-all"
-                :class="copiedId === `conv-${cur.id}`
-                  ? 'text-green-500'
-                  : 'text-text-muted hover:text-primary hover:bg-surface'"
               >
                 <component :is="copiedId === `conv-${cur.id}` ? Check : Copy" :size="14" />
               </button>
@@ -669,7 +657,7 @@ watch(
 
     <!-- All rates -->
     <div
-      class="bg-surface rounded-xl border border-border"
+      class="bg-surface rounded-xl border border-border shadow-sm"
       :class="isCompactView ? 'p-3' : viewMode === 'expanded' ? 'p-3 sm:p-5' : 'p-3 sm:p-4'"
     >
       <div class="flex items-center justify-between" :class="isCompactView ? 'mb-2' : 'mb-3'">
@@ -677,23 +665,21 @@ watch(
           <TrendingUp :size="15" class="text-primary" />
           {{ t('all_rates') }}
           <span class="text-xs font-normal text-text-muted">
-            ({{ selectedTargetIds.length }}/{{ otherCurrencies.length }})
+            ({{ listedTargetCount }}/{{ otherCurrencies.length }})
           </span>
         </div>
         <div class="flex items-center gap-1.5">
-          <button
+          <button :class="smBtn"
             @click="selectAllTargets"
-            :disabled="selectedTargetIds.length === otherCurrencies.length"
-            class="px-2 py-0.5 text-[11px] rounded border border-border text-text-secondary hover:bg-surface hover:border-text-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            :disabled="listedTargetCount === otherCurrencies.length"
             :title="t('select_all')"
           >
             <CheckSquare :size="13" class="sm:hidden" />
             <span class="hidden sm:inline">{{ t('select_all') }}</span>
           </button>
-          <button
+          <button :class="smBtn"
             @click="deselectAllTargets"
-            :disabled="selectedTargetIds.length === 0"
-            class="px-2 py-0.5 text-[11px] rounded border border-border text-text-secondary hover:bg-surface hover:border-text-muted disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+            :disabled="listedTargetCount === 0"
             :title="t('deselect_all')"
           >
             <Square :size="13" class="sm:hidden" />
@@ -713,21 +699,21 @@ watch(
             v-model="searchQuery"
             type="text"
             :placeholder="t('search') + '...'"
-            class="w-full pl-8 sm:pl-9 pr-2.5 sm:pr-3 py-1.5 sm:py-2 rounded-lg border border-border bg-surface text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary placeholder:text-text-muted"
+            :class="ui.field({ class: 'pl-8' })"
           />
         </div>
-        <div class="flex items-center gap-0.5 shrink-0">
-          <ArrowUpDown :size="12" class="text-text-muted mr-0.5" />
+        <div class="flex items-center gap-0.5 shrink-0 rounded-lg bg-surface-hover p-0.5">
+          <ArrowUpDown :size="12" class="text-text-muted mx-1" />
           <button
             v-for="opt in rateSortOptions"
             :key="opt.key"
             @click="rateSortBy = opt.key"
             :title="t(opt.labelKey)"
             :class="[
-              'px-1.5 sm:px-2 py-1 text-[10px] sm:text-[11px] rounded border transition-colors inline-flex items-center justify-center gap-1',
+ 'px-1.5 sm:px-2.5 py-1 text-[10px] sm:text-[11px] font-medium rounded-md transition-colors inline-flex items-center justify-center gap-1',
               rateSortBy === opt.key
-                ? 'bg-primary text-white border-primary'
-                : 'bg-surface-secondary text-text-secondary border-border hover:bg-surface hover:border-text-muted',
+                ? 'bg-surface text-text-primary shadow-sm'
+                : 'text-text-muted hover:text-text-primary',
             ]"
           >
             <component :is="getSortIcon(opt.key)" :size="12" class="sm:hidden" />
@@ -745,71 +731,64 @@ watch(
         >
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
-              <div class="text-sm font-bold text-text-primary">
+              <div class="text-sm font-semibold text-text-primary">
                 <span v-if="flagFor(rate.code)" class="mr-0.5">{{ flagFor(rate.code) }}</span>{{ rate.code }}
               </div>
               <div class="text-xs text-text-muted truncate">{{ rate.name }}</div>
             </div>
             <Tooltip :text="rate.enabled ? t('disable') : t('enable')">
-              <button
+              <button :class="[iconBtn, (rate.enabled
+ ? 'text-yellow-500 hover:text-yellow-600'
+                  : 'text-text-muted opacity-40 hover:opacity-70')]"
                 @click="toggleTarget(rate.id)"
-                class="p-1 rounded transition-colors shrink-0"
-                :class="rate.enabled
-                  ? 'text-yellow-500 hover:text-yellow-600'
-                  : 'text-text-muted opacity-40 hover:opacity-70'"
               >
                 <Star :size="14" :fill="rate.enabled ? 'currentColor' : 'none'" />
               </button>
             </Tooltip>
           </div>
-          <div class="mt-2 text-lg font-mono font-semibold text-text-primary tabular-nums">
+          <div class="mt-2 text-lg font-semibold text-text-primary tabular-nums">
             <input
               v-if="editingRateId === rate.id"
               v-model="editingRateValue"
               type="text"
               inputmode="decimal"
               @keydown.enter.prevent="saveRateEdit(rate)"
-              class="w-full px-2 py-1 rounded-md border border-border bg-surface text-base font-mono text-text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              :class="ui.field({ class: 'tabular-nums font-semibold' })"
             />
             <template v-else>{{ rate.rateFormatted }}</template>
           </div>
-          <div class="text-xs font-mono text-text-muted tabular-nums mt-0.5">
+          <div class="text-xs text-text-muted tabular-nums mt-0.5">
             1/{{ rate.inverse }}
           </div>
           <div class="flex justify-end mt-2">
-            <Tooltip v-if="editingRateId !== rate.id" :text="t('save')">
-              <button
+            <Tooltip v-if="editingRateId !== rate.id" :text="t('edit')">
+              <button :class="iconBtn"
                 @click="startRateEdit(rate)"
-                class="p-1.5 rounded-lg transition-all shrink-0 text-text-muted hover:text-primary"
               >
                 <Pencil :size="13" />
               </button>
             </Tooltip>
             <template v-else>
               <Tooltip :text="t('save')">
-                <button
+                <button :class="[iconBtn, 'text-success']"
                   @click="saveRateEdit(rate)"
-                  class="p-1.5 rounded-lg transition-all shrink-0 text-green-600 hover:text-green-700"
                 >
                   <Check :size="13" />
                 </button>
               </Tooltip>
               <Tooltip :text="t('cancel')">
-                <button
+                <button :class="iconBtn"
                   @click="cancelRateEdit"
-                  class="p-1.5 rounded-lg transition-all shrink-0 text-text-muted hover:text-primary"
                 >
                   <X :size="13" />
                 </button>
               </Tooltip>
             </template>
             <Tooltip :text="t('copy')">
-              <button
+              <button :class="[iconBtn, (copiedId === `rate-${rate.id}`
+ ? 'text-success'
+                  : 'text-text-muted hover:text-primary')]"
                 @click="copyRow(`1 ${mainCurrency?.code} = ${rate.rateFormatted} ${rate.code}`, `rate-${rate.id}`)"
-                class="p-1.5 rounded-lg transition-all shrink-0"
-                :class="copiedId === `rate-${rate.id}`
-                  ? 'text-green-500'
-                  : 'text-text-muted hover:text-primary'"
               >
                 <component :is="copiedId === `rate-${rate.id}` ? Check : Copy" :size="13" />
               </button>
@@ -820,25 +799,23 @@ watch(
           {{ t('no_results') }}
         </p>
       </div>
-      <div v-else class="max-h-128 overflow-y-auto -mx-1 px-0.5 sm:px-1">
+      <div v-else class="-mx-1 px-0.5 sm:px-1">
         <div
           v-for="rate in allRates"
           :key="rate.id"
           class="flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-2 py-1.5 sm:py-2 rounded-lg hover:bg-surface-hover transition-colors group border-b border-border/50 last:border-b-0"
         >
           <Tooltip :text="rate.enabled ? t('disable') : t('enable')">
-            <button
+            <button :class="[iconBtn, (rate.enabled
+ ? 'text-yellow-500 hover:text-yellow-600'
+                : 'text-text-muted opacity-25 hover:opacity-60')]"
               @click="toggleTarget(rate.id)"
-              class="p-0.5 rounded transition-colors shrink-0"
-              :class="rate.enabled
-                ? 'text-yellow-500 hover:text-yellow-600'
-                : 'text-text-muted opacity-25 hover:opacity-60'"
             >
               <Star :size="14" :fill="rate.enabled ? 'currentColor' : 'none'" />
             </button>
           </Tooltip>
-          <span class="text-sm font-bold text-text-primary w-14 sm:w-16 shrink-0">
-            <span v-if="flagFor(rate.code)" class="mr-0.5">{{ flagFor(rate.code) }}</span>{{ rate.code }}
+          <span class="flex items-center gap-1.5 text-sm font-semibold text-text-primary w-16 sm:w-20 shrink-0">
+            <span v-if="flagFor(rate.code)" class="text-base leading-none">{{ flagFor(rate.code) }}</span>{{ rate.code }}
           </span>
           <span class="text-xs sm:text-sm text-text-muted flex-1 min-w-0 truncate">{{ rate.name }}</span>
           <input
@@ -847,41 +824,36 @@ watch(
             type="text"
             inputmode="decimal"
             @keydown.enter.prevent="saveRateEdit(rate)"
-            class="w-24 px-2 py-1 rounded-md border border-border bg-surface text-xs sm:text-sm font-mono font-semibold text-text-primary tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
+            :class="ui.field({ class: 'w-28 min-h-7 py-0.5 text-right tabular-nums font-semibold' })"
           />
-          <span v-else class="text-xs sm:text-sm font-mono font-semibold text-text-primary tabular-nums">{{ rate.rateFormatted }}</span>
-          <span class="text-xs font-mono text-text-muted tabular-nums w-18 text-right hidden sm:block">1/{{ rate.inverse }}</span>
-          <Tooltip :text="editingRateId === rate.id ? t('save') : t('save')">
-            <button
+          <span v-else class="text-sm font-semibold text-text-primary tabular-nums">{{ rate.rateFormatted }}</span>
+          <span class="text-[11px] text-text-muted tabular-nums w-32 text-right hidden sm:block truncate">1 {{ rate.code }} = {{ rate.inverse }} {{ mainCurrency?.code }}</span>
+          <Tooltip :text="editingRateId === rate.id ? t('save') : t('edit')">
+            <button :class="iconBtn"
               v-if="editingRateId !== rate.id"
               @click="startRateEdit(rate)"
-              class="p-1 rounded-lg transition-all shrink-0 text-text-muted hover:text-primary"
             >
               <Pencil :size="13" />
             </button>
-            <button
+            <button :class="[iconBtn, 'text-success']"
               v-else
               @click="saveRateEdit(rate)"
-              class="p-1 rounded-lg transition-all shrink-0 text-green-600 hover:text-green-700"
             >
               <Check :size="13" />
             </button>
           </Tooltip>
           <Tooltip v-if="editingRateId === rate.id" :text="t('cancel')">
-            <button
+            <button :class="iconBtn"
               @click="cancelRateEdit"
-              class="p-1 rounded-lg transition-all shrink-0 text-text-muted hover:text-primary"
             >
               <X :size="13" />
             </button>
           </Tooltip>
           <Tooltip v-if="!isCompactView" :text="t('copy')">
-            <button
+            <button :class="[iconBtn, (copiedId === `rate-${rate.id}`
+ ? 'text-success'
+                : 'text-text-muted hover:text-primary')]"
               @click="copyRow(`1 ${mainCurrency?.code} = ${rate.rateFormatted} ${rate.code}`, `rate-${rate.id}`)"
-              class="p-1 rounded-lg transition-all shrink-0"
-              :class="copiedId === `rate-${rate.id}`
-                ? 'text-green-500'
-                : 'text-text-muted hover:text-primary'"
             >
               <component :is="copiedId === `rate-${rate.id}` ? Check : Copy" :size="13" />
             </button>

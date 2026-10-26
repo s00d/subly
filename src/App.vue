@@ -1,9 +1,11 @@
 <script setup lang="ts">
+import { button } from "@/lib/tv";
 import { onMounted, onUnmounted, watch, ref } from "vue";
-import { useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import {
   notificationsEvent,
   type InAppAlert,
+  type LocalNotificationPayload,
 } from "@/services/notificationsClient";
 import {
   initSync,
@@ -31,16 +33,16 @@ import { useAppMetaStore } from "@/stores/appMetaStore";
 import { useCatalogsUsageStore } from "@/stores/catalogsUsageStore";
 import { useNowStore } from "@/stores/nowStore";
 import AppLayout from "@/components/layout/AppLayout.vue";
-import InAppAlerts from "@/components/ui/InAppAlerts.vue";
 import Modal from "@/components/ui/Modal.vue";
 import { importFromSubly } from "@/services/exportClient";
 import { formatErrorForToast } from "@/utils/formatError";
 
 const router = useRouter();
+const route = useRoute();
 const isLoading = ref(true);
 const showBackupRestoreConfirm = ref(false);
 const pendingBackupPath = ref<string | null>(null);
-const { alerts, setAlerts, dismiss, dismissAll } = useAlerts();
+const { setAlerts } = useAlerts();
 const { t } = useI18n();
 const { toast } = useToast();
 let audioCtx: AudioContext | null = null;
@@ -69,7 +71,7 @@ async function refreshAllData() {
   await metaStore.refresh();
   await Promise.all([
     dashboardStore.loadPage(true),
-    subscriptionsStore.loadBrief(subscriptionsStore.currentFilter),
+    subscriptionsStore.loadBrief(),
     expensesStore.loadPage(expensesStore.page, expensesStore.currentFilter),
     expensesStore.refreshSummary(expensesStore.currentFilter),
     calendarStore.reloadCurrentMonth(),
@@ -104,10 +106,12 @@ let unlistenDeepLinks: (() => void) | null = null;
 let unlistenLocalNotifications: (() => void) | null = null;
 let unlistenSingleInstanceDeepLink: (() => void) | null = null;
 let unlistenDataChanged: (() => void) | null = null;
+let unlistenNotificationAlerts: (() => void) | null = null;
 let unlistenBackupOpened: (() => void) | null = null;
-let wakeHandler: (() => void) | null = null;
 let visibilityHandler: (() => void) | null = null;
 let refreshDataTimer: ReturnType<typeof setTimeout> | null = null;
+let lastNotificationCheckAt = 0;
+let notificationCheckInFlight = false;
 const dashboardStore = useDashboardStore();
 const expensesStore = useExpensesStore();
 const subscriptionsStore = useSubscriptionsStore();
@@ -143,6 +147,8 @@ function logUnhandledRejection(event: PromiseRejectionEvent) {
 }
 
 function logWindowError(event: ErrorEvent) {
+  // Benign browser notice (layout settled in a later frame), not an app error.
+  if (event.message?.includes("ResizeObserver loop")) return;
   console.error("[Global] Unhandled runtime error", {
     message: event.message,
     source: event.filename,
@@ -153,14 +159,19 @@ function logWindowError(event: ErrorEvent) {
 }
 
 async function runNotificationCheck() {
+  if (notificationCheckInFlight) return;
+  const now = Date.now();
+  if (now - lastNotificationCheckAt < 5000) return;
+  notificationCheckInFlight = true;
+  lastNotificationCheckAt = now;
   try {
     const result = await notificationsEvent<{ sentCount: number; alerts: InAppAlert[] }>("run_check");
     const data = result.data;
-    if (data.alerts.length > 0) {
-      setAlerts(data.alerts);
-    }
+    setAlerts(data.alerts ?? []);
   } catch (e) {
     console.error("Notification check failed:", e);
+  } finally {
+    notificationCheckInFlight = false;
   }
 }
 
@@ -254,18 +265,32 @@ onMounted(async () => {
   applyTheme();
   applyColorTheme();
 
+  // Listeners first: the startup check below emits `notifications:local` and marks the cycle as
+  // notified, so an event emitted before the listener exists is lost for the day.
+  unlistenNotificationAlerts = await listen<InAppAlert[]>("notifications:alerts", (event) => {
+    setAlerts(event.payload ?? []);
+  });
+  unlistenLocalNotifications = await listen<LocalNotificationPayload>("notifications:local", (event) => {
+    const payload = event.payload;
+    const items = payload?.items ?? [];
+    const body = (payload?.body ?? "").trim();
+    if (!body && items.length === 0) return;
+    if (settings.value?.notificationSound !== false) {
+      playNotificationSoundFrontend();
+    }
+    const itemCount = items.length > 0 ? items.length : 1;
+    if (itemCount > 1) {
+      toast(t("notification_digest_many", { count: itemCount }), "info");
+    } else if (body) {
+      toast(`${payload.title}: ${body}`, "info");
+    }
+  });
+
   await runNotificationCheck();
 
   notificationInterval = setInterval(() => {
     runNotificationCheck();
   }, 30 * 60 * 1000);
-
-  unlistenLocalNotifications = await listen<{ title: string; body: string }>("notifications:local", (event) => {
-    const payload = event.payload;
-    if (!payload?.body) return;
-    playNotificationSoundFrontend();
-    toast(`${payload.title}: ${payload.body}`);
-  });
 
   unlistenDataChanged = await listen<DataChangedEventPayload>("app:data-changed", (event) => {
     const payload = event.payload;
@@ -311,19 +336,16 @@ onMounted(async () => {
 
   await finishBoot();
 
-  wakeHandler = () => {
+  visibilityHandler = () => {
+    if (document.hidden) return;
     nowStore.refresh();
-    runNotificationCheck();
+    void runNotificationCheck();
     checkRemote().catch((e) => {
       const message = formatErrorForToast(e, t);
       syncStatus.error = message;
       console.error("Sync checkRemote failed:", e);
     });
   };
-  visibilityHandler = () => {
-    if (!document.hidden) wakeHandler?.();
-  };
-  window.addEventListener("focus", wakeHandler);
   document.addEventListener("visibilitychange", visibilityHandler);
 
   document.addEventListener("keydown", handleKeyDown);
@@ -357,9 +379,9 @@ onUnmounted(() => {
   if (unlistenSingleInstanceDeepLink) unlistenSingleInstanceDeepLink();
   if (unlistenLocalNotifications) unlistenLocalNotifications();
   if (unlistenDataChanged) unlistenDataChanged();
+  if (unlistenNotificationAlerts) unlistenNotificationAlerts();
   if (unlistenBackupOpened) unlistenBackupOpened();
   if (refreshDataTimer) clearTimeout(refreshDataTimer);
-  if (wakeHandler) window.removeEventListener("focus", wakeHandler);
   if (visibilityHandler) document.removeEventListener("visibilitychange", visibilityHandler);
 });
 
@@ -367,10 +389,13 @@ function handleKeyDown(e: KeyboardEvent) {
   const isMod = e.metaKey || e.ctrlKey;
   if (isMod && !e.shiftKey) {
     switch (e.key) {
+      // Cmd/Ctrl+1…6 in sidebar order
       case "1": e.preventDefault(); router.push("/"); break;
       case "2": e.preventDefault(); router.push("/subscriptions"); break;
-      case "3": e.preventDefault(); router.push("/calendar"); break;
-      case "4": e.preventDefault(); router.push("/settings"); break;
+      case "3": e.preventDefault(); router.push("/expenses"); break;
+      case "4": e.preventDefault(); router.push("/calendar"); break;
+      case "5": e.preventDefault(); router.push("/currencies"); break;
+      case "6": e.preventDefault(); router.push("/settings"); break;
     }
   }
 }
@@ -427,28 +452,20 @@ if (typeof window !== "undefined") {
         <p class="text-xs text-blue-600 dark:text-blue-400 mt-0.5">{{ t('sync_remote_newer_desc') }}</p>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <button
+        <button :class="button({ intent: 'primary', size: 'sm' })"
           @click="handlePullRemote"
           :disabled="syncStatus.syncing"
-          class="px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
         >
           {{ syncStatus.syncing ? t('sync_syncing') : t('sync_pull') }}
         </button>
-        <button
+        <button :class="button({ intent: 'ghost', size: 'sm' })"
           @click="handleDismissSync"
-          class="px-3 py-1.5 rounded-lg text-blue-600 dark:text-blue-400 text-xs font-medium hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
         >
           {{ t('sync_dismiss') }}
         </button>
       </div>
     </div>
 
-    <!-- In-app alerts banner (shown on every page) -->
-    <InAppAlerts
-      :alerts="alerts"
-      @dismiss="dismiss"
-      @dismissAll="dismissAll"
-    />
     <router-view />
   </AppLayout>
   <Modal
@@ -457,19 +474,13 @@ if (typeof window !== "undefined") {
     @close="cancelRestoreBackup"
   >
     <p class="text-sm text-text-muted">
-      Обнаружен файл резервной копии .subly. Восстановить данные из него?
+      {{ t('backup_restore_prompt') }}
     </p>
     <template #footer>
-      <button
-        class="px-4 py-2 rounded-lg border border-border text-text-secondary text-sm font-medium hover:bg-surface-hover"
-        @click="cancelRestoreBackup"
-      >
+      <button :class="button()" @click="cancelRestoreBackup">
         {{ t('cancel') }}
       </button>
-      <button
-        class="px-4 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90"
-        @click="confirmRestoreBackup"
-      >
+      <button :class="button({ intent: 'primary' })" @click="confirmRestoreBackup">
         {{ t('confirm') }}
       </button>
     </template>

@@ -113,7 +113,7 @@ function onContextMenu(e: MouseEvent) {
   <div
     ref="rootEl"
     :class="[
-      mode === 'expanded' ? 'p-3 sm:p-4' : 'flex items-center',
+ mode === 'expanded' ? 'p-3 sm:p-4' : 'flex items-center',
       mode === 'compact' ? 'min-w-0 w-full gap-2 px-3 py-2' : '',
       mode === 'default' ? `min-w-0 w-full gap-2 sm:gap-3 ${ui.listRow()}` : '',
       clickable && mode !== 'expanded'

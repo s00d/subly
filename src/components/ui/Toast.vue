@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from "vue-i18n";
 import { watch } from "vue";
 import { useClipboard } from "@/composables/useClipboard";
 import { CheckCircle, XCircle, Info, AlertTriangle, X, Copy } from "@lucide/vue";
@@ -12,6 +13,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{ close: [] }>();
+const { t } = useI18n();
 
 const icons = {
   success: CheckCircle,
@@ -23,34 +25,45 @@ const icons = {
 let timer: ReturnType<typeof setTimeout> | null = null;
 const { copyToClipboard } = useClipboard();
 
-watch(() => props.show, (val) => {
-  if (timer) { clearTimeout(timer); timer = null; }
-  if (val) {
-    timer = setTimeout(() => emit("close"), props.duration || 4000);
-  }
-});
+watch(
+  () => [props.show, props.message] as const,
+  ([show]) => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    if (show) {
+      timer = setTimeout(() => emit("close"), props.duration || 4000);
+    }
+  },
+);
 
 async function copyMessage() {
   await copyToClipboard(props.message);
 }
 
 const toastTv = tv({
-  base: [
-    "fixed z-[250] flex items-center gap-2.5 px-4 py-3 rounded-lg border shadow-lg",
-    "bottom-20 left-3 right-3 sm:bottom-6 sm:left-auto sm:right-6 sm:max-w-md",
-  ],
+  slots: {
+    root: [
+      "fixed z-[250] flex items-center gap-2.5 pl-3.5 pr-2 py-2.5 rounded-xl border border-border-strong",
+      "bg-surface text-text-primary shadow-lg",
+      "bottom-20 left-3 right-3 sm:bottom-6 sm:left-auto sm:right-6 sm:max-w-sm",
+    ],
+    icon: "shrink-0",
+  },
   variants: {
     type: {
-      success: "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/30 dark:border-green-800 dark:text-green-300",
-      error: "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/30 dark:border-red-800 dark:text-red-300",
-      info: "bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300",
-      warning: "bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/30 dark:border-yellow-800 dark:text-yellow-300",
+      success: { icon: "text-success" },
+      error: { icon: "text-danger" },
+      info: { icon: "text-primary" },
+      warning: { icon: "text-warning" },
     },
   },
   defaultVariants: { type: "info" },
 });
 
-const actionBtnClass = "p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 opacity-60 hover:opacity-100";
+const actionBtnClass =
+  "p-1.5 rounded-md text-text-muted hover:text-text-primary hover:bg-surface-hover transition-colors shrink-0";
 </script>
 
 <template>
@@ -65,14 +78,14 @@ const actionBtnClass = "p-1 rounded hover:bg-black/10 dark:hover:bg-white/10 tra
     >
       <div
         v-if="show"
-        :class="toastTv({ type: type || 'info' })"
+        :class="toastTv({ type: type || 'info' }).root()"
       >
-        <component :is="icons[type || 'info']" :size="18" class="shrink-0" />
-        <span class="text-sm font-medium flex-1 min-w-0">{{ message }}</span>
-        <button @click="copyMessage" :class="actionBtnClass" title="Copy">
+        <component :is="icons[type || 'info']" :size="17" :class="toastTv({ type: type || 'info' }).icon()" />
+        <span class="text-[13px] font-medium flex-1 min-w-0">{{ message }}</span>
+        <button @click="copyMessage" :class="actionBtnClass" :title="t('copy')" :aria-label="t('copy')">
           <Copy :size="13" />
         </button>
-        <button @click="emit('close')" :class="actionBtnClass" title="Close">
+        <button @click="emit('close')" :class="actionBtnClass" :title="t('close')" :aria-label="t('close')">
           <X :size="14" />
         </button>
       </div>
