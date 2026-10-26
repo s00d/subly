@@ -5,6 +5,35 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.7] - 2026-10-26
+
+### Added
+
+- **Redesigned UI** — one control system (36px buttons/fields, pressed state, labelled primary header action), expressive dashboard KPIs, tinted cards, gradient letter avatars, settings split into six tabs.
+- **Subscriptions list** — prices in the main currency from the backend (`priceMain`, `monthlyPriceMain`), colored due hints, per-group monthly totals, mobile-friendly rows; cycle progress bars kept in all three view modes.
+- **Expenses** — per-day totals in day headers; calendar month stats strip.
+- **Rate history** is now recorded on every rates update (one point per day, pruned to the configured window).
+- Proper day pluralization (en/ru/de/fr/es/pt).
+
+### Changed
+
+- Dashboard "amount due" counts every projected charge left this month (matches the Calendar).
+- Changing the main currency rebases all rates so the new main is 1.
+- Deleting a currency converts amounts into the main currency instead of relabelling them.
+- Renaming a tag updates it in all subscriptions and expenses.
+- Identical rates from the provider are a successful no-op (no error, no 30-minute re-fetch loop).
+
+### Fixed
+
+- Desktop notifications: no burst after renewal, "N days before" reminders delivered; mobile scheduling fallback.
+- Sync connectors: no auto-push over an empty remote, HTTP timeouts, WebDAV MOVE fallback/redirects, 401 mapping, OneDrive direct PUT, Google Drive `trashed=false`.
+- Dashboard budget ignored the Budget setting; over-budget state never showed.
+- Subscriptions page filter leaked into the Calendar; price sort ignored currency; stale selections in batch actions.
+- Expenses: empty trailing page after delete, duplicates on the wrong day, stale catalogs, duplicated default names.
+- Subscription form accepted frequency 0/blank and blank price; manual payment records were not validated.
+- Converter parsed "1,5" as 15; "Update now" did not refresh the page; settings sections reverted the main currency.
+- Calendar week view jumped to the wrong week across months; settings deep links missed usage counts; unsaved AI provider leaked to other pages.
+
 ## [1.0.6] - 2026-07-06
 
 ### Added
@@ -263,6 +292,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.1] - 2026-02-11
 ## [0.1.0] - 2026-02-11
 
+[1.0.7]: https://github.com/s00d/subly/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/s00d/subly/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/s00d/subly/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/s00d/subly/compare/v1.0.3...v1.0.4
