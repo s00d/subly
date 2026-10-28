@@ -5522,6 +5522,7 @@ dependencies = [
  "image",
  "jni",
  "libc",
+ "ndk-context",
  "objc2",
  "objc2-foundation",
  "openssl-sys",

@@ -83,7 +83,17 @@ function dismiss() {
   visible.value = false;
 }
 
+// A tap fires compat mouseenter + focusin; without this the bubble lingers after every tap.
+let lastTouchAt = 0;
+const TOUCH_COMPAT_MS = 1000;
+
+function showFromPointerOrFocus() {
+  if (Date.now() - lastTouchAt < TOUCH_COMPAT_MS) return;
+  show();
+}
+
 function onTouchStart() {
+  lastTouchAt = Date.now();
   longPressTimeout = setTimeout(() => {
     show();
     autoHideTimeout = setTimeout(dismiss, AUTO_HIDE_MS);
@@ -91,6 +101,7 @@ function onTouchStart() {
 }
 
 function onTouchEnd() {
+  lastTouchAt = Date.now();
   if (longPressTimeout) { clearTimeout(longPressTimeout); longPressTimeout = null; }
 }
 
@@ -154,9 +165,9 @@ const slots = tooltipTv({ position: props.position || "top" });
   <div
     ref="triggerRef"
     :class="slots.trigger()"
-    @mouseenter="show"
+    @mouseenter="showFromPointerOrFocus"
     @mouseleave="hide"
-    @focusin="show"
+    @focusin="showFromPointerOrFocus"
     @focusout="hide"
     @touchstart.passive="onTouchStart"
     @touchend.passive="onTouchEnd"

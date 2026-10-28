@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.8] - 2026-10-28
+
+### Fixed
+
+- **Android: app stuck on the splash screen** — the keyring store panicked ("android context was not initialized") because nothing registered the app Context with `ndk-context`; the panic poisoned the state lock so every command failed.
+- **Android: crash on widget refresh** — `WidgetSnapshotNotifier` was looked up from a Rust thread with the system class loader (`ClassNotFoundException`); the class is now resolved once on the UI thread.
+- **Android: header under the status bar** — content is kept inside the system bars (and above the keyboard) on WebViews that report zero safe-area insets.
+- Dashboard spending trend no longer adds today's subscriptions to months before they started or after they were cancelled.
+- Tooltips no longer stay on screen after a tap on touch devices.
+
 ## [1.0.7] - 2026-10-26
 
 ### Added
@@ -294,6 +304,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.1] - 2026-02-11
 ## [0.1.0] - 2026-02-11
 
+[1.0.8]: https://github.com/s00d/subly/compare/v1.0.7...v1.0.8
 [1.0.7]: https://github.com/s00d/subly/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/s00d/subly/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/s00d/subly/compare/v1.0.4...v1.0.5

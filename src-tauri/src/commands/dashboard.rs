@@ -796,14 +796,28 @@ fn build_dashboard_trends(data: &crate::AppDataDoc, now: chrono::NaiveDate) -> D
     });
 
     let active_subs = data.subscriptions.iter().filter(|s| !s.inactive).collect::<Vec<_>>();
-    let monthly_subs_total: Decimal = active_subs
-        .iter()
-        .map(|s| crate::price_per_month(s.cycle, s.frequency, crate::convert_to_main(s.price, &s.currency_id, &rates)))
-        .sum();
     let mut spending_history = Vec::new();
     for back in (0..6).rev() {
         let (y, m) = shift_calendar_month(now.year(), now.month(), -back);
         let anchor = chrono::NaiveDate::from_ymd_opt(y, m, 1).unwrap();
+        let (ny, nm) = shift_calendar_month(y, m, 1);
+        let month_end = chrono::NaiveDate::from_ymd_opt(ny, nm, 1).unwrap().pred_opt().unwrap();
+        // A subscription only costs money in months it was running: started by month end and
+        // not cancelled before the month began (inactive ones need a cancellation date to count).
+        let monthly_subs_total: Decimal = data
+            .subscriptions
+            .iter()
+            .filter(|s| {
+                let started = parse_date_ymd(&s.start_date).is_none_or(|d| d <= month_end);
+                let cancel = s.cancellation_date.as_deref().and_then(parse_date_ymd);
+                let running = match cancel {
+                    Some(c) => c >= anchor,
+                    None => !s.inactive,
+                };
+                started && running
+            })
+            .map(|s| crate::price_per_month(s.cycle, s.frequency, crate::convert_to_main(s.price, &s.currency_id, &rates)))
+            .sum();
         let expenses_total: Decimal = data
             .expenses
             .iter()
@@ -1031,5 +1045,34 @@ mod comparison_tests {
         let s = build_dashboard_summary(&doc, today);
         // 11, 18, 25 May; main currency (rate 1).
         assert_eq!(s.amount_due_this_month, Decimal::from(30));
+    }
+
+    #[test]
+    fn spending_history_skips_months_before_start_and_after_cancel() {
+        let mut doc = doc_with_rate_two();
+        let base = crate::test_support::doc_with_restart_sensitive_fields().expect("doc").subscriptions.last().cloned().expect("sub");
+        let monthly = |id: &str, start: &str, cancel: Option<&str>, inactive: bool| crate::models::SubscriptionDoc {
+            id: id.into(),
+            price: Decimal::from(10),
+            currency_id: doc.currencies[0].id.clone(),
+            cycle: 3,
+            frequency: 1,
+            start_date: start.into(),
+            cancellation_date: cancel.map(Into::into),
+            inactive,
+            ..base.clone()
+        };
+        doc.subscriptions = vec![
+            monthly("new", "2026-04-20", None, false),
+            monthly("gone", "2025-01-01", Some("2026-02-15"), true),
+        ];
+        doc.expenses.clear();
+        let t = build_dashboard_trends(&doc, chrono::NaiveDate::from_ymd_opt(2026, 5, 10).unwrap());
+        let per_month = |m0: u32| t.spending_history.iter().find(|h| h.month == m0).unwrap().amount;
+        let per_month_new = Decimal::from(10); // monthly cycle, main currency
+        assert_eq!(per_month(0), per_month_new, "Jan: only the cancelled one ran");
+        assert_eq!(per_month(1), per_month_new, "Feb: cancelled mid-month still counts");
+        assert_eq!(per_month(2), Decimal::ZERO, "Mar: nothing running");
+        assert_eq!(per_month(3), per_month_new, "Apr: new one started");
     }
 }

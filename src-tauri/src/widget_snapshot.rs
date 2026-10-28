@@ -386,7 +386,7 @@ mod ios_impl {
 #[cfg(target_os = "android")]
 mod android_impl {
     use super::shared::SnapshotJob;
-    use jni::objects::JClass;
+    use jni::objects::{GlobalRef, JClass, JObject};
     use jni::sys::{jint, JNI_VERSION_1_6};
     use jni::{JNIEnv, JavaVM};
     use std::path::PathBuf;
@@ -394,22 +394,25 @@ mod android_impl {
     use tauri::Manager;
 
     static JAVA_VM: OnceLock<JavaVM> = OnceLock::new();
-
-    pub fn store_java_vm(vm: JavaVM) {
-        let _ = JAVA_VM.set(vm);
-    }
+    /// Resolved on the UI thread: `find_class` on a Rust-spawned thread uses the
+    /// system class loader, misses app classes and leaves a pending exception
+    /// that aborts the process when the thread detaches.
+    static NOTIFIER_CLASS: OnceLock<GlobalRef> = OnceLock::new();
 
     pub fn notify_widgets_updated() {
-        let Some(vm) = JAVA_VM.get() else {
+        let (Some(vm), Some(class)) = (JAVA_VM.get(), NOTIFIER_CLASS.get()) else {
             return;
         };
         let Ok(mut env) = vm.attach_current_thread() else {
             return;
         };
-        let Ok(class) = env.find_class("com/s00d/subly/widget/WidgetSnapshotNotifier") else {
-            return;
-        };
-        let _ = env.call_static_method(class, "notifySnapshotUpdated", "()V", &[]);
+        let class: &JClass = class.as_obj().into();
+        if env
+            .call_static_method(class, "notifySnapshotUpdated", "()V", &[])
+            .is_err()
+        {
+            let _ = env.exception_clear();
+        }
     }
 
     /// Tauri `app_local_data_dir()` on Android resolves to `Context.getDataDir()`
@@ -482,18 +485,52 @@ mod android_impl {
         );
     }
 
+    /// The keyring store panics on first use ("android context was not initialized")
+    /// unless the application Context is registered with ndk-context.
+    fn init_ndk_context(env: &mut JNIEnv, activity: &JObject, vm: &JavaVM) {
+        static APP_CONTEXT: OnceLock<GlobalRef> = OnceLock::new();
+        if APP_CONTEXT.get().is_some() {
+            return;
+        }
+        let Ok(ctx) = env
+            .call_method(activity, "getApplicationContext", "()Landroid/content/Context;", &[])
+            .and_then(|v| v.l())
+        else {
+            let _ = env.exception_clear();
+            return;
+        };
+        let Ok(global) = env.new_global_ref(ctx) else {
+            return;
+        };
+        unsafe {
+            ndk_context::initialize_android_context(
+                vm.get_java_vm_pointer().cast(),
+                global.as_obj().as_raw().cast(),
+            );
+        }
+        let _ = APP_CONTEXT.set(global);
+    }
+
     #[no_mangle]
     pub extern "system" fn Java_com_s00d_subly_MainActivity_nativeInitWidgetBridge(
-        env: JNIEnv,
-        _class: JClass,
+        mut env: JNIEnv,
+        this: JObject,
     ) -> jint {
-        match env.get_java_vm() {
-            Ok(vm) => {
-                store_java_vm(vm);
-                JNI_VERSION_1_6
-            }
-            Err(_) => JNI_VERSION_1_6,
+        if let Ok(vm) = env.get_java_vm() {
+            init_ndk_context(&mut env, &this, &vm);
+            let _ = JAVA_VM.set(vm);
         }
+        match env.find_class("com/s00d/subly/widget/WidgetSnapshotNotifier") {
+            Ok(class) => {
+                if let Ok(global) = env.new_global_ref(class) {
+                    let _ = NOTIFIER_CLASS.set(global);
+                }
+            }
+            Err(_) => {
+                let _ = env.exception_clear();
+            }
+        }
+        JNI_VERSION_1_6
     }
 }
 
