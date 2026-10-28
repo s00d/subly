@@ -217,10 +217,10 @@ jobs:
               const src=fs.readFileSync('CHANGELOG.md','utf8');
               const m=src.match(/^##\s+.*\n([\s\S]*?)(?:^##\s+|\Z)/m);
               const body=(m?m[1]:src).trim().slice(0,500);
-              fs.writeFileSync(process.env.RUNNER_TEMP + '/whatsnew/whatsnew-en-US.txt', body || 'Bug fixes and improvements.');
+              fs.writeFileSync(process.env.RUNNER_TEMP + '/whatsnew/whatsnew-en-US', body || 'Bug fixes and improvements.');
             "
           else
-            echo "Bug fixes and improvements." > "$RUNNER_TEMP/whatsnew/whatsnew-en-US.txt"
+            echo "Bug fixes and improvements." > "$RUNNER_TEMP/whatsnew/whatsnew-en-US"
           fi
           echo "dir=$RUNNER_TEMP/whatsnew" >> "$GITHUB_OUTPUT"
 
