@@ -716,5 +716,7 @@
   "ai_smart_touch_upload_sub": "点按从相册或文件选择；支持收据、PDF、表格、截图（与电脑端相同格式）。",
   "sync_icloud_materializing": "iCloud 仍在下载同步文件。请在 Wi‑Fi 下等待几秒，打开「文件」→ Subly，然后再次尝试下载并应用。",
   "sync_pull_legacy_format": "云端文件为旧版 JSON 格式 (subly-sync-v1.json)。请在所有设备更新 Subly 后重新上传以创建 subly-sync-v2.sublysync。",
-  "sync_icloud_not_signed_in": "请在此设备登录 Apple ID（设置 → Apple ID），开启 iCloud 云盘后再次点击连接。"
+  "sync_icloud_not_signed_in": "请在此设备登录 Apple ID（设置 → Apple ID），开启 iCloud 云盘后再次点击连接。",
+  "subscriptions_count": "{n} 个订阅",
+  "expenses_count": "{n} 笔支出"
 }

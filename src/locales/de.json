@@ -716,5 +716,7 @@
   "ai_smart_touch_upload_sub": "Tippen, um Foto oder Datei zu wählen — Belege, PDFs, Tabellen, Screenshots (gleiche Formate wie am PC).",
   "sync_icloud_materializing": "iCloud lädt die Sync-Datei noch herunter. Warten Sie einige Sekunden im WLAN, öffnen Sie Dateien → Subly und versuchen Sie Herunterladen & Anwenden erneut.",
   "sync_pull_legacy_format": "Die Cloud-Datei nutzt das alte JSON-Format (subly-sync-v1.json). Aktualisieren Sie Subly auf allen Geräten und laden Sie erneut in die Cloud hoch, um subly-sync-v2.sublysync zu erstellen.",
-  "sync_icloud_not_signed_in": "Melden Sie sich auf diesem Gerät bei iCloud an (Einstellungen → Apple-ID), aktivieren Sie iCloud Drive und tippen Sie erneut auf Verbinden."
+  "sync_icloud_not_signed_in": "Melden Sie sich auf diesem Gerät bei iCloud an (Einstellungen → Apple-ID), aktivieren Sie iCloud Drive und tippen Sie erneut auf Verbinden.",
+  "subscriptions_count": "{n} Abonnement | {n} Abonnements",
+  "expenses_count": "{n} Ausgabe | {n} Ausgaben"
 }

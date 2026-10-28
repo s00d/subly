@@ -716,5 +716,7 @@
   "ai_smart_touch_upload_sub": "Dokunarak fotoğraf veya dosya seçin — fiş, PDF, tablo, ekran görüntüsü (masaüstüyle aynı türler).",
   "sync_icloud_materializing": "iCloud senkron dosyasını hâlâ indiriyor. Wi‑Fi’de birkaç saniye bekleyin, Dosyalar → Subly’yi açın ve İndir ve Uygula’yı tekrar deneyin.",
   "sync_pull_legacy_format": "Bulut dosyası eski JSON biçimini (subly-sync-v1.json) kullanıyor. Tüm cihazlarda Subly’yi güncelleyin ve subly-sync-v2.sublysync oluşturmak için tekrar yükleyin.",
-  "sync_icloud_not_signed_in": "Bu cihazda iCloud’a giriş yapın (Ayarlar → Apple Kimliği), iCloud Drive’ı açın ve tekrar Bağlan’a dokunun."
+  "sync_icloud_not_signed_in": "Bu cihazda iCloud’a giriş yapın (Ayarlar → Apple Kimliği), iCloud Drive’ı açın ve tekrar Bağlan’a dokunun.",
+  "subscriptions_count": "{n} abonelik",
+  "expenses_count": "{n} harcama"
 }

@@ -716,5 +716,7 @@
   "ai_smart_touch_upload_sub": "Toca para elegir foto o archivo: recibos, PDF, hojas, capturas (mismos formatos que en el ordenador).",
   "sync_icloud_materializing": "iCloud aún está descargando el archivo de sincronización. Espere unos segundos en Wi‑Fi, abra Archivos → Subly e intente Descargar y aplicar de nuevo.",
   "sync_pull_legacy_format": "El archivo en la nube usa el formato JSON antiguo (subly-sync-v1.json). Actualice Subly en todos los dispositivos y suba de nuevo para crear subly-sync-v2.sublysync.",
-  "sync_icloud_not_signed_in": "Inicie sesión en iCloud en este dispositivo (Ajustes → Apple ID), active iCloud Drive y pulse Conectar de nuevo."
+  "sync_icloud_not_signed_in": "Inicie sesión en iCloud en este dispositivo (Ajustes → Apple ID), active iCloud Drive y pulse Conectar de nuevo.",
+  "subscriptions_count": "{n} suscripción | {n} suscripciones",
+  "expenses_count": "{n} gasto | {n} gastos"
 }

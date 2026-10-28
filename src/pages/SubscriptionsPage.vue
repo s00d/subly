@@ -863,7 +863,7 @@ async function loadInitial() {
       <div class="flex items-end justify-between px-1 pb-3">
         <div class="flex items-center gap-1.5 text-xs text-text-muted">
           <CircleDollarSign :size="14" />
-          <span>{{ filteredSubscriptions.length }} {{ t('subscriptions').toLowerCase() }}</span>
+          <span>{{ t('subscriptions_count', { n: filteredSubscriptions.length }, filteredSubscriptions.length) }}</span>
         </div>
         <div class="text-xl font-semibold text-text-primary tabular-nums tracking-[-0.02em]">
           {{ fmt(totalSubscriptionsAmount, subscriptionsSummaryCurrencyId) }}

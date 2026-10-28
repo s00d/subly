@@ -805,5 +805,7 @@
   "sync_disconnect_confirm": "Stop syncing with this cloud? Data on this device and in the cloud stays as is.",
   "export_import_info_subly": "Back up all your data to a .subly archive, or restore it from one. Importing replaces the current data.",
   "previous_page": "Previous page",
-  "next_page": "Next page"
+  "next_page": "Next page",
+  "subscriptions_count": "{n} subscription | {n} subscriptions",
+  "expenses_count": "{n} expense | {n} expenses"
 }

@@ -705,7 +705,7 @@ async function fetchPage(page?: number, newFilter?: ExpenseFilter) {
     <div class="flex items-end justify-between px-1 pb-3">
       <div class="flex items-center gap-1.5 text-xs text-text-muted">
         <Wallet :size="14" />
-        <span>{{ totalCount }} {{ t('expenses').toLowerCase() }}</span>
+        <span>{{ t('expenses_count', { n: totalCount }, totalCount) }}</span>
       </div>
       <div class="text-xl font-semibold text-text-primary tabular-nums tracking-[-0.02em]">
         {{ fmtCurrency(totalFiltered, mainCurrencyCode) }}
