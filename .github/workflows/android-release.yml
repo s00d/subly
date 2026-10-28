@@ -150,7 +150,12 @@ jobs:
             echo "No APK found under src-tauri/gen/android/app/build/outputs/apk/"
             exit 1
           fi
-          APK_NAME="subly-android-${GITHUB_REF_NAME:-manual}.apk"
+          # Manual runs from a branch still attach to v<package version>, so name the file after it.
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            APK_NAME="subly-android-${GITHUB_REF_NAME}.apk"
+          else
+            APK_NAME="subly-android-v$(node -p "require('./package.json').version").apk"
+          fi
           cp "$APK_PATH" "$RUNNER_TEMP/$APK_NAME"
           echo "apk_path=$RUNNER_TEMP/$APK_NAME" >> "$GITHUB_OUTPUT"
           echo "apk_name=$APK_NAME" >> "$GITHUB_OUTPUT"
