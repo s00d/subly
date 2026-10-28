@@ -83,6 +83,22 @@ Draft "What's New" from git: `asc release-notes generate --since-tag vPREV`. Kee
 
 **Not covered by the public API** (use the web UI or `asc web`, and confirm with the owner): Sales and Trends drill-down by country, some age-rating questionnaire changes. `asc capabilities` lists what is CLI, web-only or API-limited.
 
+## Google Play (`gplay` CLI)
+
+[`gplay`](https://gplay.sh) (Homebrew) drives the Play Developer API; service account is stored in the keyring (`gplay auth doctor`). Package `com.s00d.subly`, personal developer account: production access needs a closed test (track `alpha`) with **≥ 12 testers for 14 days**, then "Apply for production" in the Console.
+
+```bash
+gplay tracks list --package com.s00d.subly
+gplay metadata pull --package com.s00d.subly --dir <dir>          # en-US + ru-RU texts
+gplay metadata apply --package com.s00d.subly --dir <dir> --dry-run   # then --confirm
+gplay metadata images apply --package com.s00d.subly --dir <dir> \
+  --type phoneScreenshots --type sevenInchScreenshots --type tenInchScreenshots --prune --dry-run
+gplay releases upload app.aab --package com.s00d.subly --track alpha --release-name X.Y.Z \
+  --release-notes-dir <dir-with-en-US.txt,ru-RU.txt> --draft --confirm
+```
+
+Known quirks (gplay 2.3.2): non-draft uploads fail with "COMPLETED release must not have fraction" — upload `--draft`, then roll out in the Console; `images list/pull` fail on `promoGraphic`, so always pass `--type`; any committed edit can reset the contact email/website — re-check with `gplay apps details view` and fix with `gplay apps details set`. Prices for a paid app are Console-only (Monetize → App pricing). Screenshot tree: `<locale>/images/<type>/NN.png`; repo copies in `store-assets/google_play/` (en) and `store-assets/google_play/ru/`.
+
 ## Doc agents
 
 Provisioning: `doc-capture-existing-project` skill → `.cursor/agents/doc-graph-scan.md`, `doc-capture.md`.
