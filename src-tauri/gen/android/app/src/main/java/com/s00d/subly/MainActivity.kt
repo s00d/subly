@@ -1,7 +1,6 @@
 package com.s00d.subly
 
 import android.os.Bundle
-import androidx.activity.enableEdgeToEdge
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -19,7 +18,9 @@ class MainActivity : TauriActivity() {
 
   override fun onCreate(savedInstanceState: Bundle?) {
     installSplashScreen()
-    enableEdgeToEdge()
+    // No enableEdgeToEdge(): it calls Window.setStatusBarColor/setNavigationBarColor, which Play
+    // flags as unsupported on Android 15. Edge-to-edge is enforced there anyway (targetSdk 36),
+    // and the insets listener below keeps content inside the system bars.
     // Before super.onCreate: Tauri setup may touch the keyring, which needs ndk-context.
     nativeInitWidgetBridge()
     super.onCreate(savedInstanceState)

@@ -71,6 +71,9 @@ android {
         }
         getByName("release") {
             isMinifyEnabled = true
+            // Drops unused Material layouts, so R8 no longer keeps MaterialDatePicker
+            // (its Window.setStatusBarColor call is flagged by Play for Android 15).
+            isShrinkResources = true
             proguardFiles(
                 *fileTree(".") { include("**/*.pro") }
                     .plus(getDefaultProguardFile("proguard-android-optimize.txt"))
@@ -111,14 +114,14 @@ dependencies {
     implementation(composeBom)
     implementation("androidx.compose.runtime:runtime")
     implementation("androidx.compose.ui:ui")
-    implementation("androidx.glance:glance-appwidget:1.1.0")
-    implementation("androidx.glance:glance-material3:1.1.0")
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("androidx.glance:glance-material3:1.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("androidx.webkit:webkit:1.14.0")
     implementation("androidx.appcompat:appcompat:1.7.1")
-    implementation("androidx.activity:activity-ktx:1.10.1")
-    implementation("androidx.core:core-splashscreen:1.0.1")
-    implementation("com.google.android.material:material:1.12.0")
+    implementation("androidx.activity:activity-ktx:1.12.4")
+    implementation("androidx.core:core-splashscreen:1.2.0")
+    implementation("com.google.android.material:material:1.13.0")
     androidTestImplementation("androidx.test.ext:junit:1.1.4")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.0")
 }
